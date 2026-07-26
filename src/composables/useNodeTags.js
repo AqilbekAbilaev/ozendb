@@ -5,8 +5,8 @@ import { invoke } from '@tauri-apps/api/core'
 // node key to a colour and drives the coloured dot shown in the sidebar and on tabs.
 // Connection tags persist on the connection config (conn.tag, restored via
 // list_connections); database/collection tags live in the dedicated node-tag store keyed
-// by tree path. `showToast` is injected so the composable stays UI-agnostic.
-export function useNodeTags({ showToast }) {
+// by tree path.
+export function useNodeTags() {
   const tagOverrides = ref({})
 
   // Restore persisted database/collection colour tags so they survive a restart.
@@ -49,7 +49,6 @@ export function useNodeTags({ showToast }) {
       tagOverrides.value = pruned
       try { await invoke('clear_node_tags_under', { prefix: clearPrefix }) } catch (_) {}
     }
-    showToast('Color tag updated')
   }
 
   return {

@@ -200,7 +200,7 @@ function showToast(msg) {
 // component that needs it (see useToast) rather than bubbled up as a `toast` event.
 provide('showToast', showToast)
 
-const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags({ showToast: showToast })
+const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags()
 
 const {
   openExportWizard,
