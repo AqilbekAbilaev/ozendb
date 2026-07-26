@@ -38,6 +38,9 @@ export function useQueryRunner({ tabs, showToast }) {
     tab.runError = null
     tab.runErrorCode = null
     tab.cancelled = false
+    // A new run invalidates any count shown on the footer's Count Documents button,
+    // so it reverts to the plain label until the user counts again.
+    tab.countShown = false
     const runId = newRunId()
     tab.runId = runId
     const t0 = Date.now()
@@ -93,6 +96,9 @@ export function useQueryRunner({ tabs, showToast }) {
     tab.runError = null
     tab.runErrorCode = null
     tab.cancelled = false
+    // A new run invalidates any count shown on the footer's Count Documents button,
+    // so it reverts to the plain label until the user counts again.
+    tab.countShown = false
     const runId = newRunId()
     tab.runId = runId
     const t0 = Date.now()

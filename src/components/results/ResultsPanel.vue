@@ -17,6 +17,7 @@ import QueryCodeView from './QueryCodeView.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
+import ContextMenu from '../base/ContextMenu.vue'
 import TabStrip from '../base/TabStrip.vue'
 import Resizer from '../base/Resizer.vue'
 import FieldError from '../base/FieldError.vue'
@@ -120,12 +121,20 @@ async function goLast() {
 
 async function countDocuments() {
   const tab = props.activeTab
-  if (!tab || isCountDisabled.value) return
+  // Ignore clicks while a count is already in flight: on a large collection each
+  // count is a heavy server op, so this stops rapid clicks from stacking counts
+  // (and sidesteps out-of-order results — only one runs at a time).
+  if (!tab || isCountDisabled.value || tab.isCounting) return
+  tab.isCounting = true
   try {
-    const total = await fetchCount(tab)
-    showToast(`${total.toLocaleString()} document${total !== 1 ? 's' : ''} match this query`)
+    await fetchCount(tab)
+    // Show the total on the button itself (see countText); it stays until the
+    // next run clears the flag or the filter changes.
+    tab.countShown = true
   } catch (e) {
     showToast('Count failed: ' + errText(e))
+  } finally {
+    tab.isCounting = false
   }
 }
 
@@ -179,6 +188,43 @@ const rangeText = computed(() => {
 const isCountDisabled = computed(() =>
   props.isAggregate || !props.activeTab || props.activeTab.kind !== 'collection'
 )
+
+// The counted total shown inline on the "Count Documents" button — only while it
+// belongs to the current run (countShown, cleared by the runner on every new run)
+// and still matches the active filter (same validity check as rangeText). Null
+// otherwise, so the label reverts to a plain "Count Documents".
+const countText = computed(() => {
+  const tab = props.activeTab
+  if (!tab || isCountDisabled.value || tab.total == null || !tab.countShown) return null
+  const parsed = parseField(tab.filter || '')
+  const curFilter = parsed.ok ? parsed.ejson : null
+  if (curFilter != null && tab.totalFilter === curFilter) {
+    return tab.total.toLocaleString()
+  }
+  return null
+})
+
+// Right-clicking the shown count offers "Copy value to clipboard" (Studio-3T style).
+// Only armed when there's a count to copy — otherwise the native menu is left alone.
+const countMenu = ref(null)
+function onCountContext(e) {
+  if (countText.value == null) return
+  e.preventDefault()
+  countMenu.value = {
+    x: e.clientX,
+    y: e.clientY,
+    items: [{ label: 'Copy value to clipboard', icon: 'copy' }],
+  }
+}
+function copyCountValue() {
+  const tab = props.activeTab
+  countMenu.value = null
+  // Copy the raw number (no thousands separators) so it pastes cleanly into
+  // spreadsheets or reports.
+  if (tab && tab.total != null) {
+    navigator.clipboard.writeText(String(tab.total)).catch(() => {})
+  }
+}
 
 // Bulk Update / Delete dialogs target a whole collection by query, so they're only
 // meaningful on a collection tab (not aggregate output, not IntelliShell results).
@@ -360,9 +406,15 @@ function toggleReadOnly() {
     <div class="rfooter">
       <span>{{ activeTab.selectedRow >= 0 ? '1 document selected' : '0 documents selected' }}</span>
       <span class="spacer"></span>
-      <span class="fitem"
-        :class="{ clickable: !isCountDisabled, faded: isCountDisabled }"
-        @click="countDocuments"><BaseIcon name="count" :size="14" /> Count Documents</span>
+      <BaseButton
+        variant="ghost"
+        size="sm"
+        icon="count"
+        :icon-size="14"
+        :disabled="isCountDisabled"
+        :active="activeTab.isCounting"
+        @click="countDocuments"
+        @contextmenu="onCountContext"><template v-if="activeTab.isCounting">Counting…</template><template v-else>Count Documents<template v-if="countText != null">: {{ countText }}</template></template></BaseButton>
       <span class="fitem" v-if="activeTab.elapsedMs != null">
         <BaseIcon name="clock" :size="14" />
         {{ (activeTab.elapsedMs / 1000).toFixed(3) }}s
@@ -381,6 +433,14 @@ function toggleReadOnly() {
       @run="emit('run')"
     />
   </div>
+
+  <!-- Right-click "Copy value to clipboard" on the shown count -->
+  <ContextMenu
+    v-if="countMenu"
+    :menu="countMenu"
+    @close="countMenu = null"
+    @pick="copyCountValue"
+  />
 
   <!-- Delete confirmation -->
   <BaseModal v-if="showDeleteConfirm" :title="selectedCount > 1 ? 'Delete Documents' : 'Delete Document'" @close="showDeleteConfirm = false">
@@ -580,9 +640,6 @@ function toggleReadOnly() {
 }
 .spacer { flex: 1; }
 .fitem { display: flex; align-items: center; gap: 6px; }
-.fitem.clickable { cursor: pointer; }
-.fitem.clickable:hover { color: var(--text); }
-.fitem.faded { opacity: .4; cursor: default; }
 
 /* Delete confirm dialog */
 /* Dialog chrome (overlay + titled box + close ✕) lives in BaseModal.vue. The rules

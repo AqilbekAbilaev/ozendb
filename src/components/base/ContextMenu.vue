@@ -14,6 +14,10 @@ const items = computed(() => props.menu.items ?? MENUS[props.menu.type] ?? [])
 const menuEl = ref(null)
 const hoveredItem = ref(null)
 const pos = ref({ x: props.menu.x, y: props.menu.y })
+// A submenu (colour swatches / Server Info list) opens to the right at its parent's
+// height. When the parent sits low in the viewport the flyout would spill off the
+// bottom, so we flip it to grow upward (bottom-anchored) instead.
+const subFlipUp = ref(false)
 
 const COLOR_TAGS = [
   { name: 'none',   color: 'transparent' },
@@ -129,6 +133,18 @@ function onKeyDown(e) {
   }
 }
 
+// Open a submenu, deciding up-front whether it must grow upward. The flyout height
+// is estimated from its row count (6 colour swatches, or the list's items) since we
+// decide before it renders; ~32px/row plus the menu's own padding.
+function openSub(item, e) {
+  hoveredItem.value = item.label
+  if (!item.sub) return
+  const rows = item.sub === 'color' ? 6 : (item.subItems ? item.subItems.length : 0)
+  const estHeight = rows * 32 + 12
+  const top = e.currentTarget.getBoundingClientRect().top
+  subFlipUp.value = top + estHeight > window.innerHeight - 8
+}
+
 function colorLabel(name) {
   if (name === 'none') return 'No Color'
   return name[0].toUpperCase() + name.slice(1)
@@ -151,7 +167,7 @@ function colorLabel(name) {
         v-else
         class="ctx-item"
         :class="{ danger: item.danger }"
-        @mouseenter="hoveredItem = item.label"
+        @mouseenter="openSub(item, $event)"
         @click="item.sub ? undefined : emit('pick', item.value ?? item.label)"
       >
         <span class="ctx-ic">
@@ -167,6 +183,7 @@ function colorLabel(name) {
         <div
           v-if="item.sub === 'list' && hoveredItem === item.label"
           class="ctx-sub"
+          :class="{ up: subFlipUp }"
         >
           <div
             v-for="sub in item.subItems"
@@ -183,6 +200,7 @@ function colorLabel(name) {
         <div
           v-if="item.sub === 'color' && hoveredItem === item.label"
           class="ctx-sub"
+          :class="{ up: subFlipUp }"
         >
           <div
             v-for="tag in COLOR_TAGS"
@@ -220,6 +238,8 @@ function colorLabel(name) {
 .ctx-caret { color: var(--text-faint); margin-left: 8px; }
 .ctx-sep { height: 1px; background: var(--border-soft); margin: 5px 8px; }
 .ctx-sub { position: absolute; left: 100%; top: -5px; margin-left: 2px; min-width: 200px; background: var(--bg-menu); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 18px 48px rgba(0,0,0,.6); padding: 5px; }
+/* Bottom-anchored so the flyout grows upward when the parent item sits low. */
+.ctx-sub.up { top: auto; bottom: -5px; }
 .ctx-color-item { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 5px; font-size: 13px; color: var(--text); }
 .ctx-color-item:hover { background: var(--accent); color: #fff; }
 .ctx-color-sw { width: 14px; height: 14px; border-radius: 4px; flex: none; }
