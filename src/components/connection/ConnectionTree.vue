@@ -6,6 +6,7 @@ import { listen } from '@tauri-apps/api/event'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
+import { colorHex } from '../../utils/tabColor.js'
 
 const props = defineProps({
   activeCollectionKey: String,
@@ -216,16 +217,6 @@ const filtered = computed(() => {
   return connections.value.filter(c => c.name.toLowerCase().includes(q))
 })
 
-// Colour-tag palette — matches the Choose Color submenu and the tab dots.
-// Red uses the theme's --prod token so it stays theme-aware.
-const TAG_HEX = {
-  blue:   '#3b82f6',
-  green:  '#4caf78',
-  purple: '#b07ddb',
-  red:    'var(--prod)',
-  orange: '#e0a35e',
-}
-
 // The colour name explicitly set on a node — its override (keyed by the node's
 // full path) wins, otherwise the persisted fallback tag (connections only).
 // Returns null when the node has no colour of its own (untagged or 'none').
@@ -345,7 +336,7 @@ defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollecti
             'ctx-sel': props.contextActiveNodeKey === conn.id,
             tagged: !!connColor(conn),
           }"
-          :style="connColor(conn) ? { '--tag-color': TAG_HEX[connColor(conn)] } : null"
+          :style="connColor(conn) ? { '--tag-color': colorHex(connColor(conn)) } : null"
           style="padding-left: 6px"
           @click="selectConnection(conn)"
           @contextmenu.prevent="onNodeContext($event, 'connection', conn.name, { connId: conn.id, connName: conn.name })"
@@ -394,7 +385,7 @@ defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollecti
                 locked: !db.accessible,
                 'ctx-sel': props.contextActiveNodeKey === conn.id + '/' + db.name,
               }"
-              :style="dbColor(conn, db.name) ? { '--tag-color': TAG_HEX[dbColor(conn, db.name)] } : null"
+              :style="dbColor(conn, db.name) ? { '--tag-color': colorHex(dbColor(conn, db.name)) } : null"
               style="padding-left: 21px"
               @click="db.accessible ? toggleDatabase(conn, db.name) : setSelection(null)"
               @contextmenu.prevent="onNodeContext($event, 'database', db.name, { connId: conn.id, dbName: db.name })"
@@ -420,7 +411,7 @@ defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollecti
                   'ctx-sel': props.contextActiveNodeKey === collectionKey(conn.id, db.name, coll),
                   tagged: !!collColor(conn, db.name, coll),
                 }"
-                :style="collColor(conn, db.name, coll) ? { '--tag-color': TAG_HEX[collColor(conn, db.name, coll)] } : null"
+                :style="collColor(conn, db.name, coll) ? { '--tag-color': colorHex(collColor(conn, db.name, coll)) } : null"
                 style="padding-left: 51px"
                 @click="highlightCollection(conn, db, coll)"
                 @dblclick="openCollection(conn, db, coll)"

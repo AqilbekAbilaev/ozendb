@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BaseIcon from './BaseIcon.vue'
+import { TAG_PRESETS } from '../../utils/tabColor.js'
 
 const props = defineProps({
   menu: { type: Object, required: true },
@@ -18,15 +19,6 @@ const pos = ref({ x: props.menu.x, y: props.menu.y })
 // height. When the parent sits low in the viewport the flyout would spill off the
 // bottom, so we flip it to grow upward (bottom-anchored) instead.
 const subFlipUp = ref(false)
-
-const COLOR_TAGS = [
-  { name: 'none',   color: 'transparent' },
-  { name: 'blue',   color: '#3b82f6' },
-  { name: 'green',  color: '#4caf78' },
-  { name: 'purple', color: '#b07ddb' },
-  { name: 'red',    color: '#e07a6b' },
-  { name: 'orange', color: '#e0a35e' },
-]
 
 const MENUS = {
   connection: [
@@ -149,6 +141,33 @@ function colorLabel(name) {
   if (name === 'none') return 'No Color'
   return name[0].toUpperCase() + name.slice(1)
 }
+
+// Recently-picked custom colours, kept in the webview's localStorage so they survive
+// a restart without needing a backend store — they're a UI convenience, not app data.
+const RECENT_KEY = 'ozendb.recentColors'
+const RECENT_MAX = 6
+const recentColors = ref(loadRecents())
+function loadRecents() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_KEY))
+    return Array.isArray(parsed) ? parsed : []
+  } catch (_) {
+    return []
+  }
+}
+function rememberColor(hex) {
+  const next = [hex, ...recentColors.value.filter((c) => c !== hex)].slice(0, RECENT_MAX)
+  recentColors.value = next
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)) } catch (_) {}
+}
+
+// A custom colour is picked from the native OS picker; its hex is remembered and
+// applied via the same 'Choose Color:<value>' pick the preset swatches use (a hex
+// has no colon, so it flows through the handler's split untouched).
+function onCustomColor(e) {
+  rememberColor(e.target.value)
+  emit('pick', 'Choose Color:' + e.target.value)
+}
 </script>
 
 <template>
@@ -203,7 +222,7 @@ function colorLabel(name) {
           :class="{ up: subFlipUp }"
         >
           <div
-            v-for="tag in COLOR_TAGS"
+            v-for="tag in TAG_PRESETS"
             :key="tag.name"
             class="ctx-color-item"
             @click.stop="emit('pick', 'Choose Color:' + tag.name)"
@@ -217,6 +236,22 @@ function colorLabel(name) {
             ></span>
             <span>{{ colorLabel(tag.name) }}</span>
           </div>
+          <!-- Recently-picked custom colours, reusable without re-picking. -->
+          <div
+            v-for="hex in recentColors"
+            :key="hex"
+            class="ctx-color-item"
+            @click.stop="emit('pick', 'Choose Color:' + hex)"
+          >
+            <span class="ctx-color-sw" :style="{ background: hex }"></span>
+            <span>{{ hex }}</span>
+          </div>
+          <!-- Custom: the native OS colour picker; its chosen hex is stored as-is. -->
+          <label class="ctx-color-item" @click.stop>
+            <span class="ctx-color-sw ctx-color-custom"></span>
+            <span>Custom…</span>
+            <input type="color" class="ctx-color-input" @change="onCustomColor" />
+          </label>
         </div>
       </div>
     </template>
@@ -243,4 +278,8 @@ function colorLabel(name) {
 .ctx-color-item { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 5px; font-size: 13px; color: var(--text); }
 .ctx-color-item:hover { background: var(--accent); color: #fff; }
 .ctx-color-sw { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+/* "Custom…" swatch: a rainbow signals "pick any colour"; the native input is hidden
+   but still opened by clicking its wrapping label. */
+.ctx-color-custom { background: conic-gradient(from 0deg, #f43f5e, #f59e0b, #eab308, #22c55e, #3b82f6, #a855f7, #f43f5e); }
+.ctx-color-input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
 </style>

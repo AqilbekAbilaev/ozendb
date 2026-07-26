@@ -1,16 +1,37 @@
-// Colour-tag palette + resolution shared by the tab bar and the workspace frame,
-// so a tab's colour and the workspace outline it drives can never drift apart.
-// Matches the tree's Choose Color submenu.
+// Colour-tag palette + resolution shared across the app — the tab bar, the workspace
+// frame, the sidebar tree, the colour picker, and the connection dialog — so a tag's
+// colour can never drift between where it's chosen and where it's shown. Red uses the
+// theme's --prod token so it stays theme-aware (red = production, handle with care).
 export const TAG_COLORS = {
   blue:   '#3b82f6',
   green:  '#4caf78',
   purple: '#b07ddb',
-  red:    '#e07a6b',
+  red:    'var(--prod)',
   orange: '#e0a35e',
 }
 
-export function colorHex(name) {
-  return TAG_COLORS[name] || null
+// Ordered swatches for the colour pickers: "no colour" first, then each preset.
+export const TAG_PRESETS = [
+  { name: 'none',   color: 'transparent' },
+  { name: 'blue',   color: TAG_COLORS.blue },
+  { name: 'green',  color: TAG_COLORS.green },
+  { name: 'purple', color: TAG_COLORS.purple },
+  { name: 'red',    color: TAG_COLORS.red },
+  { name: 'orange', color: TAG_COLORS.orange },
+]
+
+// True when a stored tag value is a raw hex colour (a custom colour) rather than one
+// of the preset names above. Custom colours persist as their own '#rrggbb' string.
+export function isHexColor(value) {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
+}
+
+// Resolve a stored tag value to a CSS colour: a preset name maps to its colour; a raw
+// hex (custom colour) is used as-is; anything else (unset / 'none') has no colour.
+export function colorHex(value) {
+  if (TAG_COLORS[value]) return TAG_COLORS[value]
+  if (isHexColor(value)) return value
+  return null
 }
 
 // The colour name in effect for a tab: a colour set on the tab itself wins;

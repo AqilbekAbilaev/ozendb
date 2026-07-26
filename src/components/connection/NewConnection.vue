@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { emit as tauriEmit } from '@tauri-apps/api/event'
 import { errText } from '../../utils/errors'
+import { TAG_PRESETS } from '../../utils/tabColor.js'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
@@ -291,13 +292,6 @@ const status    = ref(null)
 const isTesting = ref(false)
 const isSaving  = ref(false)
 
-const TAG_COLORS = {
-  none:   null,
-  blue:   '#3b82f6',
-  green:  '#4caf78',
-  purple: '#b07ddb',
-  red:    '#e07a6b',
-}
 
 const TABS = [
   ['server', 'Server'],
@@ -877,14 +871,14 @@ async function save() {
           <FormField v-if="openGroups.Appearance" label="Color tag">
             <div class="tag-row">
               <span
-                v-for="t in ['none','blue','green','purple','red']"
-                :key="t"
+                v-for="p in TAG_PRESETS"
+                :key="p.name"
                 class="tag-swatch"
-                :class="{ on: selectedTag === t }"
-                :style="TAG_COLORS[t]
-                  ? { background: TAG_COLORS[t] }
-                  : { background: 'transparent', border: '1px solid var(--border-soft)' }"
-                @click="selectedTag = t"
+                :class="{ on: selectedTag === p.name }"
+                :style="p.name === 'none'
+                  ? { background: 'transparent', border: '1px solid var(--border-soft)' }
+                  : { background: p.color }"
+                @click="selectedTag = p.name"
               ></span>
             </div>
           </FormField>
