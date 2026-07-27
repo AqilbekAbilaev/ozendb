@@ -590,26 +590,6 @@ pub fn set_menu_context(
     Ok(())
 }
 
-pub fn open_connect_window(app: &AppHandle) {
-    // If the window already exists, just focus it instead of opening a duplicate.
-    if let Some(w) = app.get_webview_window("connect-window") {
-        w.set_focus().ok();
-        return;
-    }
-
-    WebviewWindowBuilder::new(
-        app,
-        "connect-window",
-        WebviewUrl::App("src/pages/connect.html".into()),
-    )
-    .title("New Connection")
-    .inner_size(480.0, 460.0)
-    .resizable(false)
-    .center()
-    .build()
-    .ok();
-}
-
 // The document a pop-out editor window is pointed at. Sent from the frontend as a plain
 // object (camelCase), passed on the first-open URL, and re-broadcast as the
 // `document-target` event when the single window is retargeted at a different document.

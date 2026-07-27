@@ -323,7 +323,7 @@ function indexMenuAction(method, ...args) {
 function handleMenuAction(id) {
   switch (id) {
     // --- direct modals / app ---
-    case 'file:connect':     invoke('open_connect_window').catch(() => {}); return
+    case 'file:connect':     modalsApi.openModal('connectionManager'); return
     case 'file:exit':        appWindow.close(); return
     case 'edit:preferences': preferencesInitialTab.value = 'general'; modalsApi.openModal('preferences'); return
     case 'help:shortcuts':   preferencesInitialTab.value = 'keyboard'; modalsApi.openModal('preferences'); return
