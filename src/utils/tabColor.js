@@ -1,13 +1,14 @@
 // Colour-tag palette + resolution shared across the app — the tab bar, the workspace
 // frame, the sidebar tree, the colour picker, and the connection dialog — so a tag's
-// colour can never drift between where it's chosen and where it's shown. Red uses the
-// theme's --prod token so it stays theme-aware (red = production, handle with care).
+// colour can never drift between where it's chosen and where it's shown. Each preset
+// points at an existing theme token (never a raw hex), so the tags stay theme-aware
+// and in step with the rest of the UI — blue is literally the app accent.
 export const TAG_COLORS = {
-  blue:   '#3b82f6',
-  green:  '#4caf78',
-  purple: '#b07ddb',
+  blue:   'var(--accent)',
+  green:  'var(--green)',
+  purple: 'var(--purple)',
   red:    'var(--prod)',
-  orange: '#e0a35e',
+  orange: 'var(--warn)',
 }
 
 // Ordered swatches for the colour pickers: "no colour" first, then each preset.

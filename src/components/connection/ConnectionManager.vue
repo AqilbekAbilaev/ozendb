@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
+import { colorHex } from '../../utils/tabColor.js'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -32,10 +33,6 @@ const renameText       = ref('')
 const { pendingId: pendingDeleteId, confirmDelete, reset: resetDelete } = useConfirmDelete()
 const ctxMenu          = ref(null)    // { x, y, connId } for the move-to-folder context menu
 
-const TAG_COLORS = {
-  red: '#e07a6b', blue: '#3b82f6', green: '#4caf78', purple: '#b07ddb',
-}
-
 onMounted(async () => {
   connections.value = await invoke('list_connections')
   folders.value = await invoke('list_folders')
@@ -54,7 +51,6 @@ const filtered = computed(() => {
   )
 })
 
-function tagColor(tag) { return TAG_COLORS[tag] ?? null }
 
 function parseDbServer(conn) {
   const hosts = conn.hosts ?? []
@@ -470,14 +466,14 @@ const CM_TOOLS = [
                   <span class="cm-name" :class="{ 'cm-indent': row.indent }">
                     <span
                       class="cm-tag"
-                      :style="tagColor(row.conn.tag)
-                        ? { background: tagColor(row.conn.tag) }
+                      :style="colorHex(row.conn.tag)
+                        ? { background: colorHex(row.conn.tag) }
                         : { background: 'transparent', border: '1px solid var(--border-soft)' }"
                     >
                       <BaseIcon
                         name="dbSmall"
                         :size="12"
-                        :style="tagColor(row.conn.tag) ? { color: '#fff' } : { color: 'var(--text-faint)' }"
+                        :style="colorHex(row.conn.tag) ? { color: '#fff' } : { color: 'var(--text-faint)' }"
                       />
                     </span>
                     {{ row.conn.name }}
