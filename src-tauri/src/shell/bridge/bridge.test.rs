@@ -79,3 +79,80 @@ fn is_write_method_allows_reads() {
 fn is_write_method_rejects_unknown() {
     assert!(!is_write_method("bogusMethod"));
 }
+
+// ── read-only guard: runCommand and writing pipelines ──────────────────────
+
+fn args(values: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    values
+}
+
+#[test]
+fn op_writes_flags_write_methods() {
+    assert!(op_writes("deleteMany", &args(vec![])));
+    assert!(op_writes("drop", &args(vec![])));
+}
+
+#[test]
+fn op_writes_allows_plain_reads() {
+    assert!(!op_writes("find", &args(vec![serde_json::json!({})])));
+    assert!(!op_writes("countDocuments", &args(vec![])));
+    assert!(!op_writes("runCommand", &args(vec![serde_json::json!({ "listCollections": 1 })])));
+    assert!(!op_writes("runCommand", &args(vec![serde_json::json!({ "collStats": "users" })])));
+}
+
+#[test]
+fn op_writes_catches_run_command_writes() {
+    for command in [
+        serde_json::json!({ "drop": "users" }),
+        serde_json::json!({ "dropDatabase": 1 }),
+        serde_json::json!({ "createUser": "bob", "pwd": "x" }),
+        serde_json::json!({ "renameCollection": "a.b", "to": "a.c" }),
+        serde_json::json!({ "collMod": "users" }),
+    ] {
+        assert!(
+            op_writes("runCommand", &args(vec![command.clone()])),
+            "{} should be refused",
+            command
+        );
+    }
+}
+
+#[test]
+fn op_writes_is_not_fooled_by_key_order() {
+    // The command name is only "first" by MongoDB convention, and whether that
+    // survives serialization here depends on a transitive `preserve_order` feature
+    // the crate doesn't control. Build the document both ways round and require the
+    // guard to catch it either way.
+    for (first, second) in [("insert", "documents"), ("documents", "insert")] {
+        let mut map = serde_json::Map::new();
+        map.insert(String::from(first), serde_json::json!("users"));
+        map.insert(String::from(second), serde_json::json!([{ "a": 1 }]));
+        let command = serde_json::Value::Object(map);
+        assert!(
+            op_writes("runCommand", &args(vec![command])),
+            "insert should be refused with {} first",
+            first
+        );
+    }
+}
+
+#[test]
+fn op_writes_catches_writing_pipelines() {
+    let out = serde_json::json!([{ "$match": {} }, { "$out": "copy" }]);
+    let merge = serde_json::json!([{ "$merge": { "into": "copy" } }]);
+    let read = serde_json::json!([{ "$match": {} }, { "$group": { "_id": null } }]);
+
+    assert!(op_writes("aggregate", &args(vec![out.clone()])));
+    assert!(op_writes("aggregate", &args(vec![merge])));
+    assert!(!op_writes("aggregate", &args(vec![read.clone()])));
+
+    // …and the same pipeline smuggled through runCommand.
+    assert!(op_writes(
+        "runCommand",
+        &args(vec![serde_json::json!({ "aggregate": "users", "pipeline": out })])
+    ));
+    assert!(!op_writes(
+        "runCommand",
+        &args(vec![serde_json::json!({ "aggregate": "users", "pipeline": read })])
+    ));
+}

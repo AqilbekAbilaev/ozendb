@@ -204,6 +204,106 @@ pub(crate) fn is_write_method(method: &str) -> bool {
     )
 }
 
+/// Whether one decoded shell operation writes, and so must be refused on a
+/// read-only connection. Three ways an op can write:
+///   - the method itself mutates (`insertOne`, `drop`, …);
+///   - `runCommand` carrying a write command (`{ drop: "users" }`);
+///   - an aggregation whose pipeline ends in `$out` / `$merge`.
+pub(crate) fn op_writes(method: &str, args: &[serde_json::Value]) -> bool {
+    if is_write_method(method) {
+        return true;
+    }
+    if method == "aggregate" {
+        return match args.first() {
+            Some(pipeline) => pipeline_writes(pipeline),
+            None => false,
+        };
+    }
+    if method == "runCommand" {
+        let command = match args.first().and_then(|value| value.as_object()) {
+            Some(map) => map,
+            None => return false,
+        };
+        if command.keys().any(|key| is_write_command(key)) {
+            return true;
+        }
+        // `{ aggregate: "c", pipeline: [ { $out: … } ] }` writes without naming a
+        // write command.
+        return match command.get("pipeline") {
+            Some(pipeline) => pipeline_writes(pipeline),
+            None => false,
+        };
+    }
+    false
+}
+
+/// MongoDB command names that write, for gating `runCommand` on a read-only
+/// connection.
+///
+/// Checked against *every* top-level key of the command document rather than just
+/// the first. MongoDB's rule is that the command name comes first, and today that
+/// survives the trip through `serde_json::Value` — but only because a transitive
+/// dependency (`schemars`, via tauri) turns on `serde_json/preserve_order`, which
+/// this crate neither requests nor controls. If that flag ever goes away the map
+/// falls back to a `BTreeMap` and `{ insert: …, documents: [...] }` would present
+/// `documents` first, silently letting the write through. Scanning every key costs
+/// nothing and cannot be broken that way.
+pub(crate) fn is_write_command(name: &str) -> bool {
+    matches!(
+        name,
+        "insert"
+            | "update"
+            | "delete"
+            | "findAndModify"
+            | "findandmodify"
+            | "drop"
+            | "dropDatabase"
+            | "dropIndexes"
+            | "create"
+            | "createIndexes"
+            | "renameCollection"
+            | "collMod"
+            | "convertToCapped"
+            | "cloneCollectionAsCapped"
+            | "emptycapped"
+            | "compact"
+            | "createUser"
+            | "updateUser"
+            | "dropUser"
+            | "dropAllUsersFromDatabase"
+            | "grantRolesToUser"
+            | "revokeRolesFromUser"
+            | "createRole"
+            | "updateRole"
+            | "dropRole"
+            | "dropAllRolesFromDatabase"
+            | "grantPrivilegesToRole"
+            | "revokePrivilegesFromRole"
+            | "grantRolesToRole"
+            | "revokeRolesFromRole"
+            | "applyOps"
+            | "setParameter"
+            | "shutdown"
+            | "killOp"
+            | "fsync"
+            | "mapReduce"
+            | "mapreduce"
+    )
+}
+
+/// True when an aggregation pipeline ends in a stage that writes. `$out` replaces a
+/// collection and `$merge` upserts into one, so an aggregate is only a read as long
+/// as neither appears — which is why `aggregate` isn't in `is_write_method`.
+pub(crate) fn pipeline_writes(pipeline: &serde_json::Value) -> bool {
+    match pipeline.as_array() {
+        Some(stages) => stages.iter().any(|stage| match stage.as_object() {
+            Some(map) => map.contains_key("$out") || map.contains_key("$merge"),
+            None => false,
+        }),
+        None => false,
+    }
+}
+
 /// Dispatch one decoded `{ collection, method, args }` operation to the driver,
 /// blocking on the async call via the provided runtime handle.
 fn run_op(
@@ -218,18 +318,17 @@ fn run_op(
         None => return Err(String::from("operation has no method")),
     };
 
-    // TODO: read-only — a runCommand write-command denylist (drop/insert/createUser/…) is a fast-follow.
-    if read_only && is_write_method(method) {
-        return Err(String::from(
-            "This connection is read-only — writes are disabled in the shell.",
-        ));
-    }
-
     let empty: Vec<serde_json::Value> = Vec::new();
     let args = match op.get("args").and_then(|value| value.as_array()) {
         Some(value) => value,
         None => &empty,
     };
+
+    if read_only && op_writes(method, args) {
+        return Err(String::from(
+            "This connection is read-only — writes are disabled in the shell.",
+        ));
+    }
     let database = client.database(db_name);
 
     handle.block_on(async {
