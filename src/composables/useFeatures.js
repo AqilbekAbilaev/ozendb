@@ -19,7 +19,7 @@ export function useFeatures({
   // injected functions
   showToast, applyColorTag, menuTarget,
   handleTabAction, openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab,
-  openSchemaTab, openMaskingTab, openSearchTab,
+  openSchemaTab, openSearchTab,
   openExportWizard, openImportWizard, exportDatabase, importDatabase,
 }) {
   const {
@@ -38,7 +38,6 @@ export function useFeatures({
     aggregate: 'Open Aggregation Editor',
     export:    'Export…',
     import:    'Import…',
-    mask:      'Data Masking',
     schema:    'View Schema',
     search:    'Search in…',
   }
@@ -162,7 +161,6 @@ export function useFeatures({
     'Collection History':      modalFeature('history'),
     'Collection Stats':        modalFeature('stats'),
     'Open Map-Reduce':         modalFeature('mapReduce'),
-    'Data Masking':            { requires: 'collection', run: (n) => openMaskingTab(pick(n, COLL)) },
 
     // ── create/edit dialogs (state + seeders owned by useDbActions) ──
     'Add Collection…':         { requires: 'database',   run: openAddCollection },

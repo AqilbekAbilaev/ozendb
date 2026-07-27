@@ -220,7 +220,6 @@ pub fn run() {
             clear_collection_history,
             restore_history,
             translate_sql,
-            export_masked_collection,
             collection_stats,
             duplicate_collection,
             server_info,

@@ -1,4 +1,4 @@
-// Option lists shared by the import, export and masking screens.
+// Option lists shared by the import and export screens.
 // These are the values the Rust side actually accepts, so a screen that hand-rolls
 // its own copy can drift into offering something the backend rejects — or into
 // labelling the same value differently from the screen next door.
@@ -27,16 +27,6 @@ export const EXPORT_FORMATS = [
 // upsert/replace can be added without reworking the UI.
 export const INSERT_MODES = [
   { value: 'insert', label: 'Insert documents' },
-]
-
-// Masking strategies, with 'keep' first as the "don't mask this field" default.
-export const FIELD_STRATEGIES = [
-  { value: 'keep',    label: 'Keep' },
-  { value: 'redact',  label: 'Redact' },
-  { value: 'hash',    label: 'Hash' },
-  { value: 'partial', label: 'Partial' },
-  { value: 'nullify', label: 'Null' },
-  { value: 'remove',  label: 'Remove' },
 ]
 
 // Rows fetched for the preview grids in the import, CSV import and export screens.

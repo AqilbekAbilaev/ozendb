@@ -13,5 +13,4 @@ export const TOOLS = [
   { sep: true },
   { name: 'export',    label: 'Export' },
   { name: 'import',    label: 'Import' },
-  { name: 'mask',      label: 'Data Masking' },
 ]

@@ -206,7 +206,7 @@ fn export_csv_empty_is_a_single_blank_header_line() {
 
 #[test]
 fn export_csv_transform_dropping_a_field_removes_its_column() {
-    // A masking rule that removes `secret`: after the transform no document has the
+    // A transform that removes `secret`: afterwards no document has the
     // key, so it must not appear as a column. The streaming exporter applies the
     // transform in its header pass for exactly this reason; here we apply it first,
     // then assemble.

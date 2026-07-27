@@ -1,7 +1,7 @@
 <script setup>
 // The connection → database → collection breadcrumb every collection-scoped pane
 // shows across its top, optionally followed by a crumb naming the pane itself
-// (Indexes, Schema, Data Masking…). Takes plain strings rather than a tab object
+// (Indexes, Schema…). Takes plain strings rather than a tab object
 // because the tab shapes disagree — collection tabs carry `connectionName` /
 // `collectionName` while the tool panes carry `connName` / `collName`.
 import BaseIcon from './BaseIcon.vue'

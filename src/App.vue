@@ -275,7 +275,7 @@ const { handleContextAction, handleTool, menuNode } = useFeatures({
   showToast: showToast, applyColorTag: applyColorTag, menuTarget: menuTarget,
   handleTabAction: handleTabAction, openCollectionTab: openCollectionTab,
   openShellTab: openShellTab, openIndexManagerTab: openIndexManagerTab, openSqlTab: openSqlTab,
-  openSchemaTab: openSchemaTab, openMaskingTab: openMaskingTab,
+  openSchemaTab: openSchemaTab,
   openSearchTab: openSearchTab,
   openExportWizard: openExportWizard, openImportWizard: openImportWizard,
   exportDatabase: exportDatabase, importDatabase: importDatabase,
@@ -369,7 +369,6 @@ function handleMenuAction(id) {
     case 'coll:open_tab':     handleTool('collection'); return
     case 'coll:export':       handleTool('export', menuTarget('collection')); return
     case 'coll:import':       handleTool('import', menuTarget('collection')); return
-    case 'coll:mask':         handleTool('mask', menuTarget('collection')); return
 
     // --- server / connection scoped ---
     case 'file:server_status': menuNode('Server Status', 'connection'); return
@@ -711,7 +710,7 @@ function openIndexManagerTab({ connId, connName, dbName, collName }) {
   activeTabId.value = id
 }
 
-// Open (or focus) a collection-scoped tool tab — Studio-3T renders Schema, Data Masking,
+// Open (or focus) a collection-scoped tool tab — Studio-3T renders Schema,
 // etc. as workspace tabs rather than modals. Reopening the same tool on the same
 // collection focuses the existing tab.
 function openCollectionToolTab(kind, titlePrefix, { connId, connName, dbName, collName }) {
@@ -726,7 +725,6 @@ function openCollectionToolTab(kind, titlePrefix, { connId, connName, dbName, co
   activeTabId.value = id
 }
 function openSchemaTab(node)   { openCollectionToolTab('schema', 'Schema', node) }
-function openMaskingTab(node)  { openCollectionToolTab('masking', 'Masking', node) }
 
 
 // Search is database-scoped (it scans every collection in one db).

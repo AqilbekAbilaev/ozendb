@@ -15,7 +15,6 @@ pub mod persistence;
 pub mod shell;
 pub mod schema;
 pub mod sql;
-pub mod masking;
 pub mod stats;
 pub mod duplicate;
 pub mod serverinfo;
@@ -38,7 +37,6 @@ pub use persistence::*;
 pub use shell::*;
 pub use schema::*;
 pub use sql::*;
-pub use masking::*;
 pub use stats::*;
 pub use duplicate::*;
 pub use serverinfo::*;
@@ -465,7 +463,7 @@ async fn export_cursor(
 /// Streams a collection to `path` as JSON or CSV without ever holding the whole
 /// result set in memory: documents are read from the cursor one at a time,
 /// transformed, and written straight to a buffered file. `transform` lets the
-/// masked export apply its rules; plain export passes a no-op. Returns the number
+/// caller post-process each document; plain export passes a no-op. Returns the number
 /// of documents written.
 ///
 /// JSON is a single streaming pass. CSV needs the full header union up front, so

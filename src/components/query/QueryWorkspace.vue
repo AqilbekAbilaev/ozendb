@@ -12,7 +12,6 @@ import ResultsPanel from '../results/ResultsPanel.vue'
 const ShellConsole = defineAsyncComponent(() => import('../app/ShellConsole.vue'))
 import IndexManagerPane from './IndexManagerPane.vue'
 import SchemaPane from './SchemaPane.vue'
-import MaskingPane from './MaskingPane.vue'
 import SearchPane from './SearchPane.vue'
 import ImportPane from './ImportPane.vue'
 import CsvImportPane from './CsvImportPane.vue'
@@ -322,8 +321,6 @@ async function applyFromBrowser(entry) {
     <!-- Schema Explorer -->
     <SchemaPane v-else-if="activeTab.kind === 'schema'" :active-tab="activeTab" />
 
-    <!-- Data Masking -->
-    <MaskingPane v-else-if="activeTab.kind === 'masking'" :active-tab="activeTab" />
 
     <!-- Search -->
     <SearchPane v-else-if="activeTab.kind === 'search'" :active-tab="activeTab" />
