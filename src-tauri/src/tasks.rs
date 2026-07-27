@@ -9,13 +9,11 @@ use crate::error::AppError;
 use crate::json_store::JsonStore;
 use chrono::{Datelike, Local, TimeZone};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 
 // Keep only the most recent runs per task so the run log can't grow unbounded
 // (mirrors history.rs's MAX_HISTORY).
-const MAX_RUNS: usize = 50;
 
 // The type-specific payload of a task: exactly the parameters the backing
 // operation command needs. Internally tagged (`{ "kind": "export", ... }`) so it
@@ -153,42 +151,6 @@ impl TaskStore {
                     break;
                 }
             }
-        })
-    }
-}
-
-// The per-task run log (keyed by task id, newest-first, capped; mirrors
-// history.rs).
-pub struct TaskRunStore {
-    inner: JsonStore<HashMap<String, Vec<TaskRun>>>,
-}
-
-impl TaskRunStore {
-    pub fn new(path: PathBuf) -> Self {
-        Self { inner: JsonStore::new(path) }
-    }
-
-    pub fn get(&self, id: &str) -> Vec<TaskRun> {
-        let map = self.inner.load();
-        match map.get(id) {
-            Some(runs) => runs.clone(),
-            None => Vec::new(),
-        }
-    }
-
-    pub fn push(&self, id: &str, run: TaskRun) -> Result<(), AppError> {
-        self.inner.update(|map| {
-            let runs = map.entry(id.to_string()).or_insert_with(Vec::new);
-            runs.insert(0, run);
-            runs.truncate(MAX_RUNS);
-        })
-    }
-
-    // Drop a task's run log when the task is deleted so the file doesn't keep
-    // orphaned history.
-    pub fn clear(&self, id: &str) -> Result<(), AppError> {
-        self.inner.update(|map| {
-            map.remove(id);
         })
     }
 }
@@ -419,29 +381,6 @@ mod tests {
         assert_eq!(task.last_status.as_deref(), Some("ok"));
     }
 
-    #[test]
-    fn run_store_push_caps_and_orders_newest_first() {
-        let dir = tempdir().unwrap();
-        let store = TaskRunStore::new(dir.path().join("runs.json"));
-        for i in 0..(MAX_RUNS + 5) {
-            store
-                .push(
-                    "a",
-                    TaskRun {
-                        ran_at: format!("{}", i),
-                        status: String::from("ok"),
-                        message: String::new(),
-                    },
-                )
-                .unwrap();
-        }
-        let runs = store.get("a");
-        assert_eq!(runs.len(), MAX_RUNS);
-        // Newest-first: the last pushed value is at the front.
-        assert_eq!(runs[0].ran_at, format!("{}", MAX_RUNS + 4));
-        store.clear("a");
-        assert!(store.get("a").is_empty());
-    }
 
     #[test]
     fn interval_next_due_adds_minutes() {

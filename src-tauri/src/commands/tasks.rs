@@ -4,7 +4,7 @@
 
 use crate::error::AppError;
 use crate::shell::ShellEngine;
-use crate::tasks::{is_due, now_epoch_ms, now_ms, TaskDef, TaskRun, TaskRunStore, TaskSpec, TaskStore};
+use crate::tasks::{is_due, now_epoch_ms, now_ms, TaskDef, TaskRun, TaskSpec, TaskStore};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -40,22 +40,14 @@ pub fn save_task(store: State<'_, TaskStore>, task: TaskDef) -> Result<String, A
     }
 }
 
-/// Delete a task and its run log.
+/// Delete a task.
 #[tauri::command]
-pub fn delete_task(
-    store: State<'_, TaskStore>,
-    runs: State<'_, TaskRunStore>,
-    id: String,
-) -> Result<(), AppError> {
-    match store.delete(&id) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
-    runs.clear(&id)
+pub fn delete_task(store: State<'_, TaskStore>, id: String) -> Result<(), AppError> {
+    store.delete(&id)
 }
 
-/// Run a task once, on demand. Records the outcome in the task's run log and
-/// stamps `last_run`/`last_status`, then returns the run so the UI can show it.
+/// Run a task once, on demand. Stamps `last_run`/`last_status`, then returns
+/// the run so the UI can show it.
 #[tauri::command]
 pub async fn run_task(app: AppHandle, id: String) -> Result<TaskRun, AppError> {
     // Look the task up and drop the store handle before the run's `.await`.
@@ -74,21 +66,11 @@ pub async fn run_task(app: AppHandle, id: String) -> Result<TaskRun, AppError> {
     Ok(run)
 }
 
-// Append a run to the task's log and stamp its `last_run`/`last_status`. Shared by
-// the manual `run_task` command and the scheduler.
+// Stamp a task's `last_run`/`last_status` after a run. Shared by the manual
+// `run_task` command and the scheduler.
 fn persist_run(app: &AppHandle, id: &str, run: &TaskRun) -> Result<(), AppError> {
-    match app.state::<TaskRunStore>().push(id, run.clone()) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
     app.state::<TaskStore>()
         .record_run(id, &run.ran_at, &run.status)
-}
-
-/// A task's run log, newest-first.
-#[tauri::command]
-pub fn get_task_runs(runs: State<'_, TaskRunStore>, id: String) -> Vec<TaskRun> {
-    runs.get(&id)
 }
 
 /// The single entry point that actually runs a task. It resolves managed state
