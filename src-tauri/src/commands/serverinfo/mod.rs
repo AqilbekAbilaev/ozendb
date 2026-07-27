@@ -2,6 +2,7 @@ use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
 use crate::resolve;
+use crate::resolve_mongo;
 
 use super::{
     AppContext
@@ -32,10 +33,7 @@ pub async fn server_info(
         Err(e) => return Err(AppError::Bson(e)),
     };
     let client = resolve!(ctx.client(&id).await);
-    let result = match client.database("admin").run_command(command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database("admin").run_command(command).await);
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 

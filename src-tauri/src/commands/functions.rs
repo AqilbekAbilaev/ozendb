@@ -4,6 +4,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::resolve;
+use crate::try_mongo;
 
 use super::{
     next_document, AppContext
@@ -88,8 +89,5 @@ pub async fn drop_function(
     name: String,
 ) -> Result<(), AppError> {
     let coll = resolve!(ctx.collection_for_write(&id, &database, "system.js").await);
-    match coll.delete_one(bson::doc! { "_id": &name }).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(coll.delete_one(bson::doc! { "_id": &name }).await)
 }

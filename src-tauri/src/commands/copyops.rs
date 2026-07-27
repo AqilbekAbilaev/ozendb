@@ -3,6 +3,7 @@ use mongodb::bson;
 use tauri::State;
 
 use crate::resolve;
+use crate::resolve_mongo;
 
 use super::{
     next_document, AppContext, IMPORT_BATCH_SIZE
@@ -85,10 +86,7 @@ pub async fn copy_collection_to_connection(
 
     // Replace semantics: drop the target so a re-copy doesn't collide on `_id`. Dropping a
     // non-existent collection is a no-op in MongoDB.
-    match dst.drop().await {
-        Ok(_) => {}
-        Err(e) => return Err(AppError::Mongo(e)),
-    }
+    let _ = resolve_mongo!(dst.drop().await);
 
     // Stream the source and insert in bounded batches so peak memory stays O(batch).
     let mut cursor = match src.find(bson::doc! {}).await {

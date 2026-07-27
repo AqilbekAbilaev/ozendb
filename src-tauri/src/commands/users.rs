@@ -4,6 +4,8 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::resolve;
+use crate::resolve_mongo;
+use crate::try_mongo;
 
 use super::{
     AppContext
@@ -46,10 +48,7 @@ pub async fn list_users(
     database: String,
 ) -> Result<Vec<UserInfo>, AppError> {
     let client = resolve!(ctx.client(&id).await);
-    let result = match client.database(&database).run_command(bson::doc! { "usersInfo": 1 }).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database(&database).run_command(bson::doc! { "usersInfo": 1 }).await);
     let mut users: Vec<UserInfo> = Vec::new();
     if let Some(bson::Bson::Array(entries)) = result.get("users") {
         for entry in entries {
@@ -102,10 +101,7 @@ pub async fn create_user(
         "pwd": &password,
         "roles": role_docs,
     };
-    match client.database(&database).run_command(command).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(client.database(&database).run_command(command).await)
 }
 
 // Rebuild the `roles` array (as `[{ role, db }]`) from a source user document, preserving
@@ -216,10 +212,7 @@ pub async fn drop_user(
     username: String,
 ) -> Result<(), AppError> {
     let client = resolve!(ctx.client_for_write(&id).await);
-    match client.database(&database).run_command(bson::doc! { "dropUser": &username }).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(client.database(&database).run_command(bson::doc! { "dropUser": &username }).await)
 }
 
 /// List the role names defined on a database (via `rolesInfo`; built-in roles excluded).
@@ -231,10 +224,7 @@ pub async fn list_roles(
 ) -> Result<Vec<String>, AppError> {
     let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "rolesInfo": 1, "showBuiltinRoles": false };
-    let result = match client.database(&database).run_command(command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database(&database).run_command(command).await);
     let mut roles: Vec<String> = Vec::new();
     if let Some(bson::Bson::Array(entries)) = result.get("roles") {
         for entry in entries {

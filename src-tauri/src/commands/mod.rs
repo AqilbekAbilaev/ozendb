@@ -1,6 +1,7 @@
 use crate::error::AppError;
 use crate::pool::ConnectionPool;
 use crate::storage::Storage;
+use crate::resolve_mongo;
 use mongodb::bson;
 use mongodb::Client;
 use mongodb::Collection;
@@ -65,6 +66,30 @@ macro_rules! resolve {
         match $expr {
             Ok(val) => val,
             Err(e) => return Err(e),
+        }
+    };
+}
+
+/// Unwrap a driver-call `Result<T, mongodb::error::Error>`, wrapping the error as
+/// `AppError::Mongo(e)` — the sibling of `resolve!` for raw driver calls.
+#[macro_export]
+macro_rules! resolve_mongo {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(e) => return Err(crate::error::AppError::Mongo(e)),
+        }
+    };
+}
+
+/// Execute a driver call that returns `Result<(), mongodb::error::Error>`,
+/// discarding the success value and propagating the error as `AppError::Mongo(e)`.
+#[macro_export]
+macro_rules! try_mongo {
+    ($expr:expr) => {
+        match $expr {
+            Ok(_) => Ok(()),
+            Err(e) => return Err(crate::error::AppError::Mongo(e)),
         }
     };
 }
@@ -794,10 +819,7 @@ fn xlsx_write_cell(
 pub(crate) async fn next_document(
     cursor: &mut mongodb::Cursor<bson::Document>,
 ) -> Result<Option<bson::Document>, AppError> {
-    let has_next = match cursor.advance().await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let has_next = resolve_mongo!(cursor.advance().await);
     if !has_next {
         return Ok(None);
     }

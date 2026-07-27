@@ -6,6 +6,8 @@ use tauri::State;
 
 use super::portmap::{apply_field_map, FieldMap};
 use crate::resolve;
+use crate::resolve_mongo;
+use crate::try_mongo;
 
 use super::{
     collect_values, parse_ejson_document, parse_pipeline, tracked, DatabaseInfo, AppContext,
@@ -47,10 +49,7 @@ pub async fn list_databases(
 ) -> Result<Vec<DatabaseInfo>, AppError> {
     let client = resolve!(ctx.client(&id).await);
 
-    let db_names = match client.list_database_names().await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let db_names = resolve_mongo!(client.list_database_names().await);
     let mut databases = Vec::new();
     for name in db_names {
         let collections = match client.database(&name).list_collection_names().await {
@@ -116,10 +115,7 @@ pub async fn create_collection(
         Err(e) => return Err(e),
     };
     let client = resolve!(ctx.client_for_write(&id).await);
-    match client.database(&database).run_command(command).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(client.database(&database).run_command(command).await)
 }
 
 /// Assemble the `create` command document from the requested options. Kept separate and
@@ -218,10 +214,7 @@ pub async fn create_view(
         "viewOn": &view_on,
         "pipeline": pipeline_bson,
     };
-    match client.database(&database).run_command(command).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(client.database(&database).run_command(command).await)
 }
 
 // The current schema-validation settings for a collection, read from its options so
@@ -244,10 +237,7 @@ pub async fn get_validator(
 ) -> Result<ValidatorInfo, AppError> {
     let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "listCollections": 1, "filter": { "name": &collection } };
-    let result = match client.database(&database).run_command(command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database(&database).run_command(command).await);
     let empty = ValidatorInfo {
         validator: None,
         validation_level: None,
@@ -311,10 +301,7 @@ pub async fn set_validator(
     let validator_doc = if validator.trim().is_empty() || validator.trim() == "{}" {
         bson::Document::new()
     } else {
-        match parse_ejson_document(&validator) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        }
+        resolve!(parse_ejson_document(&validator))
     };
     let client = resolve!(ctx.client_for_write(&id).await);
     let command = bson::doc! {
@@ -323,10 +310,7 @@ pub async fn set_validator(
         "validationLevel": &validation_level,
         "validationAction": &validation_action,
     };
-    match client.database(&database).run_command(command).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(client.database(&database).run_command(command).await)
 }
 
 #[tauri::command]
@@ -336,10 +320,7 @@ pub async fn drop_database(
     database: String,
 ) -> Result<(), AppError> {
     let client = resolve!(ctx.client_for_write(&id).await);
-    match client.database(&database).drop().await {
-        Ok(val) => Ok(val),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(client.database(&database).drop().await)
 }
 
 #[tauri::command]
@@ -353,10 +334,7 @@ pub async fn drop_collection(
     let col = client
         .database(&database)
         .collection::<bson::Document>(&collection);
-    match col.drop().await {
-        Ok(val) => Ok(val),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(col.drop().await)
 }
 
 #[tauri::command]
@@ -376,10 +354,7 @@ pub async fn rename_collection(
         "renameCollection": from_namespace,
         "to": to_namespace,
     };
-    match client.database("admin").run_command(command).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(client.database("admin").run_command(command).await)
 }
 
 #[tauri::command]
@@ -412,10 +387,7 @@ pub async fn server_status(
 ) -> Result<serde_json::Value, AppError> {
     let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "serverStatus": 1 };
-    let result = match client.database("admin").run_command(command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database("admin").run_command(command).await);
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 
@@ -429,10 +401,7 @@ pub async fn database_stats(
 ) -> Result<serde_json::Value, AppError> {
     let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "dbStats": 1 };
-    let result = match client.database(&database).run_command(command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database(&database).run_command(command).await);
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 
@@ -445,10 +414,7 @@ pub async fn current_ops(
 ) -> Result<serde_json::Value, AppError> {
     let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "currentOp": 1 };
-    let result = match client.database("admin").run_command(command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database("admin").run_command(command).await);
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 
@@ -463,10 +429,7 @@ pub async fn list_indexes(
     // `listIndexes` returns the raw index documents (key spec, name, unique, …)
     // inside a cursor envelope; the frontend only needs the first batch to display.
     let command = bson::doc! { "listIndexes": collection };
-    let result = match client.database(&database).run_command(command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database(&database).run_command(command).await);
     let cursor_doc = match result.get_document("cursor") {
         Ok(val) => val,
         Err(e) => return Err(AppError::Bson(e.to_string())),
@@ -511,23 +474,14 @@ pub async fn create_index(
     );
     let run = async {
         let client = resolve!(ctx.client_for_write(&id).await);
-        let keys_doc = match parse_ejson_document(&keys) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-        let mut index_doc = match parse_ejson_document(&options) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let keys_doc = resolve!(parse_ejson_document(&keys));
+    let mut index_doc = resolve!(parse_ejson_document(&options));
         index_doc.insert("key", keys_doc);
         let command = bson::doc! {
             "createIndexes": &collection,
             "indexes": [index_doc],
         };
-        match client.database(&database).run_command(command).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(AppError::Mongo(e)),
-        }
+        try_mongo!(client.database(&database).run_command(command).await)
     };
     tracked(&ops, Some(meta), run).await
 }
@@ -563,10 +517,7 @@ pub async fn drop_index(
         let col = client
             .database(&database)
             .collection::<bson::Document>(&collection);
-        match col.drop_index(name).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(AppError::Mongo(e)),
-        }
+        try_mongo!(col.drop_index(name).await)
     };
     tracked(&ops, Some(meta), run).await
 }
@@ -594,10 +545,7 @@ pub async fn set_index_hidden(
         "collMod": &collection,
         "index": { "name": &name, "hidden": hidden },
     };
-    match client.database(&database).run_command(command).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(client.database(&database).run_command(command).await)
 }
 
 /// Returns the `$indexStats` usage entries for a collection (one per index, with
@@ -840,10 +788,7 @@ async fn max_id(
     col: &mongodb::Collection<bson::Document>,
 ) -> Result<Option<bson::Bson>, AppError> {
     let sort = bson::doc! { "_id": -1 };
-    let found = match col.find_one(bson::doc! {}).sort(sort).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let found = resolve_mongo!(col.find_one(bson::doc! {}).sort(sort).await);
     match found {
         Some(doc) => Ok(doc.get("_id").cloned()),
         None => Ok(None),

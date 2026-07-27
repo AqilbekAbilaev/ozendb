@@ -1,5 +1,6 @@
 use crate::collection_history::{CollectionHistoryStore, HistoryEntry};
 use crate::error::AppError;
+use crate::try_mongo;
 use mongodb::bson;
 use tauri::State;
 
@@ -92,8 +93,5 @@ pub async fn restore_history(
     // _id rides in the filter; a replacement carrying a differing _id is rejected.
     before_doc.remove("_id");
 
-    match col.replace_one(filter, before_doc).upsert(true).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(col.replace_one(filter, before_doc).upsert(true).await)
 }

@@ -3,6 +3,7 @@ use mongodb::bson;
 use tauri::State;
 
 use crate::resolve;
+use crate::resolve_mongo;
 
 use super::{
     AppContext
@@ -45,9 +46,6 @@ pub async fn map_reduce(
     if !finalize.trim().is_empty() {
         command.insert("finalize", bson::Bson::JavaScriptCode(finalize));
     }
-    let result = match client.database(&database).run_command(command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database(&database).run_command(command).await);
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }

@@ -2,6 +2,7 @@ use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
 use crate::resolve;
+use crate::resolve_mongo;
 
 use super::{
     AppContext
@@ -39,10 +40,7 @@ pub async fn duplicate_collection(
     let client = resolve!(ctx.client_for_write(&id).await);
     let db = client.database(&database);
 
-    let existing = match db.list_collection_names().await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let existing = resolve_mongo!(db.list_collection_names().await);
     let target_name = target.trim().to_string();
     match validate_target(&source, &target_name, &existing) {
         Ok(_) => {}

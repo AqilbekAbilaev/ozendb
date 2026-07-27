@@ -6,6 +6,8 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::resolve;
+use crate::resolve_mongo;
+use crate::try_mongo;
 
 use super::{
     next_document, parse_ejson_document, AppContext
@@ -82,10 +84,7 @@ pub async fn list_gridfs_buckets(
     database: String,
 ) -> Result<Vec<String>, AppError> {
     let client = resolve!(ctx.client(&id).await);
-    let names = match client.database(&database).list_collection_names().await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let names = resolve_mongo!(client.database(&database).list_collection_names().await);
     Ok(extract_buckets(&names))
 }
 
@@ -203,10 +202,7 @@ pub async fn gridfs_delete(
     };
     let options = GridFsBucketOptions::builder().bucket_name(bucket).build();
     let gridfs = client.database(&database).gridfs_bucket(Some(options));
-    match gridfs.delete(id_bson).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::Mongo(e)),
-    }
+    try_mongo!(gridfs.delete(id_bson).await)
 }
 
 /// Rename a GridFS file by updating the `filename` field on its `.files` document.
@@ -247,10 +243,7 @@ pub async fn gridfs_set_metadata(
     let metadata_doc = if metadata.trim().is_empty() || metadata.trim() == "{}" {
         bson::Document::new()
     } else {
-        match parse_ejson_document(&metadata) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        }
+        resolve!(parse_ejson_document(&metadata))
     };
     let id_bson = match parse_file_id(&file_id) {
         Ok(val) => val,
@@ -278,10 +271,7 @@ pub async fn gridfs_drop_bucket(
     let db = client.database(&database);
     for suffix in ["files", "chunks"] {
         let coll = db.collection::<bson::Document>(&format!("{bucket}.{suffix}"));
-        match coll.drop().await {
-            Ok(_) => {}
-            Err(e) => return Err(AppError::Mongo(e)),
-        }
+        let _ = resolve_mongo!(coll.drop().await);
     }
     Ok(())
 }

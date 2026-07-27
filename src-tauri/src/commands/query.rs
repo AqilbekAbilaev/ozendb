@@ -5,6 +5,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::resolve;
+use crate::resolve_mongo;
 
 use super::{
     collect_json, next_document, parse_ejson_document, parse_json_documents,
@@ -172,18 +173,9 @@ pub async fn find_documents(
 ) -> Result<Box<serde_json::value::RawValue>, AppError> {
     let col = resolve!(ctx.collection(&id, &database, &collection).await);
 
-    let filter_doc = match parse_ejson_document(&filter) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let projection_doc = match parse_ejson_document(&projection) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let sort_doc = match parse_ejson_document(&sort) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let filter_doc = resolve!(parse_ejson_document(&filter));
+    let projection_doc = resolve!(parse_ejson_document(&projection));
+    let sort_doc = resolve!(parse_ejson_document(&sort));
 
     // A positive limit is self-bounding; only a non-positive one would fetch the
     // whole collection, so clamp that case to a safe page (see FIND_LIMIT_FALLBACK).
@@ -223,10 +215,7 @@ pub async fn count_documents(
 ) -> Result<i64, AppError> {
     let col = resolve!(ctx.collection(&id, &database, &collection).await);
 
-    let filter_doc = match parse_ejson_document(&filter) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let filter_doc = resolve!(parse_ejson_document(&filter));
 
     let count = match col
         .count_documents(filter_doc)
@@ -249,14 +238,8 @@ pub async fn insert_document(
     document: String,
 ) -> Result<String, AppError> {
     let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let doc = match parse_ejson_document(&document) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let result = match col.insert_one(doc).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let doc = resolve!(parse_ejson_document(&document));
+    let result = resolve_mongo!(col.insert_one(doc).await);
     // Record the insert so it can be undone (restore = delete this document).
     record_history(&history, &id, &database, &collection, "insert", &result.inserted_id, None);
     Ok(result.inserted_id.to_string())
@@ -301,19 +284,10 @@ pub async fn replace_document(
     document: String,
 ) -> Result<(), AppError> {
     let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let filter_doc = match parse_ejson_document(&id_filter) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let mut replacement = match parse_ejson_document(&document) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let filter_doc = resolve!(parse_ejson_document(&id_filter));
+    let mut replacement = resolve!(parse_ejson_document(&document));
     // Capture the pre-image before replacing, so the edit can be undone.
-    let before = match col.find_one(filter_doc.clone()).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let before = resolve_mongo!(col.find_one(filter_doc.clone()).await);
     // MongoDB errors if the replacement contains an _id that differs from the filter.
     // Remove it unconditionally — the existing _id is preserved by replace_one.
     replacement.remove("_id");
@@ -341,15 +315,9 @@ pub async fn delete_document(
     id_filter: String,
 ) -> Result<(), AppError> {
     let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let filter_doc = match parse_ejson_document(&id_filter) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let filter_doc = resolve!(parse_ejson_document(&id_filter));
     // Capture the pre-image before deleting, so the delete can be undone.
-    let before = match col.find_one(filter_doc.clone()).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let before = resolve_mongo!(col.find_one(filter_doc.clone()).await);
     match col.delete_one(filter_doc).await {
         Ok(_) => {}
         Err(e) => return Err(AppError::Mongo(e)),
@@ -390,14 +358,8 @@ pub async fn update_many(
     multi: bool,
 ) -> Result<i64, AppError> {
     let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let filter_doc = match parse_ejson_document(&filter) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let update_doc = match parse_ejson_document(&update) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let filter_doc = resolve!(parse_ejson_document(&filter));
+    let update_doc = resolve!(parse_ejson_document(&update));
     // Guard against a replacement-style document reaching the update, which the
     // driver rejects: every top-level key of an update must be an operator ($set…).
     if !is_operator_update(&update_doc) {
@@ -435,14 +397,8 @@ pub async fn delete_many(
     filter: String,
 ) -> Result<i64, AppError> {
     let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let filter_doc = match parse_ejson_document(&filter) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let result = match col.delete_many(filter_doc).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let filter_doc = resolve!(parse_ejson_document(&filter));
+    let result = resolve_mongo!(col.delete_many(filter_doc).await);
     Ok(result.deleted_count as i64)
 }
 
@@ -458,10 +414,7 @@ pub async fn clear_collection(
 ) -> Result<i64, AppError> {
     let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
     // An empty filter matches every document; the collection itself is untouched.
-    let result = match col.delete_many(bson::doc! {}).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(col.delete_many(bson::doc! {}).await);
     Ok(result.deleted_count as i64)
 }
 
@@ -502,18 +455,9 @@ pub async fn explain_query(
     };
     let client = resolve!(ctx.client(&id).await);
 
-    let filter_doc = match parse_ejson_document(&filter) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let projection_doc = match parse_ejson_document(&projection) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let sort_doc = match parse_ejson_document(&sort) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let filter_doc = resolve!(parse_ejson_document(&filter));
+    let projection_doc = resolve!(parse_ejson_document(&projection));
+    let sort_doc = resolve!(parse_ejson_document(&sort));
 
     // The `explain` command wraps the equivalent `find` command and reports how
     // the server would execute it; mirror the same optional fields find_documents uses.
@@ -538,10 +482,7 @@ pub async fn explain_query(
         "explain": find_command,
         "verbosity": verbosity_value,
     };
-    let result = match client.database(&database).run_command(explain_command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database(&database).run_command(explain_command).await);
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 
@@ -580,10 +521,7 @@ pub async fn explain_aggregate(
         "explain": aggregate_command,
         "verbosity": verbosity_value,
     };
-    let result = match client.database(&database).run_command(explain_command).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
+    let result = resolve_mongo!(client.database(&database).run_command(explain_command).await);
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 
