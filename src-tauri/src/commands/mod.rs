@@ -107,8 +107,11 @@ pub(crate) async fn client_for(
 /// single choke point before any write reaches the driver. Non-read-only
 /// connections fall straight through to `client_for`.
 ///
-/// NOTE: IntelliShell shell writes take a separate path (see shell/bridge.rs) and
-/// are NOT yet gated by this check — a documented known limitation.
+/// IntelliShell writes never reach this function — the shell talks to the driver
+/// directly — so they are gated separately by `shell::bridge::op_writes`, which
+/// refuses write methods, write `runCommand`s and `$out`/`$merge` pipelines. Both
+/// paths must stay in step: a new mutating command belongs here, a new shell
+/// operation belongs there.
 pub(crate) async fn client_for_write(
     pool: &ConnectionPool,
     storage: &Storage,
