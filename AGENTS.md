@@ -13,44 +13,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. I'm always open to ideas on better ways to do things. Please don't hesitate to suggest a better way, or one that has long lasting impact over a tactical change. (as a few examples)
 
 # OzenDB — Claude Guidelines
-
-## Rust
-
-- Never use shorthands. Always write out field names explicitly, even when the variable name matches the field name.
-
-  ```rust
-  // BAD
-  Foo { x, y }
-
-  // GOOD
-  Foo { x: x, y: y }
-  ```
-
-- Never use the `?` operator. Always expand it to an explicit `match` block.
-
-  ```rust
-  // BAD
-  let val = some_result?;
-
-  // GOOD
-  let val = match some_result {
-      Ok(val) => val,
-      Err(e) => return Err(e.into()),
-  };
-  ```
-
-  For `Option`-returning functions:
-  ```rust
-  // BAD
-  let val = some_option?;
-
-  // GOOD
-  let val = match some_option {
-      Some(val) => val,
-      None => return None,
-  };
-  ```
-
 ## Commands
 
 ```bash
