@@ -7,6 +7,7 @@ import RawToggle from '../base/RawToggle.vue'
 import BaseModal from '../base/BaseModal.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
+import { fmtBytes } from '../../utils/format'
 
 // Opened from a collection node's "Collection Stats" action. Fetches collStats
 // and surfaces the headline numbers plus a per-index size breakdown, the way
@@ -37,18 +38,6 @@ onMounted(async () => {
   }
 })
 
-function fmtBytes(bytes) {
-  if (bytes == null) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let value = bytes / 1024
-  let i = 0
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024
-    i++
-  }
-  return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
-}
 
 function fmtNum(n) {
   if (n == null) return '—'

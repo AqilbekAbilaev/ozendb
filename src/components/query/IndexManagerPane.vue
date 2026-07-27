@@ -8,6 +8,7 @@ import {
   isProtectedIndex, isIndexHidden, indexKeyLabel, indexType, indexProperties,
 } from '../../utils/indexSpec'
 import { errText, errMessage } from '../../utils/errors'
+import { fmtBytes } from '../../utils/format'
 
 // Each Index Manager tab manages its own index list, selection, and metrics
 // independently so that two tabs for different collections don't interfere.
@@ -232,18 +233,9 @@ function toggleExpand(name) { localExpanded.value[name] = !localExpanded.value[n
 
 function typeOf(index)   { return indexType(index) }
 function propsOf(index)  { const p = indexProperties(index); return p.length ? p.join(', ') : '—' }
-function sizeOf(index)   { return fmtBytes(localIndexSizes.value[index.name]) }
+function sizeOf(index)   { return fmtBytes(localIndexSizes.value[index.name], 'n/a') }
 function usageOf(index)  { const u = localIndexUsage.value[index.name]; return u == null ? 'n/a' : u }
 
-function fmtBytes(bytes) {
-  if (bytes == null) return 'n/a'
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KiB', 'MiB', 'GiB', 'TiB']
-  let value = bytes / 1024
-  let i = 0
-  while (value >= 1024 && i < units.length - 1) { value /= 1024; i++ }
-  return `${value.toFixed(1)} ${units[i]}`
-}
 </script>
 
 <template>
@@ -329,7 +321,7 @@ function fmtBytes(bytes) {
     <div class="idx-status">
       <span>{{ localIndexesList.length }} {{ localIndexesList.length === 1 ? 'Index' : 'Indexes' }}</span>
       <span class="spacer"></span>
-      <span v-if="localIndexTotalSize != null">{{ fmtBytes(localIndexTotalSize) }}</span>
+      <span v-if="localIndexTotalSize != null">{{ fmtBytes(localIndexTotalSize, 'n/a') }}</span>
     </div>
 
     <!-- Add / Edit index dialog -->

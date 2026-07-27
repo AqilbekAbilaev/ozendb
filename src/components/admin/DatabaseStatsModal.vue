@@ -7,6 +7,7 @@ import RawToggle from '../base/RawToggle.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
 import BaseModal from '../base/BaseModal.vue'
+import { fmtBytes } from '../../utils/format'
 
 // Opened from App.vue for a database node. Fetches `dbStats` once and surfaces the
 // headline fields; the full document is available raw below.
@@ -35,14 +36,6 @@ onMounted(async () => {
   }
 })
 
-function fmtBytes(bytes) {
-  if (bytes == null) return '—'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let n = bytes
-  let i = 0
-  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
-  return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`
-}
 
 function fmtNum(n) {
   return n == null ? '—' : Number(n).toLocaleString()

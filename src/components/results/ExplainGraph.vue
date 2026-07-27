@@ -6,6 +6,7 @@
 // lays out and draws the already-normalized tree.
 import { computed } from 'vue'
 import BaseIcon from '../base/BaseIcon.vue'
+import { fmtBytes } from '../../utils/format'
 
 const props = defineProps({
   // The render-ready tree from buildExplainTree(), or null.
@@ -73,7 +74,7 @@ function iconFor(node) {
 // Edge label: byte size for an edge feeding a Collection/Index target (3T shows
 // "90.3 MiB"), the child's doc count ("N docs") otherwise. Null hides the label.
 function edgeLabel(edge) {
-  if (edge.to.isTarget) return fmtBytes(edge.to.bytes)
+  if (edge.to.isTarget) return fmtBytes(edge.to.bytes, null)
   const count = fmtCount(edge.docs)
   return count === null ? null : `${count} docs`
 }
@@ -98,18 +99,6 @@ function fmtCount(n) {
 
 // bytes → "90.3 MiB" / "119.4 KiB" / "640 B" (binary, base-1024, to match Studio 3T's
 // edge labels). Null when unknown (hides the line).
-function fmtBytes(bytes) {
-  if (bytes === null || bytes === undefined) return null
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KiB', 'MiB', 'GiB', 'TiB']
-  let value = bytes / 1024
-  let i = 0
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024
-    i++
-  }
-  return `${value.toFixed(1)} ${units[i]}`
-}
 
 // keysExamined → "1,204 keys". Null when unknown.
 function fmtKeys(n) {
@@ -285,8 +274,8 @@ function edgeLabelPos(edge) {
             <!-- Collection / Index target: namespace + byte size, no timing/metrics. -->
             <template v-else-if="node.isTarget">
               <div v-if="node.targetName" class="eg-node-pred" :title="node.targetName">{{ node.targetName }}</div>
-              <div v-if="fmtBytes(node.bytes) !== null" class="eg-node-meta eg-node-meta2">
-                <span class="eg-node-ret">{{ fmtBytes(node.bytes) }}</span>
+              <div v-if="fmtBytes(node.bytes, null) !== null" class="eg-node-meta eg-node-meta2">
+                <span class="eg-node-ret">{{ fmtBytes(node.bytes, null) }}</span>
               </div>
             </template>
 
@@ -301,11 +290,11 @@ function edgeLabelPos(edge) {
                 </span>
               </div>
               <div
-                v-if="fmtKeys(node.keysExamined) !== null || fmtBytes(node.memBytes) !== null"
+                v-if="fmtKeys(node.keysExamined) !== null || fmtBytes(node.memBytes, null) !== null"
                 class="eg-node-meta eg-node-meta2"
               >
                 <span v-if="fmtKeys(node.keysExamined) !== null" class="eg-node-ret">{{ fmtKeys(node.keysExamined) }}</span>
-                <span v-if="fmtBytes(node.memBytes) !== null" class="eg-node-ret">{{ fmtBytes(node.memBytes) }}</span>
+                <span v-if="fmtBytes(node.memBytes, null) !== null" class="eg-node-ret">{{ fmtBytes(node.memBytes, null) }}</span>
               </div>
               <div v-if="node.note" class="eg-node-note">{{ node.note }}</div>
             </template>
