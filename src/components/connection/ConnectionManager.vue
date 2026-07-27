@@ -14,6 +14,7 @@ import BaseInput from '../base/BaseInput.vue'
 import ToolbarButton from '../base/ToolbarButton.vue'
 import NewConnection from './NewConnection.vue'
 import ContextMenu from '../base/ContextMenu.vue'
+import { formatNow } from '../../utils/format'
 
 const emit = defineEmits(['close', 'connect'])
 const { showToast } = useToast()
@@ -67,12 +68,6 @@ function parseSecurity(conn) {
   return `${conn.username} @ ${db}`
 }
 
-function formatNow() {
-  return new Date().toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  }).replace(',', '')
-}
 
 function newConnection() {
   showNewConnection.value = true

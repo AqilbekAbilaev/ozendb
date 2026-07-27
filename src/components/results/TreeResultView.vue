@@ -3,6 +3,7 @@ import { ref, computed, nextTick } from 'vue'
 import { useResultSearch } from '../../composables/useResultSearch'
 import TreeView from '../base/TreeView.vue'
 import SearchBar from '../base/SearchBar.vue'
+import { isEjsonScalar } from '../../utils/mongoFormat'
 
 const props = defineProps({
   results: { type: Array, default: () => [] },
@@ -11,16 +12,6 @@ const props = defineProps({
 // MongoDB extended-JSON wrappers TreeView renders as a single scalar (e.g. {"$oid": …}
 // is an ObjectId, not a sub-document). Flatten must treat them as leaves too, so match
 // paths line up with the rows TreeView actually draws.
-// NOTE: this set is duplicated in TreeView.vue — worth hoisting to a shared util later.
-const EJSON_SCALAR = new Set([
-  '$oid', '$date', '$numberLong', '$numberDecimal',
-  '$numberInt', '$numberDouble', '$timestamp',
-])
-function isEjsonScalar(v) {
-  if (v === null || typeof v !== 'object' || Array.isArray(v)) return false
-  const keys = Object.keys(v)
-  return keys.length === 1 && EJSON_SCALAR.has(keys[0])
-}
 
 // Flatten each rendered node to { path, key, valLower } for scanning. Paths mirror the
 // ones TreeView builds (dotted keys, [i] for array elements) so a match's path finds its

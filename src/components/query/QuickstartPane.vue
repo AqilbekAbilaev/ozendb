@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
+import { formatNow } from '../../utils/format'
 
 // Actions/state come from App.vue's provided `appModals` (the same DI the modals
 // use), so the home screen can open the Connection Manager / Tasks, connect to a
@@ -20,11 +21,6 @@ const loading = ref(true)
 
 // Match ConnectionManager's timestamp format so an entry opened from here reads the
 // same in both places.
-function formatNow() {
-  return new Date().toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).replace(',', '')
-}
 
 // last_accessed is stored as a display string (not ISO), so recency ordering is a
 // best-effort parse — good enough for the common case; exact ordering would need the

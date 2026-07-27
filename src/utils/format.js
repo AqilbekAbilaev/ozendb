@@ -18,3 +18,18 @@ export function fmtBytes(bytes, empty = '—') {
   }
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[i]}`
 }
+
+// Thousands-separated count, em dash when the server omitted the field.
+export function fmtNum(n) {
+  return n == null ? '—' : Number(n).toLocaleString()
+}
+
+// Current time in the app's display format ("27 Jul 2026 14:05"). Connections store
+// `last_accessed` as this string rather than an ISO timestamp, so the format has to
+// match everywhere it's written or the sidebar's recency ordering breaks.
+export function formatNow() {
+  return new Date().toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  }).replace(',', '')
+}

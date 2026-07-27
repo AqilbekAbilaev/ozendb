@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import BaseIcon from './BaseIcon.vue'
+import { isEjsonScalar } from '../../utils/mongoFormat'
 
 // Recursive tree node. Renders one row (key / value / type) and, when expanded,
 // its children — re-using itself via filename self-reference. The top-level
@@ -29,16 +30,7 @@ const open = computed(() =>
 
 // MongoDB extended-JSON wrappers that should read as a single scalar, not an
 // expandable object (e.g. {"$oid": "..."} is an ObjectId, not a sub-document).
-const EJSON_SCALAR = new Set([
-  '$oid', '$date', '$numberLong', '$numberDecimal',
-  '$numberInt', '$numberDouble', '$timestamp',
-])
 
-function isEjsonScalar(v) {
-  if (v === null || typeof v !== 'object' || Array.isArray(v)) return false
-  const keys = Object.keys(v)
-  return keys.length === 1 && EJSON_SCALAR.has(keys[0])
-}
 
 // type token reused from the table view's TYPE_ICON map
 const typeKind = computed(() => {

@@ -7,7 +7,7 @@ import RawToggle from '../base/RawToggle.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
 import BaseModal from '../base/BaseModal.vue'
-import { fmtBytes } from '../../utils/format'
+import { fmtBytes, fmtNum } from '../../utils/format'
 
 // Opened from App.vue for a database node. Fetches `dbStats` once and surfaces the
 // headline fields; the full document is available raw below.
@@ -37,9 +37,6 @@ onMounted(async () => {
 })
 
 
-function fmtNum(n) {
-  return n == null ? '—' : Number(n).toLocaleString()
-}
 
 // dbStats headline fields, guarded for servers that omit some.
 const cards = computed(() => {
