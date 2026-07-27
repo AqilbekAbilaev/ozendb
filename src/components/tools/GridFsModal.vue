@@ -16,6 +16,7 @@ import BaseTextarea from '../base/BaseTextarea.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
+import { fmtBytes } from '../../utils/format'
 
 // Top-bar / tree GridFS browser for a database: list buckets, list files, and
 // upload / download / delete / rename / edit-metadata files, plus bucket copy/drop.
@@ -295,15 +296,6 @@ async function confirmDelete(file) {
   }
 }
 
-function fmtBytes(bytes) {
-  if (bytes == null) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let value = bytes / 1024
-  let i = 0
-  while (value >= 1024 && i < units.length - 1) { value /= 1024; i++ }
-  return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
-}
 
 function fmtDate(iso) {
   if (!iso) return '—'
