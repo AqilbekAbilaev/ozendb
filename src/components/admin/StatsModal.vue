@@ -7,7 +7,7 @@ import RawToggle from '../base/RawToggle.vue'
 import BaseModal from '../base/BaseModal.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
-import { fmtBytes } from '../../utils/format'
+import { fmtBytes, fmtNum } from '../../utils/format'
 
 // Opened from a collection node's "Collection Stats" action. Fetches collStats
 // and surfaces the headline numbers plus a per-index size breakdown, the way
@@ -39,10 +39,6 @@ onMounted(async () => {
 })
 
 
-function fmtNum(n) {
-  if (n == null) return '—'
-  return n.toLocaleString()
-}
 
 const cards = computed(() => {
   const s = stats.value

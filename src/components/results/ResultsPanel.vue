@@ -23,6 +23,7 @@ import Resizer from '../base/Resizer.vue'
 import FieldError from '../base/FieldError.vue'
 import { useDocumentActions } from '../../composables/useDocumentActions'
 import { useToast } from '../../composables/useToast'
+import { PAGE_SIZES } from '../../constants/pageSizes'
 
 const props = defineProps({
   activeTab:   { type: Object,  required: true },
@@ -71,7 +72,6 @@ const vqbWidth = ref(360)
 
 
 // ── pagination ─────────────────────────────────────────
-const PAGE_SIZES = [10, 25, 50, 100, 200]
 
 function goFirst() {
   const tab = props.activeTab

@@ -10,6 +10,7 @@ import TabStrip from '../base/TabStrip.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
 import ShortcutsPane from './ShortcutsPane.vue'
+import { PAGE_SIZES } from '../../constants/pageSizes'
 
 // App preferences. Persisted via update_settings (a partial merge on the backend);
 // on save the parent adopts the new values so open/newly opened views pick them up.
@@ -30,7 +31,6 @@ const TABS = [
   { value: 'appearance', label: 'Appearance' },
   { value: 'keyboard', label: 'Keyboard' },
 ]
-const PAGE_SIZES = [10, 25, 50, 100, 200]
 const pageSizeOptions = PAGE_SIZES.map((sz) => ({ value: sz, label: String(sz) }))
 const THEME_OPTIONS = [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]
 const VIEW_OPTIONS = [

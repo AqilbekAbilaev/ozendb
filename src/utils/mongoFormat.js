@@ -89,3 +89,18 @@ export function syntaxHighlight(json) {
       }
     )
 }
+
+// MongoDB extended-JSON wrappers that render as a single scalar rather than a
+// sub-document (`{"$oid": …}` is an ObjectId, not an object with one key). The tree
+// views use this to decide what counts as a leaf.
+export const EJSON_SCALAR = new Set([
+  '$oid', '$date', '$numberLong', '$numberDecimal',
+  '$numberInt', '$numberDouble', '$timestamp',
+])
+
+/** True when `value` is one of the EJSON wrappers above. */
+export function isEjsonScalar(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const keys = Object.keys(value)
+  return keys.length === 1 && EJSON_SCALAR.has(keys[0])
+}
