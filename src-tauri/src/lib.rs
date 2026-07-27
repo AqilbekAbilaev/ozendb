@@ -52,7 +52,7 @@ use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;
 use storage::Storage;
 use tabs::TabStorage;
-use tasks::{TaskRunStore, TaskStore};
+use tasks::TaskStore;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -93,10 +93,8 @@ pub fn run() {
             app.manage(ShellHistoryStorage::new(
                 data_dir.join("shell_history.json"),
             ));
-            // Saved tasks and their per-task run log (the scheduler that fires them
-            // is spawned in a later step).
+            // Saved tasks (the scheduler that fires them is spawned in a later step).
             app.manage(TaskStore::new(data_dir.join("tasks.json")));
-            app.manage(TaskRunStore::new(data_dir.join("task_runs.json")));
             // The single source of truth for the Operations pane; holds the app
             // handle so it can announce changes via the `operations-changed` event.
             app.manage(OperationsRegistry::new(
@@ -262,7 +260,6 @@ pub fn run() {
             save_task,
             delete_task,
             run_task,
-            get_task_runs,
             list_operations,
             clear_operations,
             menu::set_menu_context,
