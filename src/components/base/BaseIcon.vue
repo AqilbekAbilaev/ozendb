@@ -49,7 +49,6 @@ const PATHS = {
   clock:      '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
   cog:        '<circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"/>',
   expr:       '<path d="M8 5H6a2 2 0 0 0-2 2v3l-2 2 2 2v3a2 2 0 0 0 2 2h2M16 5h2a2 2 0 0 1 2 2v3l2 2-2 2v3a2 2 0 0 1-2 2h-2"/>',
-  move:       '<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/>',
   typeId:     '<rect x="2.5" y="7" width="19" height="10" rx="2.5"/><path d="M7 10.5v3M11 9.5v4M11 13.5h1.8a2 2 0 0 0 0-4H11z"/>',
   typeStr:    '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10h11M6.5 13.5h6.5"/>',
   typeNum:    '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M9.5 8.5l-1.2 7M15 8.5l-1.2 7M7 11h8.5M6.4 13.5h8.5"/>',

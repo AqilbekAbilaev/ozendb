@@ -1,7 +1,6 @@
 /* ===== OzenDB design tokens ===== */
 :root {
   --bg-window:   #1f2023;
-  --bg-titlebar: #2c2e31;
   --bg-toolbar:  #28292c;
   --bg-panel:    #232427;
   --bg-panel-2:  #1c1d20;
@@ -20,7 +19,6 @@
   --accent:      #3b82f6;
   --accent-soft: #2563eb;
   --prod:        #e07a6b;
-  --prod-dim:    #c96b5d;
   --link:        #6ea8fe;
   --green:       #4caf78;
   --purple:      #b07ddb;
@@ -45,7 +43,6 @@
   --scrollbar-thumb-hover: #55575c;
   --mono: "SF Mono","JetBrains Mono","Menlo","Consolas",monospace;
   --sans: -apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",sans-serif;
-  --radius: 7px;
   --search-hit:    rgba(255, 200, 0, .18);
   --search-active: rgba(255, 140, 0, .35);
 }
@@ -54,7 +51,6 @@
    inherited from :root above. Applied via <html data-theme="light">. */
 :root[data-theme="light"] {
   --bg-window:   #f4f5f7;
-  --bg-titlebar: #e4e6ea;
   --bg-toolbar:  #eceef1;
   --bg-panel:    #f7f8fa;
   --bg-panel-2:  #eef0f3;
@@ -73,7 +69,6 @@
   --accent:      #3b82f6;
   --accent-soft: #2563eb;
   --prod:        #d2604f;
-  --prod-dim:    #b85748;
   --link:        #2563eb;
   --green:       #2e9e63;
   --purple:      #8b5cc7;
