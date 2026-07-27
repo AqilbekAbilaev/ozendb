@@ -220,20 +220,10 @@ watch(() => t.value.selectedSource, () => { if (t.value.previewOpen) loadPreview
 
 <template>
   <div class="imp">
-    <!-- task toolbar -->
+    <!-- toolbar -->
     <div class="imp-toolbar">
       <BaseButton variant="ghost" size="sm" class="run" :disabled="!canRun || running" @click="run">
         <BaseIcon name="run" :size="18" class="ic" /> {{ running ? 'Running…' : 'Run' }}
-      </BaseButton>
-      <span class="tb-div"></span>
-      <BaseButton variant="ghost" size="sm" disabled title="Import tasks aren't supported yet">
-        <BaseIcon name="load" :size="18" class="ic" /> Load task
-      </BaseButton>
-      <BaseButton variant="ghost" size="sm" disabled title="Import tasks aren't supported yet">
-        <BaseIcon name="save" :size="18" class="ic" /> Save task
-      </BaseButton>
-      <BaseButton variant="ghost" size="sm" disabled title="Scheduling isn't supported yet">
-        <BaseIcon name="clock" :size="18" class="ic" /> Schedule
       </BaseButton>
     </div>
 

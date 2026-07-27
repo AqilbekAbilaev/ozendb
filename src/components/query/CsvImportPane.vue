@@ -209,20 +209,10 @@ function reset() {
 
 <template>
   <div class="imp">
-    <!-- task toolbar -->
+    <!-- toolbar -->
     <div class="imp-toolbar">
       <BaseButton variant="ghost" size="sm" class="run" :disabled="!canRun || running" @click="run">
         <BaseIcon name="run" :size="18" class="ic" /> {{ running ? 'Running…' : 'Run' }}
-      </BaseButton>
-      <span class="tb-div"></span>
-      <BaseButton variant="ghost" size="sm" disabled title="Import tasks aren't supported yet">
-        <BaseIcon name="load" :size="18" class="ic" /> Load task
-      </BaseButton>
-      <BaseButton variant="ghost" size="sm" disabled title="Import tasks aren't supported yet">
-        <BaseIcon name="save" :size="18" class="ic" /> Save task
-      </BaseButton>
-      <BaseButton variant="ghost" size="sm" disabled title="Scheduling isn't supported yet">
-        <BaseIcon name="clock" :size="18" class="ic" /> Schedule
       </BaseButton>
     </div>
 
@@ -363,7 +353,6 @@ function reset() {
 .ic { color: var(--text-dim); }
 .base-btn.run { min-width: 92px; justify-content: flex-start; border: 1px solid var(--green); }
 .run .ic { color: var(--green); }
-.tb-div { width: 1px; align-self: stretch; margin: 4px 4px; background: var(--border-soft); }
 
 .sub-tabs { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--border-soft); flex: none; }
 .sub-tab {
