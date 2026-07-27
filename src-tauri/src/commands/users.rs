@@ -3,7 +3,11 @@ use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
 
-use super::AppContext;
+use crate::resolve;
+
+use super::{
+    AppContext
+};
 
 // A database user, normalized from the `usersInfo` result.
 #[derive(Serialize)]
@@ -41,10 +45,7 @@ pub async fn list_users(
     id: String,
     database: String,
 ) -> Result<Vec<UserInfo>, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let result = match client.database(&database).run_command(bson::doc! { "usersInfo": 1 }).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
@@ -83,10 +84,7 @@ pub async fn create_user(
     password: String,
     roles: Vec<String>,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let mut role_docs: Vec<bson::Bson> = Vec::new();
     for role in roles.iter() {
         let trimmed = role.trim();
@@ -156,10 +154,7 @@ pub async fn copy_users_to_connection(
     target_id: String,
     target_database: String,
 ) -> Result<Vec<CopiedUser>, AppError> {
-    let source_client = match ctx.client(&source_id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let source_client = resolve!(ctx.client(&source_id).await);
     let result = match source_client
         .database(&source_database)
         .run_command(bson::doc! { "usersInfo": 1 })
@@ -169,10 +164,7 @@ pub async fn copy_users_to_connection(
         Err(e) => return Err(AppError::Mongo(e)),
     };
 
-    let target_client = match ctx.client_for_write(&target_id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let target_client = resolve!(ctx.client_for_write(&target_id).await);
     let target_db = target_client.database(&target_database);
 
     let mut copied: Vec<CopiedUser> = Vec::new();
@@ -223,10 +215,7 @@ pub async fn drop_user(
     database: String,
     username: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     match client.database(&database).run_command(bson::doc! { "dropUser": &username }).await {
         Ok(_) => Ok(()),
         Err(e) => Err(AppError::Mongo(e)),
@@ -240,10 +229,7 @@ pub async fn list_roles(
     id: String,
     database: String,
 ) -> Result<Vec<String>, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "rolesInfo": 1, "showBuiltinRoles": false };
     let result = match client.database(&database).run_command(command).await {
         Ok(val) => val,

@@ -1,7 +1,11 @@
 use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
-use super::AppContext;
+use crate::resolve;
+
+use super::{
+    AppContext
+};
 use super::collect_values;
 
 // Build the `profile` admin command for a database. Pure, so it's unit-tested; an
@@ -22,10 +26,7 @@ pub async fn get_profiling_status(
     id: String,
     database: String,
 ) -> Result<serde_json::Value, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let result = match client
         .database(&database)
         .run_command(bson::doc! { "profile": -1 })
@@ -52,10 +53,7 @@ pub async fn set_profiling_level(
         Ok(val) => val,
         Err(e) => return Err(AppError::Bson(e)),
     };
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let result = match client.database(&database).run_command(command).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
@@ -76,10 +74,7 @@ pub async fn list_profile(
     limit: i64,
     slower_than_ms: Option<i64>,
 ) -> Result<serde_json::Value, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let col = client
         .database(&database)
         .collection::<bson::Document>("system.profile");
@@ -96,10 +91,7 @@ pub async fn list_profile(
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
     };
-    let values = match collect_values(&mut cursor).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let values = resolve!(collect_values(&mut cursor).await);
     Ok(serde_json::Value::Array(values))
 }
 

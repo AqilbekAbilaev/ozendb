@@ -2,7 +2,11 @@ use crate::error::AppError;
 use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
-use super::AppContext;
+use crate::resolve;
+
+use super::{
+    AppContext
+};
 
 // A single index's on-disk size, pulled from collStats.indexSizes.
 #[derive(Serialize)]
@@ -78,10 +82,7 @@ pub async fn collection_stats(
     database: String,
     collection: String,
 ) -> Result<CollectionStats, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "collStats": &collection };
     let result = match client.database(&database).run_command(command).await {
         Ok(val) => val,

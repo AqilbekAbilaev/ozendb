@@ -2,7 +2,11 @@ use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
 
-use super::{next_document, AppContext, IMPORT_BATCH_SIZE};
+use crate::resolve;
+
+use super::{
+    next_document, AppContext, IMPORT_BATCH_SIZE
+};
 
 /// Copy a collection to another collection (optionally in another database) on the
 /// SAME connection, via an aggregation `$out`. The target collection is replaced if
@@ -19,10 +23,7 @@ pub async fn copy_collection(
 ) -> Result<(), AppError> {
     // Copy writes into the target collection on this same connection, so gate on
     // the connection being writable (the `$out` below is the write).
-    let src = match ctx.collection_for_write(&id, &source_database, &source_collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let src = resolve!(ctx.collection_for_write(&id, &source_database, &source_collection).await);
     let pipeline = vec![
         bson::doc! { "$match": {} },
         bson::doc! { "$out": { "db": &target_database, "coll": &target_collection } },
@@ -97,10 +98,7 @@ pub async fn copy_collection_to_connection(
     let mut batch: Vec<bson::Document> = Vec::with_capacity(IMPORT_BATCH_SIZE);
     let mut count: u64 = 0;
     loop {
-        let next = match next_document(&mut cursor).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let next = resolve!(next_document(&mut cursor).await);
         match next {
             Some(doc) => {
                 batch.push(doc);

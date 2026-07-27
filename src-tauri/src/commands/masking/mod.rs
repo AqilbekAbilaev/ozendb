@@ -3,7 +3,11 @@ use mongodb::bson;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use super::{parse_ejson_document, MAX_QUERY_TIME, AppContext};
+use crate::resolve;
+
+use super::{
+    parse_ejson_document, MAX_QUERY_TIME, AppContext
+};
 
 // A per-field masking instruction. `field` is a dotted path (e.g. "contact.email").
 // Only fields the user chose to mask are sent; everything else is exported as-is.
@@ -157,10 +161,7 @@ pub async fn export_masked_collection(
     format: String,
     limit: Option<i64>,
 ) -> Result<usize, AppError> {
-    let col = match ctx.collection(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection(&id, &database, &collection).await);
 
     let filter_doc = match parse_ejson_document(&filter) {
         Ok(val) => val,

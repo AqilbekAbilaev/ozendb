@@ -31,6 +31,7 @@ mod ssh;
 mod shell_history;
 mod storage;
 mod tabs;
+
 mod time;
 mod uri;
 
@@ -52,6 +53,7 @@ use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;
 use storage::Storage;
 use tabs::TabStorage;
+
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

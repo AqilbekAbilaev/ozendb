@@ -4,7 +4,11 @@ use crate::error::AppError;
 use crate::shell::{ShellEngine, ShellResult};
 use crate::shell_history::ShellHistoryStorage;
 use tauri::State;
-use super::AppContext;
+use crate::resolve;
+
+use super::{
+    AppContext
+};
 
 /// Evaluate a block of JavaScript in the shell session identified by
 /// `session_id`. Each session has its own persistent JS context, so variables
@@ -22,10 +26,7 @@ pub async fn run_shell_command(
 ) -> Result<ShellResult, AppError> {
     // Resolve the connection exactly like find_documents so the shell shares the
     // same pooled client and credential flow.
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
 
     // A read-only connection must refuse shell writes (insertOne/drop/…) just like
     // the rest of the app; reads still pass through.

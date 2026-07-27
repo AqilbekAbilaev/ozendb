@@ -4,6 +4,8 @@ use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
 
+use crate::resolve;
+
 use super::{
     collect_json, next_document, parse_ejson_document, parse_json_documents,
     parse_pipeline, MAX_QUERY_TIME, AppContext,
@@ -121,10 +123,7 @@ pub async fn kill_query(
     id: String,
     comment: String,
 ) -> Result<usize, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let admin = client.database("admin");
 
     // $currentOp defaults to the authenticated user's own ops, which is exactly
@@ -171,10 +170,7 @@ pub async fn find_documents(
     limit: i64,
     comment: Option<String>,
 ) -> Result<Box<serde_json::value::RawValue>, AppError> {
-    let col = match ctx.collection(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection(&id, &database, &collection).await);
 
     let filter_doc = match parse_ejson_document(&filter) {
         Ok(val) => val,
@@ -225,10 +221,7 @@ pub async fn count_documents(
     collection: String,
     filter: String,
 ) -> Result<i64, AppError> {
-    let col = match ctx.collection(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection(&id, &database, &collection).await);
 
     let filter_doc = match parse_ejson_document(&filter) {
         Ok(val) => val,
@@ -255,10 +248,7 @@ pub async fn insert_document(
     collection: String,
     document: String,
 ) -> Result<String, AppError> {
-    let col = match ctx.collection_for_write(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
     let doc = match parse_ejson_document(&document) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -293,10 +283,7 @@ pub async fn insert_documents(
             "Clipboard has no document(s) to paste".to_string(),
         ));
     }
-    let col = match ctx.collection_for_write(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
     match col.insert_many(docs).await {
         Ok(result) => Ok(result.inserted_ids.len()),
         Err(e) => Err(AppError::Mongo(e)),
@@ -313,10 +300,7 @@ pub async fn replace_document(
     id_filter: String,
     document: String,
 ) -> Result<(), AppError> {
-    let col = match ctx.collection_for_write(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
     let filter_doc = match parse_ejson_document(&id_filter) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -356,10 +340,7 @@ pub async fn delete_document(
     collection: String,
     id_filter: String,
 ) -> Result<(), AppError> {
-    let col = match ctx.collection_for_write(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
     let filter_doc = match parse_ejson_document(&id_filter) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -408,10 +389,7 @@ pub async fn update_many(
     upsert: bool,
     multi: bool,
 ) -> Result<i64, AppError> {
-    let col = match ctx.collection_for_write(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
     let filter_doc = match parse_ejson_document(&filter) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -456,10 +434,7 @@ pub async fn delete_many(
     collection: String,
     filter: String,
 ) -> Result<i64, AppError> {
-    let col = match ctx.collection_for_write(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
     let filter_doc = match parse_ejson_document(&filter) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -481,10 +456,7 @@ pub async fn clear_collection(
     database: String,
     collection: String,
 ) -> Result<i64, AppError> {
-    let col = match ctx.collection_for_write(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
     // An empty filter matches every document; the collection itself is untouched.
     let result = match col.delete_many(bson::doc! {}).await {
         Ok(val) => val,
@@ -528,10 +500,7 @@ pub async fn explain_query(
         Ok(val) => val,
         Err(e) => return Err(AppError::Bson(e)),
     };
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
 
     let filter_doc = match parse_ejson_document(&filter) {
         Ok(val) => val,
@@ -592,10 +561,7 @@ pub async fn explain_aggregate(
         Ok(val) => val,
         Err(e) => return Err(AppError::Bson(e)),
     };
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let stages = match parse_pipeline(&pipeline) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -630,10 +596,7 @@ pub async fn run_aggregate(
     pipeline: String,
     comment: Option<String>,
 ) -> Result<AggregateResult, AppError> {
-    let col = match ctx.collection(&id, &database, &collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection(&id, &database, &collection).await);
     let stages = match parse_pipeline(&pipeline) {
         Ok(val) => val,
         Err(e) => return Err(e),

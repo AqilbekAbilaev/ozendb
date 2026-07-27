@@ -3,7 +3,11 @@ use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
 
-use super::{next_document, AppContext};
+use crate::resolve;
+
+use super::{
+    next_document, AppContext
+};
 
 // A server-side stored function, from a `system.js` document ({ _id, value: Code }).
 #[derive(Serialize)]
@@ -29,10 +33,7 @@ pub async fn list_functions(
     id: String,
     database: String,
 ) -> Result<Vec<StoredFunction>, AppError> {
-    let coll = match ctx.collection(&id, &database, "system.js").await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let coll = resolve!(ctx.collection(&id, &database, "system.js").await);
     let mut cursor = match coll.find(bson::doc! {}).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
@@ -66,10 +67,7 @@ pub async fn save_function(
     name: String,
     body: String,
 ) -> Result<(), AppError> {
-    let coll = match ctx.collection_for_write(&id, &database, "system.js").await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let coll = resolve!(ctx.collection_for_write(&id, &database, "system.js").await);
     let update = bson::doc! { "$set": { "value": bson::Bson::JavaScriptCode(body) } };
     match coll
         .update_one(bson::doc! { "_id": &name }, update)
@@ -89,10 +87,7 @@ pub async fn drop_function(
     database: String,
     name: String,
 ) -> Result<(), AppError> {
-    let coll = match ctx.collection_for_write(&id, &database, "system.js").await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let coll = resolve!(ctx.collection_for_write(&id, &database, "system.js").await);
     match coll.delete_one(bson::doc! { "_id": &name }).await {
         Ok(_) => Ok(()),
         Err(e) => Err(AppError::Mongo(e)),
