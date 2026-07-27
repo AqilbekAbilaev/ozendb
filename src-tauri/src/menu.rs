@@ -104,7 +104,6 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
                 Spec::Separator,
                 Spec::Action { id: "file:intellishell", label: "Open IntelliShell", accel: Some("CmdOrCtrl+L"), gate: Some(Gate::Database) },
                 Spec::Action { id: "file:sql", label: "Open SQL", accel: Some("CmdOrCtrl+Shift+L"), gate: Some(Gate::Collection) },
-                Spec::Action { id: "file:tasks", label: "Open Tasks", accel: None, gate: None },
                 Spec::Action { id: "file:search", label: "Search in…", accel: None, gate: Some(Gate::Database) },
                 Spec::Placeholder { id: "file:manage_sql", label: "Manage SQL Connections" },
                 Spec::Separator,

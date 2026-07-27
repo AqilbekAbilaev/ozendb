@@ -742,7 +742,7 @@ pub async fn import_collection(
             .collection::<bson::Document>(&collection);
         // Stream the file in bounded batches instead of loading + parsing + inserting the
         // whole thing at once, so a large import can't exhaust memory. `None` mapping =
-        // insert documents exactly as parsed (also the Tasks import path).
+        // insert documents exactly as parsed.
         super::stream_import(&col, &path, &format, None, super::CsvOptions::default()).await
     };
     tracked(&ops, Some(meta), run).await

@@ -14,7 +14,6 @@ import IndexManagerPane from './IndexManagerPane.vue'
 import SchemaPane from './SchemaPane.vue'
 import MaskingPane from './MaskingPane.vue'
 import SearchPane from './SearchPane.vue'
-import TasksPane from './TasksPane.vue'
 import ImportPane from './ImportPane.vue'
 import CsvImportPane from './CsvImportPane.vue'
 import QueryBrowserModal from './QueryBrowserModal.vue'
@@ -330,7 +329,6 @@ async function applyFromBrowser(entry) {
     <SearchPane v-else-if="activeTab.kind === 'search'" :active-tab="activeTab" />
 
     <!-- Tasks (app-level) -->
-    <TasksPane v-else-if="activeTab.kind === 'tasks'" />
 
     <!-- Import (CSV uses the single-source, sub-tab layout; JSON the multi-source table) -->
     <CsvImportPane v-else-if="activeTab.kind === 'import' && activeTab.format === 'csv'" :active-tab="activeTab" />

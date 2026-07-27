@@ -7,7 +7,7 @@ import BaseSelect from '../base/BaseSelect.vue'
 import { formatNow } from '../../utils/format'
 
 // Actions/state come from App.vue's provided `appModals` (the same DI the modals
-// use), so the home screen can open the Connection Manager / Tasks, connect to a
+// use), so the home screen can open the Connection Manager, connect to a
 // recent connection, and change the theme without threading props through
 // QueryWorkspace. Guarded so the component still renders if provided in isolation.
 const app = inject('appModals', null)
@@ -58,8 +58,6 @@ async function openRecent(c) {
 // ── actions ────────────────────────────────────────────────
 function openConnectionManager() { if (modals.openModal) modals.openModal('connectionManager') }
 function createConnection()       { openConnectionManager() }  // new-connection form lives inside the manager
-function openTasks()              { handlers.openTasksTab?.() }
-function createTask()             { openTasks() }
 
 function setTheme(value) { handlers.setTheme?.(value) }
 
@@ -125,19 +123,6 @@ function openLink(url) { openUrl(url).catch(() => handlers.showToast?.('Could no
 
       <!-- Right column -->
       <div class="qs-col">
-        <section class="qs-sec">
-          <h2>Tasks</h2>
-          <p class="qs-muted">Automate common operations — imports, exports and scripts, on demand or on a schedule.</p>
-          <button class="qs-row action" @click="openTasks">
-            <BaseIcon name="tasks" :size="18" class="qs-row-ic" />
-            <span class="qs-row-title">Open Task Manager</span>
-          </button>
-          <button class="qs-row action" @click="createTask">
-            <BaseIcon name="plus" :size="18" class="qs-row-ic" />
-            <span class="qs-row-title">Create a new task</span>
-          </button>
-        </section>
-
         <section class="qs-sec">
           <h2>Help &amp; Learning</h2>
           <a v-for="[label, url] in helpLinks" :key="url" class="qs-link" @click="openLink(url)">

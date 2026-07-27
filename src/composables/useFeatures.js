@@ -19,7 +19,7 @@ export function useFeatures({
   // injected functions
   showToast, applyColorTag, menuTarget,
   handleTabAction, openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab,
-  openSchemaTab, openMaskingTab, openSearchTab, openTasksTab,
+  openSchemaTab, openMaskingTab, openSearchTab,
   openExportWizard, openImportWizard, exportDatabase, importDatabase,
 }) {
   const {
@@ -33,7 +33,7 @@ export function useFeatures({
   const COLL = ['connId', 'connName', 'dbName', 'collName']
 
   // Toolbar tool name → registry action. Tools whose behavior is app-level
-  // (connect/sql/tasks) or bespoke (collection/shell) are handled in handleTool.
+  // (connect/sql) or bespoke (collection/shell) are handled in handleTool.
   const TOOL_ALIASES = {
     aggregate: 'Open Aggregation Editor',
     export:    'Export…',
@@ -237,13 +237,12 @@ export function useFeatures({
     return runFeature(action, saved.nodeData, { label: saved.label })
   }
 
-  // Toolbar / native-menu tool dispatch. `connect`/`sql`/`tasks` are app-level (no
+  // Toolbar / native-menu tool dispatch. `connect`/`sql` are app-level (no
   // node); `collection`/`shell` keep their bespoke selection + guidance logic; every
   // other tool resolves the operating node (the passed sidebar selection, else the
   // active tab) and routes through the shared feature registry.
   function handleTool(name, target = null) {
     if (name === 'connect') { modals.openModal('connectionManager'); return }
-    if (name === 'tasks')   { openTasksTab();                       return }
 
     if (name === 'collection') {
       // Opens the collection currently highlighted in the sidebar, same as

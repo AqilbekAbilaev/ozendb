@@ -12,7 +12,6 @@ const PATHS = {
   aggregate:  '<circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M7.6 7.6 11 15.2M16.4 7.6 13 15.2"/>',
   search:     '<circle cx="11" cy="11" r="6.2"/><path d="M20 20l-4.6-4.6"/>',
   schema:     '<circle cx="12" cy="12" r="8"/><path d="M12 4v8l5.6 3.2"/>',
-  tasks:      '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 1.6-2M4 12l1 1 1.6-2M4 18l1 1 1.6-2"/>',
   export:     '<ellipse cx="9" cy="6" rx="6" ry="2.4"/><path d="M3 6v7c0 1.3 2.7 2.4 6 2.4"/><path d="M16 9v8M16 9l-3 3M16 9l3 3" transform="translate(0 -1)"/>',
   import:     '<ellipse cx="9" cy="6" rx="6" ry="2.4"/><path d="M3 6v7c0 1.3 2.7 2.4 6 2.4"/><path d="M16 17V9M16 17l-3-3M16 17l3-3" transform="translate(0 -1)"/>',
   mask:       '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7.5 10v4M7.5 10l3 4M7.5 14l3-4M14 10v4M14 10l3 4M14 14l3-4" stroke-width="1.2"/>',

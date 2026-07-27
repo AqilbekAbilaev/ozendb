@@ -10,7 +10,6 @@ export const TOOLS = [
   { name: 'search',    label: 'Search in…' },
   { sep: true },
   { name: 'schema',    label: 'Schema' },
-  { name: 'tasks',     label: 'Tasks' },
   { sep: true },
   { name: 'export',    label: 'Export' },
   { name: 'import',    label: 'Import' },

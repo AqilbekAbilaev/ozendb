@@ -31,7 +31,6 @@ mod ssh;
 mod shell_history;
 mod storage;
 mod tabs;
-mod tasks;
 mod time;
 mod uri;
 
@@ -53,7 +52,6 @@ use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;
 use storage::Storage;
 use tabs::TabStorage;
-use tasks::TaskStore;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -94,8 +92,6 @@ pub fn run() {
             app.manage(ShellHistoryStorage::new(
                 data_dir.join("shell_history.json"),
             ));
-            // Saved tasks (the scheduler that fires them is spawned in a later step).
-            app.manage(TaskStore::new(data_dir.join("tasks.json")));
             // The single source of truth for the Operations pane; holds the app
             // handle so it can announce changes via the `operations-changed` event.
             app.manage(OperationsRegistry::new(
@@ -128,11 +124,6 @@ pub fn run() {
             };
             app.manage(menu::MenuItems(std::sync::Mutex::new(gated_items)));
             app.on_menu_event(menu::handle_event);
-
-            // Start the in-app task scheduler now that its stores are managed. It
-            // ticks in the background, runs due scheduled tasks, and catches up any
-            // that came due while the app was closed.
-            commands::tasks::spawn_scheduler(app.handle().clone());
 
             Ok(())
         })
@@ -257,10 +248,6 @@ pub fn run() {
             rename_folder,
             delete_folder,
             move_connection_to_folder,
-            list_tasks,
-            save_task,
-            delete_task,
-            run_task,
             list_operations,
             clear_operations,
             menu::set_menu_context,
