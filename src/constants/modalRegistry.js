@@ -16,7 +16,6 @@ export const MODALS = {
   // Opened by id alone (openModal('about')); any props/events they need are declared in
   // App.vue's modalProps / modalEmits maps and bound generically by AppModals.
   connectionManager: { component: lazy(() => import('../components/connection/ConnectionManager.vue')), level: null },
-  shortcuts:         { component: lazy(() => import('../components/app/ShortcutsModal.vue')),            level: null },
   about:             { component: lazy(() => import('../components/app/AboutModal.vue')),                level: null },
   preferences:       { component: lazy(() => import('../components/app/PreferencesModal.vue')),          level: null },
 

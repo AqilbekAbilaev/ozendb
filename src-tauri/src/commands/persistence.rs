@@ -15,23 +15,61 @@ pub fn get_settings(settings: State<'_, SettingsStorage>) -> Settings {
     settings.load()
 }
 
-/// Persist app preferences. The default query limit is clamped to a sane range
-/// so a bad value can't break paging. Returns the saved settings.
+/// Persist app preferences. Each field is optional and merged over the current
+/// settings, so a partial update (e.g. just toggling the theme) can't wipe the
+/// others. Values are clamped/validated so a bad value can't break the UI.
 #[tauri::command]
 pub fn update_settings(
     settings: State<'_, SettingsStorage>,
-    default_query_limit: i64,
-    theme: String,
+    default_query_limit: Option<i64>,
+    theme: Option<String>,
+    default_result_view: Option<String>,
+    restore_session: Option<bool>,
+    editor_tab_width: Option<i64>,
 ) -> Result<Settings, AppError> {
+    let current = settings.load();
+
     // Only known theme names are accepted; anything else falls back to dark so a
     // bad value from the frontend can't leave the UI in an undefined state.
-    let validated_theme = match theme.as_str() {
+    let merged_theme = match theme {
+        Some(value) => value,
+        None => current.theme,
+    };
+    let validated_theme = match merged_theme.as_str() {
         "light" => "light".to_string(),
         _ => "dark".to_string(),
     };
+
+    // Result view is one of the three known modes; anything else falls back to table.
+    let merged_view = match default_result_view {
+        Some(value) => value,
+        None => current.default_result_view,
+    };
+    let validated_view = match merged_view.as_str() {
+        "json" => "json".to_string(),
+        "tree" => "tree".to_string(),
+        _ => "table".to_string(),
+    };
+
+    let merged_limit = match default_query_limit {
+        Some(value) => value,
+        None => current.default_query_limit,
+    };
+    let merged_restore = match restore_session {
+        Some(value) => value,
+        None => current.restore_session,
+    };
+    let merged_tab_width = match editor_tab_width {
+        Some(value) => value,
+        None => current.editor_tab_width,
+    };
+
     let new_settings = Settings {
-        default_query_limit: default_query_limit.clamp(1, 1000),
+        default_query_limit: merged_limit.clamp(1, 1000),
         theme: validated_theme,
+        default_result_view: validated_view,
+        restore_session: merged_restore,
+        editor_tab_width: merged_tab_width.clamp(1, 8),
     };
     match settings.save(&new_settings) {
         Ok(_) => Ok(new_settings),

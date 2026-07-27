@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { errText } from '../../utils/errors'
 import { parseField } from '../../utils/queryParser'
@@ -43,7 +43,17 @@ const props = defineProps({
 const emit = defineEmits(['run', 'requery', 'select-rtab', 'explain-verbosity', 'open-vqb', 'close-vqb', 'cancel', 'follow-reference'])
 const { showToast } = useToast()
 
-const viewMode     = ref('table')
+// The Table/JSON/Tree view lives on the active tab, so each tab keeps its own view;
+// a tab that has none yet falls back to the configured default (Preferences → General).
+const defaultResultView = inject('defaultResultView', ref('table'))
+const viewMode = computed({
+  get() {
+    return props.activeTab && props.activeTab.resultView ? props.activeTab.resultView : defaultResultView.value
+  },
+  set(value) {
+    if (props.activeTab) props.activeTab.resultView = value
+  },
+})
 const viewMenu     = ref(false)
 const pageSizeMenu = ref(false)
 

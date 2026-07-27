@@ -1,9 +1,9 @@
 <script setup>
-import { ref, shallowRef, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { EditorView, lineNumbers as lineNumbersExt, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { indentWithTab } from '@codemirror/commands'
-import { syntaxHighlighting } from '@codemirror/language'
+import { syntaxHighlighting, indentUnit } from '@codemirror/language'
 import { baseTheme, codeHighlightStyle, jsonHighlightStyle } from '../../utils/codemirror/theme'
 import { languageExtension } from '../../utils/codemirror/languages'
 
@@ -26,6 +26,10 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
+// Spaces per indent level (Preferences → Appearance). Injected so every editor —
+// IntelliShell, the document editor, the JSON view — honors the one setting.
+const editorTabWidth = inject('editorTabWidth', ref(4))
+
 const hostEl = ref(null)
 const view = shallowRef(null)
 // True while we push an external modelValue into the view, so the resulting docChanged
@@ -35,6 +39,9 @@ let applyingModelValue = false
 function buildState() {
   const base = []
   if (props.lineNumbers) base.push(lineNumbersExt())
+  const tabWidth = editorTabWidth.value
+  base.push(EditorState.tabSize.of(tabWidth))
+  base.push(indentUnit.of(' '.repeat(tabWidth)))
   base.push(keymap.of([indentWithTab]))
   base.push(languageExtension(props.language))
   base.push(syntaxHighlighting(props.highlight === 'json' ? jsonHighlightStyle : codeHighlightStyle))

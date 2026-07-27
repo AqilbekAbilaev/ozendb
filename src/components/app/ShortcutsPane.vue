@@ -1,19 +1,16 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import BaseIcon from '../base/BaseIcon.vue'
 import { SHORTCUT_COMMANDS, defaultAccel, accelToTokens, accelFromEvent } from '../../utils/keybindings'
-import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import KeybindButton from '../base/KeybindButton.vue'
 
-// Keyboard shortcuts: the top section is customizable (the menu actions the app
-// can rebind); the reference groups below list the fixed shortcuts the editors
-// and grid handle. Rebinds are saved via the parent (persisted + applied live on
-// Linux, and on the native menu bar at next launch).
+// Keyboard shortcuts editor — the body of the old ShortcutsModal, lifted into a pane
+// so it can live as a Preferences tab. The top section rebinds the customizable menu
+// actions; the groups below list the fixed shortcuts the editors and grid handle.
+// The parent collects the working bindings on save via the exposed collectBindings().
 const props = defineProps({
   bindings: { type: Object, default: () => ({}) },
 })
-const emit = defineEmits(['close', 'save'])
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '')
 const mod = isMac ? '⌘' : 'Ctrl'
@@ -27,10 +24,6 @@ for (const cmd of SHORTCUT_COMMANDS) {
 
 const capturingId = ref(null)   // command id whose row is listening for a key
 const conflict = ref(null)      // { label } the last capture collided with
-
-const dirty = computed(() =>
-  SHORTCUT_COMMANDS.some((cmd) => working[cmd.id] !== (props.bindings[cmd.id] || cmd.default))
-)
 
 function tokens(accel) {
   return accelToTokens(accel, isMac)
@@ -78,12 +71,19 @@ function resetAll() {
   cancelCapture()
 }
 
-function save() {
+// Whether the working copy differs from the saved bindings (for the parent's Save).
+const dirty = computed(() =>
+  SHORTCUT_COMMANDS.some((cmd) => working[cmd.id] !== (props.bindings[cmd.id] || cmd.default))
+)
+
+// The full command→accelerator map, read by the parent (PreferencesModal) on save.
+function collectBindings() {
   const payload = {}
   for (const cmd of SHORTCUT_COMMANDS) payload[cmd.id] = working[cmd.id]
-  emit('save', payload)
-  emit('close')
+  return payload
 }
+
+defineExpose({ collectBindings: collectBindings, dirty: dirty })
 
 // Fixed reference shortcuts handled directly by the editors and results grid.
 const REFERENCE = computed(() => [
@@ -122,78 +122,66 @@ const REFERENCE = computed(() => [
 </script>
 
 <template>
-  <BaseModal title="Keyboard Shortcuts" width="560px" max-width="92vw" @close="$emit('close')">
-
-      <div class="sc-body">
-        <!-- Customizable menu shortcuts -->
-        <section class="sc-group">
-          <div class="sc-group-head">
-            <h3 class="sc-group-title">Menu shortcuts</h3>
-            <BaseButton variant="ghost" size="sm" @click="resetAll">Reset all</BaseButton>
-          </div>
-
-          <div v-for="cmd in SHORTCUT_COMMANDS" :key="cmd.id" class="sc-edit-row">
-            <span class="sc-desc">{{ cmd.label }}</span>
-
-            <KeybindButton
-              v-if="capturingId !== cmd.id"
-              :keys="tokens(working[cmd.id])"
-              @click="startCapture(cmd.id)"
-            />
-
-            <span
-              v-else
-              class="sc-binding capturing"
-              tabindex="0"
-              :ref="(el) => el && el.focus()"
-              @keydown="onCaptureKeydown(cmd.id, $event)"
-              @blur="cancelCapture"
-            >Press a shortcut… <span class="sc-esc">Esc to cancel</span></span>
-
-            <BaseButton
-              variant="ghost"
-              size="sm"
-              :disabled="working[cmd.id] === cmd.default"
-              title="Reset to default"
-              @click="resetOne(cmd.id)"
-            >Reset</BaseButton>
-          </div>
-
-          <p v-if="conflict" class="sc-conflict">
-            That shortcut is already used by “{{ conflict.label }}”. Pick another.
-          </p>
-        </section>
-
-        <!-- Fixed reference -->
-        <section v-for="group in REFERENCE" :key="group.title" class="sc-group">
-          <h3 class="sc-group-title">{{ group.title }}</h3>
-          <div v-for="item in group.items" :key="item.desc" class="sc-row">
-            <span class="sc-keys">
-              <template v-for="(k, i) in item.keys" :key="i">
-                <kbd>{{ k }}</kbd><span v-if="i < item.keys.length - 1" class="sc-plus">+</span>
-              </template>
-            </span>
-            <span class="sc-desc">{{ item.desc }}</span>
-          </div>
-        </section>
+  <div class="sc-body">
+    <!-- Customizable menu shortcuts -->
+    <section class="sc-group">
+      <div class="sc-group-head">
+        <h3 class="sc-group-title">Menu shortcuts</h3>
+        <BaseButton variant="ghost" size="sm" @click="resetAll">Reset all</BaseButton>
       </div>
 
-      <div class="sc-footer">
-        <BaseButton bordered @click="$emit('close')">Close</BaseButton>
-        <BaseButton variant="primary" :disabled="!dirty" @click="save">Save changes</BaseButton>
+      <div v-for="cmd in SHORTCUT_COMMANDS" :key="cmd.id" class="sc-edit-row">
+        <span class="sc-desc">{{ cmd.label }}</span>
+
+        <KeybindButton
+          v-if="capturingId !== cmd.id"
+          :keys="tokens(working[cmd.id])"
+          @click="startCapture(cmd.id)"
+        />
+
+        <span
+          v-else
+          class="sc-binding capturing"
+          tabindex="0"
+          :ref="(el) => el && el.focus()"
+          @keydown="onCaptureKeydown(cmd.id, $event)"
+          @blur="cancelCapture"
+        >Press a shortcut… <span class="sc-esc">Esc to cancel</span></span>
+
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          :disabled="working[cmd.id] === cmd.default"
+          title="Reset to default"
+          @click="resetOne(cmd.id)"
+        >Reset</BaseButton>
       </div>
-    </BaseModal>
+
+      <p v-if="conflict" class="sc-conflict">
+        That shortcut is already used by “{{ conflict.label }}”. Pick another.
+      </p>
+    </section>
+
+    <!-- Fixed reference -->
+    <section v-for="group in REFERENCE" :key="group.title" class="sc-group">
+      <h3 class="sc-group-title">{{ group.title }}</h3>
+      <div v-for="item in group.items" :key="item.desc" class="sc-row">
+        <span class="sc-keys">
+          <template v-for="(k, i) in item.keys" :key="i">
+            <kbd>{{ k }}</kbd><span v-if="i < item.keys.length - 1" class="sc-plus">+</span>
+          </template>
+        </span>
+        <span class="sc-desc">{{ item.desc }}</span>
+      </div>
+    </section>
+  </div>
 </template>
 
 <style scoped>
-
 .sc-body {
-  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-height: 66vh;
-  overflow-y: auto;
 }
 .sc-group-head {
   display: flex;
@@ -258,21 +246,10 @@ const REFERENCE = computed(() => [
 }
 .sc-esc { color: var(--text-faint); margin-left: 6px; font-size: 11px; }
 
-
 .sc-conflict {
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--danger-text);
-}
-
-.sc-footer {
-  flex: none;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 10px 14px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-panel);
 }
 
 kbd {

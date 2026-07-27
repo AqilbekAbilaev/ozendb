@@ -80,6 +80,9 @@ onMounted(async () => {
       defaultQueryLimit.value = Number(settings.default_query_limit)
     }
     if (settings && settings.theme) applyTheme(settings.theme)
+    if (settings && settings.default_result_view) defaultResultView.value = settings.default_result_view
+    if (settings && typeof settings.restore_session === 'boolean') restoreSessionEnabled.value = settings.restore_session
+    if (settings && Number(settings.editor_tab_width)) editorTabWidth.value = Number(settings.editor_tab_width)
   } catch (_) {}
 
   // Load custom keyboard shortcuts so the JS handler (Linux) honors rebinds.
@@ -92,8 +95,9 @@ onMounted(async () => {
   await loadNodeTags()
 
   // Restore the previous session's tabs before wiring up the save watcher, so the
-  // empty default never overwrites tabs.json first.
-  await restoreSession()
+  // empty default never overwrites tabs.json first. Skipped when the user turned
+  // session restore off (the save watcher below still keeps tabs.json current).
+  if (restoreSessionEnabled.value) await restoreSession()
 
   // Save on any change to the open tabs or the active tab.
   startAutoSave()
@@ -142,6 +146,10 @@ const modalsApi = useModals()
 // by useFeatures (via `modals: modalsApi`) and AppModals (via provide/inject).
 const defaultQueryLimit = ref(50)     // from settings; applied to newly opened collection tabs
 const theme = ref('dark')             // from settings; drives <html data-theme>
+const defaultResultView = ref('table')// from settings; the view a freshly opened collection tab shows
+const restoreSessionEnabled = ref(true) // from settings; whether to reopen last session's tabs on startup
+const editorTabWidth = ref(4)         // from settings; spaces per indent in the query/shell editors
+const preferencesInitialTab = ref('general') // which Preferences tab to open on (e.g. 'keyboard' from Help menu)
 // Effective keyboard shortcuts (defaults + user overrides). The JS key handler
 // reads these on Linux; the native menu reads the same persisted store at build.
 const keyBindings = ref(mergeBindings(null))
@@ -199,6 +207,11 @@ function showToast(msg) {
 // Toast is an app-wide concern, so it's provided once here and injected by any
 // component that needs it (see useToast) rather than bubbled up as a `toast` event.
 provide('showToast', showToast)
+// The default result view (Preferences → General) is injected by ResultsPanel as the
+// fallback for a tab that has no view of its own yet.
+provide('defaultResultView', defaultResultView)
+// Editor indent width (Preferences → Appearance) is injected by every CodeEditor.
+provide('editorTabWidth', editorTabWidth)
 
 const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags()
 
@@ -312,8 +325,8 @@ function handleMenuAction(id) {
     // --- direct modals / app ---
     case 'file:connect':     invoke('open_connect_window').catch(() => {}); return
     case 'file:exit':        appWindow.close(); return
-    case 'edit:preferences': modalsApi.openModal('preferences'); return
-    case 'help:shortcuts':   modalsApi.openModal('shortcuts'); return
+    case 'edit:preferences': preferencesInitialTab.value = 'general'; modalsApi.openModal('preferences'); return
+    case 'help:shortcuts':   preferencesInitialTab.value = 'keyboard'; modalsApi.openModal('preferences'); return
     case 'help:quickstart':  openQuickstart(); return
     case 'help:about':       modalsApi.openModal('about'); return
     // Help links open the project's GitHub (issues / releases / repo). Configurable —
@@ -586,6 +599,7 @@ async function openCollectionTab({ connectionId, connectionName, dbName, collect
     filter: filter || '', projection: '', sort: '', skip: 0, limit: defaultQueryLimit.value,
     mode: startMode, pipeline: '',
     vqb: null,
+    resultView: defaultResultView.value,
     results: [], hasRun: false, isRunning: false, runError: null,
     selectedRow: -1, selectedRows: [], elapsedMs: null,
   })
@@ -860,6 +874,9 @@ async function onPasteQuery() {
 function onPrefsSaved(payload) {
   defaultQueryLimit.value = payload.defaultQueryLimit
   applyTheme(payload.theme)
+  defaultResultView.value = payload.defaultResultView
+  restoreSessionEnabled.value = payload.restoreSession
+  editorTabWidth.value = payload.editorTabWidth
 }
 
 // Shortcuts editor saved: persist the new bindings and adopt them live. The JS
@@ -903,17 +920,23 @@ provide('appModals', {
       },
     },
     connectionManager: { connect: onManagerConnect },
-    shortcuts: { save: onKeybindingsSaved },
     preferences: {
       saved: onPrefsSaved,
-      'open-shortcuts': () => { modalsApi.closeModal('preferences'); modalsApi.openModal('shortcuts') },
+      'saved-keybindings': onKeybindingsSaved,
     },
   },
   // Extra props for registry-driven modals that need app-level state beyond their target:
   // modal id → () => props object, re-read on each render so reactive values stay current.
   modalProps: {
-    shortcuts: () => ({ bindings: keyBindings.value }),
-    preferences: () => ({ defaultQueryLimit: defaultQueryLimit.value, theme: theme.value }),
+    preferences: () => ({
+      defaultQueryLimit: defaultQueryLimit.value,
+      theme: theme.value,
+      defaultResultView: defaultResultView.value,
+      restoreSession: restoreSessionEnabled.value,
+      editorTabWidth: editorTabWidth.value,
+      bindings: keyBindings.value,
+      initialTab: preferencesInitialTab.value,
+    }),
   },
   prefs: { defaultQueryLimit: defaultQueryLimit, theme: theme, keyBindings: keyBindings },
   tabRename: { renameTabTarget: renameTabTarget, renameTabValue: renameTabValue, confirmRenameTab: confirmRenameTab },
