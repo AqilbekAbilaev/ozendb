@@ -12,6 +12,7 @@ import BaseRadio from '../base/BaseRadio.vue'
 import NumberStepper from '../base/NumberStepper.vue'
 import StateMessage from '../base/StateMessage.vue'
 import HintText from '../base/HintText.vue'
+import { cellText } from '../../utils/format'
 
 // CSV import tab, modelled on Studio 3T's CSV import: a Source options / Target
 // options split, a single source (Clipboard or File), a CSV options panel
@@ -167,12 +168,6 @@ function syncFields(columns) {
 const includedFields = computed(() =>
   (t.value.fields || []).filter(f => f.include && String(f.target).trim() !== '')
 )
-
-function cellText(value) {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
 
 // Re-run the preview when the CSV options change (they alter how the file parses).
 watch(

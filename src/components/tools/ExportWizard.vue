@@ -12,6 +12,7 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
 import ReorderButtons from '../base/ReorderButtons.vue'
 import HintText from '../base/HintText.vue'
+import { cellText } from '../../utils/format'
 
 const EXPORT_FORMATS = [
   { value: 'json', label: 'JSON' },
@@ -127,12 +128,6 @@ const previewRows = computed(() =>
     return out
   })
 )
-
-function cellText(value) {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
 
 // ── navigation ─────────────────────────────────────────────────
 const canGoNext = computed(() => includedFields.value.length > 0)

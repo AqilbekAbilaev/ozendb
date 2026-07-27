@@ -19,6 +19,14 @@ export function fmtBytes(bytes, empty = '—') {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[i]}`
 }
 
+// One preview-table cell as text: objects are shown as compact JSON, null/undefined
+// as blank. Used by the import, CSV import and export preview grids.
+export function cellText(value) {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
 // Thousands-separated count, em dash when the server omitted the field.
 export function fmtNum(n) {
   return n == null ? '—' : Number(n).toLocaleString()

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fmtBytes } from './format'
+import { fmtBytes, cellText } from './format'
 
 describe('fmtBytes', () => {
   it('reports raw bytes below 1 KB', () => {
@@ -30,5 +30,23 @@ describe('fmtBytes', () => {
     expect(fmtBytes(undefined)).toBe('—')
     expect(fmtBytes(null, 'n/a')).toBe('n/a')
     expect(fmtBytes(null, null)).toBeNull()
+  })
+})
+
+describe('cellText', () => {
+  it('renders scalars as strings', () => {
+    expect(cellText('x')).toBe('x')
+    expect(cellText(0)).toBe('0')
+    expect(cellText(false)).toBe('false')
+  })
+
+  it('blanks null and undefined', () => {
+    expect(cellText(null)).toBe('')
+    expect(cellText(undefined)).toBe('')
+  })
+
+  it('renders objects and arrays as compact JSON', () => {
+    expect(cellText({ $oid: 'abc' })).toBe('{"$oid":"abc"}')
+    expect(cellText([1, 2])).toBe('[1,2]')
   })
 })
