@@ -3,7 +3,6 @@ use crate::json_store::JsonStore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
 
 const MAX_HISTORY: usize = 50;
 
@@ -63,10 +62,3 @@ fn is_same_query(a: &QueryHistoryEntry, b: &QueryHistoryEntry) -> bool {
         && a.pipeline == b.pipeline
 }
 
-pub fn now_ms() -> String {
-    let ms = std::time::SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    format!("{}", ms)
-}

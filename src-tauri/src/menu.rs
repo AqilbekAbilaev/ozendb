@@ -1,3 +1,4 @@
+use crate::uri::percent_encode;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -613,22 +614,6 @@ pub struct DocumentTarget {
     pub mode: String,
 }
 
-// Percent-encode a value for safe inclusion in the window URL's query string. Kept local
-// (no extra crate) — every byte that isn't an unreserved URL character becomes %XX.
-fn percent_encode(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.as_bytes() {
-        let b = *byte;
-        let unreserved = b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~';
-        if unreserved {
-            out.push(b as char);
-        } else {
-            out.push('%');
-            out.push_str(&format!("{:02X}", b));
-        }
-    }
-    out
-}
 
 // Monotonic sequence for unique read-only view-window labels. View windows are unlimited
 // and independent, so each open gets its own label (unlike the single editor window).

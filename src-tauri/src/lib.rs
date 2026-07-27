@@ -32,6 +32,7 @@ mod shell_history;
 mod storage;
 mod tabs;
 mod tasks;
+mod time;
 mod uri;
 
 use commands::*;

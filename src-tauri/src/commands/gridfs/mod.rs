@@ -17,14 +17,6 @@ pub struct GridFsFile {
     pub content_type: Option<String>,
 }
 
-fn as_i64(value: Option<&bson::Bson>) -> i64 {
-    match value {
-        Some(bson::Bson::Int32(v)) => *v as i64,
-        Some(bson::Bson::Int64(v)) => *v,
-        Some(bson::Bson::Double(v)) => *v as i64,
-        _ => 0,
-    }
-}
 
 // Pure extraction of the display fields from a GridFS `.files` document.
 pub(crate) fn extract_file(doc: &bson::Document) -> GridFsFile {
@@ -48,7 +40,7 @@ pub(crate) fn extract_file(doc: &bson::Document) -> GridFsFile {
     GridFsFile {
         id: id,
         filename: filename,
-        length: as_i64(doc.get("length")),
+        length: crate::commands::bson_as_i64(doc.get("length")).unwrap_or(0),
         upload_date: upload_date,
         content_type: content_type,
     }

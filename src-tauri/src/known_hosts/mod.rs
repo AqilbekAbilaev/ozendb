@@ -13,7 +13,6 @@ use crate::error::AppError;
 use crate::json_store::JsonStore;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct KnownHost {
@@ -96,7 +95,7 @@ impl KnownHostsStore {
                 host: host.to_string(),
                 port: port,
                 key: key.to_string(),
-                added: now_ms(),
+                added: crate::time::now_ms(),
             });
         })
     }
@@ -111,13 +110,6 @@ impl KnownHostsStore {
     }
 }
 
-fn now_ms() -> String {
-    let ms = std::time::SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    format!("{}", ms)
-}
 
 #[cfg(test)]
 #[path = "known_hosts.test.rs"]

@@ -14,7 +14,6 @@ use crate::json_store::JsonStore;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 
 // Cap on how many terminal records we keep (and hand to the UI). Oldest fall off.
@@ -80,7 +79,7 @@ impl OperationsRegistry {
             database: meta.database,
             collection: meta.collection,
             status: String::from("running"),
-            started_at: now_ms(),
+            started_at: crate::time::now_epoch_ms(),
             finished_at: None,
             elapsed_ms: None,
             detail: None,
@@ -105,7 +104,7 @@ impl OperationsRegistry {
                 None => return,
             }
         };
-        let finished = now_ms();
+        let finished = crate::time::now_epoch_ms();
         record.finished_at = Some(finished);
         record.elapsed_ms = Some(finished - record.started_at);
         record.status = status.to_string();
@@ -151,12 +150,6 @@ impl OperationsRegistry {
     }
 }
 
-fn now_ms() -> i64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => duration.as_millis() as i64,
-        Err(_) => 0,
-    }
-}
 
 #[cfg(test)]
 mod tests {

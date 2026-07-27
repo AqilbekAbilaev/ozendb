@@ -1,5 +1,6 @@
 use crate::error::AppError;
-use crate::history::{now_ms, HistoryStorage, QueryHistoryEntry};
+use crate::history::{HistoryStorage, QueryHistoryEntry};
+use crate::time::now_ms;
 use crate::default_queries::{DefaultQuery, DefaultQueryStorage};
 use crate::keybindings::KeybindingStorage;
 use crate::node_tags::NodeTagStorage;

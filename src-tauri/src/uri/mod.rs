@@ -6,7 +6,7 @@ const TCP_PROBE_SECS: u64 = 3;
 
 /// Percent-encodes a string per RFC 3986, encoding every byte that is not
 /// an unreserved character. Handles non-ASCII by encoding each UTF-8 byte.
-fn percent_encode(s: &str) -> String {
+pub fn percent_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for byte in s.bytes() {
         match byte {

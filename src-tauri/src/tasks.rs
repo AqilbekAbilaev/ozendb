@@ -10,7 +10,6 @@ use crate::json_store::JsonStore;
 use chrono::{Datelike, Local, TimeZone};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
 
 // Keep only the most recent runs per task so the run log can't grow unbounded
 // (mirrors history.rs's MAX_HISTORY).
@@ -155,19 +154,6 @@ impl TaskStore {
     }
 }
 
-// Current wall-clock as epoch-ms (the integer the schedule math compares against).
-pub fn now_epoch_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
-}
-
-// Current wall-clock as an epoch-ms string (the shape stored in `created_at` /
-// `last_run` / `ran_at`; same helper shape as history::now_ms).
-pub fn now_ms() -> String {
-    format!("{}", now_epoch_ms())
-}
 
 // ── Schedule math (pure, unit-tested) ─────────────────────────────────────
 //
