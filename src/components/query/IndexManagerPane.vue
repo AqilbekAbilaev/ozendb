@@ -9,6 +9,7 @@ import {
 } from '../../utils/indexSpec'
 import { errText, errMessage } from '../../utils/errors'
 import { fmtBytes } from '../../utils/format'
+import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 
 // Each Index Manager tab manages its own index list, selection, and metrics
 // independently so that two tabs for different collections don't interfere.
@@ -241,19 +242,7 @@ function usageOf(index)  { const u = localIndexUsage.value[index.name]; return u
 <template>
   <div class="idxm">
     <!-- Breadcrumb -->
-    <div class="crumbs">
-      <BaseIcon name="connect" :size="15" class="c-ic" />
-      <span class="crumb">{{ activeTab.connName }}</span>
-      <BaseIcon name="caret" :size="11" class="sep" />
-      <BaseIcon name="dbSmall" :size="15" class="c-ic" />
-      <span class="crumb">{{ activeTab.dbName }}</span>
-      <BaseIcon name="caret" :size="11" class="sep" />
-      <BaseIcon name="collSmall" :size="15" class="c-ic" />
-      <span class="crumb">{{ activeTab.collName }}</span>
-      <BaseIcon name="caret" :size="11" class="sep" />
-      <BaseIcon name="anchor" :size="15" class="c-ic" />
-      <span class="crumb">Indexes</span>
-    </div>
+    <CollectionCrumbs :conn="activeTab.connName" :db="activeTab.dbName" :coll="activeTab.collName" icon="anchor" label="Indexes" />
 
     <!-- Toolbar -->
     <div class="idx-toolbar">
@@ -341,13 +330,6 @@ function usageOf(index)  { const u = localIndexUsage.value[index.name]; return u
 .idxm { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-window); }
 
 /* Breadcrumb (mirrors the collection tab) */
-.crumbs {
-  display: flex; align-items: center; gap: 7px;
-  padding: 6px 14px; font-size: 12.5px; color: var(--text-dim);
-  border-bottom: 1px solid var(--border); flex: none;
-}
-.sep { color: var(--text-faint); }
-.c-ic { color: var(--text-faint); }
 
 /* Toolbar */
 .idx-toolbar {

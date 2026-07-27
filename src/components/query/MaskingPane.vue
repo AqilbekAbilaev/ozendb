@@ -4,13 +4,13 @@ import { invoke } from '@tauri-apps/api/core'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText, errCode } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
-import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
 import HintText from '../base/HintText.vue'
 import { FIELD_STRATEGIES, EXPORT_FORMATS } from '../../constants/dataTools'
+import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 
 // The Data Masking tab lists the collection's fields (from a sample document) and lets the
 // user pick a masking strategy per field, then exports an obfuscated copy — the source
@@ -117,19 +117,7 @@ async function runExport() {
 <template>
   <div class="mask-pane">
     <!-- Breadcrumb -->
-    <div class="crumbs">
-      <BaseIcon name="connect" :size="15" class="c-ic" />
-      <span class="crumb">{{ activeTab.connName }}</span>
-      <BaseIcon name="caret" :size="11" class="sep" />
-      <BaseIcon name="dbSmall" :size="15" class="c-ic" />
-      <span class="crumb">{{ activeTab.dbName }}</span>
-      <BaseIcon name="caret" :size="11" class="sep" />
-      <BaseIcon name="collSmall" :size="15" class="c-ic" />
-      <span class="crumb">{{ activeTab.collName }}</span>
-      <BaseIcon name="caret" :size="11" class="sep" />
-      <BaseIcon name="mask" :size="15" class="c-ic" />
-      <span class="crumb">Data Masking</span>
-    </div>
+    <CollectionCrumbs :conn="activeTab.connName" :db="activeTab.dbName" :coll="activeTab.collName" icon="mask" label="Data Masking" />
 
     <div class="mk-body">
       <StateMessage v-if="loading" mode="loading" label="Reading fields…" />
@@ -194,13 +182,6 @@ async function runExport() {
 <style scoped>
 .mask-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-window); }
 
-.crumbs {
-  display: flex; align-items: center; gap: 7px;
-  padding: 6px 14px; font-size: 12.5px; color: var(--text-dim);
-  border-bottom: 1px solid var(--border); flex: none;
-}
-.sep { color: var(--text-faint); }
-.c-ic { color: var(--text-faint); }
 
 .mk-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; }
 .mk-head {

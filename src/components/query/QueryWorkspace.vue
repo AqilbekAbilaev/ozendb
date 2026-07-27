@@ -2,7 +2,6 @@
 import { ref, computed, nextTick, watch, defineAsyncComponent } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { errText } from '../../utils/errors'
-import BaseIcon from '../base/BaseIcon.vue'
 import TabBar from '../base/TabBar.vue'
 import QuickstartPane from './QuickstartPane.vue'
 import QueryBar from './QueryBar.vue'
@@ -20,6 +19,7 @@ import ImportPane from './ImportPane.vue'
 import CsvImportPane from './CsvImportPane.vue'
 import QueryBrowserModal from './QueryBrowserModal.vue'
 import { parseField, parsePipeline } from '../../utils/queryParser'
+import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 
 const props = defineProps({
   tabs:           { type: Array,   required: true },
@@ -339,16 +339,7 @@ async function applyFromBrowser(entry) {
     <!-- Collection workspace -->
     <template v-else-if="activeTab.kind === 'collection'">
       <!-- Breadcrumb -->
-      <div class="crumbs">
-        <BaseIcon name="connect" :size="15" class="c-ic" />
-        <span class="crumb">{{ activeTab.connectionName }}</span>
-        <BaseIcon name="caret"  :size="11" class="sep" />
-        <BaseIcon name="dbSmall" :size="15" class="c-ic" />
-        <span class="crumb">{{ activeTab.dbName }}</span>
-        <BaseIcon name="caret"  :size="11" class="sep" />
-        <BaseIcon name="collSmall" :size="15" class="c-ic" />
-        <span class="crumb">{{ activeTab.collectionName }}</span>
-      </div>
+      <CollectionCrumbs :conn="activeTab.connectionName" :db="activeTab.dbName" :coll="activeTab.collectionName" />
 
       <!-- SQL query bar (sql mode) -->
       <SqlQueryBar
@@ -419,16 +410,4 @@ async function applyFromBrowser(entry) {
 .work { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-window); }
 
 /* Breadcrumb */
-.crumbs {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  border-bottom: 1px solid var(--border);
-  flex: none;
-}
-.sep { color: var(--text-faint); }
-.c-ic { color: var(--text-faint); }
 </style>
