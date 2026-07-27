@@ -60,6 +60,19 @@ pub use operations::*;
 // server instead of hanging the UI (Tauri commands can't be cancelled in-flight).
 pub(crate) const MAX_QUERY_TIME: Duration = Duration::from_secs(60);
 
+/// Unwrap a `Result<T, AppError>` or early-return with the error.
+/// Replaces the 4-line `match expr { Ok(v) => v, Err(e) => return Err(e) }`
+/// pattern that appears dozens of times across command files.
+#[macro_export]
+macro_rules! resolve {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(e) => return Err(e),
+        }
+    };
+}
+
 /// Record a long-running operation in the Operations registry (the one place all
 /// operations are tracked) while it runs, without changing what the command returns.
 /// Pass `Some(meta)` to track (a `running` record is inserted, then stamped
@@ -160,10 +173,7 @@ impl AppContext {
         database: &str,
         collection: &str,
     ) -> Result<Collection<bson::Document>, AppError> {
-        let client = match self.client(id).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let client = resolve!(self.client(id).await);
         Ok(client
             .database(database)
             .collection::<bson::Document>(collection))
@@ -177,10 +187,7 @@ impl AppContext {
         database: &str,
         collection: &str,
     ) -> Result<Collection<bson::Document>, AppError> {
-        let client = match self.client_for_write(id).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let client = resolve!(self.client_for_write(id).await);
         Ok(client
             .database(database)
             .collection::<bson::Document>(collection))
@@ -825,10 +832,7 @@ pub(crate) async fn collect_documents(
 pub(crate) async fn collect_values(
     cursor: &mut mongodb::Cursor<bson::Document>,
 ) -> Result<Vec<serde_json::Value>, AppError> {
-    let docs = match collect_documents(cursor).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let docs = resolve!(collect_documents(cursor).await);
     Ok(docs
         .into_iter()
         .map(|doc| serde_json::Value::from(bson::Bson::Document(doc)))

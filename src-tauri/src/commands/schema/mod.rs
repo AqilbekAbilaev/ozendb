@@ -4,7 +4,11 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use tauri::State;
 
-use super::{collect_documents, MAX_QUERY_TIME, AppContext};
+use crate::resolve;
+
+use super::{
+    collect_documents, MAX_QUERY_TIME, AppContext
+};
 
 // The number of documents sampled by default when the frontend does not supply
 // an explicit size. Clamped hard limits keep a huge collection from stalling the
@@ -179,10 +183,7 @@ async fn sampled_schema(
     };
     let size = requested.clamp(MIN_SAMPLE_SIZE, MAX_SAMPLE_SIZE);
 
-    let col = match ctx.collection(id, database, collection).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let col = resolve!(ctx.collection(id, database, collection).await);
 
     let pipeline = vec![bson::doc! { "$sample": { "size": size } }];
     let mut cursor = match col.aggregate(pipeline).max_time(MAX_QUERY_TIME).await {
@@ -190,10 +191,7 @@ async fn sampled_schema(
         Err(e) => return Err(AppError::Mongo(e)),
     };
 
-    let docs = match collect_documents(&mut cursor).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let docs = resolve!(collect_documents(&mut cursor).await);
 
     Ok(infer_schema(&docs))
 }
@@ -317,10 +315,7 @@ pub async fn export_schema(
     path: String,
     format: Option<String>,
 ) -> Result<u64, AppError> {
-    let report = match sampled_schema(&ctx, &id, &database, &collection, sample_size).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let report = resolve!(sampled_schema(&ctx, &id, &database, &collection, sample_size).await);
     let is_docx = format.as_deref() == Some("docx");
     if is_docx {
         match write_schema_docx(&report, &collection, &path) {

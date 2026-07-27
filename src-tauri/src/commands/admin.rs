@@ -5,6 +5,8 @@ use serde::Serialize;
 use tauri::State;
 
 use super::portmap::{apply_field_map, FieldMap};
+use crate::resolve;
+
 use super::{
     collect_values, parse_ejson_document, parse_pipeline, tracked, DatabaseInfo, AppContext,
 };
@@ -43,10 +45,7 @@ pub async fn list_databases(
     ctx: State<'_, AppContext>,
     id: String,
 ) -> Result<Vec<DatabaseInfo>, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
 
     let db_names = match client.list_database_names().await {
         Ok(val) => val,
@@ -116,10 +115,7 @@ pub async fn create_collection(
         Ok(val) => val,
         Err(e) => return Err(e),
     };
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     match client.database(&database).run_command(command).await {
         Ok(_) => Ok(()),
         Err(e) => Err(AppError::Mongo(e)),
@@ -215,10 +211,7 @@ pub async fn create_view(
         Ok(val) => val,
         Err(e) => return Err(e),
     };
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let pipeline_bson: Vec<bson::Bson> = stages.into_iter().map(bson::Bson::Document).collect();
     let command = bson::doc! {
         "create": &name,
@@ -249,10 +242,7 @@ pub async fn get_validator(
     database: String,
     collection: String,
 ) -> Result<ValidatorInfo, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "listCollections": 1, "filter": { "name": &collection } };
     let result = match client.database(&database).run_command(command).await {
         Ok(val) => val,
@@ -326,10 +316,7 @@ pub async fn set_validator(
             Err(e) => return Err(e),
         }
     };
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let command = bson::doc! {
         "collMod": &collection,
         "validator": validator_doc,
@@ -348,10 +335,7 @@ pub async fn drop_database(
     id: String,
     database: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     match client.database(&database).drop().await {
         Ok(val) => Ok(val),
         Err(e) => Err(AppError::Mongo(e)),
@@ -365,10 +349,7 @@ pub async fn drop_collection(
     database: String,
     collection: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let col = client
         .database(&database)
         .collection::<bson::Document>(&collection);
@@ -386,10 +367,7 @@ pub async fn rename_collection(
     collection: String,
     new_name: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     // MongoDB has no per-collection rename helper; the admin `renameCollection`
     // command takes fully-qualified `db.collection` namespaces for both sides.
     let from_namespace = format!("{}.{}", database, collection);
@@ -411,10 +389,7 @@ pub async fn create_database(
     database: String,
     first_collection: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     // A MongoDB database only materializes once it holds content, so creating the
     // first collection is what actually brings the database into existence.
     match client
@@ -435,10 +410,7 @@ pub async fn server_status(
     ctx: State<'_, AppContext>,
     id: String,
 ) -> Result<serde_json::Value, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "serverStatus": 1 };
     let result = match client.database("admin").run_command(command).await {
         Ok(val) => val,
@@ -455,10 +427,7 @@ pub async fn database_stats(
     id: String,
     database: String,
 ) -> Result<serde_json::Value, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "dbStats": 1 };
     let result = match client.database(&database).run_command(command).await {
         Ok(val) => val,
@@ -474,10 +443,7 @@ pub async fn current_ops(
     ctx: State<'_, AppContext>,
     id: String,
 ) -> Result<serde_json::Value, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let command = bson::doc! { "currentOp": 1 };
     let result = match client.database("admin").run_command(command).await {
         Ok(val) => val,
@@ -493,10 +459,7 @@ pub async fn list_indexes(
     database: String,
     collection: String,
 ) -> Result<Vec<serde_json::Value>, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     // `listIndexes` returns the raw index documents (key spec, name, unique, …)
     // inside a cursor envelope; the frontend only needs the first batch to display.
     let command = bson::doc! { "listIndexes": collection };
@@ -547,10 +510,7 @@ pub async fn create_index(
         &collection,
     );
     let run = async {
-        let client = match ctx.client_for_write(&id).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let client = resolve!(ctx.client_for_write(&id).await);
         let keys_doc = match parse_ejson_document(&keys) {
             Ok(val) => val,
             Err(e) => return Err(e),
@@ -599,10 +559,7 @@ pub async fn drop_index(
         &collection,
     );
     let run = async {
-        let client = match ctx.client_for_write(&id).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let client = resolve!(ctx.client_for_write(&id).await);
         let col = client
             .database(&database)
             .collection::<bson::Document>(&collection);
@@ -632,10 +589,7 @@ pub async fn set_index_hidden(
             name
         )));
     }
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let command = bson::doc! {
         "collMod": &collection,
         "index": { "name": &name, "hidden": hidden },
@@ -657,10 +611,7 @@ pub async fn index_stats(
     database: String,
     collection: String,
 ) -> Result<Vec<serde_json::Value>, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let col = client
         .database(&database)
         .collection::<bson::Document>(&collection);
@@ -691,10 +642,7 @@ pub async fn export_collection(
         &collection,
     );
     let run = async {
-        let client = match ctx.client(&id).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let client = resolve!(ctx.client(&id).await);
         let col = client
             .database(&database)
             .collection::<bson::Document>(&collection);
@@ -733,10 +681,7 @@ pub async fn import_collection(
         &collection,
     );
     let run = async {
-        let client = match ctx.client_for_write(&id).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let client = resolve!(ctx.client_for_write(&id).await);
         let col = client
             .database(&database)
             .collection::<bson::Document>(&collection);
@@ -764,10 +709,7 @@ pub async fn import_collection_mapped(
     mapping: Vec<FieldMap>,
     csv: Option<super::CsvOptionsInput>,
 ) -> Result<usize, AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let col = client
         .database(&database)
         .collection::<bson::Document>(&collection);
@@ -831,10 +773,7 @@ pub async fn export_collection_fields(
     fields: Vec<FieldMap>,
     incremental: Option<bool>,
 ) -> Result<usize, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let col = client
         .database(&database)
         .collection::<bson::Document>(&collection);
@@ -848,10 +787,7 @@ pub async fn export_collection_fields(
     if use_incremental {
         // The boundary is the current maximum `_id`; nothing beyond it is exported, so a
         // document inserted after this point is left for the next run.
-        let boundary = match max_id(&col).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let boundary = resolve!(max_id(&col).await);
         let boundary = match boundary {
             Some(val) => val,
             // Empty collection → nothing to export, and no watermark to advance.

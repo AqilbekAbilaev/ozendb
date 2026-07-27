@@ -5,7 +5,11 @@ use mongodb::options::GridFsBucketOptions;
 use serde::Serialize;
 use tauri::State;
 
-use super::{next_document, parse_ejson_document, AppContext};
+use crate::resolve;
+
+use super::{
+    next_document, parse_ejson_document, AppContext
+};
 
 // A GridFS file's display metadata, normalized from its `.files` document.
 #[derive(Serialize)]
@@ -77,10 +81,7 @@ pub async fn list_gridfs_buckets(
     id: String,
     database: String,
 ) -> Result<Vec<String>, AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let names = match client.database(&database).list_collection_names().await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
@@ -96,10 +97,7 @@ pub async fn list_gridfs_files(
     database: String,
     bucket: String,
 ) -> Result<Vec<GridFsFile>, AppError> {
-    let files = match ctx.collection(&id, &database, &format!("{bucket}.files")).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let files = resolve!(ctx.collection(&id, &database, &format!("{bucket}.files")).await);
     let mut cursor = match files.find(bson::doc! {}).sort(bson::doc! { "filename": 1 }).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
@@ -125,10 +123,7 @@ pub async fn gridfs_upload(
     bucket: String,
     path: String,
 ) -> Result<String, AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let bytes = match std::fs::read(&path) {
         Ok(val) => val,
         Err(e) => return Err(AppError::Io(e)),
@@ -170,10 +165,7 @@ pub async fn gridfs_download(
     file_id: String,
     dest: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let id_bson = match parse_file_id(&file_id) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -204,10 +196,7 @@ pub async fn gridfs_delete(
     bucket: String,
     file_id: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let id_bson = match parse_file_id(&file_id) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -234,10 +223,7 @@ pub async fn gridfs_rename(
         Ok(val) => val,
         Err(e) => return Err(e),
     };
-    let files = match ctx.collection_for_write(&id, &database, &format!("{bucket}.files")).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let files = resolve!(ctx.collection_for_write(&id, &database, &format!("{bucket}.files")).await);
     match files
         .update_one(bson::doc! { "_id": id_bson }, bson::doc! { "$set": { "filename": new_name } })
         .await
@@ -270,10 +256,7 @@ pub async fn gridfs_set_metadata(
         Ok(val) => val,
         Err(e) => return Err(e),
     };
-    let files = match ctx.collection_for_write(&id, &database, &format!("{bucket}.files")).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let files = resolve!(ctx.collection_for_write(&id, &database, &format!("{bucket}.files")).await);
     match files
         .update_one(bson::doc! { "_id": id_bson }, bson::doc! { "$set": { "metadata": metadata_doc } })
         .await
@@ -291,10 +274,7 @@ pub async fn gridfs_drop_bucket(
     database: String,
     bucket: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let db = client.database(&database);
     for suffix in ["files", "chunks"] {
         let coll = db.collection::<bson::Document>(&format!("{bucket}.{suffix}"));
@@ -316,10 +296,7 @@ pub async fn gridfs_copy_bucket(
     bucket: String,
     new_bucket: String,
 ) -> Result<(), AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let db = client.database(&database);
     for suffix in ["files", "chunks"] {
         let src = db.collection::<bson::Document>(&format!("{bucket}.{suffix}"));

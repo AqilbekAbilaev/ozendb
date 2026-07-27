@@ -2,7 +2,11 @@ use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
 
-use super::AppContext;
+use crate::resolve;
+
+use super::{
+    AppContext
+};
 
 /// Run a `mapReduce` over a collection. `map`/`reduce` (and optional `finalize`) are
 /// JavaScript function sources. An empty `out_collection` runs inline (results
@@ -23,15 +27,9 @@ pub async fn map_reduce(
     // results to that collection, so gate that case on the connection being writable.
     let writes = !out_collection.trim().is_empty();
     let client = if writes {
-        match ctx.client_for_write(&id).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        }
+        resolve!(ctx.client_for_write(&id).await)
     } else {
-        match ctx.client(&id).await {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        }
+        resolve!(ctx.client(&id).await)
     };
     let out: bson::Bson = if out_collection.trim().is_empty() {
         bson::Bson::Document(bson::doc! { "inline": 1 })

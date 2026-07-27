@@ -1,7 +1,11 @@
 use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
-use super::AppContext;
+use crate::resolve;
+
+use super::{
+    AppContext
+};
 
 // Validate a duplicate target name before touching the server: non-empty, distinct
 // from the source, and not colliding with an existing collection (so we never
@@ -32,10 +36,7 @@ pub async fn duplicate_collection(
     source: String,
     target: String,
 ) -> Result<u64, AppError> {
-    let client = match ctx.client_for_write(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client_for_write(&id).await);
     let db = client.database(&database);
 
     let existing = match db.list_collection_names().await {

@@ -1,7 +1,11 @@
 use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
-use super::AppContext;
+use crate::resolve;
+
+use super::{
+    AppContext
+};
 
 // Map a UI "kind" to the admin diagnostic command to run. Pure, so it's
 // unit-tested; an unknown kind is rejected rather than sending a bogus command.
@@ -27,10 +31,7 @@ pub async fn server_info(
         Ok(val) => val,
         Err(e) => return Err(AppError::Bson(e)),
     };
-    let client = match ctx.client(&id).await {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let client = resolve!(ctx.client(&id).await);
     let result = match client.database("admin").run_command(command).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
