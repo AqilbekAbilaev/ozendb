@@ -4,7 +4,9 @@
 //   { kind: 'interval'|'daily'|'weekly', every_minutes, at_hhmm, weekday }
 // A task with no schedule is "Manual" (only ever runs when the user clicks Run now).
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+// Indexed by the backend's `weekday` value, so the order is load-bearing: the
+// picker sends the array index straight through as the schedule's weekday.
+export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export function scheduleSummary(schedule) {
   if (!schedule || !schedule.kind) return 'Manual'
