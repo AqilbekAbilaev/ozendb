@@ -18,7 +18,7 @@ pub fn create_folder(
         id: Uuid::new_v4().to_string(),
         name: name,
         parent_id: None,
-        created_at: crate::history::now_ms(),
+        created_at: crate::time::now_ms(),
     };
     match folders.insert(folder.clone()) {
         Ok(_) => Ok(folder),

@@ -30,14 +30,6 @@ pub struct CollectionStats {
 
 // collStats mixes Int32 / Int64 / Double for its numeric fields depending on the
 // server and value magnitude, so read any of them as i64.
-fn as_i64(value: Option<&bson::Bson>) -> Option<i64> {
-    match value {
-        Some(bson::Bson::Int32(v)) => Some(*v as i64),
-        Some(bson::Bson::Int64(v)) => Some(*v),
-        Some(bson::Bson::Double(v)) => Some(*v as i64),
-        _ => None,
-    }
-}
 
 // Pure extraction from a raw collStats document into the typed summary. Kept free
 // of I/O so it can be unit-tested with a hand-built document.
@@ -45,7 +37,7 @@ pub(crate) fn extract_stats(doc: &bson::Document) -> CollectionStats {
     let mut indexes: Vec<IndexSize> = Vec::new();
     if let Some(bson::Bson::Document(sizes)) = doc.get("indexSizes") {
         for (name, value) in sizes {
-            if let Some(size) = as_i64(Some(value)) {
+            if let Some(size) = crate::commands::bson_as_i64(Some(value)) {
                 indexes.push(IndexSize { name: name.clone(), size: size });
             }
         }
@@ -64,12 +56,12 @@ pub(crate) fn extract_stats(doc: &bson::Document) -> CollectionStats {
 
     CollectionStats {
         ns: ns,
-        count: as_i64(doc.get("count")),
-        size: as_i64(doc.get("size")),
-        avg_obj_size: as_i64(doc.get("avgObjSize")),
-        storage_size: as_i64(doc.get("storageSize")),
-        total_index_size: as_i64(doc.get("totalIndexSize")),
-        nindexes: as_i64(doc.get("nindexes")),
+        count: crate::commands::bson_as_i64(doc.get("count")),
+        size: crate::commands::bson_as_i64(doc.get("size")),
+        avg_obj_size: crate::commands::bson_as_i64(doc.get("avgObjSize")),
+        storage_size: crate::commands::bson_as_i64(doc.get("storageSize")),
+        total_index_size: crate::commands::bson_as_i64(doc.get("totalIndexSize")),
+        nindexes: crate::commands::bson_as_i64(doc.get("nindexes")),
         capped: capped,
         indexes: indexes,
         raw: serde_json::Value::from(bson::Bson::Document(doc.clone())),

@@ -198,6 +198,18 @@ pub struct DatabaseInfo {
 // at the OS text-input layer, before the keystroke ever reaches the web page —
 // no HTML attribute on the input can suppress it. Normalize here so a query
 // typed (or pasted from a rich-text source) with curly quotes still parses.
+// Numeric BSON field as i64, whatever numeric type the server used. Server stats
+// documents are inconsistent about Int32/Int64/Double for the same field, so every
+// reader goes through this rather than matching on one type.
+pub(crate) fn bson_as_i64(value: Option<&bson::Bson>) -> Option<i64> {
+    match value {
+        Some(bson::Bson::Int32(v)) => Some(*v as i64),
+        Some(bson::Bson::Int64(v)) => Some(*v),
+        Some(bson::Bson::Double(v)) => Some(*v as i64),
+        _ => None,
+    }
+}
+
 fn normalize_smart_quotes(value: &str) -> String {
     value
         .chars()
