@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
-import { scheduleSummary } from '../../utils/taskSchedule'
+import { scheduleSummary, WEEKDAYS } from '../../utils/taskSchedule'
 import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -33,7 +33,6 @@ const TYPES = [
 ]
 const TYPE_META = Object.fromEntries(TYPES.map(t => [t.value, t]))
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const view = ref('list')            // 'list' | 'form'
 const tasks = ref([])
