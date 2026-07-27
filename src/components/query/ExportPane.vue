@@ -6,51 +6,40 @@ import { errText, errCode } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
-import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
 import ReorderButtons from '../base/ReorderButtons.vue'
 import HintText from '../base/HintText.vue'
+import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 import { cellText } from '../../utils/format'
 import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT } from '../../constants/dataTools'
 
-
 // Stepped Export wizard for a single collection: sample the collection, choose /
 // reorder / rename the fields (optionally coercing a type), pick a format, preview,
-// then run (`export_collection_fields`). Import moved to its own workspace tab
-// (ImportPane), so this component is export-only.
+// then run (`export_collection_fields`).
+//
+// This is a workspace tab, not a modal, so the wizard's working state (step, format,
+// field mapping) lives on the tab object — the pane is unmounted whenever the user
+// switches tabs, and local refs would reset the wizard every time.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName, dbName, collName }
+  activeTab: { type: Object, required: true },
 })
-const emit = defineEmits(['close'])
 const { showToast } = useToast()
 
-// The per-field type coercions the backend understands. 'auto' keeps the value
-// as parsed (no coercion).
-
-
-const step = ref(0)
-const steps = ['Select fields', 'Preview & run']
-
+// Sample rows back the preview only. They're re-fetched on mount rather than stored,
+// so a restored tab previews the collection's current contents, not a stale snapshot.
+const sampleRows = ref([])
 const loading = ref(false)
 const error = ref(null)
 const errorCode = ref(null)
 const running = ref(false)
 
-// Chosen output format.
-const format = ref('json')
-// Export only documents added since this collection's last incremental export (tracked
-// by _id on the backend).
-const incremental = ref(false)
+const steps = ['Select fields', 'Preview & run']
 
-// [{ source, target, kind, include }] — the mapping the user edits.
-const fields = ref([])
-// Sample rows (objects keyed by source column) for the preview.
-const sampleRows = ref([])
-
+const t = computed(() => props.activeTab)
 const includedFields = computed(() =>
-  fields.value.filter(f => f.include && String(f.target).trim() !== '')
+  t.value.fields.filter(f => f.include && String(f.target).trim() !== '')
 )
 
 onMounted(loadCollectionSample)
@@ -60,15 +49,18 @@ function setError(e) {
   errorCode.value = errCode(e)
 }
 
-// Sample the collection to discover the fields to offer.
+// Sample the collection to discover the fields to offer. An existing mapping (kept
+// across a tab switch, or restored from the last session) wins: only columns it
+// doesn't already mention are appended, so the user's selections and renames survive
+// both a re-sample and a collection that has since grown new fields.
 async function loadCollectionSample() {
   loading.value = true
   error.value = null
   try {
     const docs = await invoke('find_documents', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
+      id: t.value.connId,
+      database: t.value.dbName,
+      collection: t.value.collName,
       filter: '{}',
       projection: '{}',
       sort: '{}',
@@ -82,7 +74,12 @@ async function loadCollectionSample() {
         if (!cols.includes(key)) cols.push(key)
       }
     }
-    fields.value = cols.map(name => ({ source: name, target: name, kind: 'auto', include: true }))
+    const known = new Set(t.value.fields.map(f => f.source))
+    for (const name of cols) {
+      if (!known.has(name)) {
+        t.value.fields.push({ source: name, target: name, kind: 'auto', include: true })
+      }
+    }
   } catch (e) {
     setError(e)
   } finally {
@@ -93,8 +90,8 @@ async function loadCollectionSample() {
 // ── field reordering ───────────────────────────────────────────
 function moveField(index, delta) {
   const next = index + delta
-  if (next < 0 || next >= fields.value.length) return
-  const arr = fields.value
+  if (next < 0 || next >= t.value.fields.length) return
+  const arr = t.value.fields
   const tmp = arr[index]
   arr[index] = arr[next]
   arr[next] = tmp
@@ -119,11 +116,11 @@ const canGoNext = computed(() => includedFields.value.length > 0)
 
 function next() {
   error.value = null
-  if (step.value < steps.length - 1) step.value += 1
+  if (t.value.step < steps.length - 1) t.value.step += 1
 }
 function back() {
   error.value = null
-  if (step.value > 0) step.value -= 1
+  if (t.value.step > 0) t.value.step -= 1
 }
 
 // The field payload sent to the backend.
@@ -140,8 +137,8 @@ async function run() {
   let path
   try {
     path = await saveDialog({
-      defaultPath: `${props.target.collName}.${format.value}`,
-      filters: [{ name: format.value.toUpperCase(), extensions: [format.value] }],
+      defaultPath: `${t.value.collName}.${t.value.format}`,
+      filters: [{ name: t.value.format.toUpperCase(), extensions: [t.value.format] }],
     })
   } catch (e) {
     setError(e)
@@ -152,16 +149,18 @@ async function run() {
   error.value = null
   try {
     const count = await invoke('export_collection_fields', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
+      id: t.value.connId,
+      database: t.value.dbName,
+      collection: t.value.collName,
       path: String(path),
-      format: format.value,
+      format: t.value.format,
       fields: mappingPayload(),
-      incremental: incremental.value,
+      incremental: t.value.incremental,
     })
-    showToast(`Exported ${count} document${count === 1 ? '' : 's'} to ${format.value.toUpperCase()}`)
-    emit('close')
+    // The tab stays open on success so the mapping can be tweaked and re-run; the
+    // result banner replaces the modal's close-on-success.
+    t.value.result = { count: count, path: String(path) }
+    showToast(`Exported ${count} document${count === 1 ? '' : 's'} to ${t.value.format.toUpperCase()}`)
   } catch (e) {
     setError(e)
   } finally {
@@ -169,12 +168,15 @@ async function run() {
   }
 }
 
-const isLastStep = computed(() => step.value === steps.length - 1)
-const titleText = computed(() => `Export — ${props.target.dbName}.${props.target.collName}`)
+const isLastStep = computed(() => t.value.step === steps.length - 1)
 </script>
 
 <template>
-  <BaseModal :title="titleText" width="720px" max-width="94vw" @close="$emit('close')">
+  <div class="export-pane">
+    <CollectionCrumbs
+      :conn="activeTab.connName" :db="activeTab.dbName" :coll="activeTab.collName"
+      icon="export" label="Export"
+    />
 
     <!-- step indicator -->
     <div class="iew-steps">
@@ -182,7 +184,7 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
         v-for="(label, i) in steps"
         :key="label"
         class="iew-step"
-        :class="{ active: i === step, done: i < step }"
+        :class="{ active: i === activeTab.step, done: i < activeTab.step }"
       >
         <span class="iew-dot">{{ i + 1 }}</span>{{ label }}
       </span>
@@ -191,14 +193,14 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
     <div class="iew-body">
       <StateMessage v-if="loading" mode="loading" label="Working…" />
       <StateMessage
-        v-else-if="error && !fields.length"
+        v-else-if="error && !activeTab.fields.length"
         mode="error"
         :message="error"
         :code="errorCode"
       />
 
       <!-- Field selection (step 0) -->
-      <template v-else-if="step === 0">
+      <template v-else-if="activeTab.step === 0">
         <HintText dim>
           Choose which fields to export, rename or reorder them, and optionally coerce a type.
         </HintText>
@@ -210,7 +212,7 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
           <span>Order</span>
         </div>
         <div class="iew-rows">
-          <div v-for="(f, i) in fields" :key="f.source" class="iew-row">
+          <div v-for="(f, i) in activeTab.fields" :key="f.source" class="iew-row">
             <BaseCheckbox v-model="f.include" class="iew-chk" />
             <code class="iew-field" :title="f.source">{{ f.source }}</code>
             <BaseInput v-model="f.target" class="iew-input" :disabled="!f.include" />
@@ -218,7 +220,7 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
             <span class="iew-order">
               <ReorderButtons
                 :up-disabled="i === 0"
-                :down-disabled="i === fields.length - 1"
+                :down-disabled="i === activeTab.fields.length - 1"
                 @up="moveField(i, -1)"
                 @down="moveField(i, 1)"
               />
@@ -236,10 +238,10 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
           <div class="iew-export-opts">
             <label class="iew-f">
               Format
-              <BaseSelect v-model="format" class="iew-select" :options="EXPORT_FORMATS" size="sm" />
+              <BaseSelect v-model="activeTab.format" class="iew-select" :options="EXPORT_FORMATS" size="sm" />
             </label>
             <label class="iew-f iew-inc" title="Export only documents added since this collection's last incremental export (tracked by _id)">
-              <BaseCheckbox v-model="incremental" />
+              <BaseCheckbox v-model="activeTab.incremental" />
               Incremental (new only)
             </label>
           </div>
@@ -257,12 +259,17 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
           </table>
           <StateMessage v-else mode="empty" label="No fields selected" />
         </div>
+        <div v-if="activeTab.result" class="iew-result">
+          Exported {{ activeTab.result.count }}
+          document{{ activeTab.result.count === 1 ? '' : 's' }} to
+          <code :title="activeTab.result.path">{{ activeTab.result.path }}</code>
+        </div>
         <StateMessage v-if="error" mode="error" :message="error" :code="errorCode" />
       </template>
     </div>
 
     <div class="iew-footer">
-      <BaseButton v-if="step > 0" bordered :disabled="running" @click="back">Back</BaseButton>
+      <BaseButton v-if="activeTab.step > 0" bordered :disabled="running" @click="back">Back</BaseButton>
       <span class="iew-spacer"></span>
       <BaseButton
         v-if="!isLastStep"
@@ -275,12 +282,14 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
         variant="primary"
         :disabled="running || !includedFields.length"
         @click="run"
-      >{{ running ? 'Exporting…' : 'Run export' }}</BaseButton>
+      >{{ running ? 'Exporting…' : (activeTab.result ? 'Run again' : 'Run export') }}</BaseButton>
     </div>
-  </BaseModal>
+  </div>
 </template>
 
 <style scoped>
+.export-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-window); }
+
 .iew-steps {
   display: flex;
   gap: 18px;
@@ -288,6 +297,7 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
   border-bottom: 1px solid var(--border-soft);
   font-size: 12px;
   color: var(--text-faint);
+  flex: none;
 }
 .iew-step { display: flex; align-items: center; gap: 6px; }
 .iew-step.active { color: var(--text); }
@@ -304,12 +314,12 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
 .iew-step.active .iew-dot { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 .iew-body {
+  flex: 1;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 240px;
-  max-height: 66vh;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -355,7 +365,7 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
 .iew-inc input { cursor: pointer; }
 
 .iew-preview-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.iew-table-wrap { overflow: auto; border: 1px solid var(--border-soft); border-radius: 6px; }
+.iew-table-wrap { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border-soft); border-radius: 6px; }
 .iew-table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
 .iew-table th, .iew-table td {
   border-bottom: 1px solid var(--grid-line);
@@ -376,12 +386,28 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
 }
 .iew-table td { color: var(--text); font-family: var(--mono); }
 
+.iew-result {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-dim);
+  border: 1px solid var(--border-soft);
+  border-left: 2px solid var(--green);
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+.iew-result code {
+  font-family: var(--mono);
+  color: var(--text);
+  word-break: break-all;
+}
+
 .iew-footer {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
   border-top: 1px solid var(--border-soft);
+  flex: none;
 }
 .iew-spacer { flex: 1; }
 </style>

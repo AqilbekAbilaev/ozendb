@@ -20,7 +20,7 @@ export function useFeatures({
   showToast, applyColorTag, menuTarget,
   handleTabAction, openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab,
   openSchemaTab, openSearchTab,
-  openExportWizard, openImportWizard, exportDatabase, importDatabase,
+  openExportTab, openImportWizard, exportDatabase, importDatabase,
 }) {
   const {
     openAddCollection, openAddDatabase, openAddView, openAddBucket,
@@ -174,7 +174,7 @@ export function useFeatures({
     'Duplicate Collection…':   { requires: 'collection', run: openDuplicateCollection },
 
     // ── import / export (collection-level wizards; db-level exports many) ──
-    'Export…':                 { requires: 'collection', run: (n) => openExportWizard(pick(n, COLL)) },
+    'Export…':                 { requires: 'collection', run: (n) => openExportTab(pick(n, COLL)) },
     'Import…':                 { requires: 'collection', run: (n) => openImportWizard(pick(n, COLL)) },
     'Export Collections…':     { requires: 'database',   run: (n) => exportDatabase(pick(n, COLL)) },
     'Import Collections…':     { requires: 'database',   run: (n) => importDatabase(pick(n, COLL)) },

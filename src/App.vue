@@ -210,7 +210,6 @@ provide('editorTabWidth', editorTabWidth)
 const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags()
 
 const {
-  openExportWizard,
   openImportWizard,
   onWizardImported,
   exportDatabase,
@@ -277,7 +276,7 @@ const { handleContextAction, handleTool, menuNode } = useFeatures({
   openShellTab: openShellTab, openIndexManagerTab: openIndexManagerTab, openSqlTab: openSqlTab,
   openSchemaTab: openSchemaTab,
   openSearchTab: openSearchTab,
-  openExportWizard: openExportWizard, openImportWizard: openImportWizard,
+  openExportTab: openExportTab, openImportWizard: openImportWizard,
   exportDatabase: exportDatabase, importDatabase: importDatabase,
 })
 
@@ -725,6 +724,25 @@ function openCollectionToolTab(kind, titlePrefix, { connId, connName, dbName, co
   activeTabId.value = id
 }
 function openSchemaTab(node)   { openCollectionToolTab('schema', 'Schema', node) }
+
+// Opens (or focuses) an Export tab for a collection. The wizard's working state lives
+// on the tab — the pane is unmounted on a tab switch, so local refs would reset the
+// step and field mapping every time. `result` holds the last successful run so the tab
+// can show it and offer a re-run; it is deliberately not persisted across restarts.
+function openExportTab({ connId, connName, dbName, collName }) {
+  const existing = tabs.value.find(t =>
+    t.kind === 'export' && t.connId === connId && t.dbName === dbName && t.collName === collName)
+  if (existing) { activeTabId.value = existing.id; return }
+  const id = 't' + Date.now()
+  tabs.value.push({
+    id: id, kind: 'export', title: 'Export: ' + collName,
+    connId: connId, connName: connName, dbName: dbName, collName: collName,
+    step: 0, format: 'json', incremental: false,
+    fields: [],          // [{ source, target, kind, include }] — the user's mapping
+    result: null,        // { count, path } after a successful export
+  })
+  activeTabId.value = id
+}
 
 
 // Search is database-scoped (it scans every collection in one db).

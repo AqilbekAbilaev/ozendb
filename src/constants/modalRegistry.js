@@ -43,6 +43,5 @@ export const MODALS = {
   history:   { component: lazy(() => import('../components/tools/CollectionHistoryModal.vue')), level: 'collection' },
   mapReduce: { component: lazy(() => import('../components/query/MapReduceModal.vue')),         level: 'collection' },
   validator: { component: lazy(() => import('../components/admin/ValidatorModal.vue')),         level: 'collection' },
-  export:    { component: lazy(() => import('../components/tools/ExportWizard.vue')),           level: 'collection' },
   import:    { component: lazy(() => import('../components/tools/ImportFormatModal.vue')),      level: 'collection' },
 }

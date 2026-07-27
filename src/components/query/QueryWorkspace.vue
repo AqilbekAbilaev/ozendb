@@ -15,6 +15,7 @@ import SchemaPane from './SchemaPane.vue'
 import SearchPane from './SearchPane.vue'
 import ImportPane from './ImportPane.vue'
 import CsvImportPane from './CsvImportPane.vue'
+import ExportPane from './ExportPane.vue'
 import QueryBrowserModal from './QueryBrowserModal.vue'
 import { parseField, parsePipeline } from '../../utils/queryParser'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
@@ -328,6 +329,9 @@ async function applyFromBrowser(entry) {
     <!-- Tasks (app-level) -->
 
     <!-- Import (CSV uses the single-source, sub-tab layout; JSON the multi-source table) -->
+    <!-- Export -->
+    <ExportPane v-else-if="activeTab.kind === 'export'" :active-tab="activeTab" />
+
     <CsvImportPane v-else-if="activeTab.kind === 'import' && activeTab.format === 'csv'" :active-tab="activeTab" />
     <ImportPane v-else-if="activeTab.kind === 'import'" :active-tab="activeTab" />
 

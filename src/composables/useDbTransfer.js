@@ -2,25 +2,14 @@ import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
 
-// Import / export flows. The per-collection wizard (stepped, with column→field mapping
-// and a live preview) just sets its modal target; the database-level Export/Import
+// Import / export flows. Per-collection export is a workspace tab (see openExportTab in
+// App.vue); import opens a format picker first. The database-level Export/Import
 // Collections… run the plain per-collection commands in a loop over a chosen folder/files.
 // `showToast` and `connectionTreeRef` are injected; `openModal` is the registry opener
-// from useModals so the export/import wizards open through the same path as every other
-// registry-driven modal.
+// from useModals, so the import format picker opens through the same path as every
+// other registry-driven modal.
 export function useDbTransfer({ showToast, connectionTreeRef, openModal }) {
-  // Open the stepped Import / Export wizard for a single collection. `nodeData` is the
-  // sidebar/tab shape ({ connId, connName, dbName, collName }); the wizard maps
-  // columns→fields with per-field type coercion and shows a live preview before it runs.
-  function openExportWizard(nodeData) {
-    openModal('export', {
-      connId: nodeData.connId,
-      connName: nodeData.connName,
-      dbName: nodeData.dbName,
-      collName: nodeData.collName,
-    })
-  }
-
+  // Import starts with the format picker; on Configure it opens the matching import tab.
   function openImportWizard(nodeData) {
     openModal('import', {
       connId: nodeData.connId,
@@ -114,7 +103,6 @@ export function useDbTransfer({ showToast, connectionTreeRef, openModal }) {
   }
 
   return {
-    openExportWizard: openExportWizard,
     openImportWizard: openImportWizard,
     onWizardImported: onWizardImported,
     exportDatabase: exportDatabase,

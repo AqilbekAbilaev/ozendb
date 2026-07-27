@@ -47,6 +47,20 @@ export function useSessionPersistence({ tabs, activeTabId, runRestoredTab }) {
         })),
       }
     }
+    if (t.kind === 'export') {
+      // Export tab: the field mapping is the user's curation, so it's worth keeping;
+      // the sample rows behind the preview are re-fetched on mount. `result` is not
+      // stored — a previous run's success banner would be stale on restart.
+      return {
+        id: t.id, kind: 'export', title: t.title, color: t.color,
+        connId: t.connId, connName: t.connName,
+        dbName: t.dbName, collName: t.collName,
+        step: t.step, format: t.format, incremental: !!t.incremental,
+        fields: (t.fields || []).map(f => ({
+          source: f.source, target: f.target, kind: f.kind, include: !!f.include,
+        })),
+      }
+    }
     if (t.kind === 'indexes') {
       // Index Manager tab: a thin shell keyed on the collection. The pane reloads
       // its index list + metrics itself on mount, so only the identity is stored.
@@ -82,7 +96,7 @@ export function useSessionPersistence({ tabs, activeTabId, runRestoredTab }) {
     return {
       activeTabId: activeTabId.value,
       tabs: tabs.value
-        .filter(t => t.kind === 'collection' || t.kind === 'shell' || t.kind === 'import' || t.kind === 'indexes')
+        .filter(t => t.kind === 'collection' || t.kind === 'shell' || t.kind === 'import' || t.kind === 'indexes' || t.kind === 'export')
         .map(projectTab),
     }
   }
@@ -151,6 +165,19 @@ export function useSessionPersistence({ tabs, activeTabId, runRestoredTab }) {
                 results: [], resultView: 'table', resultTab: 'Console',
                 runError: null, elapsedMs: null, drillPath: [], hasRun: false, selectedRow: -1, selectedRows: [],
                 logs: [], scalar: undefined, hasScalar: false,
+              }
+            : t.kind === 'export'
+            ? {
+                // Export tab: mapping and format come back; the preview re-samples on
+                // mount and the result banner starts clear.
+                id: t.id, kind: 'export', title: t.title, color: t.color,
+                connId: t.connId, connName: t.connName,
+                dbName: t.dbName, collName: t.collName,
+                step: t.step || 0, format: t.format || 'json', incremental: !!t.incremental,
+                fields: (t.fields || []).map(f => ({
+                  source: f.source, target: f.target, kind: f.kind, include: !!f.include,
+                })),
+                result: null,
               }
             : t.kind === 'indexes'
             ? {
