@@ -2,8 +2,6 @@ use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
 
-use crate::resolve;
-use crate::resolve_mongo;
 
 use super::{
     next_document, AppContext, IMPORT_BATCH_SIZE
@@ -24,7 +22,7 @@ pub async fn copy_collection(
 ) -> Result<(), AppError> {
     // Copy writes into the target collection on this same connection, so gate on
     // the connection being writable (the `$out` below is the write).
-    let src = resolve!(ctx.collection_for_write(&id, &source_database, &source_collection).await);
+    let src = ctx.collection_for_write(&id, &source_database, &source_collection).await?;
     let pipeline = vec![
         bson::doc! { "$match": {} },
         bson::doc! { "$out": { "db": &target_database, "coll": &target_collection } },
@@ -86,7 +84,7 @@ pub async fn copy_collection_to_connection(
 
     // Replace semantics: drop the target so a re-copy doesn't collide on `_id`. Dropping a
     // non-existent collection is a no-op in MongoDB.
-    let _ = resolve_mongo!(dst.drop().await);
+    let _ = dst.drop().await?;
 
     // Stream the source and insert in bounded batches so peak memory stays O(batch).
     let mut cursor = match src.find(bson::doc! {}).await {
@@ -96,7 +94,7 @@ pub async fn copy_collection_to_connection(
     let mut batch: Vec<bson::Document> = Vec::with_capacity(IMPORT_BATCH_SIZE);
     let mut count: u64 = 0;
     loop {
-        let next = resolve!(next_document(&mut cursor).await);
+        let next = next_document(&mut cursor).await?;
         match next {
             Some(doc) => {
                 batch.push(doc);

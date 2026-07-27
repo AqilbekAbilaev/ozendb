@@ -4,7 +4,6 @@ use crate::error::AppError;
 use crate::shell::{ShellEngine, ShellResult};
 use crate::shell_history::ShellHistoryStorage;
 use tauri::State;
-use crate::resolve;
 
 use super::{
     AppContext
@@ -26,7 +25,7 @@ pub async fn run_shell_command(
 ) -> Result<ShellResult, AppError> {
     // Resolve the connection exactly like find_documents so the shell shares the
     // same pooled client and credential flow.
-    let client = resolve!(ctx.client(&id).await);
+    let client = ctx.client(&id).await?;
 
     // A read-only connection must refuse shell writes (insertOne/drop/…) just like
     // the rest of the app; reads still pass through.

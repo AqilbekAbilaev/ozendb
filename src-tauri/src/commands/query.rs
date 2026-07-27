@@ -4,8 +4,6 @@ use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
 
-use crate::resolve;
-use crate::resolve_mongo;
 
 use super::{
     collect_json, next_document, parse_ejson_document, parse_json_documents,
@@ -124,7 +122,7 @@ pub async fn kill_query(
     id: String,
     comment: String,
 ) -> Result<usize, AppError> {
-    let client = resolve!(ctx.client(&id).await);
+    let client = ctx.client(&id).await?;
     let admin = client.database("admin");
 
     // $currentOp defaults to the authenticated user's own ops, which is exactly
@@ -171,11 +169,11 @@ pub async fn find_documents(
     limit: i64,
     comment: Option<String>,
 ) -> Result<Box<serde_json::value::RawValue>, AppError> {
-    let col = resolve!(ctx.collection(&id, &database, &collection).await);
+    let col = ctx.collection(&id, &database, &collection).await?;
 
-    let filter_doc = resolve!(parse_ejson_document(&filter));
-    let projection_doc = resolve!(parse_ejson_document(&projection));
-    let sort_doc = resolve!(parse_ejson_document(&sort));
+    let filter_doc = parse_ejson_document(&filter)?;
+    let projection_doc = parse_ejson_document(&projection)?;
+    let sort_doc = parse_ejson_document(&sort)?;
 
     // A positive limit is self-bounding; only a non-positive one would fetch the
     // whole collection, so clamp that case to a safe page (see FIND_LIMIT_FALLBACK).
@@ -213,9 +211,9 @@ pub async fn count_documents(
     collection: String,
     filter: String,
 ) -> Result<i64, AppError> {
-    let col = resolve!(ctx.collection(&id, &database, &collection).await);
+    let col = ctx.collection(&id, &database, &collection).await?;
 
-    let filter_doc = resolve!(parse_ejson_document(&filter));
+    let filter_doc = parse_ejson_document(&filter)?;
 
     let count = match col
         .count_documents(filter_doc)
@@ -237,9 +235,9 @@ pub async fn insert_document(
     collection: String,
     document: String,
 ) -> Result<String, AppError> {
-    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let doc = resolve!(parse_ejson_document(&document));
-    let result = resolve_mongo!(col.insert_one(doc).await);
+    let col = ctx.collection_for_write(&id, &database, &collection).await?;
+    let doc = parse_ejson_document(&document)?;
+    let result = col.insert_one(doc).await?;
     // Record the insert so it can be undone (restore = delete this document).
     record_history(&history, &id, &database, &collection, "insert", &result.inserted_id, None);
     Ok(result.inserted_id.to_string())
@@ -266,7 +264,7 @@ pub async fn insert_documents(
             "Clipboard has no document(s) to paste".to_string(),
         ));
     }
-    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
+    let col = ctx.collection_for_write(&id, &database, &collection).await?;
     match col.insert_many(docs).await {
         Ok(result) => Ok(result.inserted_ids.len()),
         Err(e) => Err(AppError::Mongo(e)),
@@ -283,11 +281,11 @@ pub async fn replace_document(
     id_filter: String,
     document: String,
 ) -> Result<(), AppError> {
-    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let filter_doc = resolve!(parse_ejson_document(&id_filter));
-    let mut replacement = resolve!(parse_ejson_document(&document));
+    let col = ctx.collection_for_write(&id, &database, &collection).await?;
+    let filter_doc = parse_ejson_document(&id_filter)?;
+    let mut replacement = parse_ejson_document(&document)?;
     // Capture the pre-image before replacing, so the edit can be undone.
-    let before = resolve_mongo!(col.find_one(filter_doc.clone()).await);
+    let before = col.find_one(filter_doc.clone()).await?;
     // MongoDB errors if the replacement contains an _id that differs from the filter.
     // Remove it unconditionally — the existing _id is preserved by replace_one.
     replacement.remove("_id");
@@ -314,10 +312,10 @@ pub async fn delete_document(
     collection: String,
     id_filter: String,
 ) -> Result<(), AppError> {
-    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let filter_doc = resolve!(parse_ejson_document(&id_filter));
+    let col = ctx.collection_for_write(&id, &database, &collection).await?;
+    let filter_doc = parse_ejson_document(&id_filter)?;
     // Capture the pre-image before deleting, so the delete can be undone.
-    let before = resolve_mongo!(col.find_one(filter_doc.clone()).await);
+    let before = col.find_one(filter_doc.clone()).await?;
     match col.delete_one(filter_doc).await {
         Ok(_) => {}
         Err(e) => return Err(AppError::Mongo(e)),
@@ -357,9 +355,9 @@ pub async fn update_many(
     upsert: bool,
     multi: bool,
 ) -> Result<i64, AppError> {
-    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let filter_doc = resolve!(parse_ejson_document(&filter));
-    let update_doc = resolve!(parse_ejson_document(&update));
+    let col = ctx.collection_for_write(&id, &database, &collection).await?;
+    let filter_doc = parse_ejson_document(&filter)?;
+    let update_doc = parse_ejson_document(&update)?;
     // Guard against a replacement-style document reaching the update, which the
     // driver rejects: every top-level key of an update must be an operator ($set…).
     if !is_operator_update(&update_doc) {
@@ -396,9 +394,9 @@ pub async fn delete_many(
     collection: String,
     filter: String,
 ) -> Result<i64, AppError> {
-    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
-    let filter_doc = resolve!(parse_ejson_document(&filter));
-    let result = resolve_mongo!(col.delete_many(filter_doc).await);
+    let col = ctx.collection_for_write(&id, &database, &collection).await?;
+    let filter_doc = parse_ejson_document(&filter)?;
+    let result = col.delete_many(filter_doc).await?;
     Ok(result.deleted_count as i64)
 }
 
@@ -412,9 +410,9 @@ pub async fn clear_collection(
     database: String,
     collection: String,
 ) -> Result<i64, AppError> {
-    let col = resolve!(ctx.collection_for_write(&id, &database, &collection).await);
+    let col = ctx.collection_for_write(&id, &database, &collection).await?;
     // An empty filter matches every document; the collection itself is untouched.
-    let result = resolve_mongo!(col.delete_many(bson::doc! {}).await);
+    let result = col.delete_many(bson::doc! {}).await?;
     Ok(result.deleted_count as i64)
 }
 
@@ -453,11 +451,11 @@ pub async fn explain_query(
         Ok(val) => val,
         Err(e) => return Err(AppError::Bson(e)),
     };
-    let client = resolve!(ctx.client(&id).await);
+    let client = ctx.client(&id).await?;
 
-    let filter_doc = resolve!(parse_ejson_document(&filter));
-    let projection_doc = resolve!(parse_ejson_document(&projection));
-    let sort_doc = resolve!(parse_ejson_document(&sort));
+    let filter_doc = parse_ejson_document(&filter)?;
+    let projection_doc = parse_ejson_document(&projection)?;
+    let sort_doc = parse_ejson_document(&sort)?;
 
     // The `explain` command wraps the equivalent `find` command and reports how
     // the server would execute it; mirror the same optional fields find_documents uses.
@@ -482,7 +480,7 @@ pub async fn explain_query(
         "explain": find_command,
         "verbosity": verbosity_value,
     };
-    let result = resolve_mongo!(client.database(&database).run_command(explain_command).await);
+    let result = client.database(&database).run_command(explain_command).await?;
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 
@@ -502,7 +500,7 @@ pub async fn explain_aggregate(
         Ok(val) => val,
         Err(e) => return Err(AppError::Bson(e)),
     };
-    let client = resolve!(ctx.client(&id).await);
+    let client = ctx.client(&id).await?;
     let stages = match parse_pipeline(&pipeline) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -521,7 +519,7 @@ pub async fn explain_aggregate(
         "explain": aggregate_command,
         "verbosity": verbosity_value,
     };
-    let result = resolve_mongo!(client.database(&database).run_command(explain_command).await);
+    let result = client.database(&database).run_command(explain_command).await?;
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 
@@ -534,7 +532,7 @@ pub async fn run_aggregate(
     pipeline: String,
     comment: Option<String>,
 ) -> Result<AggregateResult, AppError> {
-    let col = resolve!(ctx.collection(&id, &database, &collection).await);
+    let col = ctx.collection(&id, &database, &collection).await?;
     let stages = match parse_pipeline(&pipeline) {
         Ok(val) => val,
         Err(e) => return Err(e),

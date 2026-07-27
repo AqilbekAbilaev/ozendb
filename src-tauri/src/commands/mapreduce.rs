@@ -2,8 +2,6 @@ use crate::error::AppError;
 use mongodb::bson;
 use tauri::State;
 
-use crate::resolve;
-use crate::resolve_mongo;
 
 use super::{
     AppContext
@@ -28,9 +26,9 @@ pub async fn map_reduce(
     // results to that collection, so gate that case on the connection being writable.
     let writes = !out_collection.trim().is_empty();
     let client = if writes {
-        resolve!(ctx.client_for_write(&id).await)
+        ctx.client_for_write(&id).await?
     } else {
-        resolve!(ctx.client(&id).await)
+        ctx.client(&id).await?
     };
     let out: bson::Bson = if out_collection.trim().is_empty() {
         bson::Bson::Document(bson::doc! { "inline": 1 })
@@ -46,6 +44,6 @@ pub async fn map_reduce(
     if !finalize.trim().is_empty() {
         command.insert("finalize", bson::Bson::JavaScriptCode(finalize));
     }
-    let result = resolve_mongo!(client.database(&database).run_command(command).await);
+    let result = client.database(&database).run_command(command).await?;
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }

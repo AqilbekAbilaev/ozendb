@@ -5,7 +5,6 @@ use crate::ssh::HostKeyPrompts;
 use crate::storage::{ConnectionConfig, HostEntry, SshAuthMethod};
 use super::AppContext;
 use crate::uri;
-use crate::resolve_mongo;
 use mongodb::Client;
 use std::sync::Arc;
 use tauri::State;
@@ -17,7 +16,7 @@ pub async fn test_connection(uri: String) -> Result<(), AppError> {
         Ok(val) => val,
         Err(e) => return Err(e),
     };
-    let client = resolve_mongo!(Client::with_uri_str(&uri::with_timeout(&uri)).await);
+    let client = Client::with_uri_str(&uri::with_timeout(&uri)).await?;
     match client.list_database_names().await {
         Ok(_) => {},
         Err(e) => return Err(AppError::Mongo(e)),
@@ -108,7 +107,7 @@ pub async fn test_ssh_connection(
         "127.0.0.1",
         local_port,
     ));
-    let client = resolve_mongo!(Client::with_uri_str(&uri).await);
+    let client = Client::with_uri_str(&uri).await?;
     match client.list_database_names().await {
         Ok(_) => {}
         Err(e) => return Err(AppError::Mongo(e)),

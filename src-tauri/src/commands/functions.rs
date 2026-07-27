@@ -3,8 +3,6 @@ use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
 
-use crate::resolve;
-use crate::try_mongo;
 
 use super::{
     next_document, AppContext
@@ -34,7 +32,7 @@ pub async fn list_functions(
     id: String,
     database: String,
 ) -> Result<Vec<StoredFunction>, AppError> {
-    let coll = resolve!(ctx.collection(&id, &database, "system.js").await);
+    let coll = ctx.collection(&id, &database, "system.js").await?;
     let mut cursor = match coll.find(bson::doc! {}).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
@@ -68,7 +66,7 @@ pub async fn save_function(
     name: String,
     body: String,
 ) -> Result<(), AppError> {
-    let coll = resolve!(ctx.collection_for_write(&id, &database, "system.js").await);
+    let coll = ctx.collection_for_write(&id, &database, "system.js").await?;
     let update = bson::doc! { "$set": { "value": bson::Bson::JavaScriptCode(body) } };
     match coll
         .update_one(bson::doc! { "_id": &name }, update)
@@ -88,6 +86,7 @@ pub async fn drop_function(
     database: String,
     name: String,
 ) -> Result<(), AppError> {
-    let coll = resolve!(ctx.collection_for_write(&id, &database, "system.js").await);
-    try_mongo!(coll.delete_one(bson::doc! { "_id": &name }).await)
+    let coll = ctx.collection_for_write(&id, &database, "system.js").await?;
+    coll.delete_one(bson::doc! { "_id": &name }).await?;
+    Ok(())
 }

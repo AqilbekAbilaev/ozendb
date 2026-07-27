@@ -2,8 +2,6 @@ use crate::error::AppError;
 use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
-use crate::resolve;
-use crate::resolve_mongo;
 
 use super::{
     AppContext
@@ -83,9 +81,9 @@ pub async fn collection_stats(
     database: String,
     collection: String,
 ) -> Result<CollectionStats, AppError> {
-    let client = resolve!(ctx.client(&id).await);
+    let client = ctx.client(&id).await?;
     let command = bson::doc! { "collStats": &collection };
-    let result = resolve_mongo!(client.database(&database).run_command(command).await);
+    let result = client.database(&database).run_command(command).await?;
     Ok(extract_stats(&result))
 }
 

@@ -1,7 +1,6 @@
 use crate::error::AppError;
 use crate::pool::ConnectionPool;
 use crate::storage::Storage;
-use crate::resolve_mongo;
 use mongodb::bson;
 use mongodb::Client;
 use mongodb::Collection;
@@ -56,43 +55,6 @@ pub use operations::*;
 // Server-side time cap on user queries so a runaway find/aggregate aborts on the
 // server instead of hanging the UI (Tauri commands can't be cancelled in-flight).
 pub(crate) const MAX_QUERY_TIME: Duration = Duration::from_secs(60);
-
-/// Unwrap a `Result<T, AppError>` or early-return with the error.
-/// Replaces the 4-line `match expr { Ok(v) => v, Err(e) => return Err(e) }`
-/// pattern that appears dozens of times across command files.
-#[macro_export]
-macro_rules! resolve {
-    ($expr:expr) => {
-        match $expr {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        }
-    };
-}
-
-/// Unwrap a driver-call `Result<T, mongodb::error::Error>`, wrapping the error as
-/// `AppError::Mongo(e)` — the sibling of `resolve!` for raw driver calls.
-#[macro_export]
-macro_rules! resolve_mongo {
-    ($expr:expr) => {
-        match $expr {
-            Ok(val) => val,
-            Err(e) => return Err(crate::error::AppError::Mongo(e)),
-        }
-    };
-}
-
-/// Execute a driver call that returns `Result<(), mongodb::error::Error>`,
-/// discarding the success value and propagating the error as `AppError::Mongo(e)`.
-#[macro_export]
-macro_rules! try_mongo {
-    ($expr:expr) => {
-        match $expr {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(crate::error::AppError::Mongo(e)),
-        }
-    };
-}
 
 /// Record a long-running operation in the Operations registry (the one place all
 /// operations are tracked) while it runs, without changing what the command returns.
@@ -194,7 +156,7 @@ impl AppContext {
         database: &str,
         collection: &str,
     ) -> Result<Collection<bson::Document>, AppError> {
-        let client = resolve!(self.client(id).await);
+        let client = self.client(id).await?;
         Ok(client
             .database(database)
             .collection::<bson::Document>(collection))
@@ -208,7 +170,7 @@ impl AppContext {
         database: &str,
         collection: &str,
     ) -> Result<Collection<bson::Document>, AppError> {
-        let client = resolve!(self.client_for_write(id).await);
+        let client = self.client_for_write(id).await?;
         Ok(client
             .database(database)
             .collection::<bson::Document>(collection))
@@ -819,7 +781,7 @@ fn xlsx_write_cell(
 pub(crate) async fn next_document(
     cursor: &mut mongodb::Cursor<bson::Document>,
 ) -> Result<Option<bson::Document>, AppError> {
-    let has_next = resolve_mongo!(cursor.advance().await);
+    let has_next = cursor.advance().await?;
     if !has_next {
         return Ok(None);
     }
@@ -850,7 +812,7 @@ pub(crate) async fn collect_documents(
 pub(crate) async fn collect_values(
     cursor: &mut mongodb::Cursor<bson::Document>,
 ) -> Result<Vec<serde_json::Value>, AppError> {
-    let docs = resolve!(collect_documents(cursor).await);
+    let docs = collect_documents(cursor).await?;
     Ok(docs
         .into_iter()
         .map(|doc| serde_json::Value::from(bson::Bson::Document(doc)))

@@ -3,7 +3,6 @@ use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
 
-use crate::resolve;
 
 use super::{
     next_document, MAX_QUERY_TIME, AppContext
@@ -192,7 +191,7 @@ pub async fn search_collections(
         _ => Scope { values: true, names: true },
     };
 
-    let client = resolve!(ctx.client(&id).await);
+    let client = ctx.client(&id).await?;
     let db = client.database(&database);
 
     let scan = match scan_limit {

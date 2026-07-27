@@ -3,9 +3,6 @@ use mongodb::bson;
 use serde::Serialize;
 use tauri::State;
 
-use crate::resolve;
-use crate::resolve_mongo;
-use crate::try_mongo;
 
 use super::{
     AppContext
@@ -47,8 +44,8 @@ pub async fn list_users(
     id: String,
     database: String,
 ) -> Result<Vec<UserInfo>, AppError> {
-    let client = resolve!(ctx.client(&id).await);
-    let result = resolve_mongo!(client.database(&database).run_command(bson::doc! { "usersInfo": 1 }).await);
+    let client = ctx.client(&id).await?;
+    let result = client.database(&database).run_command(bson::doc! { "usersInfo": 1 }).await?;
     let mut users: Vec<UserInfo> = Vec::new();
     if let Some(bson::Bson::Array(entries)) = result.get("users") {
         for entry in entries {
@@ -83,7 +80,7 @@ pub async fn create_user(
     password: String,
     roles: Vec<String>,
 ) -> Result<(), AppError> {
-    let client = resolve!(ctx.client_for_write(&id).await);
+    let client = ctx.client_for_write(&id).await?;
     let mut role_docs: Vec<bson::Bson> = Vec::new();
     for role in roles.iter() {
         let trimmed = role.trim();
@@ -101,7 +98,8 @@ pub async fn create_user(
         "pwd": &password,
         "roles": role_docs,
     };
-    try_mongo!(client.database(&database).run_command(command).await)
+    client.database(&database).run_command(command).await?;
+    Ok(())
 }
 
 // Rebuild the `roles` array (as `[{ role, db }]`) from a source user document, preserving
@@ -150,7 +148,7 @@ pub async fn copy_users_to_connection(
     target_id: String,
     target_database: String,
 ) -> Result<Vec<CopiedUser>, AppError> {
-    let source_client = resolve!(ctx.client(&source_id).await);
+    let source_client = ctx.client(&source_id).await?;
     let result = match source_client
         .database(&source_database)
         .run_command(bson::doc! { "usersInfo": 1 })
@@ -160,7 +158,7 @@ pub async fn copy_users_to_connection(
         Err(e) => return Err(AppError::Mongo(e)),
     };
 
-    let target_client = resolve!(ctx.client_for_write(&target_id).await);
+    let target_client = ctx.client_for_write(&target_id).await?;
     let target_db = target_client.database(&target_database);
 
     let mut copied: Vec<CopiedUser> = Vec::new();
@@ -211,8 +209,9 @@ pub async fn drop_user(
     database: String,
     username: String,
 ) -> Result<(), AppError> {
-    let client = resolve!(ctx.client_for_write(&id).await);
-    try_mongo!(client.database(&database).run_command(bson::doc! { "dropUser": &username }).await)
+    let client = ctx.client_for_write(&id).await?;
+    client.database(&database).run_command(bson::doc! { "dropUser": &username }).await?;
+    Ok(())
 }
 
 /// List the role names defined on a database (via `rolesInfo`; built-in roles excluded).
@@ -222,9 +221,9 @@ pub async fn list_roles(
     id: String,
     database: String,
 ) -> Result<Vec<String>, AppError> {
-    let client = resolve!(ctx.client(&id).await);
+    let client = ctx.client(&id).await?;
     let command = bson::doc! { "rolesInfo": 1, "showBuiltinRoles": false };
-    let result = resolve_mongo!(client.database(&database).run_command(command).await);
+    let result = client.database(&database).run_command(command).await?;
     let mut roles: Vec<String> = Vec::new();
     if let Some(bson::Bson::Array(entries)) = result.get("roles") {
         for entry in entries {
