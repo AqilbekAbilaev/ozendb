@@ -13,6 +13,7 @@ import NumberStepper from '../base/NumberStepper.vue'
 import StateMessage from '../base/StateMessage.vue'
 import HintText from '../base/HintText.vue'
 import { cellText } from '../../utils/format'
+import { INSERT_MODES, BSON_KINDS, PREVIEW_LIMIT } from '../../constants/dataTools'
 
 // CSV import tab, modelled on Studio 3T's CSV import: a Source options / Target
 // options split, a single source (Clipboard or File), a CSV options panel
@@ -39,20 +40,6 @@ const DELIMITERS = [
   { value: ' ', label: 'Space' },
   { value: 'other', label: 'Other' },
 ]
-const INSERT_MODES = [
-  { value: 'insert', label: 'Insert documents' },
-]
-const KINDS = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'string', label: 'String' },
-  { value: 'int', label: 'Int32' },
-  { value: 'long', label: 'Int64' },
-  { value: 'double', label: 'Double' },
-  { value: 'bool', label: 'Boolean' },
-  { value: 'date', label: 'Date' },
-  { value: 'objectId', label: 'ObjectId' },
-]
-const PREVIEW_LIMIT = 20
 
 const t = computed(() => props.activeTab)
 
@@ -352,7 +339,7 @@ function reset() {
                   <BaseCheckbox v-model="f.include" class="map-chk" />
                   <code class="map-field" :title="f.source">{{ f.source }}</code>
                   <BaseInput v-model="f.target" class="map-input" :disabled="!f.include" />
-                  <BaseSelect v-model="f.kind" class="map-select" :options="KINDS" :disabled="!f.include" size="sm" />
+                  <BaseSelect v-model="f.kind" class="map-select" :options="BSON_KINDS" :disabled="!f.include" size="sm" />
                 </div>
               </div>
             </div>

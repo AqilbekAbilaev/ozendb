@@ -10,6 +10,7 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
 import HintText from '../base/HintText.vue'
+import { FIELD_STRATEGIES, EXPORT_FORMATS } from '../../constants/dataTools'
 
 // The Data Masking tab lists the collection's fields (from a sample document) and lets the
 // user pick a masking strategy per field, then exports an obfuscated copy — the source
@@ -19,19 +20,6 @@ const props = defineProps({
 })
 const { showToast } = useToast()
 
-const STRATEGIES = [
-  { value: 'keep',    label: 'Keep' },
-  { value: 'redact',  label: 'Redact' },
-  { value: 'hash',    label: 'Hash' },
-  { value: 'partial', label: 'Partial' },
-  { value: 'nullify', label: 'Null' },
-  { value: 'remove',  label: 'Remove' },
-]
-const FORMAT_OPTIONS = [
-  { value: 'json', label: 'JSON' },
-  { value: 'csv',  label: 'CSV' },
-  { value: 'xlsx', label: 'Excel (.xlsx)' },
-]
 
 const loading = ref(true)
 const error = ref(null)
@@ -170,7 +158,7 @@ async function runExport() {
         <div class="mk-rows">
           <div v-for="f in fields" :key="f.name" class="mk-row">
             <code class="mk-field" :title="f.name">{{ f.name }}</code>
-            <BaseSelect v-model="f.strategy" class="mk-select" :options="STRATEGIES" size="sm" />
+            <BaseSelect v-model="f.strategy" class="mk-select" :options="FIELD_STRATEGIES" size="sm" />
             <span class="mk-opts">
               <template v-if="f.strategy === 'partial'">
                 keep
@@ -189,7 +177,7 @@ async function runExport() {
     <div v-if="fields.length" class="mk-foot">
       <label class="mk-f">
         Format
-        <BaseSelect v-model="format" class="mk-select" :options="FORMAT_OPTIONS" size="sm" />
+        <BaseSelect v-model="format" class="mk-select" :options="EXPORT_FORMATS" size="sm" />
       </label>
       <label class="mk-f">
         Limit
