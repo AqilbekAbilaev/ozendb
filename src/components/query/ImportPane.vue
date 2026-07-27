@@ -9,6 +9,7 @@ import StateMessage from '../base/StateMessage.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
+import { cellText } from '../../utils/format'
 
 // Import surface for a collection, rendered as a workspace tab (kind 'import').
 // The format was chosen in the ImportFormatModal picker and lives on the tab.
@@ -168,12 +169,6 @@ async function loadPreview() {
   } finally {
     previewLoading.value = false
   }
-}
-
-function cellText(value) {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
 }
 
 // ── run ────────────────────────────────────────────────────────
