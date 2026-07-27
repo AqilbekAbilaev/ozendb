@@ -66,7 +66,7 @@ fn record_does_not_duplicate_on_retrust() {
     store
         .record("bastion.example.com", 22, "ssh-ed25519 BBBB")
         .unwrap();
-    let hosts = store.load_all();
+    let hosts = store.load();
     assert_eq!(hosts.len(), 1);
     assert_eq!(hosts[0].key, "ssh-ed25519 BBBB");
 }
@@ -77,7 +77,7 @@ fn remove_forgets_only_the_named_host() {
     store.record("a.example.com", 22, "ssh-ed25519 AAAA").unwrap();
     store.record("b.example.com", 22, "ssh-ed25519 BBBB").unwrap();
     store.remove("a.example.com", 22).unwrap();
-    let hosts = store.load_all();
+    let hosts = store.load();
     assert_eq!(hosts.len(), 1);
     assert_eq!(hosts[0].host, "b.example.com");
     // After forgetting, the host reads as a fresh first contact again.
@@ -93,5 +93,5 @@ fn different_port_is_a_separate_host() {
     store.record("bastion.example.com", 22, "ssh-ed25519 AAAA").unwrap();
     // Same host name, different port → recorded independently.
     store.record("bastion.example.com", 2222, "ssh-ed25519 BBBB").unwrap();
-    assert_eq!(store.load_all().len(), 2);
+    assert_eq!(store.load().len(), 2);
 }
