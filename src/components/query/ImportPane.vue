@@ -10,6 +10,7 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
 import { cellText } from '../../utils/format'
+import { INSERT_MODES, PREVIEW_LIMIT } from '../../constants/dataTools'
 
 // Import surface for a collection, rendered as a workspace tab (kind 'import').
 // The format was chosen in the ImportFormatModal picker and lives on the tab.
@@ -33,11 +34,7 @@ function changeTarget() {
 
 // Insertion modes. Only plain insert is wired today; overwrite/merge/skip need a
 // backend `mode` param on import_collection_mapped (a follow-up).
-const INSERT_MODES = [
-  { value: 'insert', label: 'Insert documents' },
-]
 
-const PREVIEW_LIMIT = 20
 
 const t = computed(() => props.activeTab)
 const fmt = computed(() => (t.value.format || 'json').toUpperCase())

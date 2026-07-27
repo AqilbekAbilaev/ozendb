@@ -13,12 +13,8 @@ import BaseCheckbox from '../base/BaseCheckbox.vue'
 import ReorderButtons from '../base/ReorderButtons.vue'
 import HintText from '../base/HintText.vue'
 import { cellText } from '../../utils/format'
+import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT } from '../../constants/dataTools'
 
-const EXPORT_FORMATS = [
-  { value: 'json', label: 'JSON' },
-  { value: 'csv',  label: 'CSV' },
-  { value: 'xlsx', label: 'Excel (.xlsx)' },
-]
 
 // Stepped Export wizard for a single collection: sample the collection, choose /
 // reorder / rename the fields (optionally coercing a type), pick a format, preview,
@@ -32,18 +28,7 @@ const { showToast } = useToast()
 
 // The per-field type coercions the backend understands. 'auto' keeps the value
 // as parsed (no coercion).
-const KINDS = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'string', label: 'String' },
-  { value: 'int', label: 'Int32' },
-  { value: 'long', label: 'Int64' },
-  { value: 'double', label: 'Double' },
-  { value: 'bool', label: 'Boolean' },
-  { value: 'date', label: 'Date' },
-  { value: 'objectId', label: 'ObjectId' },
-]
 
-const PREVIEW_LIMIT = 20
 
 const step = ref(0)
 const steps = ['Select fields', 'Preview & run']
@@ -229,7 +214,7 @@ const titleText = computed(() => `Export — ${props.target.dbName}.${props.targ
             <BaseCheckbox v-model="f.include" class="iew-chk" />
             <code class="iew-field" :title="f.source">{{ f.source }}</code>
             <BaseInput v-model="f.target" class="iew-input" :disabled="!f.include" />
-            <BaseSelect v-model="f.kind" class="iew-select" :options="KINDS" :disabled="!f.include" size="sm" />
+            <BaseSelect v-model="f.kind" class="iew-select" :options="BSON_KINDS" :disabled="!f.include" size="sm" />
             <span class="iew-order">
               <ReorderButtons
                 :up-disabled="i === 0"

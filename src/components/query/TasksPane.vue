@@ -14,6 +14,7 @@ import FormField from '../base/FormField.vue'
 import BaseTextarea from '../base/BaseTextarea.vue'
 import SelectCard from '../base/SelectCard.vue'
 import StateMessage from '../base/StateMessage.vue'
+import { EXPORT_FORMATS, IMPORT_FORMATS, MASK_STRATEGIES } from '../../constants/dataTools'
 
 // The Tasks panel: saved, parameterised invocations of an existing operation
 // (Export / Import / Data Masking / IntelliShell Script) that the
@@ -32,7 +33,6 @@ const TYPES = [
 ]
 const TYPE_META = Object.fromEntries(TYPES.map(t => [t.value, t]))
 
-const MASK_STRATEGIES = ['redact', 'hash', 'partial', 'nullify', 'remove']
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const view = ref('list')            // 'list' | 'form'
@@ -51,12 +51,8 @@ let unlisten = null
 const form = reactive(blankForm())
 
 // ── BaseSelect option sets ──
-const FORMAT_BASE = [{ value: 'json', label: 'JSON' }, { value: 'csv', label: 'CSV' }]
-const XLSX_OPTION = { value: 'xlsx', label: 'Excel (.xlsx)' }
-const EXPORT_FORMATS = [...FORMAT_BASE, XLSX_OPTION]
 // Excel is only offered for exports (import can't target .xlsx).
-const formatOptions = computed(() => (form.type === 'export' ? EXPORT_FORMATS : FORMAT_BASE))
-const STRATEGY_OPTIONS = MASK_STRATEGIES.map((s) => ({ value: s, label: s }))
+const formatOptions = computed(() => (form.type === 'export' ? EXPORT_FORMATS : IMPORT_FORMATS))
 const WEEKDAY_OPTIONS = WEEKDAYS.map((d, i) => ({ value: i, label: d }))
 const SCHED_OPTIONS = [
   { value: 'manual',   label: 'Manual (run on demand only)' },
@@ -521,7 +517,7 @@ async function save() {
           </div>
           <div v-for="(rule, i) in form.rules" :key="i" class="tk-rule">
             <BaseInput v-model="rule.field" class="tk-input" placeholder="field.path" />
-            <BaseSelect v-model="rule.strategy" class="tk-select narrow" :options="STRATEGY_OPTIONS" size="sm" />
+            <BaseSelect v-model="rule.strategy" class="tk-select narrow" :options="MASK_STRATEGIES" size="sm" />
             <template v-if="rule.strategy === 'partial'">
               <BaseInput v-model="rule.keepStart" class="tk-input tiny" placeholder="start" title="Keep first N chars" />
               <BaseInput v-model="rule.keepEnd" class="tk-input tiny" placeholder="end" title="Keep last N chars" />
