@@ -133,6 +133,22 @@ pub fn forget_ssh_host(
     known_hosts.remove(&host, port)
 }
 
+/// Which stored secrets an updated config can still use. A `false` means the
+/// setting that justified the secret is gone — no username (or auth turned off),
+/// SSH disabled, or SSH switched to the other auth method — so the keychain entry
+/// should be dropped rather than left behind.
+///
+/// Kept as a pure function so the decision is unit-testable without touching a real
+/// OS keychain. Returns `(password, ssh_password, ssh_passphrase)`.
+pub(crate) fn usable_secrets(config: &ConnectionConfig) -> (bool, bool, bool) {
+    let no_auth = config.auth_mechanism.as_deref() == Some("none");
+    let has_user = !no_auth
+        && config.username.as_deref().filter(|s| !s.is_empty()).is_some();
+    let ssh_password = config.ssh_enabled && config.ssh_auth.as_deref() == Some("password");
+    let ssh_passphrase = config.ssh_enabled && config.ssh_auth.as_deref() == Some("key");
+    (has_user, ssh_password, ssh_passphrase)
+}
+
 #[tauri::command]
 pub async fn save_connection(
     ctx: State<'_, AppContext>,
@@ -419,6 +435,21 @@ pub async fn update_connection(
         };
     }
 
+    // Drop secrets the updated config can no longer use, so a credential doesn't
+    // outlive the setting that needed it. "Leave blank to keep existing" only holds
+    // while the field still applies — clearing the username, turning SSH off, or
+    // switching SSH auth retires the corresponding secret.
+    let (keep_password, keep_ssh_password, keep_ssh_passphrase) = usable_secrets(&config);
+    if !keep_password {
+        crate::keychain::delete(&id);
+    }
+    if !keep_ssh_password {
+        crate::keychain::delete(&format!("{}::ssh-pass", id));
+    }
+    if !keep_ssh_passphrase {
+        crate::keychain::delete(&format!("{}::ssh-key-pass", id));
+    }
+
     match ctx.storage.update(config) {
         Ok(val) => val,
         Err(e) => return Err(e),
@@ -505,3 +536,7 @@ pub fn update_last_accessed(
 pub fn open_document_window(app: tauri::AppHandle, target: crate::menu::DocumentTarget) {
     crate::menu::open_document_window(&app, target);
 }
+
+#[cfg(test)]
+#[path = "connection.test.rs"]
+mod tests;
