@@ -36,12 +36,6 @@ const appWindow = getCurrentWindow();
 // shortcut handling there. Detected from the webview's platform string.
 const NATIVE_MENU_OWNS_SHORTCUTS = !/Linux/i.test(navigator.userAgent);
 
-appWindow.listen('window-focus', async (event) => {
-  if (event.payload === true) {
-    await appWindow.setFocus();
-  }
-});
-
 onMounted(async () => {
   // WebKitGTK has no native undo/redo for text fields — install our own so Ctrl+Z works.
   installInputUndo()
