@@ -1,8 +1,7 @@
+use crate::json_store_wrapper;
 use crate::error::AppError;
-use crate::json_store::JsonStore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 const MAX_HISTORY: usize = 50;
 
@@ -19,17 +18,11 @@ pub struct QueryHistoryEntry {
     pub ran_at: String,
 }
 
-pub struct HistoryStorage {
-    inner: JsonStore<HashMap<String, Vec<QueryHistoryEntry>>>,
-}
+json_store_wrapper!(HistoryStorage, HashMap<String, Vec<QueryHistoryEntry>>);
 
 impl HistoryStorage {
-    pub fn new(path: PathBuf) -> Self {
-        Self { inner: JsonStore::new(path) }
-    }
-
     pub fn get(&self, key: &str) -> Vec<QueryHistoryEntry> {
-        let map = self.inner.load();
+        let map = self.load();
         match map.get(key) {
             Some(entries) => entries.clone(),
             None => Vec::new(),

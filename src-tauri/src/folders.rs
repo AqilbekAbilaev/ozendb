@@ -1,7 +1,6 @@
+use crate::json_store_wrapper;
 use crate::error::AppError;
-use crate::json_store::JsonStore;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// A connection-organizing folder shown in the Connection Manager grid. Folders
 /// are their own entities (persisted in `folders.json`) so an empty folder can
@@ -16,19 +15,9 @@ pub struct Folder {
     pub created_at: String,
 }
 
-pub struct FolderStorage {
-    inner: JsonStore<Vec<Folder>>,
-}
+json_store_wrapper!(FolderStorage, Vec<Folder>);
 
 impl FolderStorage {
-    pub fn new(path: PathBuf) -> Self {
-        Self { inner: JsonStore::new(path) }
-    }
-
-    pub fn load(&self) -> Vec<Folder> {
-        self.inner.load()
-    }
-
     pub fn insert(&self, folder: Folder) -> Result<(), AppError> {
         self.inner.update(|folders| folders.push(folder))
     }

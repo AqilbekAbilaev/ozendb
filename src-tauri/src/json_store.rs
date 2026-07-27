@@ -84,6 +84,39 @@ where
     }
 }
 
+/// Generate the struct, constructor, and `load` delegation for a domain store
+/// that wraps `JsonStore<T>`. Every store gets `new(path)`, `load()`, and a
+/// `pub(crate)` `inner` field so custom mutation methods can call
+/// `self.inner.update(...)` directly.
+///
+/// # Example
+///
+/// ```ignore
+/// crate::json_store_wrapper!(SettingsStorage, Settings);
+///
+/// impl SettingsStorage {
+///     pub fn save(&self, settings: &Settings) -> Result<(), AppError> {
+///         self.inner.save(settings)
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! json_store_wrapper {
+    ($name:ident, $type:ty) => {
+        pub struct $name {
+            pub(crate) inner: crate::json_store::JsonStore<$type>,
+        }
+        impl $name {
+            pub fn new(path: std::path::PathBuf) -> Self {
+                Self { inner: crate::json_store::JsonStore::new(path) }
+            }
+            pub fn load(&self) -> $type {
+                self.inner.load()
+            }
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

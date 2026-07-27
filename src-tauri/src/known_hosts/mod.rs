@@ -1,3 +1,4 @@
+use crate::json_store_wrapper;
 // Trust-on-first-use (TOFU) store for SSH host keys.
 //
 // We compare the key a bastion presents against what we have on file: a match is
@@ -10,9 +11,7 @@
 // share one bastion and should trust the same key.
 
 use crate::error::AppError;
-use crate::json_store::JsonStore;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct KnownHost {
@@ -49,26 +48,14 @@ pub fn classify(stored: Option<&str>, presented: &str) -> HostKeyCheck {
     }
 }
 
-pub struct KnownHostsStore {
-    // The JsonStore's lock serializes the load-modify-save sequence so two
-    // first-contact connections can't lose each other's recorded keys.
-    inner: JsonStore<Vec<KnownHost>>,
-}
+json_store_wrapper!(KnownHostsStore, Vec<KnownHost>);
 
 impl KnownHostsStore {
-    pub fn new(path: PathBuf) -> Self {
-        Self { inner: JsonStore::new(path) }
-    }
-
-    fn load_all(&self) -> Vec<KnownHost> {
-        self.inner.load()
-    }
-
     /// Read-only TOFU comparison — does the presented key match, is this a new
     /// host, or has its key changed? Writes nothing; the caller decides what to
     /// do (prompt, accept, reject) based on the verdict.
     pub fn check(&self, host: &str, port: u16, presented: &str) -> HostKeyCheck {
-        let hosts = self.load_all();
+        let hosts = self.load();
         let stored = hosts
             .iter()
             .find(|h| h.host == host && h.port == port)
@@ -79,7 +66,7 @@ impl KnownHostsStore {
     /// The OpenSSH-form key currently trusted for this host, if any. Used to
     /// show the previously-trusted fingerprint when a key has changed.
     pub fn stored_key(&self, host: &str, port: u16) -> Option<String> {
-        self.load_all()
+        self.load()
             .into_iter()
             .find(|h| h.host == host && h.port == port)
             .map(|h| h.key)

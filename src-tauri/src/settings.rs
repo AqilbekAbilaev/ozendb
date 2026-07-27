@@ -1,7 +1,6 @@
+use crate::json_store_wrapper;
 use crate::error::AppError;
-use crate::json_store::JsonStore;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// Application-wide preferences. A single JSON object (not keyed), persisted to
 /// `settings.json`. New fields should carry `#[serde(default)]` so older files
@@ -52,19 +51,9 @@ impl Default for Settings {
     }
 }
 
-pub struct SettingsStorage {
-    inner: JsonStore<Settings>,
-}
+json_store_wrapper!(SettingsStorage, Settings);
 
 impl SettingsStorage {
-    pub fn new(path: PathBuf) -> Self {
-        Self { inner: JsonStore::new(path) }
-    }
-
-    pub fn load(&self) -> Settings {
-        self.inner.load()
-    }
-
     pub fn save(&self, settings: &Settings) -> Result<(), AppError> {
         self.inner.save(settings)
     }

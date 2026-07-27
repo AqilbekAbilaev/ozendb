@@ -1,7 +1,6 @@
+use crate::json_store_wrapper;
 use crate::error::AppError;
-use crate::json_store::JsonStore;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SavedQueryEntry {
@@ -17,19 +16,9 @@ pub struct SavedQueryEntry {
     pub saved_at:   String,
 }
 
-pub struct SavedQueryStorage {
-    inner: JsonStore<Vec<SavedQueryEntry>>,
-}
+json_store_wrapper!(SavedQueryStorage, Vec<SavedQueryEntry>);
 
 impl SavedQueryStorage {
-    pub fn new(path: PathBuf) -> Self {
-        Self { inner: JsonStore::new(path) }
-    }
-
-    pub fn load(&self) -> Vec<SavedQueryEntry> {
-        self.inner.load()
-    }
-
     pub fn insert(&self, entry: SavedQueryEntry) -> Result<(), AppError> {
         self.inner.update(|entries| entries.insert(0, entry))
     }
