@@ -173,6 +173,10 @@ const isLastStep = computed(() => t.value.step === steps.length - 1)
 
 // What the picker chose, for the banner under the breadcrumb. Shown always — an
 // export that silently covers less than the whole collection is worth stating.
+// CSV and Excel flatten to columns; JSON keeps the document shape. Worth saying out
+// loud next to the field mapping, since that's what changes between them.
+const isTabular = computed(() => t.value.format === 'csv' || t.value.format === 'xlsx')
+
 const sourceLabel = computed(() => {
   if (t.value.source === 'query') return 'Current query result'
   if (t.value.source === 'selected') {
@@ -190,10 +194,22 @@ const sourceLabel = computed(() => {
       icon="export" label="Export"
     />
 
-    <div class="iew-source">
-      <span class="iew-source-label">Source</span>
-      <span class="iew-source-value">{{ sourceLabel }}</span>
-      <code v-if="activeTab.filter && activeTab.filter !== '{}'" class="iew-source-filter">{{ activeTab.filter }}</code>
+    <!-- Source and format sit above the steps because both decide what the field
+         step below actually means: a CSV/Excel export is flat, so column choice and
+         order matter, while JSON keeps nesting. -->
+    <div class="iew-header">
+      <div class="iew-hrow">
+        <span class="iew-hlabel">Source</span>
+        <span class="iew-source-value">{{ sourceLabel }}</span>
+        <code v-if="activeTab.filter && activeTab.filter !== '{}'" class="iew-source-filter">{{ activeTab.filter }}</code>
+      </div>
+      <div class="iew-hrow">
+        <span class="iew-hlabel">Format</span>
+        <BaseSelect v-model="activeTab.format" class="iew-format" :options="EXPORT_FORMATS" size="sm" />
+        <span v-if="isTabular" class="iew-hnote">
+          Flat output — only the selected fields become columns, and nested values are stringified.
+        </span>
+      </div>
     </div>
 
     <!-- step indicator -->
@@ -254,10 +270,6 @@ const sourceLabel = computed(() => {
             Preview of the first {{ previewRows.length }} row{{ previewRows.length === 1 ? '' : 's' }}.
           </HintText>
           <div class="iew-export-opts">
-            <label class="iew-f">
-              Format
-              <BaseSelect v-model="activeTab.format" class="iew-select" :options="EXPORT_FORMATS" size="sm" />
-            </label>
             <label class="iew-f iew-inc" title="Export only documents added since this collection's last incremental export (tracked by _id)">
               <BaseCheckbox v-model="activeTab.incremental" />
               Incremental (new only)
@@ -308,17 +320,20 @@ const sourceLabel = computed(() => {
 <style scoped>
 .export-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-window); }
 
-.iew-source {
+.iew-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 16px;
   border-bottom: 1px solid var(--border-soft);
   font-size: 12px;
   flex: none;
   min-width: 0;
 }
-.iew-source-label { color: var(--text-faint); }
+.iew-hrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.iew-hlabel { color: var(--text-faint); width: 52px; flex: none; }
+.iew-format { min-width: 150px; flex: none; }
+.iew-hnote { color: var(--text-faint); font-size: 11.5px; }
 .iew-source-value { color: var(--text); }
 .iew-source-filter {
   font-family: var(--mono);
