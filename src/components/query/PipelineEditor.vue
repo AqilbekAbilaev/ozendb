@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import CodeEditor from '../base/CodeEditor.vue'
 import FieldError from '../base/FieldError.vue'
@@ -15,53 +15,71 @@ defineProps({
 })
 const emit = defineEmits(['run'])
 
-// The base theme pins every editor to height:100%, which inside an auto-height box lets
-// the editor render past its parent and paint over the results tabs. Here it sizes to the
-// pipeline instead and scrolls once it reaches 40vh. Layered over the base theme (later
-// theme rules win), same trick as IntelliShell's line-height override.
-// `minHeight: 100%` is what makes the drag handle work: while the box is auto-sized it
-// resolves to nothing, and once a drag puts an explicit height on the box the editor
-// fills it (and beats maxHeight, so dragging past 40vh is allowed).
-const growWithContent = EditorView.theme({
-  '&': { height: 'auto', minHeight: '100%', maxHeight: '40vh' },
+// The box always gets an explicit pixel height (see `height` below) and the editor fills it
+// through the base theme's height:100%. Sizing it the other way round — an auto-height box
+// wrapping an editor bounded by percentages — is what put the error text over the results
+// tabs: WebKit resolves a percentage against an auto-height parent by falling back to the
+// content, so the editor rendered taller than the box its parent had accounted for.
+const scrollWhenFull = EditorView.theme({
   '.cm-scroller': { overflow: 'auto' },
 })
+
+const MIN_HEIGHT = 96
+// How much of the column the box may take on its own, before anyone drags it.
+const AUTO_FRACTION = 0.4
+// What a drag must leave behind, so the results panel is always visible.
+const RESULTS_RESERVE = 180
+
+const rootEl = ref(null)
+const inputEl = ref(null)
+const contentHeight = ref(MIN_HEIGHT)  // what CodeMirror measured the pipeline to be
+const boxHeight = ref(null)            // set by a drag; null while the box sizes itself
+const dragCeiling = ref(MIN_HEIGHT)    // the tallest the box may ever be
+const autoCeiling = ref(MIN_HEIGHT)    // the tallest it grows to without a drag
 
 // Built once: CodeEditor rebuilds its state whenever this array's identity changes.
 // `Mod-Enter` is Cmd on macOS and Ctrl elsewhere, replacing the old ctrl/meta pair.
 const pipelineExtensions = [
-  growWithContent,
+  scrollWhenFull,
+  // CodeMirror measures the pipeline for us, so the box can be sized from the real content
+  // height rather than from a CSS guess.
+  EditorView.updateListener.of((update) => {
+    if (update.heightChanged || update.docChanged) contentHeight.value = update.view.contentHeight
+  }),
   placeholder('[ { "$match": {} }, { "$limit": 20 } ]'),
   keymap.of([
     { key: 'Mod-Enter', preventDefault: true, run: () => { emit('run'); return true } },
   ]),
 ]
 
-// Drag-to-resize, through the shared Resizer. It drives a number, but until the first drag
-// the box has no height of its own — it grows with the pipeline — so `autoHeight` tracks
-// what that growth currently measures and hands the drag its true starting point. After a
-// drag `boxHeight` pins the box and the editor fills it.
-const MIN_HEIGHT = 96
-const inputEl = ref(null)
-const autoHeight = ref(MIN_HEIGHT)
-const boxHeight = ref(null)
-
+// The workspace column decides both ceilings, so they follow window and pane resizes.
 let observer = null
 onMounted(() => {
+  // A restored pipeline is already in the editor before the first update lands.
+  contentHeight.value = inputEl.value.getView()?.contentHeight ?? MIN_HEIGHT
+  const column = rootEl.value.parentElement
   observer = new ResizeObserver(() => {
-    if (boxHeight.value === null) autoHeight.value = inputEl.value.$el.offsetHeight
+    dragCeiling.value = Math.max(MIN_HEIGHT, column.clientHeight - RESULTS_RESERVE)
+    autoCeiling.value = Math.min(dragCeiling.value, Math.round(column.clientHeight * AUTO_FRACTION))
   })
-  observer.observe(inputEl.value.$el)
+  observer.observe(column)
 })
 onBeforeUnmount(() => observer?.disconnect())
+
+// The one height everything reads: the drag if there was one, otherwise the pipeline's own
+// size, clamped either way. `+ 2` covers the box's top and bottom border.
+const height = computed(() => {
+  const wanted = boxHeight.value ?? Math.min(contentHeight.value + 2, autoCeiling.value)
+  return Math.min(Math.max(wanted, MIN_HEIGHT), dragCeiling.value)
+})
 </script>
 
 <template>
-  <div class="agg-editor">
+  <div ref="rootEl" class="agg-editor">
     <CodeEditor
       ref="inputEl"
       class="agg-input"
-      :style="boxHeight ? { height: boxHeight + 'px' } : null"
+      :style="{ height: height + 'px' }"
       :model-value="activeTab.pipeline"
       :extensions="pipelineExtensions"
       :line-numbers="false"
@@ -71,7 +89,8 @@ onBeforeUnmount(() => observer?.disconnect())
       class="agg-grip"
       axis="y"
       :min="MIN_HEIGHT"
-      :model-value="boxHeight ?? autoHeight"
+      :max="dragCeiling"
+      :model-value="height"
       @update:model-value="boxHeight = $event"
     />
     <FieldError :text="pipelineErrorText" class="qparse-error" />
@@ -86,19 +105,15 @@ onBeforeUnmount(() => observer?.disconnect())
   border-bottom: 1px solid var(--border);
   flex: none;
 }
-/* Height comes from the editor (see growWithContent above) until a drag pins it; the box
-   only sets the floor the textarea used to have, so an empty pipeline looks like a field. */
+/* Height is set inline from `height` above; the editor fills it and scrolls inside. */
 .agg-input {
   flex: none;
-  min-height: 96px;
   overflow: hidden;
   background: var(--bg-input);
   border: 1px solid var(--border-soft);
   border-radius: 6px;
 }
 .agg-input:focus-within { border-color: var(--accent); }
-/* The shared Resizer is a 3px divider meant to sit between panes; inside the editor's
-   padding it needs a little breathing room and no bar of its own. */
 /* The shared Resizer draws its grip only on hover, which is invisible at rest inside a
    field. Here the bar is always drawn (and still turns accent on hover/drag); the
    divider's own full-width line stays off so it reads as a handle, not a separator. */
