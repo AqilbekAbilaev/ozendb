@@ -61,7 +61,7 @@ async function loadCollectionSample() {
       id: t.value.connId,
       database: t.value.dbName,
       collection: t.value.collName,
-      filter: '{}',
+      filter: t.value.filter || '{}',
       projection: '{}',
       sort: '{}',
       skip: 0,
@@ -156,6 +156,7 @@ async function run() {
       format: t.value.format,
       fields: mappingPayload(),
       incremental: t.value.incremental,
+      filter: t.value.filter || '{}',
     })
     // The tab stays open on success so the mapping can be tweaked and re-run; the
     // result banner replaces the modal's close-on-success.
@@ -169,6 +170,17 @@ async function run() {
 }
 
 const isLastStep = computed(() => t.value.step === steps.length - 1)
+
+// What the picker chose, for the banner under the breadcrumb. Shown always — an
+// export that silently covers less than the whole collection is worth stating.
+const sourceLabel = computed(() => {
+  if (t.value.source === 'query') return 'Current query result'
+  if (t.value.source === 'selected') {
+    const n = t.value.sourceCount
+    return `${n} selected document${n === 1 ? '' : 's'}`
+  }
+  return 'Entire collection'
+})
 </script>
 
 <template>
@@ -177,6 +189,12 @@ const isLastStep = computed(() => t.value.step === steps.length - 1)
       :conn="activeTab.connName" :db="activeTab.dbName" :coll="activeTab.collName"
       icon="export" label="Export"
     />
+
+    <div class="iew-source">
+      <span class="iew-source-label">Source</span>
+      <span class="iew-source-value">{{ sourceLabel }}</span>
+      <code v-if="activeTab.filter && activeTab.filter !== '{}'" class="iew-source-filter">{{ activeTab.filter }}</code>
+    </div>
 
     <!-- step indicator -->
     <div class="iew-steps">
@@ -289,6 +307,31 @@ const isLastStep = computed(() => t.value.step === steps.length - 1)
 
 <style scoped>
 .export-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-window); }
+
+.iew-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
+  flex: none;
+  min-width: 0;
+}
+.iew-source-label { color: var(--text-faint); }
+.iew-source-value { color: var(--text); }
+.iew-source-filter {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .iew-steps {
   display: flex;

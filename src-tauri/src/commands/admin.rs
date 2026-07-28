@@ -726,6 +726,10 @@ pub async fn export_collection_fields(
     format: String,
     fields: Vec<FieldMap>,
     incremental: Option<bool>,
+    // EJSON query limiting what is exported. `None`/`{}` means the whole collection —
+    // the "Entire Collection" source. The export source picker sends the tab's current
+    // query here, or an `_id` set for a selection.
+    filter: Option<String>,
 ) -> Result<usize, AppError> {
     let client = ctx.client(&id).await?;
     let col = client
@@ -735,8 +739,12 @@ pub async fn export_collection_fields(
     let use_incremental = incremental.unwrap_or(false);
     let watermark_key = format!("{}/{}/{}", id, database, collection);
 
-    // For an incremental export, work out the id window before streaming.
-    let mut filter = bson::doc! {};
+    // Start from the caller's query (whole collection when absent), then narrow it
+    // further if this is an incremental run.
+    let mut filter = match filter.as_deref().map(str::trim) {
+        Some("") | Some("{}") | None => bson::doc! {},
+        Some(text) => super::parse_ejson_document(text)?,
+    };
     let mut new_watermark: Option<bson::Bson> = None;
     if use_incremental {
         // The boundary is the current maximum `_id`; nothing beyond it is exported, so a
@@ -751,7 +759,13 @@ pub async fn export_collection_fields(
             Some(text) => watermark_from_string(&text),
             None => None,
         };
-        filter = incremental_filter(previous.as_ref(), &boundary);
+        // Merge rather than replace: an incremental export of a filtered source must
+        // honour both constraints, so the query and the id window are AND-ed together.
+        let window = incremental_filter(previous.as_ref(), &boundary);
+        filter = match filter.is_empty() {
+            true => window,
+            false => bson::doc! { "$and": [filter, window] },
+        };
         new_watermark = Some(boundary);
     }
 

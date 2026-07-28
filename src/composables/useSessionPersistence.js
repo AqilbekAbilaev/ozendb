@@ -56,6 +56,11 @@ export function useSessionPersistence({ tabs, activeTabId, runRestoredTab }) {
         connId: t.connId, connName: t.connName,
         dbName: t.dbName, collName: t.collName,
         step: t.step, format: t.format, incremental: !!t.incremental,
+        // The source and its frozen filter define what the export covers, so they
+        // must come back with it — a restored tab that quietly widened to the whole
+        // collection would export more than the user set up.
+        source: t.source || 'collection', sourceCount: t.sourceCount ?? null,
+        filter: t.filter || '{}',
         fields: (t.fields || []).map(f => ({
           source: f.source, target: f.target, kind: f.kind, include: !!f.include,
         })),
@@ -174,6 +179,8 @@ export function useSessionPersistence({ tabs, activeTabId, runRestoredTab }) {
                 connId: t.connId, connName: t.connName,
                 dbName: t.dbName, collName: t.collName,
                 step: t.step || 0, format: t.format || 'json', incremental: !!t.incremental,
+                source: t.source || 'collection', sourceCount: t.sourceCount ?? null,
+                filter: t.filter || '{}',
                 fields: (t.fields || []).map(f => ({
                   source: f.source, target: f.target, kind: f.kind, include: !!f.include,
                 })),

@@ -276,7 +276,7 @@ const { handleContextAction, handleTool, menuNode } = useFeatures({
   openShellTab: openShellTab, openIndexManagerTab: openIndexManagerTab, openSqlTab: openSqlTab,
   openSchemaTab: openSchemaTab,
   openSearchTab: openSearchTab,
-  openExportTab: openExportTab, openImportWizard: openImportWizard,
+  openExportSource: openExportSource, openImportWizard: openImportWizard,
   exportDatabase: exportDatabase, importDatabase: importDatabase,
 })
 
@@ -725,19 +725,58 @@ function openCollectionToolTab(kind, titlePrefix, { connId, connName, dbName, co
 }
 function openSchemaTab(node)   { openCollectionToolTab('schema', 'Schema', node) }
 
+// Export starts with the source picker (Entire Collection / Current Query Result /
+// Selected Documents). The two narrower sources are only offered when an open
+// collection tab for the same collection can supply them, so the query and the
+// selected _ids are resolved here and handed to the modal.
+function openExportSource(node) {
+  const tab = tabs.value.find(t =>
+    t.kind === 'collection' && t.connectionId === node.connId
+    && t.dbName === node.dbName && t.collectionName === node.collName)
+  const pf = tab ? parseField(tab.filter) : null
+  const rows = (tab && tab.selectedRows) || []
+  const selectedIds = rows
+    .map(i => tab.results[i])
+    .filter(doc => doc && doc._id !== undefined)
+    .map(doc => doc._id)
+  modalsApi.openModal('exportSource', {
+    ...node,
+    query: pf && pf.ok ? pf.ejson : null,
+    selectedIds: selectedIds,
+  })
+}
+
 // Opens (or focuses) an Export tab for a collection. The wizard's working state lives
 // on the tab — the pane is unmounted on a tab switch, so local refs would reset the
 // step and field mapping every time. `result` holds the last successful run so the tab
 // can show it and offer a re-run; it is deliberately not persisted across restarts.
-function openExportTab({ connId, connName, dbName, collName }) {
-  const existing = tabs.value.find(t =>
-    t.kind === 'export' && t.connId === connId && t.dbName === dbName && t.collName === collName)
-  if (existing) { activeTabId.value = existing.id; return }
+//
+// `source` comes from the picker and fixes what gets exported: the whole collection, the
+// originating tab's query, or an explicit _id set. The resulting filter is frozen onto
+// the tab at open time — re-running the export re-reads the collection, but through the
+// query as it was when the export was set up, not whatever the other tab shows now.
+function openExportTab(target, source) {
+  const { connId, connName, dbName, collName } = target
+  const filter = source === 'query'
+    ? (target.query || '{}')
+    : source === 'selected'
+      ? JSON.stringify({ _id: { $in: target.selectedIds || [] } })
+      : '{}'
+  // Each Export opens its own tab rather than focusing an existing one: two exports of
+  // the same collection can have different sources, and silently reusing a tab would
+  // change what the user set up. The title carries the source so they stay tellable
+  // apart in the tab bar.
+  const suffix = source === 'query' ? ' (query)'
+    : source === 'selected' ? ` (${(target.selectedIds || []).length} selected)`
+    : ''
   const id = 't' + Date.now()
   tabs.value.push({
-    id: id, kind: 'export', title: 'Export: ' + collName,
+    id: id, kind: 'export', title: 'Export: ' + collName + suffix,
     connId: connId, connName: connName, dbName: dbName, collName: collName,
     step: 0, format: 'json', incremental: false,
+    source: source || 'collection',
+    sourceCount: source === 'selected' ? (target.selectedIds || []).length : null,
+    filter: filter,
     fields: [],          // [{ source, target, kind, include }] — the user's mapping
     result: null,        // { count, path } after a successful export
   })
@@ -917,6 +956,12 @@ provide('appModals', {
       configure: (format) => {
         openImportTab(modalsApi.openModals.import, format)
         modalsApi.closeModal('import')
+      },
+    },
+    exportSource: {
+      choose: (source) => {
+        openExportTab(modalsApi.openModals.exportSource, source)
+        modalsApi.closeModal('exportSource')
       },
     },
     connectionManager: { connect: onManagerConnect },
