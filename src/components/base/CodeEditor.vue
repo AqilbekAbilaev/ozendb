@@ -4,7 +4,7 @@ import { EditorView, lineNumbers as lineNumbersExt, keymap } from '@codemirror/v
 import { EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
-import { syntaxHighlighting, indentUnit } from '@codemirror/language'
+import { syntaxHighlighting, indentUnit, bracketMatching } from '@codemirror/language'
 import { baseTheme, codeHighlightStyle, jsonHighlightStyle } from '../../utils/codemirror/theme'
 import { languageExtension } from '../../utils/codemirror/languages'
 
@@ -50,6 +50,7 @@ function buildState() {
   // two copies are one. Lowest precedence so a site's own bindings (shell's Mod-Enter,
   // docEditor's Mod-s) still win.
   base.push(closeBrackets())
+  base.push(bracketMatching())
   base.push(history())
   base.push(Prec.low(keymap.of([indentWithTab, ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap])))
   base.push(languageExtension(props.language))
