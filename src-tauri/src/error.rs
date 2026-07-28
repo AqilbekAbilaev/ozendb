@@ -116,6 +116,11 @@ fn mongo_code(e: &mongodb::error::Error) -> &'static str {
         | ErrorKind::ConnectionPoolCleared { .. }
         | ErrorKind::Io(_) => "network",
         ErrorKind::Write(_) | ErrorKind::InsertMany(_) => "write",
+        // The server rejected the command (bad pipeline stage, not authorized, …). Its
+        // own errmsg is the useful part and `mongo_message` already extracts it, so this
+        // gets its own code — `mongo` is the bucket whose message is a driver dump the
+        // frontend replaces with a generic title.
+        ErrorKind::Command(_) => "command",
         _ => "mongo",
     }
 }
