@@ -1,8 +1,9 @@
 <script setup>
 import { ref, shallowRef, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { EditorView, lineNumbers as lineNumbersExt, keymap } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
-import { indentWithTab } from '@codemirror/commands'
+import { EditorState, Prec } from '@codemirror/state'
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { syntaxHighlighting, indentUnit } from '@codemirror/language'
 import { baseTheme, codeHighlightStyle, jsonHighlightStyle } from '../../utils/codemirror/theme'
 import { languageExtension } from '../../utils/codemirror/languages'
@@ -42,7 +43,15 @@ function buildState() {
   const tabWidth = editorTabWidth.value
   base.push(EditorState.tabSize.of(tabWidth))
   base.push(indentUnit.of(' '.repeat(tabWidth)))
-  base.push(keymap.of([indentWithTab]))
+  // Basic editing keys (Enter → newline+indent, Home/End, word motions…). Without these
+  // the browser's own contenteditable handling takes over Enter and inserts two lines.
+  // Undo/redo needs the history state field, not just the keymap. The shell and document
+  // editors add their own history() — CodeMirror dedupes the shared state field, so the
+  // two copies are one. Lowest precedence so a site's own bindings (shell's Mod-Enter,
+  // docEditor's Mod-s) still win.
+  base.push(closeBrackets())
+  base.push(history())
+  base.push(Prec.low(keymap.of([indentWithTab, ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap])))
   base.push(languageExtension(props.language))
   base.push(syntaxHighlighting(props.highlight === 'json' ? jsonHighlightStyle : codeHighlightStyle))
   base.push(baseTheme)
