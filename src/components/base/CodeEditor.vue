@@ -1,5 +1,5 @@
 <script setup>
-import { ref, shallowRef, watch, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { EditorView, lineNumbers as lineNumbersExt, keymap } from '@codemirror/view'
 import { EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
@@ -7,6 +7,7 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { syntaxHighlighting, indentUnit, bracketMatching } from '@codemirror/language'
 import { baseTheme, codeHighlightStyle, jsonHighlightStyle } from '../../utils/codemirror/theme'
 import { languageExtension } from '../../utils/codemirror/languages'
+import { useMomentumScroll } from '../../composables/useMomentumScroll'
 
 // Reusable CodeMirror 6 editor/viewer. Owns the EditorView lifecycle and v-model sync;
 // everything site-specific (Mongo autocomplete, run/save keymaps, code folding, doc
@@ -69,6 +70,12 @@ function buildState() {
 onMounted(() => {
   view.value = new EditorView({ state: buildState(), parent: hostEl.value })
 })
+
+// Touchpad momentum on the editor's own scroller (CodeMirror scrolls .cm-scroller, not hostEl).
+// Here rather than per call site so every editor — the JSON results view, IntelliShell, the
+// pop-out document window — behaves the same. A keypress or click cancels the glide, so it
+// never fights CodeMirror's scroll-into-view while you're typing.
+useMomentumScroll(computed(() => view.value?.scrollDOM ?? null))
 onBeforeUnmount(() => {
   if (view.value) { view.value.destroy(); view.value = null }
 })

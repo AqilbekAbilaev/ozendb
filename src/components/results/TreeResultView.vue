@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue'
 import { useResultSearch } from '../../composables/useResultSearch'
+import { useMomentumScroll } from '../../composables/useMomentumScroll'
 import TreeView from '../base/TreeView.vue'
 import SearchBar from '../base/SearchBar.vue'
 import { isEjsonScalar } from '../../utils/mongoFormat'
@@ -73,6 +74,8 @@ const expandPaths = computed(() => {
 })
 
 const treeBodyRef = ref(null)
+const treeScrollRef = ref(null)
+useMomentumScroll(treeScrollRef)   // touchpad swipes keep gliding after the fingers lift
 
 // Toggle the highlight classes on the rendered rows. Ancestor auto-expand happens
 // reactively via expandPaths, so this runs in nextTick — after those rows are on screen.
@@ -134,7 +137,7 @@ const {
         @prev="onPrev"
         @close="onClose"
       />
-      <div class="tree-scroll">
+      <div ref="treeScrollRef" class="tree-scroll">
         <div class="tree-head">
           <span class="th-key">Key</span>
           <span class="th-val">Value</span>

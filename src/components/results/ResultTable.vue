@@ -7,6 +7,7 @@ import { valueToClipboard } from '../../utils/clipboardCopy'
 import { dbRefOf, idFilterString } from '../../utils/dbRef'
 import { useResultSearch } from '../../composables/useResultSearch'
 import { useColumnReorder } from '../../composables/useColumnReorder'
+import { useMomentumScroll } from '../../composables/useMomentumScroll'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import SearchBar from '../base/SearchBar.vue'
@@ -174,6 +175,7 @@ function columns(results) {
 // recomputed from the actual container height so it still covers tall windows.
 const gridWrapRef  = ref(null)
 const FILLER_ROW_HEIGHT = 25
+useMomentumScroll(gridWrapRef)   // touchpad swipes keep gliding after the fingers lift
 const minFillRows  = ref(24)
 let gridResizeObserver = null
 
