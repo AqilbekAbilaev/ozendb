@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.1.3
+
+- **Paste documents from the clipboard** — Ctrl+V in the results grid, or
+  Edit → Paste Document(s), inserts the clipboard's document(s) into the open
+  collection after a confirmation dialog showing what and where. Also fixes
+  clipboard reads on Linux, where they previously always failed.
+- **Momentum scrolling** — touchpad swipes keep gliding after your fingers
+  lift, in the table, JSON and tree result views, the pop-out document window
+  and every code editor.
+- **Aggregation pipeline editor** — the pipeline now uses the full code editor
+  with syntax highlighting and bracket matching, grows with its content, and
+  can be resized without pushing the results off screen.
+- **Export source picker** — export the entire collection, just the current
+  query's results, or only the selected documents. The output format moved to
+  the header so it's chosen before the field mapping.
+- **Export wizard as a workspace tab** — export opens as a tab instead of a
+  modal, with tab navigation and a full-width working area.
+- **Read-only connections are properly enforced** — `runCommand` writes and
+  `$out` / `$merge` pipeline stages are now refused, closing two paths that
+  bypassed the read-only guard.
+- **Real error messages from MongoDB** — when the server rejects a command,
+  its own message reaches the UI instead of a generic failure.
+- **Preferences pane** — keyboard shortcuts, default result view, session
+  restore, and editor indentation are configured in one place.
+- **Drag-to-reorder tabs and columns** — reorder workspace tabs, and reorder
+  columns in table view, by dragging.
+- **Document count on the button** — the total shows inline on the Count
+  button, with right-click to copy it.
+- **Colour tags** — pick a custom colour through the native colour picker;
+  recent choices are remembered.
+- **Stale credentials are cleaned up** — editing a connection now removes any
+  keychain secret it can no longer use.
+- **Removed** — the data masking feature, the background task scheduler and
+  its Tasks tab, and the duplicate Connect popup (Ctrl+N now opens the
+  connection manager).
+
 ## v0.1.2
 
 - **Declarative modal registry** — all top-level modals now render from a
