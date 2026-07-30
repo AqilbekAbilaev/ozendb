@@ -25,7 +25,7 @@ const props = defineProps({
 // consumed by VisualQueryBuilder, which lives beside this grid in ResultsPanel, so they
 // bubble up rather than being held here. `update:drillPath` keeps drill state (owned by
 // ResultsPanel so it survives view switches and the run-reset) in sync via v-model.
-const emit = defineEmits(['dragged-field', 'drag-over-section', 'vqb-drop', 'open-vqb', 'close-vqb', 'crud-error', 'update:drillPath', 'follow-reference'])
+const emit = defineEmits(['dragged-field', 'drag-over-section', 'vqb-drop', 'open-vqb', 'close-vqb', 'crud-error', 'update:drillPath', 'follow-reference', 'paste-documents'])
 
 function onThClick(col) {
   if (suppressNextClick) { suppressNextClick = false; return }
@@ -801,6 +801,14 @@ function handleKeydown(e) {
     tab.selectedRow = docs.length - 1
     anchorRow.value = 0
     selectedCol.value = null
+    return
+  }
+
+  // Ctrl/Cmd+V — insert the clipboard's document(s) into this collection. The counterpart
+  // to Ctrl+C below; no row selection needed, so it sits above the selection guard.
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'v' || e.key === 'V')) {
+    e.preventDefault()
+    emit('paste-documents')
     return
   }
 

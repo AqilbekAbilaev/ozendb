@@ -219,7 +219,7 @@ props.activeTab._idxApi = menuApi
 // Paste: create an index from a JSON spec on the clipboard
 async function pasteIndex() {
   let text = ''
-  try { text = await navigator.clipboard.readText() } catch (e) { text = '' }
+  try { text = await invoke('read_clipboard_text') } catch (e) { text = '' }
   if (!text.trim()) { showToast('Clipboard is empty'); return }
   let spec
   try { spec = JSON.parse(text) } catch (e) { showToast('Clipboard is not a valid index spec'); return }

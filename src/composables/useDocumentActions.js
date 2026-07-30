@@ -156,6 +156,8 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   const showUpdateDialog = ref(false)
   const showDeleteDialog = ref(false)
   const showClearConfirm = ref(false)
+  const pasteConfirm     = ref(null)   // { text, id, database, collection } | null — pending paste
+  const pasteBusy        = ref(false)
   const clearConfirmText = ref('')
   const clearBusy        = ref(false)
   const clearError       = ref(null)
@@ -309,9 +311,12 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       .catch(() => showToast('Copy to clipboard failed'))
   }
 
-  // Edit → Paste Document(s): read the clipboard, insert its document(s) into the
-  // active collection, and refresh. Parse/insert errors surface as a toast (the
-  // backend validates the Extended JSON), so a bad paste never crashes.
+  // Edit → Paste Document(s) / Ctrl+V in the grid: read the clipboard and ask for
+  // confirmation before inserting — a paste writes to the collection, and the clipboard
+  // may hold something the user never meant to send. The read goes through the backend
+  // because `navigator.clipboard.readText` is blocked under WebKitGTK on Linux, same as
+  // the import pane. The target is captured here so a tab switch mid-dialog can't
+  // redirect the insert.
   async function pasteDocuments() {
     const tab = activeTab()
     if (!tab || tab.kind !== 'collection' || !tab.collectionName) {
@@ -320,7 +325,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     }
     let text
     try {
-      text = await navigator.clipboard.readText()
+      text = await invoke('read_clipboard_text')
     } catch (e) {
       showToast('Cannot read from clipboard')
       return
@@ -329,17 +334,36 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       showToast('Clipboard is empty')
       return
     }
+    pasteConfirm.value = {
+      text: text,
+      id: tab.connectionId,
+      database: tab.dbName,
+      collection: tab.collectionName,
+    }
+  }
+
+  // Confirmed paste: insert and refresh. Parse/insert errors surface as a toast (the
+  // backend validates the Extended JSON), so a bad paste never crashes.
+  async function onPasteConfirm() {
+    const target = pasteConfirm.value
+    if (!target || pasteBusy.value) return
+    // The dialog stays up, disabled, until the insert returns — closing it first would
+    // leave a large paste running with nothing on screen to say so.
+    pasteBusy.value = true
     try {
       const count = await invoke('insert_documents', {
-        id: tab.connectionId,
-        database: tab.dbName,
-        collection: tab.collectionName,
-        documents: text,
+        id: target.id,
+        database: target.database,
+        collection: target.collection,
+        documents: target.text,
       })
       showToast(`Pasted ${count} document${count !== 1 ? 's' : ''}`)
       requery(true)
     } catch (e) {
       showToast(errText(e))
+    } finally {
+      pasteBusy.value = false
+      pasteConfirm.value = null
     }
   }
 
@@ -443,6 +467,10 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     openEdit: openEdit,
     openView: openView,
     copySelectedDocument: copySelectedDocument,
+    pasteDocuments: pasteDocuments,
+    pasteConfirm: pasteConfirm,
+    pasteBusy: pasteBusy,
+    onPasteConfirm: onPasteConfirm,
     onDeleteConfirm: onDeleteConfirm,
     fieldEdit: fieldEdit,
     fieldEditError: fieldEditError,

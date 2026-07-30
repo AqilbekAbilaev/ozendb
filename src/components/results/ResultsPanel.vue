@@ -164,6 +164,7 @@ const {
   drillPath,
   showDeleteConfirm, selectedCount, crudError,
   openInsert, openEdit, openView, copySelectedDocument, onDeleteConfirm,
+  pasteDocuments, pasteConfirm, pasteBusy, onPasteConfirm,
   fieldEdit, fieldEditError, removeFieldName, removeFieldError,
   showUpdateDialog, showDeleteDialog, showClearConfirm, clearConfirmText, clearBusy, clearError,
   onFieldEditSave, onRemoveFieldConfirm, onClearConfirm, onUpdateDialogDone, onDeleteDialogDone,
@@ -174,6 +175,13 @@ const {
   showToast: showToast,
   requery: (history) => emit('requery', history),
 })
+
+// Cap the paste preview. A few hundred copied documents is a megabyte of text, and
+// laying that out in one wrapped <pre> freezes the webview — show the head only and
+// say how much is hidden. The full clipboard text is still what gets inserted.
+const PASTE_PREVIEW_CHARS = 4000
+const pastePreview = computed(() => (pasteConfirm.value?.text ?? '').slice(0, PASTE_PREVIEW_CHARS))
+const pasteHidden  = computed(() => Math.max(0, (pasteConfirm.value?.text?.length ?? 0) - PASTE_PREVIEW_CHARS))
 
 // ── paging range / count ──────────────────────────────
 // "<from> to <to>" of the current page, skip-aware; appends "of <N>" only when a
@@ -379,6 +387,7 @@ function toggleReadOnly() {
       @open-vqb="emit('open-vqb')"
       @close-vqb="emit('close-vqb')"
       @crud-error="crudError = $event"
+      @paste-documents="pasteDocuments()"
       @follow-reference="emit('follow-reference', $event)"
     />
 
@@ -463,6 +472,23 @@ function toggleReadOnly() {
       <span class="spacer"></span>
       <BaseButton @click="showDeleteConfirm = false">Cancel</BaseButton>
       <BaseButton variant="danger" @click="onDeleteConfirm">{{ selectedCount > 1 ? `Delete ${selectedCount}` : 'Delete' }}</BaseButton>
+    </div>
+  </BaseModal>
+
+  <!-- Paste confirmation: the clipboard is about to be written to a collection, so show
+       what will be inserted and where before it happens. -->
+  <BaseModal v-if="pasteConfirm" title="Paste Documents" @close="!pasteBusy && (pasteConfirm = null)">
+    <div class="del-body">
+      <p>Insert the clipboard contents into <strong>{{ pasteConfirm.database }}.{{ pasteConfirm.collection }}</strong>?</p>
+      <pre class="paste-preview">{{ pastePreview }}</pre>
+      <p v-if="pasteHidden" class="paste-more">… and {{ pasteHidden.toLocaleString() }} more characters</p>
+    </div>
+    <div class="del-footer">
+      <span class="spacer"></span>
+      <BaseButton :disabled="pasteBusy" @click="pasteConfirm = null">Cancel</BaseButton>
+      <BaseButton variant="primary" :disabled="pasteBusy" @click="onPasteConfirm">
+        {{ pasteBusy ? 'Pasting…' : 'Paste' }}
+      </BaseButton>
     </div>
   </BaseModal>
 
@@ -671,6 +697,23 @@ function toggleReadOnly() {
   gap: 8px;
 }
 .del-body code { font-family: var(--mono); color: var(--text); }
+.paste-more { margin: 6px 0 0; color: var(--text-faint); font-size: 12px; }
+/* Clipboard preview: capped so a huge paste scrolls instead of growing the dialog. */
+.paste-preview {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-input);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-dim);
+}
 .cc-prompt { margin-top: 12px; }
 .base-input.cc-input {
   margin-top: 8px;
