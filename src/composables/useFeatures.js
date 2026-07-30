@@ -23,11 +23,7 @@ export function useFeatures({
   openSchemaTab, openSearchTab,
   openExportSource, openImportWizard, exportDatabase, importDatabase,
 }) {
-  const {
-    openAddCollection, openAddDatabase, openAddView,
-    openDropDatabase, openDropCollection, openRenameCollection, openDuplicateCollection,
-    pasteClipboard,
-  } = dbActions
+  const { pasteClipboard } = dbActions
 
   const CONN = ['connId', 'connName']
   const DB   = ['connId', 'connName', 'dbName']
@@ -47,6 +43,13 @@ export function useFeatures({
     const out = {}
     for (const field of fields) out[field] = node[field]
     return out
+  }
+
+  // Add View is the one structural dialog whose payload isn't just the node's level fields:
+  // it carries the source collection to prefill (empty from a database node, the clicked
+  // collection from "Add View Here…"), so it opens directly instead of via modalFeature.
+  function openAddView(node, source) {
+    modals.openModal('addView', { ...pick(node, DB), source: source })
   }
 
   // A feature that simply opens a modal by copying node fields into its target ref.
@@ -157,15 +160,15 @@ export function useFeatures({
     'Open Map-Reduce':         modalFeature('mapReduce'),
 
     // ── create/edit dialogs (state + seeders owned by useDbActions) ──
-    'Add Collection…':         { requires: 'database',   run: openAddCollection },
-    'Add Database…':           { requires: 'connection', run: openAddDatabase },
+    'Add Collection…':         modalFeature('addCollection'),
+    'Add Database…':           modalFeature('addDatabase'),
     'Add View…':               { requires: 'database',   run: (n) => openAddView(n, '') },
     'Add View Here…':          { requires: 'collection', run: (n) => openAddView(n, n.collName || '') },
     'Add GridFS Bucket…':      modalFeature('addBucket'),
-    'Drop Database…':          { requires: 'database',   run: openDropDatabase },
-    'Drop Collection…':        { requires: 'collection', run: openDropCollection },
-    'Rename Collection…':      { requires: 'collection', run: openRenameCollection },
-    'Duplicate Collection…':   { requires: 'collection', run: openDuplicateCollection },
+    'Drop Database…':          modalFeature('dropDatabase'),
+    'Drop Collection…':        modalFeature('dropCollection'),
+    'Rename Collection…':      modalFeature('renameCollection'),
+    'Duplicate Collection…':   modalFeature('duplicateCollection'),
 
     // ── import / export (collection-level wizards; db-level exports many) ──
     'Export…':                 { requires: 'collection', run: (n) => openExportSource(pick(n, COLL)) },

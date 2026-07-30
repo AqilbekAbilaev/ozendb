@@ -26,6 +26,7 @@ export const MODALS = {
   // Build / Host / Replica info share one modal; its feature seeds a { kind, title } payload
   // on top of the node fields (see openServerInfo), so it opens directly, not via modalFeature.
   serverInfo:   { component: lazy(() => import('../components/admin/ServerInfoModal.vue')),   level: 'connection' },
+  addDatabase:  { component: lazy(() => import('../components/admin/AddDatabaseModal.vue')),  level: 'connection' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },
@@ -36,7 +37,13 @@ export const MODALS = {
   gridfs:    { component: lazy(() => import('../components/tools/GridFsModal.vue')),        level: 'database' },
   // Structural dialogs: each owns its form state and its own driver call, and emits
   // `saved` so App.vue can refresh the sidebar (see its modalEmits map).
-  addBucket: { component: lazy(() => import('../components/admin/AddBucketModal.vue')),     level: 'database' },
+  addBucket:     { component: lazy(() => import('../components/admin/AddBucketModal.vue')),     level: 'database' },
+  addCollection: { component: lazy(() => import('../components/admin/AddCollectionModal.vue')), level: 'database' },
+  dropDatabase:  { component: lazy(() => import('../components/admin/DropDatabaseModal.vue')),  level: 'database' },
+  // Add View is seeded with an extra `source` on top of the database fields (empty from a
+  // database node, the clicked collection from "Add View Here…"), so its features open it
+  // directly rather than through modalFeature.
+  addView:       { component: lazy(() => import('../components/admin/AddViewModal.vue')),       level: 'database' },
 
   // ── collection level ──
   // A modal with extra domain events (e.g. validator's `saved`) keeps its component
@@ -48,4 +55,7 @@ export const MODALS = {
   validator: { component: lazy(() => import('../components/admin/ValidatorModal.vue')),         level: 'collection' },
   import:    { component: lazy(() => import('../components/tools/ImportFormatModal.vue')),      level: 'collection' },
   exportSource: { component: lazy(() => import('../components/tools/ExportSourceModal.vue')),   level: 'collection' },
+  dropCollection:      { component: lazy(() => import('../components/admin/DropCollectionModal.vue')),      level: 'collection' },
+  renameCollection:    { component: lazy(() => import('../components/admin/RenameCollectionModal.vue')),    level: 'collection' },
+  duplicateCollection: { component: lazy(() => import('../components/admin/DuplicateCollectionModal.vue')), level: 'collection' },
 }

@@ -933,13 +933,19 @@ async function onKeybindingsSaved(bindings) {
   }
 }
 
+// The registry dialogs that change the tree; each emits `saved` with the connection id.
+const STRUCTURAL_DIALOGS = [
+  'addCollection', 'addDatabase', 'addView', 'addBucket',
+  'dropDatabase', 'dropCollection', 'renameCollection', 'duplicateCollection',
+]
+const refreshConn = (connId) => connectionTreeRef.value?.refreshConn(connId)
+
 // Everything the extracted AppModals.vue needs, bundled behind one provide/inject.
 // Grouped by concern; AppModals destructures each group back to the same identifier
 // names the moved template already uses, so that template stays verbatim.
 provide('appModals', {
   modals: modalsApi,
   indexes: indexesApi,
-  dbActions: dbActionsApi,
   ssh: sshApi,
   handlers: {
     setTheme: setTheme,
@@ -967,9 +973,10 @@ provide('appModals', {
       },
     },
     connectionManager: { connect: onManagerConnect },
-    // Structural dialogs create/drop things in the tree, so the sidebar needs a refresh
-    // once they succeed. The dialog owns the driver call; only the refresh comes back here.
-    addBucket: { saved: (connId) => connectionTreeRef.value?.refreshConn(connId) },
+    // Structural dialogs create/drop/rename things in the tree, so the sidebar needs a
+    // refresh once they succeed. The dialog owns the driver call and its own form state;
+    // only the refresh comes back here, since the tree ref lives in App.vue.
+    ...Object.fromEntries(STRUCTURAL_DIALOGS.map(id => [id, { saved: refreshConn }])),
     preferences: {
       saved: onPrefsSaved,
       'saved-keybindings': onKeybindingsSaved,
