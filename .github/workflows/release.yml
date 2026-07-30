@@ -11,8 +11,14 @@ name: Release
 # must be done with a real account — GitHub suppresses workflow-triggering events for
 # anything the default GITHUB_TOKEN does, so a CI-driven publish would never fire the
 # `release: published` that deploy-website.yml listens for, and the site would go stale.
-# Builds are UNSIGNED for now — code-signing secrets (Apple Developer ID, Windows
-# cert) can be wired in later without changing the shape of this workflow.
+# Builds are NOT NOTARIZED — that needs a paid Apple Developer ID, so macOS still warns
+# about an unidentified developer. The macOS bundle is ad-hoc signed instead
+# (`bundle.macOS.signingIdentity: "-"` in tauri.conf.json), which is free and required:
+# Apple Silicon refuses to execute an unsigned binary, and `lipo` stitching the universal
+# binary drops the signature the linker would otherwise apply — without the ad-hoc step
+# users get "OzenDB is damaged and can't be opened" even after clearing quarantine.
+# Real signing secrets (Apple Developer ID, Windows cert) can be wired in later without
+# changing the shape of this workflow; override the identity via APPLE_SIGNING_IDENTITY.
 
 on:
   push:

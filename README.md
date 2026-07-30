@@ -47,8 +47,9 @@ Grab the latest build for your platform from the [Releases page](https://github.
 - **Windows** — `OzenDB_*_x64-setup.exe` (installer) or `OzenDB_*_x64_en-US.msi`. Run it and follow the prompts.
 - **Linux** — `OzenDB_*_amd64.AppImage` (portable — `chmod +x` then run), `OzenDB_*_amd64.deb` (Debian/Ubuntu), or `OzenDB-*.x86_64.rpm` (Fedora/RHEL).
 
-> **Heads-up for macOS and Windows users:** these builds are **not yet code-signed or notarized**, so the OS will warn you that OzenDB is from an unidentified developer and may block it on first launch. This is expected — it's a policy about signing, not a problem with the app itself.
-> - **macOS (Gatekeeper):** right-click the app → **Open** → **Open** again, or run `xattr -dr com.apple.quarantine /Applications/OzenDB.app`.
+> **Heads-up for macOS and Windows users:** these builds are **not notarized** (that needs a paid developer account), so the OS will warn you that OzenDB is from an unidentified developer and may block it on first launch. This is expected — it's a policy about signing, not a problem with the app itself.
+> - **macOS (Gatekeeper):** open **System Settings → Privacy & Security**, scroll to the message about OzenDB and click **Open Anyway**. Or clear the download flag from a terminal: `xattr -dr com.apple.quarantine /Applications/OzenDB.app`.
+>   On macOS 14 and earlier you can instead right-click the app → **Open** → **Open** again; macOS 15 removed that shortcut.
 > - **Windows (SmartScreen):** click **More info** → **Run anyway** on the blue warning dialog.
 
 #### Build from source

@@ -37,6 +37,9 @@
       "rpm": {
         "desktopTemplate": "./linux/main.desktop"
       }
+    },
+    "macOS": {
+      "signingIdentity": "-"
     }
   }
 }
