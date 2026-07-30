@@ -2,12 +2,13 @@ import { markRaw } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { errText, errCode } from '../utils/errors'
 import { parseField } from '../utils/queryParser'
+import { tabs } from '../stores/tabs'
 
 // Query execution: running find/aggregate queries against a tab, cancelling an
 // in-flight query, and re-running a tab restored from a previous session.
-// `tabs` (the App-owned ref) and `showToast` are injected so the composable
-// mutates the same tab objects and surfaces the same toasts as before.
-export function useQueryRunner({ tabs, showToast }) {
+// Tabs come from the store, so this mutates the same tab objects every other consumer
+// sees; `showToast` is still injected to surface the same toasts as before.
+export function useQueryRunner({ showToast }) {
   // ── query execution ────────────────────────────────────────
   // A unique tag stamped on each query op (as its `comment`) so a cancel can find
   // and kill exactly that operation server-side.

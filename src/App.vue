@@ -9,7 +9,6 @@ import { mergeBindings, matchBinding } from './utils/keybindings'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
-import { useTabs } from './composables/useTabs'
 import { useDbActions } from './composables/useDbActions'
 import { useMenu } from './composables/useMenu'
 import { useModals } from './composables/useModals'
@@ -18,6 +17,11 @@ import { useNodeTags } from './composables/useNodeTags'
 import { useDbTransfer } from './composables/useDbTransfer'
 import { useFeatures } from './composables/useFeatures'
 import { useSessionPersistence } from './composables/useSessionPersistence'
+import {
+  tabs, activeTabId, setRunRestoredTab,
+  activateTab, cycleTab, closeTab, moveTab, handleTabAction,
+  renameTabTarget, renameTabValue, confirmRenameTab,
+} from './stores/tabs'
 import ConnectionTree from './components/connection/ConnectionTree.vue'
 import QueryWorkspace from './components/query/QueryWorkspace.vue'
 import ContextMenu from './components/base/ContextMenu.vue'
@@ -103,10 +107,8 @@ onUnmounted(() => {
 
 // ── toolbar definition ─────────────────────────────────────
 // ── app state ──────────────────────────────────────────────
-const tabs = ref([
-  { id: 't0', kind: 'quickstart', title: 'Quickstart' }
-])
-const activeTabId = ref('t0')
+// `tabs`/`activeTabId` now come from stores/tabs.js (imported above). The tab creators
+// still live here because they depend on the query runner and settings.
 
 // The workspace always keeps at least one tab open: closing the last tab reopens
 // the Quickstart tab (the home screen) instead of leaving an empty, tab-less pane.
@@ -242,33 +244,33 @@ const {
   onHostKeyForget,
 } = sshApi
 
-const { runQuery, runAggregate, cancelQuery, runRestoredTab } = useQueryRunner({ tabs: tabs, showToast: showToast })
+const { runQuery, runAggregate, cancelQuery, runRestoredTab } = useQueryRunner({ showToast: showToast })
 
-// Tab operations (activate/close/cycle/duplicate/rename + tab context menu). The
-// tab state (tabs/activeTabId) stays in App.vue as the spine; the tab creators
-// (openCollectionTab/openShellTab/openIndexManagerTab/openQuickstart) stay too, as
-// they depend on the query runner and settings.
-const {
-  activateTab, cycleTab, closeTab, moveTab, onTabContext, handleTabAction,
-  renameTabTarget, renameTabValue, confirmRenameTab,
-} = useTabs({ tabs: tabs, activeTabId: activeTabId, contextMenu: contextMenu, runRestoredTab: runRestoredTab })
+// Tab operations live in stores/tabs.js (imported above) alongside the tab state. The
+// tab creators (openCollectionTab/openShellTab/openIndexManagerTab/openQuickstart) stay
+// here, as they depend on the query runner and settings. Registering the re-runner is
+// what lets the store re-run a restored tab without reaching for the query runner.
+setRunRestoredTab(runRestoredTab)
+
+// Tab right-click: the context menu itself is App.vue state, so this stays out of the store.
+function onTabContext({ id, x, y }) {
+  contextMenu.value = { type: 'tab', x: x, y: y, nodeData: { tabId: id } }
+}
 
 const { restoreSession, startAutoSave } = useSessionPersistence({
-  tabs: tabs,
-  activeTabId: activeTabId,
   runRestoredTab: runRestoredTab,
 })
 
 // dbActionsApi is consumed whole by useFeatures (dialog seeders + pasteClipboard)
 // and AppModals (dialog state + confirm handlers, via provide/inject).
-const dbActionsApi = useDbActions({ tabs: tabs, activeTabId: activeTabId, showToast: showToast, connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard })
+const dbActionsApi = useDbActions({ showToast: showToast, connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard })
 
-const { menuTarget } = useMenu({ tabs: tabs, activeTabId: activeTabId, treeSelection: treeSelection, treeConnectionCount: treeConnectionCount, selectedIndex: selectedIndex })
+const { menuTarget } = useMenu({ treeSelection: treeSelection, treeConnectionCount: treeConnectionCount, selectedIndex: selectedIndex })
 
 // Node-action dispatch (right-click menu, native menu bar via menuNode, toolbar).
 // handleMenuAction (the menu-bar spine) stays in App.vue and calls into these.
 const { handleContextAction, handleTool, menuNode } = useFeatures({
-  contextMenu: contextMenu, tabs: tabs, activeTabId: activeTabId,
+  contextMenu: contextMenu,
   connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard,
   modals: modalsApi, dbActions: dbActionsApi,
   showToast: showToast, applyColorTag: applyColorTag, menuTarget: menuTarget,

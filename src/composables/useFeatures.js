@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { TOOLS } from '../constants/tools'
 import { MODALS } from '../constants/modalRegistry'
+import { tabs, activeTab, pruneActiveTab } from '../stores/tabs'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
@@ -10,10 +11,10 @@ import { MODALS } from '../constants/modalRegistry'
 //
 // Dependencies are injected so this stays UI-agnostic and testable: `modals`/
 // `dbActions` are the sibling composable APIs; the rest are shared refs and the
-// tab-spine functions that remain in App.vue.
+// tab creators, which remain in App.vue. Tab state comes from the store.
 export function useFeatures({
   // shared reactive state
-  contextMenu, tabs, activeTabId, connectionTreeRef, dbClipboard,
+  contextMenu, connectionTreeRef, dbClipboard,
   // sibling composable APIs
   modals, dbActions,
   // injected functions
@@ -72,13 +73,6 @@ export function useFeatures({
   }
   function shellArgs(node) {
     return { connectionId: node.connId, connectionName: node.connName, dbName: node.dbName }
-  }
-
-  // After removing tabs, keep activeTabId valid (fall back to the last tab, or none).
-  function pruneActiveTab() {
-    if (activeTabId.value && !tabs.value.find(t => t.id === activeTabId.value)) {
-      activeTabId.value = tabs.value.length ? tabs.value[tabs.value.length - 1].id : null
-    }
   }
 
   async function disconnectOne(node, ctx) {
@@ -253,7 +247,7 @@ export function useFeatures({
 
     // The remaining actions operate on a specific node. From the toolbar that's the
     // active tab; from the native menu the caller passes the sidebar selection.
-    const tab = target || tabs.value.find(t => t.id === activeTabId.value)
+    const tab = target || activeTab.value
 
     if (name === 'shell') {
       if (tab && tab.connectionId && tab.dbName) {

@@ -2,13 +2,14 @@ import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { errText } from '../utils/errors'
 import { parsePipeline } from '../utils/queryParser'
+import { tabs, pruneActiveTab } from '../stores/tabs'
 
 // Collection/database CRUD-dialog state + confirm actions (add/drop/rename/duplicate
 // collection & database & view & GridFS-bucket). `showToast` is injected so the
-// composable stays UI-agnostic; `tabs`/`activeTabId` are shared with App.vue (drop and
-// rename touch the open tabs); `connectionTreeRef` refreshes the sidebar after a change;
+// composable stays UI-agnostic; the open tabs come from the store (drop and rename touch
+// them); `connectionTreeRef` refreshes the sidebar after a change;
 // `dbClipboard` is read by pasteClipboard (App.vue still owns and sets it on copy).
-export function useDbActions({ tabs, activeTabId, showToast, connectionTreeRef, dbClipboard }) {
+export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
   const addCollectionTarget = ref(null)   // { connId, dbName } | null
   const newCollectionName   = ref('')
   const addCollectionError  = ref(null)
@@ -229,9 +230,7 @@ export function useDbActions({ tabs, activeTabId, showToast, connectionTreeRef, 
       await invoke('drop_database', { id: target.connId, database: target.dbName })
       await connectionTreeRef.value.refreshConn(target.connId)
       tabs.value = tabs.value.filter(t => !(t.kind === 'collection' && t.connectionId === target.connId && t.dbName === target.dbName))
-      if (activeTabId.value && !tabs.value.find(t => t.id === activeTabId.value)) {
-        activeTabId.value = tabs.value.length ? tabs.value[tabs.value.length - 1].id : null
-      }
+      pruneActiveTab()
       showToast(`Database "${target.dbName}" dropped`)
       dropDatabaseTarget.value = null
     } catch (e) {
@@ -250,9 +249,7 @@ export function useDbActions({ tabs, activeTabId, showToast, connectionTreeRef, 
       await invoke('drop_collection', { id: target.connId, database: target.dbName, collection: target.collName })
       await connectionTreeRef.value.refreshConn(target.connId)
       tabs.value = tabs.value.filter(t => !(t.kind === 'collection' && t.connectionId === target.connId && t.dbName === target.dbName && t.collectionName === target.collName))
-      if (activeTabId.value && !tabs.value.find(t => t.id === activeTabId.value)) {
-        activeTabId.value = tabs.value.length ? tabs.value[tabs.value.length - 1].id : null
-      }
+      pruneActiveTab()
       showToast(`Collection "${target.collName}" dropped`)
       dropCollectionTarget.value = null
     } catch (e) {

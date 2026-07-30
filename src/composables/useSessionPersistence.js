@@ -1,12 +1,13 @@
 import { watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { tabs, activeTabId, activeTab } from '../stores/tabs'
 
 // Tab-session persistence. Persists open collection/shell/import/index tabs (and which one is active)
 // so they return after a restart. Only the persistable fields are projected — result sets
 // and other runtime state are rebuilt on demand, so paging through data never saves. The
-// tab spine (`tabs`, `activeTabId`) stays owned by App.vue and is passed in;
-// `runRestoredTab` re-runs a restored find tab's stored query in place.
-export function useSessionPersistence({ tabs, activeTabId, runRestoredTab }) {
+// tab spine (`tabs`, `activeTabId`) comes from the store; `runRestoredTab` re-runs a
+// restored find tab's stored query in place.
+export function useSessionPersistence({ runRestoredTab }) {
   // Import tabs persist their target + chosen format + the list of sources (each a
   // file path plus its target db/collection/insertion mode). Preview data is
   // re-derived on demand, so it isn't stored.
@@ -217,7 +218,7 @@ export function useSessionPersistence({ tabs, activeTabId, runRestoredTab }) {
             activeTabId.value = session.activeTabId
           }
           // Lazily run the active restored tab (find mode re-runs its query).
-          const active = tabs.value.find(x => x.id === activeTabId.value)
+          const active = activeTab.value
           if (active && active._restored) runRestoredTab(active)
         }
       }
