@@ -17,6 +17,7 @@
     "core:path:default",
     "core:event:allow-emit",
     "core:window:allow-close",
-    "core:window:allow-set-title"
+    "core:window:allow-set-title",
+    "core:webview:allow-set-webview-zoom"
   ]
 }

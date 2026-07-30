@@ -18,6 +18,11 @@ export const SHORTCUT_COMMANDS = [
   { id: 'view:refresh',      label: 'Refresh',                   group: 'View',       default: 'CmdOrCtrl+R' },
   { id: 'view:next_tab',    label: 'Next Tab',                 group: 'View',       default: 'CmdOrCtrl+Tab' },
   { id: 'view:prev_tab',    label: 'Previous Tab',             group: 'View',       default: 'CmdOrCtrl+Shift+Tab' },
+  // `=` / `-` / `0` rather than "Plus"/"Minus": those are the literal names the native
+  // accelerator parser accepts *and* what `event.key` reports, so one string serves both.
+  { id: 'view:zoom_in',     label: 'Zoom In',                  group: 'View',       default: 'CmdOrCtrl+=' },
+  { id: 'view:zoom_out',    label: 'Zoom Out',                 group: 'View',       default: 'CmdOrCtrl+-' },
+  { id: 'view:zoom_reset',  label: 'Actual Size',              group: 'View',       default: 'CmdOrCtrl+0' },
 ]
 
 const DEFAULTS = Object.fromEntries(SHORTCUT_COMMANDS.map((cmd) => [cmd.id, cmd.default]))

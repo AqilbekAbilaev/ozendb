@@ -261,6 +261,14 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
                 Spec::Action { id: "view:close_tab", label: "Close Tab", accel: None, gate: None },
                 Spec::Action { id: "view:close_tab_np", label: "Close Tab (No Prompt)", accel: None, gate: None },
                 Spec::Separator,
+                // Webview zoom for the whole window. Always enabled — zoom applies with or
+                // without a connection. `=` / `-` / `0` are the literal key names the
+                // accelerator parser accepts (not "Plus"), and they're also what
+                // `event.key` reports, so the same string drives the JS handler on Linux.
+                Spec::Action { id: "view:zoom_in", label: "Zoom In", accel: Some("CmdOrCtrl+="), gate: None },
+                Spec::Action { id: "view:zoom_out", label: "Zoom Out", accel: Some("CmdOrCtrl+-"), gate: None },
+                Spec::Action { id: "view:zoom_reset", label: "Actual Size", accel: Some("CmdOrCtrl+0"), gate: None },
+                Spec::Separator,
                 Spec::Action { id: "view:history", label: "History Manager…", accel: None, gate: Some(Gate::Collection) },
                 // Toggles the global toolbar; the label stays "Hide Global Toolbar"
                 // (native menu labels aren't re-titled), a toast reports the new state.

@@ -27,6 +27,7 @@ pub fn update_settings(
     default_result_view: Option<String>,
     restore_session: Option<bool>,
     editor_tab_width: Option<i64>,
+    ui_zoom: Option<f64>,
 ) -> Result<Settings, AppError> {
     let current = settings.load();
 
@@ -64,6 +65,13 @@ pub fn update_settings(
         Some(value) => value,
         None => current.editor_tab_width,
     };
+    // The frontend snaps to its zoom ladder; clamping here too keeps a hand-edited
+    // settings.json (or a NaN) from shrinking the UI to nothing on next launch.
+    let merged_zoom = match ui_zoom {
+        Some(value) if value.is_finite() => value,
+        Some(_) => current.ui_zoom,
+        None => current.ui_zoom,
+    };
 
     let new_settings = Settings {
         default_query_limit: merged_limit.clamp(1, 1000),
@@ -71,6 +79,7 @@ pub fn update_settings(
         default_result_view: validated_view,
         restore_session: merged_restore,
         editor_tab_width: merged_tab_width.clamp(1, 8),
+        ui_zoom: merged_zoom.clamp(0.5, 2.0),
     };
     match settings.save(&new_settings) {
         Ok(_) => Ok(new_settings),

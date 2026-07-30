@@ -17,6 +17,7 @@ import { useNodeTags } from './composables/useNodeTags'
 import { useDbTransfer } from './composables/useDbTransfer'
 import { useFeatures } from './composables/useFeatures'
 import { useSessionPersistence } from './composables/useSessionPersistence'
+import { useZoom } from './composables/useZoom'
 import {
   tabs, activeTabId, setRunRestoredTab,
   activateTab, cycleTab, closeTab, moveTab, handleTabAction,
@@ -81,6 +82,7 @@ onMounted(async () => {
     if (settings && settings.default_result_view) defaultResultView.value = settings.default_result_view
     if (settings && typeof settings.restore_session === 'boolean') restoreSessionEnabled.value = settings.restore_session
     if (settings && Number(settings.editor_tab_width)) editorTabWidth.value = Number(settings.editor_tab_width)
+    await loadZoom(settings && settings.ui_zoom)
   } catch (_) {}
 
   // Load custom keyboard shortcuts so the JS handler (Linux) honors rebinds.
@@ -188,6 +190,7 @@ const sidebarOpen = ref(true)   // the "Open connections" rail entry toggles the
 // ── Operations pane (bottom dock) ──
 // Backed by the backend registry; the rail "Operations" label toggles it.
 const { operations, runningCount, clearFinished } = useOperations()
+const { zoomIn, zoomOut, resetZoom, loadZoom } = useZoom({ showToast: showToast })
 const operationsPaneOpen = ref(false)
 const operationsPaneHeight = ref(200)
 
@@ -472,6 +475,9 @@ function handleMenuAction(id) {
     // today — there is no unsaved-changes prompt to differ on yet.
     case 'view:next_tab':      cycleTab(1); return
     case 'view:prev_tab':      cycleTab(-1); return
+    case 'view:zoom_in':       zoomIn(); return
+    case 'view:zoom_out':      zoomOut(); return
+    case 'view:zoom_reset':    resetZoom(); return
     case 'view:close_tab':
     case 'view:close_tab_np':
       if (activeTabId.value != null) closeTab(activeTabId.value)

@@ -17,6 +17,9 @@ pub struct Settings {
     pub restore_session: bool,
     #[serde(default = "default_editor_tab_width")]
     pub editor_tab_width: i64,
+    /// Webview zoom factor for the main window (1.0 = 100%).
+    #[serde(default = "default_ui_zoom")]
+    pub ui_zoom: f64,
 }
 
 fn default_query_limit() -> i64 {
@@ -39,6 +42,10 @@ fn default_editor_tab_width() -> i64 {
     4
 }
 
+fn default_ui_zoom() -> f64 {
+    1.0
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -47,6 +54,7 @@ impl Default for Settings {
             default_result_view: default_result_view(),
             restore_session: default_restore_session(),
             editor_tab_width: default_editor_tab_width(),
+            ui_zoom: default_ui_zoom(),
         }
     }
 }
