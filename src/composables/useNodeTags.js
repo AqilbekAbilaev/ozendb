@@ -9,12 +9,26 @@ import { invoke } from '@tauri-apps/api/core'
 export function useNodeTags() {
   const tagOverrides = ref({})
 
-  // Restore persisted database/collection colour tags so they survive a restart.
-  // Connection tags come back on each connection (conn.tag) via list_connections.
+  // Restore persisted colour tags so they survive a restart. Database/collection
+  // tags come from the dedicated node-tag store; connection tags live on the
+  // connection config (conn.tag) and are loaded from list_connections.
   async function loadNodeTags() {
     try {
       const nodeTags = await invoke('get_node_tags')
       if (nodeTags) tagOverrides.value = { ...nodeTags, ...tagOverrides.value }
+    } catch (_) {}
+    // Connection-level tags are stored on the connection config, not in the
+    // node-tag store. Load them into tagOverrides so tabs (which resolve colour
+    // from tagOverrides alone) can see connection-level colours at startup.
+    try {
+      const conns = await invoke('list_connections')
+      const connTags = {}
+      for (const c of conns) {
+        if (c.tag) connTags[c.id] = c.tag
+      }
+      if (Object.keys(connTags).length) {
+        tagOverrides.value = { ...tagOverrides.value, ...connTags }
+      }
     } catch (_) {}
   }
 
