@@ -6,9 +6,11 @@ name: Release
 #   git tag v0.1.0 && git push origin v0.1.0
 #
 # The matrix builds into a DRAFT release (so all platforms attach to the same
-# release), then the `publish` job flips it to published once every platform has
-# finished. Release notes are filled automatically from the matching CHANGELOG.md
-# section, so a tag push goes all the way to the live website with no manual step.
+# release) with notes filled from the matching CHANGELOG.md section. Publishing is
+# the one MANUAL step: check the draft has all six installers, then publish it. That
+# must be done with a real account — GitHub suppresses workflow-triggering events for
+# anything the default GITHUB_TOKEN does, so a CI-driven publish would never fire the
+# `release: published` that deploy-website.yml listens for, and the site would go stale.
 # Builds are UNSIGNED for now — code-signing secrets (Apple Developer ID, Windows
 # cert) can be wired in later without changing the shape of this workflow.
 
@@ -109,24 +111,9 @@ jobs:
           releaseName: ${{ github.ref_type == 'tag' && format('OzenDB {0}', github.ref_name) || 'OzenDB nightly' }}
           # Notes come from the matching CHANGELOG.md section (see step above).
           releaseBody: ${{ steps.changelog.outputs.body }}
-          # Stay a draft here; the publish job releases it once all platforms
-          # finish, so `release: published` fires with every installer attached.
+          # Stay a draft: publish it yourself once all three platforms have
+          # attached their installers, so `release: published` fires from a real
+          # account and deploy-website.yml picks it up.
           releaseDraft: true
           prerelease: ${{ github.ref_type != 'tag' }}
           args: ${{ matrix.args }}
-
-  # Publishes the draft once every matrix build has succeeded, so the release
-  # (and the website deploy hook it triggers) only goes live with all installers
-  # present. Tag pushes only — nightlies stay draft/prerelease.
-  publish:
-    needs: release
-    if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish the release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release edit "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --draft=false --latest

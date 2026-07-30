@@ -3,6 +3,10 @@ name: Rebuild website on release
 on:
   release:
     types: [published]
+  # Manual fallback for when the site is stale but no release is being made —
+  # `gh workflow run deploy-website.yml`. Beats toggling a live release to draft
+  # and back just to re-fire the event above.
+  workflow_dispatch:
 
 jobs:
   trigger-deploy:
