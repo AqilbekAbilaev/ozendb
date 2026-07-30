@@ -5,7 +5,7 @@ import { parsePipeline } from '../utils/queryParser'
 import { tabs, pruneActiveTab } from '../stores/tabs'
 
 // Collection/database CRUD-dialog state + confirm actions (add/drop/rename/duplicate
-// collection & database & view & GridFS-bucket). `showToast` is injected so the
+// collection & database & view). `showToast` is injected so the
 // composable stays UI-agnostic; the open tabs come from the store (drop and rename touch
 // them); `connectionTreeRef` refreshes the sidebar after a change;
 // `dbClipboard` is read by pasteClipboard (App.vue still owns and sets it on copy).
@@ -30,11 +30,6 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
   const newViewPipeline = ref('')         // aggregation pipeline (JSON array, optional)
   const addViewError    = ref(null)
   const addViewSaving   = ref(false)
-
-  const addBucketTarget = ref(null)       // { connId, dbName } | null
-  const newBucketName   = ref('')
-  const addBucketError  = ref(null)
-  const addBucketSaving = ref(false)
 
   const dropDatabaseTarget   = ref(null)  // { connId, dbName } | null
   const dropDatabaseError    = ref(null)
@@ -195,32 +190,6 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
     }
   }
 
-  // Database → Add GridFS Bucket…: a bucket is the pair of `<name>.files` and
-  // `<name>.chunks` collections; create both so it appears in the GridFS view.
-  async function confirmAddBucket() {
-    const target = addBucketTarget.value
-    const name = newBucketName.value.trim()
-    if (!target || !name) return
-    addBucketSaving.value = true
-    addBucketError.value = null
-    try {
-      for (const suffix of ['files', 'chunks']) {
-        await invoke('create_collection', {
-          id: target.connId,
-          database: target.dbName,
-          name: `${name}.${suffix}`,
-        })
-      }
-      await connectionTreeRef.value.refreshConn(target.connId)
-      showToast(`GridFS bucket "${name}" created`)
-      addBucketTarget.value = null
-    } catch (e) {
-      addBucketError.value = errText(e)
-    } finally {
-      addBucketSaving.value = false
-    }
-  }
-
   async function confirmDropDatabase() {
     const target = dropDatabaseTarget.value
     if (!target) return
@@ -348,11 +317,6 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
     newViewPipeline.value = ''
     addViewError.value = null
   }
-  function openAddBucket(node) {
-    addBucketTarget.value = { connId: node.connId, dbName: node.dbName }
-    newBucketName.value = ''
-    addBucketError.value = null
-  }
   function openDropDatabase(node) {
     dropDatabaseTarget.value = { connId: node.connId, dbName: node.dbName }
     dropDatabaseError.value = null
@@ -385,10 +349,6 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
     newViewPipeline: newViewPipeline,
     addViewError: addViewError,
     addViewSaving: addViewSaving,
-    addBucketTarget: addBucketTarget,
-    newBucketName: newBucketName,
-    addBucketError: addBucketError,
-    addBucketSaving: addBucketSaving,
     dropDatabaseTarget: dropDatabaseTarget,
     dropDatabaseError: dropDatabaseError,
     dropDatabaseDeleting: dropDatabaseDeleting,
@@ -410,7 +370,6 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
     addDatabaseSaving: addDatabaseSaving,
     confirmAddCollection: confirmAddCollection,
     confirmAddView: confirmAddView,
-    confirmAddBucket: confirmAddBucket,
     confirmDropDatabase: confirmDropDatabase,
     confirmDropCollection: confirmDropCollection,
     confirmRenameCollection: confirmRenameCollection,
@@ -420,7 +379,6 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
     openAddCollection: openAddCollection,
     openAddDatabase: openAddDatabase,
     openAddView: openAddView,
-    openAddBucket: openAddBucket,
     openDropDatabase: openDropDatabase,
     openDropCollection: openDropCollection,
     openRenameCollection: openRenameCollection,

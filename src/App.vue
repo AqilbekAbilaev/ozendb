@@ -967,6 +967,9 @@ provide('appModals', {
       },
     },
     connectionManager: { connect: onManagerConnect },
+    // Structural dialogs create/drop things in the tree, so the sidebar needs a refresh
+    // once they succeed. The dialog owns the driver call; only the refresh comes back here.
+    addBucket: { saved: (connId) => connectionTreeRef.value?.refreshConn(connId) },
     preferences: {
       saved: onPrefsSaved,
       'saved-keybindings': onKeybindingsSaved,

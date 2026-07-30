@@ -24,7 +24,7 @@ export function useFeatures({
   openExportSource, openImportWizard, exportDatabase, importDatabase,
 }) {
   const {
-    openAddCollection, openAddDatabase, openAddView, openAddBucket,
+    openAddCollection, openAddDatabase, openAddView,
     openDropDatabase, openDropCollection, openRenameCollection, openDuplicateCollection,
     pasteClipboard,
   } = dbActions
@@ -161,7 +161,7 @@ export function useFeatures({
     'Add Database…':           { requires: 'connection', run: openAddDatabase },
     'Add View…':               { requires: 'database',   run: (n) => openAddView(n, '') },
     'Add View Here…':          { requires: 'collection', run: (n) => openAddView(n, n.collName || '') },
-    'Add GridFS Bucket…':      { requires: 'database',   run: openAddBucket },
+    'Add GridFS Bucket…':      modalFeature('addBucket'),
     'Drop Database…':          { requires: 'database',   run: openDropDatabase },
     'Drop Collection…':        { requires: 'collection', run: openDropCollection },
     'Rename Collection…':      { requires: 'collection', run: openRenameCollection },

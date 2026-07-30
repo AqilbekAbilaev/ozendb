@@ -34,6 +34,9 @@ export const MODALS = {
   roles:     { component: lazy(() => import('../components/admin/RolesModal.vue')),         level: 'database' },
   functions: { component: lazy(() => import('../components/admin/FunctionsModal.vue')),     level: 'database' },
   gridfs:    { component: lazy(() => import('../components/tools/GridFsModal.vue')),        level: 'database' },
+  // Structural dialogs: each owns its form state and its own driver call, and emits
+  // `saved` so App.vue can refresh the sidebar (see its modalEmits map).
+  addBucket: { component: lazy(() => import('../components/admin/AddBucketModal.vue')),     level: 'database' },
 
   // ── collection level ──
   // A modal with extra domain events (e.g. validator's `saved`) keeps its component

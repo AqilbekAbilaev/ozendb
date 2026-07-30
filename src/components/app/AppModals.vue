@@ -67,10 +67,6 @@ const {
   newViewPipeline,
   addViewError,
   addViewSaving,
-  addBucketTarget,
-  newBucketName,
-  addBucketError,
-  addBucketSaving,
   dropDatabaseTarget,
   dropDatabaseError,
   dropDatabaseDeleting,
@@ -92,7 +88,6 @@ const {
   addDatabaseSaving,
   confirmAddCollection,
   confirmAddView,
-  confirmAddBucket,
   confirmDropDatabase,
   confirmDropCollection,
   confirmRenameCollection,
@@ -225,26 +220,6 @@ const { renameTabTarget, renameTabValue, confirmRenameTab } = ctx.tabRename
           <BaseButton @click="addViewTarget = null">Cancel</BaseButton>
           <BaseButton variant="primary" :disabled="!newViewName.trim() || !newViewSource.trim() || addViewSaving" @click="confirmAddView">
             {{ addViewSaving ? 'Creating…' : 'Create' }}
-          </BaseButton>
-        </div>
-  </BaseModal>
-
-    <!-- Add GridFS Bucket modal -->
-    <BaseModal v-if="addBucketTarget" title="Add GridFS Bucket" @close="addBucketTarget = null">
-        <div class="del-body">
-          <BaseInput
-            v-model="newBucketName"
-            class="prompt-input"
-            placeholder="Bucket name (e.g. fs)"
-            @keydown.enter="confirmAddBucket"
-          />
-          <FieldError :text="addBucketError" spaced />
-        </div>
-        <div class="del-footer">
-          <span class="spacer"></span>
-          <BaseButton @click="addBucketTarget = null">Cancel</BaseButton>
-          <BaseButton variant="primary" :disabled="!newBucketName.trim() || addBucketSaving" @click="confirmAddBucket">
-            {{ addBucketSaving ? 'Creating…' : 'Create' }}
           </BaseButton>
         </div>
   </BaseModal>
