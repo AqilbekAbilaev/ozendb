@@ -1,5 +1,6 @@
 import { createApp } from "vue";
 import "./assets/theme.css";
+import "./assets/dialogs.css";
 import App from "./App.vue";
 
 // Pre-paint the theme from the localStorage mirror before mount so light-theme

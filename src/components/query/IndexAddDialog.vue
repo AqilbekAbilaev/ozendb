@@ -427,7 +427,3 @@ const title = computed(() => props.mode === 'edit' ? 'Edit index' : 'Add index')
 .bg-check { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text); }
 .json-btn { margin-left: 4px; }
 </style>
-
-<!-- Shared dialog/button classes (.del-*, .btn, .prompt-input, …) from App.css,
-     imported scoped like AppModals/IndexManagerPane do. -->
-<style src="../../App.css" scoped></style>

@@ -73,5 +73,3 @@ async function confirm() {
     </div>
   </BaseModal>
 </template>
-
-<style src="../../App.css" scoped></style>

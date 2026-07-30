@@ -147,7 +147,3 @@ const { renameTabTarget, renameTabValue, confirmRenameTab } = ctx.tabRename
         </div>
   </BaseModal>
 </template>
-
-<!-- Same stylesheet App.vue uses; scoped here so the dialog classes (.del-*, .idx-*,
-     .btn, …) apply to these modals without leaking globally to other components. -->
-<style src="../../App.css" scoped></style>

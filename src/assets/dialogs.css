@@ -1,0 +1,92 @@
+/* Shared dialog chrome: the body/footer frame, prompt inputs, the Add Collection type
+   fields, and the index-detail tables. Loaded once globally from main.js.
+
+   Every dialog used to get these by importing the whole of App.css `scoped`, which shipped
+   a full 6 kB copy per component — eight extracted dialogs meant eight copies in the
+   bundle. Global means one copy, at the cost of plain single-class selectors: a component
+   overriding one does it with a scoped two-class selector, which still wins (see
+   IndexAddDialog's `.del-body.idx-add-body` and `.prompt-input.sm`).
+
+   Rules whose names collide with unrelated component-local classes are deliberately nested
+   under `.del-body` / `.del-footer` so going global can't reach outside a dialog:
+   `.spacer` is used by a dozen panes and `.idx-*` by IndexManagerPane and StatsModal. */
+
+/* ── dialog body / footer frame ── */
+.del-body {
+  padding: 20px 20px 12px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.del-body p { margin: 0 0 8px; }
+.del-body code { font-family: var(--mono); }
+.del-footer {
+  height: 48px;
+  flex: none;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+}
+/* Pushes the footer buttons right. Nested so it can't restyle the `.spacer` spans in
+   QueryBar, ShellConsole, OperationsPane and friends, which define their own or none. */
+.del-footer .spacer { flex: 1; }
+
+/* ── prompt inputs ── */
+.prompt-input,
+.base-input.prompt-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.prompt-input:focus,
+.base-input.prompt-input:focus { outline: none; border-color: var(--accent); }
+/* BaseSelect used where a .prompt-input would go — it self-styles, so this is width only. */
+.prompt-select { width: 100%; }
+.base-textarea.pipeline-input { min-height: 76px; margin-top: 10px; }
+/* Space stacked inputs in multi-field dialogs (e.g. Add View); single-input
+   dialogs like Add Collection are unaffected. */
+.del-body .prompt-input + .prompt-input { margin-top: 10px; }
+
+/* ── Add Collection: type selector (Standard / Capped / Time-series) + option fields ── */
+.cc-types { display: flex; gap: 16px; margin-top: 12px; }
+.cc-type { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; }
+.cc-opts { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+.cc-field { display: flex; flex-direction: column; gap: 5px; }
+.cc-label { font-size: 12px; color: var(--text-dim); }
+.cc-opt { color: var(--text-faint); }
+.cc-hint { margin: 0; font-size: 12px; color: var(--text-dim); }
+.cc-hint code { font-family: var(--mono); font-size: 11px; }
+
+/* Type-the-name-to-confirm prompt (Drop Index, Clear Collection). */
+.cc-prompt { margin-top: 12px; font-size: 12.5px; color: var(--text-dim); }
+.cc-prompt code { font-family: var(--mono); }
+
+/* ── Index Details dialog ── nested so IndexManagerPane and StatsModal, which have their
+   own .idx-* classes and no .del-body, are untouched. */
+.del-body .idx-msg { padding: 16px 0; color: var(--text-faint); font-size: 12px; }
+.del-body .idx-detail-section { font-size: 12px; color: var(--text-faint); margin: 14px 0 6px; }
+.del-body .idx-detail-section:first-child { margin-top: 0; }
+.del-body .idx-detail-json {
+  margin: 0;
+  padding: 10px;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre;
+}
+.del-body .idx-detail-stats { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.del-body .idx-detail-stats td { padding: 4px 8px; border-bottom: 1px solid var(--border-soft); }
+.del-body .idx-detail-stats td:first-child { color: var(--text-faint); width: 40%; }
