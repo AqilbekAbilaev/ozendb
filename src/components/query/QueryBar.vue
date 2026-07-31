@@ -370,7 +370,10 @@ watch(() => props.activeTab && props.activeTab.id, () => {
   background: var(--bg-input);
   border: 1px solid var(--border-soft);
   border-radius: 6px;
-  padding: 5px 10px;
+  /* Vertical padding lives on the input itself (see .qval) rather than here: with a
+     zero-height content box WebKit draws a stunted caret in the empty field, which only
+     corrects once you type. The 5px moved inward keeps the field the same 29px tall. */
+  padding: 0 10px;
   font-family: var(--mono);
   font-size: 12.5px;
   display: flex;
@@ -383,7 +386,9 @@ watch(() => props.activeTab && props.activeTab.id, () => {
   flex: 1;
   background: none;
   border: none;
-  padding: 0;
+  /* Vertical padding taken from .qinput, not added on top — the field height is
+     unchanged. Without it the empty field's caret renders short (see .qinput). */
+  padding: 5px 0;
   font-family: var(--mono);
   font-size: 12.5px;
   min-width: 0;
