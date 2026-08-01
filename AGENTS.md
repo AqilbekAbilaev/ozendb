@@ -41,33 +41,35 @@ npm test
 ### Data flow
 
 ```
-App.vue  (holds the tab/pane spine: tabs[], activeTabId, split-pane sizing)
-  ├── Toolbar.vue          (global toolbar actions)
-  ├── ConnectionTree.vue   (sidebar; calls list_connections, list_databases on mount/expand)
-  ├── QueryWorkspace.vue   (tabs + query UI; emits run-query → App.vue calls find_documents)
-  ├── OperationsPane.vue   (surface for long-running operations)
-  ├── AppModals.vue        (renders every top-level modal, incl. ConnectionManager → NewConnection)
-  └── ContextMenu.vue      (handled entirely in App.vue's handleContextAction)
+App.vue  (composes the panes; owns split-pane sizing and handleContextAction)
+  ├── app/Toolbar.vue            (global toolbar actions)
+  ├── connection/ConnectionTree.vue  (sidebar; list_connections, list_databases on mount/expand)
+  ├── query/QueryWorkspace.vue   (tabs + query UI; emits run-query → App.vue calls find_documents)
+  ├── app/OperationsPane.vue     (surface for long-running operations)
+  ├── app/AppModals.vue          (renders every top-level modal, incl. ConnectionManager → NewConnection)
+  └── base/ContextMenu.vue       (handled entirely in App.vue's handleContextAction)
 ```
 
-Most app state and logic now live in `src/composables/*` (`useTabs`, `useModals`, `useQueryRunner`, `useDbActions`, `useMenu`, `useOperations`, `useSessionPersistence`, …) — `useModals` owns the open-state for every modal. App.vue composes these and passes props/handlers down; treat the composable as the source of truth for its slice. The tab/pane spine is intentionally kept in App.vue.
+Components are grouped by area under `src/components/`: `admin/`, `app/`, `base/`, `connection/`, `query/`, `results/`, `tools/`.
 
-**Tab state** lives in `App.vue`'s `tabs` ref as plain objects. Child components mutate tab properties directly (e.g. `tab.filter`, `tab.skip`) — this works because Vue 3 makes array items reactive. `QueryWorkspace` receives `tabs` as a prop and reads `activeTab` via a computed, then emits `run-query` up to App.vue which calls `invoke('find_documents', ...)`.
+Most app state and logic live in `src/composables/*` (`useModals`, `useQueryRunner`, `useDbActions`, `useMenu`, `useOperations`, `useSessionPersistence`, …) — `useModals` owns the open-state for every modal. App.vue composes these and passes props/handlers down; treat the composable as the source of truth for its slice.
+
+**Tab state** lives in `src/stores/tabs.js` — module-scope `tabs` / `activeTabId` refs plus every tab mutation (activate/close/cycle/duplicate/reorder/rename), shared by every importer. Tabs are plain objects and children mutate their properties directly (e.g. `tab.filter`, `tab.skip`), which works because Vue 3 makes array items reactive. The tab *creators* — what a newly opened tab of each kind contains — live in `src/composables/useTabCreators.js`, which App.vue constructs with the query runner and the settings-backed defaults they need. Note: module-scope refs do not survive Vite HMR cleanly — restart the dev server before blaming the code for stale tab state.
 
 ### Rust backend (`src-tauri/src/`)
 
 | File | Responsibility |
 |---|---|
-| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `masking`, `migration`, `gridfs`, `compare`, `stats`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds shared helpers — notably `client_for(pool, storage, id)`, the single entry point every command uses to resolve a connection to a live client, plus the EJSON/CSV parse helpers. |
+| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds shared helpers — notably `client_for(pool, storage, id)`, the single entry point every command uses to resolve a connection to a live client, plus the EJSON/CSV parse helpers. |
 | `pool.rs` | `ConnectionPool`: one `Client` per connection id behind a `tokio::Mutex` (and the live `SshTunnel` for tunnelled connections). `connect()` returns the cached client on a hit and only reads the keychain / builds the URI on a miss. |
-| `storage/mod.rs` | JSON persistence for `ConnectionConfig` (`connections.json`). Read-modify-write goes through the locked `update_with`; the raw `save` is private so writes can't bypass the lock. Other JSON stores (`folders`, `history`, `saved_queries`, `default_queries`, `settings`, `tabs`, `shell_history`, `known_hosts`) share the same shape via the generic `JsonStore<T>` in `json_store.rs`. |
+| `storage/mod.rs` | JSON persistence for `ConnectionConfig` (`connections.json`). Read-modify-write goes through the locked `update_with`; the raw `save` is private so writes can't bypass the lock. Most other JSON stores (`folders`, `history`, `saved_queries`, `default_queries`, `settings`, `shell_history`, `known_hosts`, `node_tags`, `collection_history`, `keybindings`, `export_watermarks`, `operations`) share the same shape via the generic `JsonStore<T>` in `json_store.rs`. `tabs.rs` and `storage/mod.rs` are deliberately bespoke — each carries a comment saying why. |
 | `persist.rs` | `atomic_write()` — write-to-temp-then-rename so a crash can't leave a truncated file. Shared by every JSON store. |
 | `keychain.rs` | Secrets (passwords, SSH key passphrases) in the OS keychain, keyed by connection id (SSH secrets under `id::ssh-*`). Configs on disk are credential-free. |
 | `ssh.rs` / `known_hosts/mod.rs` | Optional SSH tunnel (pure-Rust `russh`) with trust-on-first-use host-key verification: unchanged key accepted, new host prompts, changed key refused. |
 | `shell/` | Embedded JS shell ("IntelliShell"): `engine.rs` runs one `boa` context per session on its own worker thread; `bridge/mod.rs` exposes the `db` object that forwards to the driver. |
 | `uri/mod.rs` | `build_uri()` assembles the connection string from a config; `with_timeout()` appends MongoDB timeout params; `tcp_probe()` does a fast TCP check before the MongoDB handshake. |
 | `error.rs` | `AppError` enum serialized as `{ code, message }` so the frontend gets a stable category plus a human-readable message. |
-| `menu.rs` | Native OS menu (source of truth); File → Connect opens a **second Tauri webview window** at `src/pages/connect.html`. See "Native menu" below. |
+| `menu.rs` | Native OS menu (source of truth). Also opens the document editor/viewer as a **second Tauri webview window** at `src/pages/document.html` (registered as a Vite entry in `vite.config.js`). See "Native menu" below. |
 
 ### Native menu
 
@@ -77,7 +79,8 @@ Windows/Linux). There is no in-window Vue menu bar — the old `src/components/M
 removed.
 
 - **Structure** is a data table (`menus()`): each item has an id, label, optional accelerator, and
-  an optional `Gate` (`Connection` / `Database` / `Collection` / `AnyConnection`). Placeholders are
+  an optional `Gate` (`Connection` / `Database` / `Collection` / `AnyConnection` / `Document` /
+  `DocumentField` / `Index`). Placeholders are
   the `built:false` features — carried over as present-but-disabled items.
 - **Clicks** → `handle_event` emits `menu-action` with the item id → `App.vue` listens and routes
   through the existing `handleMenuAction` (same handlers the toolbar/right-click use). Actions are
@@ -102,6 +105,72 @@ removed.
 - **Dialog headers must not have macOS traffic lights.** Only the real OS window gets them. Dialogs use a centered title + a single close ✕ button on the right.
 - All colors come from CSS custom properties in `src/assets/theme.css` — never hardcode hex values that already exist as tokens.
 - Icons are inline SVG rendered by `BaseIcon.vue` via a `name` prop — add new icons there, never use external icon fonts or raster images.
+
+---
+
+## Code quality
+
+There is no linter or formatter in this repo. CI runs `npm test`, `cargo test`, and the file-size
+check below — every other rule here is enforced by review, so they have to be short enough to
+actually hold in your head.
+
+### Where code goes
+
+- **Logic that can be tested without a DOM belongs in `src/utils/`** (pure functions) **or
+  `src/composables/`** (stateful, reusable). Components render and wire events; they don't parse,
+  format, derive, or transform. The tell: every one of the frontend specs sits in
+  `utils/`, `composables/`, `stores/` or `constants/` — there are no component tests, because
+  there is not supposed to be anything in a component worth testing.
+- **A composable owns one slice of state end to end.** If two composables both mutate the same
+  thing, one of them is wrong — collapse them or move the state into `src/stores/`.
+- **Rust: `commands/*` are thin.** A `#[tauri::command]` resolves its client via `client_for`,
+  calls into real logic, and maps errors. Business logic that grows past a screenful moves to a
+  sibling module so it can be unit-tested without a live MongoDB.
+
+### File size
+
+**Hard limit: 600 lines** for any `.js`, `.vue` or `.rs` file. Enforced — `npm run check:size`,
+run in CI. Soft limit 400: not enforced, but past 400 expect to justify the file in review.
+Line count is a smell proxy, not the actual rule — a 500-line file of flat, obvious cases is fine,
+a 300-line file doing four jobs is not.
+
+Ten files were already over 600 when the limit landed. `scripts/check-file-size.mjs` pins each at
+the length it had that day: they may shrink, never grow, and the check tells you to delete the pin
+once a file drops under the limit. So the list is the debt register — it is the one place those
+numbers live, don't copy them here. New files get no such grace.
+
+**Splitting a god file is its own change.** Never bundle it with a feature or a fix (see Workflow).
+When you touch a pinned file for another reason, leave it no bigger than you found it.
+
+### Tests
+
+- **Write the test first.** New logic in `utils/`, `composables/`, `stores/` or any Rust module
+  ships with its spec in the same change, not a follow-up.
+- **Frontend:** spec next to the source — `src/utils/format.js` → `src/utils/format.test.js`.
+- **Rust:** sidecar file pulled in with `#[cfg(test)] #[path = "x.test.rs"] mod tests;` (see the
+  foot of `storage/mod.rs`), so tests don't inflate the module they cover.
+- A bug fix gets a test that fails before it and passes after. No test, no fix.
+
+### Dependencies
+
+Four devDependencies and a deliberately small crate list — keep it that way. A new dependency
+needs a reason a few lines of code can't cover, and the user approves it before it lands. The
+inverse also holds: don't hand-roll what an already-installed library does (the codebase uses
+`sqlparser`, `boa`, `russh` rather than home-grown equivalents).
+
+### Comments
+
+Comments say **why**, never what. The existing ones explain history and constraints — why
+`tabs.rs` is bespoke instead of a `JsonStore<T>`, why accelerators are skipped on Linux, why CI is
+Linux-only. If a comment restates the code, delete it; if the code needs a comment to be followed
+at all, the code is the thing to fix.
+
+### Errors
+
+Rust returns `AppError` so the frontend gets `{ code, message }` — a stable code to branch on plus
+a human-readable message. The frontend reads that shape through `src/utils/errors.js` — use those
+helpers rather than touching `e.message` directly. Never surface a raw driver error string to the
+UI, and never swallow one into a generic "something went wrong": map it to a code.
 
 ---
 
