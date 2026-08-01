@@ -1,0 +1,204 @@
+/* Grid */
+.grid-outer { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--bg-window); position: relative; }
+.grid-wrap { flex: 1; overflow: auto; min-height: 0; }
+.grid-scroll { width: max-content; min-width: 100%; }
+.fieldpath {
+  height: 34px;
+  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg-panel-2);
+  border-bottom: 1px solid var(--border);
+}
+.fieldpath .fp-sep { color: var(--text-faint); }
+.fieldpath .fp-link { cursor: pointer; }
+.fieldpath .fp-link:hover { color: var(--accent); }
+table.grid {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+table.grid th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-toolbar);
+  color: var(--text-dim);
+  font-weight: 600;
+  text-align: left;
+  padding: 5px 12px;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+  z-index: 2;
+}
+table.grid td {
+  padding: 4px 12px;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
+  color: var(--text);
+  white-space: nowrap;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Zebra striping keyed off the real row index (vrow.index), not DOM position — the
+   virtualization spacer rows would otherwise flip the nth-child parity as you scroll. */
+table.grid tr.datarow.stripe td { background: var(--bg-row-alt); }
+table.grid tr:hover td { background: var(--bg-hover); }
+/* Selection — accent-blue tint. The .datarow.selrow specificity intentionally beats the
+   striped-row and hover rules so a selected row reads clearly whether it's striped or
+   hovered (the old single-class .selrow lost to .datarow.stripe on odd rows). */
+table.grid tr.datarow.selrow td { background: var(--bg-selected); }
+table.grid td.selcell { outline: 2px solid var(--accent); outline-offset: -2px; position: relative; z-index: 4; }
+table.grid td.drillable { cursor: pointer; }
+/* rownum — sticky left gutter column */
+table.grid th.rownum,
+table.grid td.rownum {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-panel-2);
+  color: var(--text-faint);
+  text-align: right;
+  min-width: 46px;
+  border-right: 1px solid var(--border-soft);
+}
+table.grid th.rownum { z-index: 3; }
+table.grid tr:hover td.rownum { background: var(--bg-hover); }
+/* Selected rows get an accent bar down the sticky row-number gutter — a clear, contiguous
+   marker for a multi-row selection. Higher specificity than the hover rule above. */
+table.grid tr.datarow.selrow td.rownum {
+  background: var(--bg-selected);
+  color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+/* virtualization spacers — reserve scroll height for the un-mounted rows above/below
+   the window; they carry no border or fill so they read as empty gap, not a row. */
+table.grid tr.vspacer td { padding: 0; border: none; background: transparent; }
+/* filler rows extend the column grid below real documents */
+table.grid tr.filler td { height: 25px; padding: 0; }
+table.grid tr.filler:nth-child(even) td { background: var(--bg-row-alt); }
+th.col-filler, td.col-filler { border-right: none; width: 100%; }
+
+/* Drag ghost — follows the pointer while dragging a cell into the VQB.
+   pointer-events:none is required so elementFromPoint sees the dropzone, not the ghost. */
+.drag-ghost {
+  position: fixed;
+  z-index: 200;
+  pointer-events: none;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
+  white-space: nowrap;
+}
+
+/* Cell context menu */
+.cell-ctx-backdrop { position: fixed; inset: 0; z-index: 80; }
+.cell-ctx-menu {
+  position: fixed;
+  z-index: 81;
+  min-width: 190px;
+  background: var(--bg-menu);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(0,0,0,.6);
+  padding: 5px;
+}
+.cell-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: default;
+}
+.cell-ctx-item:hover { background: var(--accent); color: #fff; }
+.cell-ctx-ic { width: 18px; flex: none; display: grid; place-items: center; color: var(--text-dim); }
+.cell-ctx-item:hover .cell-ctx-ic,
+.cell-ctx-item:hover .cell-ctx-sc { color: rgba(255,255,255,.75); }
+.cell-ctx-sc { margin-left: auto; color: var(--text-faint); font-size: 12px; letter-spacing: .5px; }
+.cell-ctx-sep { height: 1px; background: var(--border-soft); margin: 5px 8px; }
+
+.col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+  transform: translateX(50%);
+}
+
+.tcell { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+.cell-oid   { color: var(--link); }
+.cell-str   { color: var(--cell-str-green); }
+.cell-num   { color: var(--cell-num); }
+.cell-faint { color: var(--text-faint); }
+
+.empty-rows {
+  min-height: 2000px;
+  position: relative;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 24px, var(--grid-line) 24px 25px),
+    repeating-linear-gradient(to bottom, var(--bg-row) 0 25px, var(--bg-row-alt) 25px 50px);
+}
+.empty-rows-gutter {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 46px;
+  /* Alternate per 25px row like the populated grid's row-number gutter, so the empty
+     state doesn't read as one solid near-black bar. */
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--bg-panel-2) 0 25px,
+    var(--bg-row-alt) 25px 50px
+  );
+  border-right: 1px solid var(--border-soft);
+}
+
+/* Data-column headers are draggable to reorder (row-number + filler headers are not; the
+   resize handle overrides its own right-edge cursor). */
+table.grid thead th:not(.rownum):not(.col-filler) { cursor: grab; }
+/* While a header is pressed (mousedown through release) show the closed hand across every
+   header, so the drag reads as grabbing the whole time — not just once it starts moving. The
+   second rule covers the resize handle that straddles each column border, which would
+   otherwise flip the cursor to col-resize as the pointer crosses a boundary mid-drag. */
+table.grid.reordering thead th:not(.rownum):not(.col-filler) { cursor: grabbing; }
+table.grid.reordering .col-resize-handle { cursor: grabbing; }
+
+/* Drop-indicator line for column reorder */
+.drop-indicator {
+  position: fixed;
+  z-index: 10;
+  width: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* Inline cell editor */
+.base-input.cell-edit-input {
+  background: transparent;
+  border: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 0;
+}
+
+/* Search match highlighting */
+td.search-match { background: var(--search-hit) !important; }
+td.search-active { background: var(--search-active) !important; }
