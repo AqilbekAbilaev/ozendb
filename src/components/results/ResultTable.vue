@@ -10,6 +10,7 @@ import { useResultSearch } from '../../composables/useResultSearch'
 import { useColumnReorder } from '../../composables/useColumnReorder'
 import { useColumnResize } from '../../composables/useColumnResize'
 import { useRowSelection } from '../../composables/useRowSelection'
+import { useFieldDrag } from '../../composables/useFieldDrag'
 import { useMomentumScroll } from '../../composables/useMomentumScroll'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
@@ -29,36 +30,19 @@ const props = defineProps({
 // bubble up rather than being held here. `update:drillPath` keeps drill state (owned by
 // ResultsPanel so it survives view switches and the run-reset) in sync via v-model.
 const emit = defineEmits(['dragged-field', 'drag-over-section', 'vqb-drop', 'open-vqb', 'close-vqb', 'crud-error', 'update:drillPath', 'follow-reference', 'paste-documents'])
-
 function onThClick(col) {
-  if (suppressNextClick) { suppressNextClick = false; return }
+  if (suppressNextClick.value) { suppressNextClick.value = false; return }
   if (!props.vqbOpen) return
   emit('dragged-field', col)
   nextTick(() => { emit('dragged-field', '') })
 }
 
-// ── drag a result cell → Visual Query Builder ──────────────
-// HTML5 drag-and-drop doesn't fire drop events reliably inside Tauri's WKWebView,
-// so dragging is done with raw mouse events. A drag only starts once the pointer
-// moves past a small threshold, so a plain click still selects the cell. On drop
-// we hit-test the pointer against the VQB sections (tagged with data-vqb-drop)
-// and hand the field + section to VisualQueryBuilder via the vqbDrop prop.
-const DRAG_THRESHOLD  = 5
-const dragging        = ref(false)
-const dragGhost       = ref({ x: 0, y: 0, label: '' })
-
-let dragField         = ''
-let dragValue         = ''
-let dragStartX        = 0
-let dragStartY        = 0
-let suppressNextClick = false
-let openedByDrag      = false  // did *this* drag auto-open the panel?
-
-function sectionAtPoint(x, y) {
-  const el = document.elementFromPoint(x, y)
-  const zone = el && el.closest('[data-vqb-drop]')
-  return zone ? zone.getAttribute('data-vqb-drop') : null
-}
+// Dragging a cell into the Visual Query Builder. The gesture itself lives in the
+// composable; what a mousedown means for editing and selection stays here.
+const { dragging, dragGhost, suppressNextClick, beginDrag } = useFieldDrag({
+  vqbOpen: () => props.vqbOpen,
+  emit:    emit,
+})
 
 function onCellMouseDown(e, col, value) {
   if (e.button !== 0) return
@@ -72,59 +56,16 @@ function onCellMouseDown(e, col, value) {
   // auto-scrolls the grid sideways as the pointer moves toward the VQB panel.
   // Click and dblclick still fire, so cell selection / editing is unaffected.
   e.preventDefault()
-  suppressNextClick = false
-  openedByDrag = false
-  dragField  = col
-  dragValue  = value == null ? '' : String(value)
-  dragStartX = e.clientX
-  dragStartY = e.clientY
-  dragging.value = false
-  document.addEventListener('mousemove', onDragMove)
-  document.addEventListener('mouseup',   onDragUp)
-}
-
-function onDragMove(e) {
-  if (!dragging.value) {
-    if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) < DRAG_THRESHOLD) return
-    dragging.value = true
-    document.body.style.cursor = 'grabbing'
-    // Opening the panel mid-drag renders its drop zones (data-vqb-drop) just in
-    // time for the pointer to reach them, so the drop hit-test below still works.
-    if (!props.vqbOpen) { openedByDrag = true; emit('open-vqb') }
-  }
-  dragGhost.value = { x: e.clientX, y: e.clientY, label: dragField }
-  emit('drag-over-section', sectionAtPoint(e.clientX, e.clientY))
-}
-
-function onDragUp(e) {
-  document.removeEventListener('mousemove', onDragMove)
-  document.removeEventListener('mouseup',   onDragUp)
-  document.body.style.cursor = ''
-  if (dragging.value) {
-    const section = sectionAtPoint(e.clientX, e.clientY)
-    if (section) emit('vqb-drop', { field: dragField, value: dragValue, section: section, nonce: Date.now() })
-    // Dropped outside the panel: if this drag is what opened it, close it again.
-    else if (openedByDrag) emit('close-vqb')
-    suppressNextClick = true  // swallow the click that fires after a real drag
-  }
-  dragging.value = false
-  emit('drag-over-section', null)
-  dragField = ''
-  dragValue = ''
+  beginDrag(e, col, value)
 }
 
 function onCellClick(e, rowIdx, col) {
-  if (suppressNextClick) { suppressNextClick = false; return }
+  if (suppressNextClick.value) { suppressNextClick.value = false; return }
   // Shift / Ctrl+Cmd on a cell click select rows (document-level), not a single cell.
   if (e.shiftKey) { selectRangeTo(rowIdx); selectedCol.value = null; cellCtx.value = null; return }
   if (e.metaKey || e.ctrlKey) { toggleRow(rowIdx); selectedCol.value = null; cellCtx.value = null; return }
   selectCell(rowIdx, col)
 }
-
-onUnmounted(() => {
-  document.removeEventListener('mousemove', onDragMove)
-  document.removeEventListener('mouseup',   onDragUp)
-})
 
 // Filler rows pad the grid below real documents so the row stripes/borders
 // reach the bottom of the viewport instead of stopping after a fixed count —
@@ -225,7 +166,7 @@ const {
   gridWrapRef:    gridWrapRef,
   headerLabel:    headerLabel,
   onBeforePress:  () => { if (inlineEdit.value) commitInlineEdit() },
-  onReordered:    () => { suppressNextClick = true },
+  onReordered:    () => { suppressNextClick.value = true },
 })
 
 // ── per-cell display data (memoized) ────────────────────

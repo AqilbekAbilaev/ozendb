@@ -15,7 +15,7 @@ const LIMIT = 600
 // Shrink one of these and lower its number in the same commit — the check tells you to.
 // Once a file is under LIMIT, delete its line entirely.
 const GRANDFATHERED = {
-  'src/components/results/ResultTable.vue': 1096,
+  'src/components/results/ResultTable.vue': 1037,
   'src/App.vue': 865,
   'src/components/connection/NewConnection.vue': 1044,
   'src-tauri/src/menu.rs': 915,
