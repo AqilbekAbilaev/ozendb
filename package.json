@@ -16,7 +16,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:size": "node scripts/check-file-size.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
