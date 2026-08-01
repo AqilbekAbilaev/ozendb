@@ -1,4 +1,4 @@
-import { ref, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 
 // Drag-to-resize and double-click-to-auto-fit for the result grid's columns. Owns the
 // width map the table renders from; `{}` means auto layout, an entry pins that column
@@ -7,7 +7,7 @@ import { ref, nextTick } from 'vue'
 // `gridColumns` is a getter rather than a ref because the component builds its column
 // list further down its own setup than this is called — the same shape useColumnReorder
 // takes for its inputs. It's only read during a gesture, long after setup has finished.
-export function useColumnResize({ gridColumns }) {
+export function useColumnResize({ gridColumns, cellData }) {
   const tableRef  = ref(null)
   const colWidths = ref({})   // col name → px; empty = auto layout
 
@@ -82,5 +82,51 @@ export function useColumnResize({ gridColumns }) {
     colWidths.value[col] = Math.ceil(maxW)
   }
 
-  return { tableRef, colWidths, startResize, autoFitColumn }
+  // Virtualization mounts only the visible rows, so auto table-layout would resize columns
+  // to whatever is on screen as you scroll. Pin every column to a content-derived width so
+  // they stay steady. The grid font is monospace, so width ≈ longest value's character
+  // count × char width — measured once, no per-cell DOM work.
+  const charW = ref(7.3)
+  function measureCharW() {
+    const probe = document.createElement('span')
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font-family:var(--mono);font-size:12px'
+    probe.textContent = '0'.repeat(100)
+    document.body.appendChild(probe)
+    const w = probe.offsetWidth / 100
+    document.body.removeChild(probe)
+    if (w > 0) charW.value = w
+  }
+
+  // Header label for a column (mirrors the template) so its width is counted too.
+  function headerLabel(col) {
+    if (col === '_id') return '{Document id}'
+    return /^\d+$/.test(col) ? `[${col}]` : col
+  }
+
+  const colDefaultWidths = computed(() => {
+    const cols = gridColumns()
+    const rows = cellData()
+    const out  = {}
+    for (let c = 0; c < cols.length; c++) {
+      let maxLen = headerLabel(cols[c]).length
+      for (const row of rows) {
+        const len = row[c].display.length
+        if (len > maxLen) maxLen = len
+      }
+      out[cols[c]] = Math.min(360, Math.max(40, Math.ceil(maxLen * charW.value) + 24))
+    }
+    return out
+  })
+
+  // User resize / auto-fit wins; otherwise the content-derived default. Pinning the header
+  // cell pins the whole column under auto table-layout.
+  function thWidthStyle(col) {
+    const w = colWidths.value[col] ?? colDefaultWidths.value[col]
+    return w ? { minWidth: w + 'px', maxWidth: w + 'px' } : {}
+  }
+
+
+  onMounted(measureCharW)
+
+  return { tableRef, colWidths, startResize, autoFitColumn, headerLabel, thWidthStyle }
 }

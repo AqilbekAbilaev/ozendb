@@ -30,6 +30,7 @@ const props = defineProps({
 // bubble up rather than being held here. `update:drillPath` keeps drill state (owned by
 // ResultsPanel so it survives view switches and the run-reset) in sync via v-model.
 const emit = defineEmits(['dragged-field', 'drag-over-section', 'vqb-drop', 'open-vqb', 'close-vqb', 'crud-error', 'update:drillPath', 'follow-reference', 'paste-documents'])
+
 function onThClick(col) {
   if (suppressNextClick.value) { suppressNextClick.value = false; return }
   if (!props.vqbOpen) return
@@ -96,10 +97,14 @@ function fillerCount(results) {
   return Math.max(0, minFillRows.value - (results?.length || 0))
 }
 
-// Column resize owns tableRef and the width map; gridColumns is passed as a getter
-// because it isn't built until further down (see the composable).
-const { tableRef, colWidths, startResize, autoFitColumn } = useColumnResize({
+// Column widths: user resize / auto-fit plus the content-derived defaults, and the
+// header label the widths are measured from. gridColumns and cellData are passed as
+// getters because neither is built until further down (see the composable).
+const {
+  tableRef, colWidths, startResize, autoFitColumn, headerLabel, thWidthStyle,
+} = useColumnResize({
   gridColumns: () => gridColumns.value,
+  cellData:    () => cellData.value,
 })
 
 // ── row / cell selection ──────────────────────────────
@@ -243,50 +248,6 @@ const matchSet = computed(() => {
 
 function isMatchCell(row, col) {
   return matchSet.value.has(row + ',' + col)
-}
-
-// ── column widths ───────────────────────────────────────
-// Virtualization mounts only the visible rows, so auto table-layout would resize columns
-// to whatever is on screen as you scroll. Pin every column to a content-derived width so
-// they stay steady. The grid font is monospace, so width ≈ longest value's character
-// count × char width — measured once, no per-cell DOM work.
-const charW = ref(7.3)
-function measureCharW() {
-  const probe = document.createElement('span')
-  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font-family:var(--mono);font-size:12px'
-  probe.textContent = '0'.repeat(100)
-  document.body.appendChild(probe)
-  const w = probe.offsetWidth / 100
-  document.body.removeChild(probe)
-  if (w > 0) charW.value = w
-}
-
-// Header label for a column (mirrors the template) so its width is counted too.
-function headerLabel(col) {
-  if (col === '_id') return '{Document id}'
-  return /^\d+$/.test(col) ? `[${col}]` : col
-}
-
-const colDefaultWidths = computed(() => {
-  const cols = gridColumns.value
-  const rows = cellData.value
-  const out  = {}
-  for (let c = 0; c < cols.length; c++) {
-    let maxLen = headerLabel(cols[c]).length
-    for (const row of rows) {
-      const len = row[c].display.length
-      if (len > maxLen) maxLen = len
-    }
-    out[cols[c]] = Math.min(360, Math.max(40, Math.ceil(maxLen * charW.value) + 24))
-  }
-  return out
-})
-
-// User resize / auto-fit wins; otherwise the content-derived default. Pinning the header
-// cell pins the whole column under auto table-layout.
-function thWidthStyle(col) {
-  const w = colWidths.value[col] ?? colDefaultWidths.value[col]
-  return w ? { minWidth: w + 'px', maxWidth: w + 'px' } : {}
 }
 
 // ── row virtualization (@tanstack/vue-virtual) ──────────
@@ -625,7 +586,7 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 
 // One-time monospace char-width measurement (feeds column sizing), plus an initial
 // row-height measure once the first rows have rendered (feeds the virtualizer estimate).
-onMounted(() => { measureCharW(); nextTick(measureRowH) })
+onMounted(() => { nextTick(measureRowH) })
 
 // WebKitGTK (the Linux Tauri webview) lets the grid's compositor layer go "cold"
 // while the window is backgrounded, so after switching back it won't repaint on
