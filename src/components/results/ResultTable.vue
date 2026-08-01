@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { errText } from '../../utils/errors'
 import { valueToClipboard } from '../../utils/clipboardCopy'
 import { dbRefOf, idFilterString } from '../../utils/dbRef'
+import { guessType, TYPE_CLASS, formatCell, columns, getAtPath } from '../../utils/resultGrid'
 import { useResultSearch } from '../../composables/useResultSearch'
 import { useColumnReorder } from '../../composables/useColumnReorder'
 import { useMomentumScroll } from '../../composables/useMomentumScroll'
@@ -122,53 +123,6 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', onDragMove)
   document.removeEventListener('mouseup',   onDragUp)
 })
-
-// ── table view helpers ─────────────────────────────────────
-function guessType(key, val) {
-  if (key === '_id' || (val && typeof val === 'object' && '$oid' in val)) return 'id'
-  if (val && typeof val === 'object' && '$date' in val) return 'date'
-  // Decimal128 and (canonical) Int64 arrive Extended-JSON-wrapped. Classify them as
-  // editable scalars rather than falling through to the generic 'obj' (which would make
-  // the cell drill in instead of edit).
-  if (val && typeof val === 'object' && '$numberDecimal' in val) return 'decimal'
-  if (val && typeof val === 'object' && '$numberLong' in val) return 'num'
-  if (typeof val === 'number') return 'num'
-  if (typeof val === 'boolean') return 'bool'
-  if (val === null || val === undefined) return 'null'
-  if (Array.isArray(val) || (typeof val === 'object')) return 'obj'
-  return 'str'
-}
-
-const TYPE_CLASS = { id: 'cell-oid', str: 'cell-str', num: 'cell-num', decimal: 'cell-num', date: '', bool: 'cell-num', null: 'cell-faint', obj: 'cell-faint' }
-
-function formatCell(key, val) {
-  if (val === null || val === undefined) return ''
-  if (typeof val === 'string') return val
-  if (typeof val === 'number' || typeof val === 'boolean') return String(val)
-  if (Array.isArray(val)) return `Array(${val.length})`
-  if (typeof val === 'object') {
-    if ('$oid' in val) return val.$oid
-    if ('$date' in val) {
-      const d = val.$date
-      if (typeof d === 'string') return d
-      if (typeof d === 'object' && '$numberLong' in d) return new Date(parseInt(d.$numberLong)).toISOString()
-    }
-    if ('$numberLong' in val) return val.$numberLong
-    if ('$numberDecimal' in val) return val.$numberDecimal
-    return '{…}'
-  }
-  return JSON.stringify(val)
-}
-
-function columns(results) {
-  if (!results?.length) return []
-  const seen = new Set()
-  for (const doc of results) for (const k of Object.keys(doc)) seen.add(k)
-  const allNumeric = [...seen].every(k => /^\d+$/.test(k))
-  if (allNumeric) return [...seen].sort((a, b) => Number(a) - Number(b))
-  const rest = [...seen].filter(k => k !== '_id').sort()
-  return seen.has('_id') ? ['_id', ...rest] : rest
-}
 
 // Filler rows pad the grid below real documents so the row stripes/borders
 // reach the bottom of the viewport instead of stopping after a fixed count —
@@ -353,15 +307,6 @@ watch(() => props.activeTab?.id, () => {
   colWidths.value = {}
   anchorRow.value = -1
 })
-
-function getAtPath(doc, path) {
-  let cur = doc
-  for (const key of path) {
-    if (cur === null || typeof cur !== 'object') return undefined
-    cur = cur[key]
-  }
-  return cur
-}
 
 // the "documents" the grid currently renders: either the real result set, or
 // (once drilled) every document's value at the drilled path — one row per
