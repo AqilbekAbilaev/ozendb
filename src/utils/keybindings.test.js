@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   SHORTCUT_COMMANDS,
+  shortcutGroups,
   mergeBindings,
   parseAccel,
   eventMatchesAccel,
@@ -13,6 +14,34 @@ import {
 function evt({ key, code = '', ctrl = false, meta = false, shift = false, alt = false }) {
   return { key: key, code: code, ctrlKey: ctrl, metaKey: meta, shiftKey: shift, altKey: alt }
 }
+
+describe('SHORTCUT_COMMANDS', () => {
+  it('never ships two commands on the same default accelerator', () => {
+    // Two commands on one key means whichever matchBinding reaches first wins and the
+    // other silently never fires — the kind of clash only a user report would surface.
+    const byAccel = {}
+    for (const cmd of SHORTCUT_COMMANDS) {
+      expect(byAccel[cmd.default], `${cmd.default} is already bound to ${byAccel[cmd.default]}`).toBeUndefined()
+      byAccel[cmd.default] = cmd.id
+    }
+  })
+})
+
+describe('shortcutGroups', () => {
+  it('buckets every command exactly once, keeping the table order', () => {
+    const groups = shortcutGroups()
+    expect(groups.map((g) => g.title)).toEqual(['File', 'Edit', 'Collection', 'Document', 'View'])
+    const ids = groups.flatMap((g) => g.commands.map((c) => c.id))
+    expect(ids).toHaveLength(SHORTCUT_COMMANDS.length)
+    expect(new Set(ids).size).toBe(SHORTCUT_COMMANDS.length)
+  })
+
+  it('puts each command under its own group', () => {
+    for (const group of shortcutGroups()) {
+      for (const cmd of group.commands) expect(cmd.group).toBe(group.title)
+    }
+  })
+})
 
 describe('mergeBindings', () => {
   it('returns the built-in defaults when there are no overrides', () => {

@@ -14,6 +14,7 @@ export const SHORTCUT_COMMANDS = [
   { id: 'coll:vqb',          label: 'Show Visual Query Builder', group: 'Collection', default: 'CmdOrCtrl+B' },
   { id: 'coll:aggregation',  label: 'Open Aggregation Editor',   group: 'Collection', default: 'F4' },
   { id: 'coll:open_tab',     label: 'Open Collection Tab',       group: 'Collection', default: 'F10' },
+  { id: 'doc:view_json',     label: 'View Document (JSON)…',     group: 'Document',   default: 'F3' },
   { id: 'doc:edit_json',     label: 'Edit Document (JSON)…',     group: 'Document',   default: 'CmdOrCtrl+J' },
   { id: 'view:refresh',      label: 'Refresh',                   group: 'View',       default: 'CmdOrCtrl+R' },
   { id: 'view:next_tab',    label: 'Next Tab',                 group: 'View',       default: 'CmdOrCtrl+Tab' },
@@ -26,6 +27,21 @@ export const SHORTCUT_COMMANDS = [
 ]
 
 const DEFAULTS = Object.fromEntries(SHORTCUT_COMMANDS.map((cmd) => [cmd.id, cmd.default]))
+
+// The commands bucketed by their group, groups in the order they first appear above —
+// so the editor's section order is the table's order and not an alphabetical accident.
+export function shortcutGroups() {
+  const groups = []
+  for (const cmd of SHORTCUT_COMMANDS) {
+    let group = groups.find((g) => g.title === cmd.group)
+    if (!group) {
+      group = { title: cmd.group, commands: [] }
+      groups.push(group)
+    }
+    group.commands.push(cmd)
+  }
+  return groups
+}
 
 // The built-in default accelerator for a command id (or undefined).
 export function defaultAccel(id) {

@@ -122,7 +122,7 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
                 Spec::Action { id: "doc:rename_field", label: "Rename Field…", accel: None, gate: Some(Gate::DocumentField) },
                 Spec::Action { id: "doc:add_field", label: "Add Field / Value…", accel: None, gate: Some(Gate::Document) },
                 Spec::Separator,
-                Spec::Action { id: "doc:view_json", label: "View Document (JSON)…", accel: None, gate: Some(Gate::Document) },
+                Spec::Action { id: "doc:view_json", label: "View Document (JSON)…", accel: Some("F3"), gate: Some(Gate::Document) },
                 Spec::Action { id: "doc:edit_json", label: "Edit Document (JSON)…", accel: Some("CmdOrCtrl+J"), gate: Some(Gate::Document) },
                 Spec::Action { id: "doc:delete", label: "Delete Document", accel: None, gate: Some(Gate::Document) },
             ],
