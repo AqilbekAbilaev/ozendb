@@ -12,8 +12,10 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "OzenDB",
-        "maximized": true
+        "maximized": true,
+        "create": false
       }
     ],
     "security": {

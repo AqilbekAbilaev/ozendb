@@ -101,6 +101,25 @@ pub fn run() {
                 app.handle().clone(),
             ));
 
+            // The main window is built here rather than auto-created from the config
+            // (hence `"create": false` there) because clipboard access is a builder-only
+            // option: without it WebKitGTK leaves `javascript-can-access-clipboard` off
+            // and every `navigator.clipboard.writeText` in the app rejects with
+            // NotAllowedError — silently, since a copy has nothing to fall back on.
+            let main_config = match app.config().app.windows.iter().find(|w| w.label == "main") {
+                Some(val) => val.clone(),
+                None => return Err("no main window in the config".into()),
+            };
+            let main_builder =
+                match tauri::WebviewWindowBuilder::from_config(app.handle(), &main_config) {
+                    Ok(val) => val,
+                    Err(e) => return Err(e.into()),
+                };
+            match main_builder.enable_clipboard_access().build() {
+                Ok(_val) => {}
+                Err(e) => return Err(e.into()),
+            };
+
             // Install the native OS menu (macOS system menu bar; native in-window
             // menu on Windows/Linux). Item clicks are emitted to the frontend,
             // which routes them through the existing handlers. The gated item
