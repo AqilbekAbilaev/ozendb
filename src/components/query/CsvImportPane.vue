@@ -98,7 +98,7 @@ async function pasteFromClipboard() {
   error.value = null
   let text = ''
   try {
-    text = await invoke('read_clipboard_text')
+    text = await navigator.clipboard.readText()
   } catch (e) {
     setError(errText(e))
     return

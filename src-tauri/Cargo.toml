@@ -72,12 +72,6 @@ rust_xlsxwriter = "0.96"
 # Pure-Rust .docx writer for "export schema documentation" as a Word document
 # (alongside the CSV form). Small reports, so the doc is built in memory then packed.
 docx-rs = "0.4"
-
-# Native OS clipboard read. WebKitGTK (Linux) refuses programmatic reads via the
-# browser `navigator.clipboard.readText`, so "Paste from clipboard" in the import tab
-# reads through this crate instead (X11 + Wayland backends). Standalone of Tauri, so
-# it doesn't perturb the pinned tauri/wry versions.
-arboard = { version = "3", features = ["wayland-data-control"] }
 sqlparser = "0.62.0"
 # Optional RegEx mode for "Search in…" (the search toolbar's RegEx toggle). Already
 # built transitively via mongodb; promoted to a direct dependency so we can compile

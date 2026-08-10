@@ -211,7 +211,6 @@ pub fn run() {
             export_collection_fields,
             import_preview,
             stage_import_text,
-            read_clipboard_text,
             get_default_query,
             set_default_query,
             clear_default_query,

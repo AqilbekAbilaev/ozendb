@@ -313,10 +313,8 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
 
   // Edit → Paste Document(s) / Ctrl+V in the grid: read the clipboard and ask for
   // confirmation before inserting — a paste writes to the collection, and the clipboard
-  // may hold something the user never meant to send. The read goes through the backend
-  // because `navigator.clipboard.readText` is blocked under WebKitGTK on Linux, same as
-  // the import pane. The target is captured here so a tab switch mid-dialog can't
-  // redirect the insert.
+  // may hold something the user never meant to send. The target is captured here so a
+  // tab switch mid-dialog can't redirect the insert.
   async function pasteDocuments() {
     const tab = activeTab()
     if (!tab || tab.kind !== 'collection' || !tab.collectionName) {
@@ -325,7 +323,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     }
     let text
     try {
-      text = await invoke('read_clipboard_text')
+      text = await navigator.clipboard.readText()
     } catch (e) {
       showToast('Cannot read from clipboard')
       return

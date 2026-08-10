@@ -101,15 +101,13 @@ function selectSource(i) {
   if (t.value.previewOpen) loadPreview()
 }
 
-// Paste from clipboard: read the OS clipboard via the backend (the browser
-// `navigator.clipboard.readText` is blocked under WebKitGTK on Linux). The text is
-// staged as a temp file so it flows through the same path-based preview/import as a
-// picked file.
+// Paste from clipboard: the text is staged as a temp file so it flows through the same
+// path-based preview/import as a picked file.
 async function pasteSource() {
   error.value = null
   let text = ''
   try {
-    text = await invoke('read_clipboard_text')
+    text = await navigator.clipboard.readText()
   } catch (e) {
     setError(errText(e))
     return
