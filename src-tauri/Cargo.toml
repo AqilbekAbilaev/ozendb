@@ -34,6 +34,12 @@ strip = true # Ensures debug symbols are removed.
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
+# Self-update. The updater can only replace the bundle it shipped as, so on Linux it
+# covers AppImage only — deb/rpm installs are told about the release and sent to the
+# downloads page instead (see `can_self_update`). `process` is here purely for the
+# relaunch after an update installs.
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 serde_json = { version = "1", features = ["raw_value"] }
 # Global allocator. Query results are deserialized into serde_json::Value (many tiny
 # allocations per document); glibc's per-thread arenas fragment badly under that churn

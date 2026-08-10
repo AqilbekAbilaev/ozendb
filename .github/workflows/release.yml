@@ -110,6 +110,12 @@ jobs:
           # IntelliShell's boa_engine needs a larger compile-time stack or rustc
           # can overflow while building it. 16 MiB is comfortably above the need.
           RUST_MIN_STACK: '16777216'
+          # Signs the updater artifacts. Without these the build still succeeds but
+          # ships no .sig files, and every client rejects the update as unsigned.
+          # The matching public key is baked into tauri.conf.json — if this private
+          # key is ever lost, existing installs can never be updated again.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # Use the pushed tag (e.g. v0.1.0) for a tag trigger; fall back to a
           # nightly-style tag for manual runs so they don't collide.

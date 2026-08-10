@@ -18,6 +18,8 @@
     "core:event:allow-emit",
     "core:window:allow-close",
     "core:window:allow-set-title",
-    "core:webview:allow-set-webview-zoom"
+    "core:webview:allow-set-webview-zoom",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

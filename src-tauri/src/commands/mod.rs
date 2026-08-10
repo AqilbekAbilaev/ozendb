@@ -28,6 +28,7 @@ pub mod folders;
 pub mod portmap;
 pub mod history;
 pub mod operations;
+pub mod updater;
 
 pub use connection::*;
 pub use query::*;
@@ -50,6 +51,7 @@ pub use folders::*;
 pub use portmap::*;
 pub use history::*;
 pub use operations::*;
+pub use updater::*;
 
 // Helper modules carved out of this file when it outgrew the size limit. Unlike the
 // command modules above these expose no Tauri commands — they're the shared parsing,

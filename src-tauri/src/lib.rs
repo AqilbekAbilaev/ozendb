@@ -150,6 +150,8 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             test_connection,
             test_ssh_connection,
@@ -211,6 +213,7 @@ pub fn run() {
             export_collection_fields,
             import_preview,
             stage_import_text,
+            can_self_update,
             get_default_query,
             set_default_query,
             clear_default_query,
