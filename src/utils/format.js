@@ -19,6 +19,23 @@ export function fmtBytes(bytes, empty = '—') {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[i]}`
 }
 
+// Human size followed by the exact byte count, the way Studio-3T's collection tooltip
+// reports sizes — the rounded figure to read, the exact one to check against. Below 1 KB
+// fmtBytes already *is* the byte count, so the parenthetical would just repeat it.
+export function fmtBytesExact(bytes) {
+  if (bytes == null) return '—'
+  if (bytes < 1024) return fmtBytes(bytes)
+  return `${fmtBytes(bytes)} (${fmtNum(bytes)})`
+}
+
+// Wall clock to the second, for "fetched at" stamps. Distinct from formatNow(), whose
+// format is pinned by the connection list's `last_accessed` ordering.
+export function fmtClock() {
+  const now = new Date()
+  const date = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  return `${date} ${now.toLocaleTimeString('en-GB', { hour12: false })}`
+}
+
 // One preview-table cell as text: objects are shown as compact JSON, null/undefined
 // as blank. Used by the import, CSV import and export preview grids.
 export function cellText(value) {

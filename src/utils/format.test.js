@@ -1,5 +1,34 @@
-import { describe, it, expect } from 'vitest'
-import { fmtBytes, cellText } from './format'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { fmtBytes, fmtBytesExact, fmtClock, cellText } from './format'
+
+describe('fmtBytesExact', () => {
+  it('follows the human size with the exact byte count', () => {
+    // fmtBytes drops the decimal at 10 and above, so this reads 93 MB, not 92.7 MB —
+    // the exact figure beside it is what the parenthetical is for.
+    expect(fmtBytesExact(97215550)).toBe('93 MB (97,215,550)')
+    expect(fmtBytesExact(1576960)).toBe('1.5 MB (1,576,960)')
+  })
+
+  it('omits the parenthetical when the human size is already the byte count', () => {
+    expect(fmtBytesExact(291)).toBe('291 B')
+    expect(fmtBytesExact(0)).toBe('0 B')
+  })
+
+  it('returns the empty marker for a missing value', () => {
+    expect(fmtBytesExact(null)).toBe('—')
+    expect(fmtBytesExact(undefined)).toBe('—')
+  })
+})
+
+describe('fmtClock', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('stamps the wall clock to the second', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 10, 13, 33, 22))
+    expect(fmtClock()).toBe('10 Aug 2026 13:33:22')
+  })
+})
 
 describe('fmtBytes', () => {
   it('reports raw bytes below 1 KB', () => {

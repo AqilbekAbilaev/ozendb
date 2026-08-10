@@ -6,6 +6,8 @@ import { listen } from '@tauri-apps/api/event'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
+import StatsTip from './StatsTip.vue'
+import { useStatsTip } from '../../composables/useStatsTip'
 import { colorHex } from '../../utils/tabColor.js'
 
 const props = defineProps({
@@ -262,6 +264,9 @@ const STATUS_LABEL = {
 }
 
 function onNodeContext(e, type, label, nodeData) {
+  // The stats card opens at the pointer, which is exactly where the menu is about to
+  // appear — drop it at once rather than leaving it to the hover grace period.
+  statsTip.hide()
   emit('context-menu', { type: type, x: e.clientX, y: e.clientY, label: label, nodeData: nodeData })
 }
 
@@ -306,6 +311,10 @@ function getConnections() {
   return connections.value
 }
 
+// Hovering a database or collection row pops its stats card (see useStatsTip). The rows
+// pass their own target, so the card needs no per-kind handler here.
+const { tip, ...statsTip } = useStatsTip()
+
 defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollection })
 </script>
 
@@ -322,7 +331,8 @@ defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollecti
 
     <!-- Tree -->
     <!-- Clicking empty space in the tree clears a single-click collection highlight. -->
-    <div class="tree" @click.self="clearSelection">
+    <!-- Scrolling leaves the stats card anchored to a row that has moved, so drop it. -->
+    <div class="tree" @click.self="clearSelection" @scroll.passive="statsTip.hide">
       <div v-if="filtered.length === 0" class="tree-empty">
         No connections. Use File → Connect.
       </div>
@@ -389,6 +399,9 @@ defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollecti
               style="padding-left: 21px"
               @click="db.accessible ? toggleDatabase(conn, db.name) : setSelection(null)"
               @contextmenu.prevent="onNodeContext($event, 'database', db.name, { connId: conn.id, dbName: db.name })"
+              @mouseenter="db.accessible && statsTip.show($event, { connId: conn.id, dbName: db.name })"
+              @mousemove="statsTip.move"
+              @mouseleave="statsTip.hideSoon"
             >
               <span class="tw">
                 <BaseIcon v-if="!db.accessible" name="lock" :size="12" />
@@ -415,6 +428,9 @@ defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollecti
                 style="padding-left: 51px"
                 @click="highlightCollection(conn, db, coll)"
                 @dblclick="openCollection(conn, db, coll)"
+                @mouseenter="statsTip.show($event, { connId: conn.id, dbName: db.name, collName: coll })"
+                @mousemove="statsTip.move"
+                @mouseleave="statsTip.hideSoon"
                 @contextmenu.prevent="onNodeContext($event, 'collection', coll, { connId: conn.id, connName: conn.name, dbName: db.name, collName: coll })"
               >
                 <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
@@ -426,6 +442,8 @@ defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollecti
         </template>
       </template>
     </div>
+
+    <StatsTip :tip="tip" @keep="statsTip.keep" @leave="statsTip.hideSoon" @refresh="statsTip.refresh" />
   </div>
 </template>
 
