@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.1.4
+
+- **Automatic updates** — OzenDB now checks for new versions on launch and from
+  Help → Check for Updates…, and can install them itself. **This release must be
+  installed by hand; updates are automatic from the next one on.** Linux `.deb`
+  and `.rpm` installs are managed by your package manager, so they're pointed at
+  the downloads page instead of updating in place.
+- **Copying works again on Linux** — copying a cell, a document or a selection
+  silently did nothing. The window never asked the webview for clipboard access,
+  so every copy in the app was rejected without an error.
+- **Zoom the whole interface** — zoom in and out from the View menu, remembered
+  between launches.
+- **Database and collection stats on hover** — hovering a node in the sidebar
+  shows its size, document count and index count without opening it.
+- **F3 opens the selected document** in the viewer window, and the keyboard
+  shortcut settings are now grouped by area.
+- **Fixed** — connection colour tags now load at startup, so tabs show them after
+  a restart instead of only once you expand the connection.
+- **Fixed** — the text caret is full height in empty query fields.
+- macOS builds are ad-hoc signed, which is what Apple Silicon requires to run
+  them at all. They are still not notarized, so first launch still needs the
+  right-click → Open path.
+
 ## v0.1.3
 
 - **Paste documents from the clipboard** — Ctrl+V in the results grid, or
