@@ -5,11 +5,15 @@
 // same thing — open a URL — so the only thing that varies is the URL.
 export const HELP_REPO = 'https://github.com/AqilbekAbilaev/ozendb'
 
+// Where an install that can't replace itself (deb/rpm) is sent to get the new version.
+export const RELEASES_URL = `${HELP_REPO}/releases`
+
+// Note `help:updates` is deliberately absent: it runs a real update check (see
+// useUpdater), and listing it here would make the link handler swallow it first.
 export const HELP_URLS = {
   'help:license':         HELP_REPO,
   'help:gallery':         `${HELP_REPO}#readme`,
-  'help:whats_new':       `${HELP_REPO}/releases`,
-  'help:updates':         `${HELP_REPO}/releases`,
+  'help:whats_new':       RELEASES_URL,
   'help:support':         `${HELP_REPO}/issues`,
   'help:feature_request': `${HELP_REPO}/issues/new`,
   'help:feedback':        `${HELP_REPO}/issues/new`,

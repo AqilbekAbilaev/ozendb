@@ -6,13 +6,14 @@ import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
 import { errText } from './utils/errors'
 import { mergeBindings, matchBinding } from './utils/keybindings'
-import { HELP_URLS, isHelpLink } from './constants/helpLinks'
+import { HELP_URLS, RELEASES_URL, isHelpLink } from './constants/helpLinks'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
 import { useDbActions } from './composables/useDbActions'
 import { useMenu } from './composables/useMenu'
 import { useModals } from './composables/useModals'
+import { useUpdater } from './composables/useUpdater'
 import { useOperations } from './composables/useOperations'
 import { useNodeTags } from './composables/useNodeTags'
 import { useDbTransfer } from './composables/useDbTransfer'
@@ -103,6 +104,9 @@ onMounted(async () => {
 
   // Save on any change to the open tabs or the active tab.
   startAutoSave()
+
+  // Not awaited: a slow or failed check must never hold up startup.
+  updater.checkOnLaunch()
 });
 
 onUnmounted(() => {
@@ -219,6 +223,14 @@ const {
   showToast: showToast,
   connectionTreeRef: connectionTreeRef,
   openModal: modalsApi.openModal,
+})
+
+// Self-update. The launch check is silent; Help → Check for Updates… is the loud one.
+const updater = useUpdater({
+  showToast: showToast,
+  openModal: modalsApi.openModal,
+  closeModal: modalsApi.closeModal,
+  openDownloadsPage: () => openUrl(RELEASES_URL).catch(() => showToast('Could not open link')),
 })
 
 const indexesApi = useIndexes({ showToast: showToast })
@@ -340,6 +352,7 @@ function handleMenuAction(id) {
     case 'help:shortcuts':   preferencesInitialTab.value = 'keyboard'; modalsApi.openModal('preferences'); return
     case 'help:quickstart':  openQuickstart(); return
     case 'help:about':       modalsApi.openModal('about'); return
+    case 'help:updates':     updater.checkNow(); return
     case 'coll:vqb': {
       const tab = menuTarget('collection')
       if (!tab || tab.kind !== 'collection' || !tab.collectionName) {
@@ -709,6 +722,7 @@ provide('appModals', {
       },
     },
     connectionManager: { connect: onManagerConnect },
+    update: { install: updater.install, downloads: updater.openDownloads },
     // Structural dialogs create/drop/rename things in the tree, so the sidebar needs a
     // refresh once they succeed. The dialog owns the driver call and its own form state;
     // only the refresh comes back here, since the tree ref lives in App.vue.
@@ -721,6 +735,7 @@ provide('appModals', {
   // Extra props for registry-driven modals that need app-level state beyond their target:
   // modal id → () => props object, re-read on each render so reactive values stay current.
   modalProps: {
+    update: () => updater.dialogProps.value,
     preferences: () => ({
       defaultQueryLimit: defaultQueryLimit.value,
       theme: theme.value,

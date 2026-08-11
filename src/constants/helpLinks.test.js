@@ -14,6 +14,13 @@ describe('isHelpLink', () => {
     expect(isHelpLink('file:connect')).toBe(false)
   })
 
+  // Check for Updates… runs a real update check. If it ever reappears in the table the
+  // link handler claims it before the switch, and the menu item silently goes back to
+  // opening a web page.
+  it('does not claim help:updates', () => {
+    expect(isHelpLink('help:updates')).toBe(false)
+  })
+
   // Guards against a key like `constructor` or `toString` resolving off the prototype
   // and sending openUrl a function instead of a URL.
   it('does not claim inherited object properties', () => {

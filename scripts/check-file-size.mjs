@@ -16,7 +16,7 @@ const LIMIT = 600
 // Once a file is under LIMIT, delete its line entirely.
 const GRANDFATHERED = {
   'src/components/results/ResultTable.vue': 793,
-  'src/App.vue': 865,
+  'src/App.vue': 859,
   'src/components/connection/NewConnection.vue': 915,
   'src-tauri/src/shell/bridge/mod.rs': 824,
   'src-tauri/src/commands/admin.rs': 820,
