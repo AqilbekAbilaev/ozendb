@@ -24,7 +24,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_ME_WITH_THE_PUBLIC_KEY_FROM_tauri_signer_generate",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE5MDQ0NTA1RTY3NkI5OUUKUldTZXVYYm1CVVVFR2U0SldFM3lYcFpoRDc0TFN3cDBINE1LcVVvL1oxL0gvTTBTWVg4ZElvZjIK",
       "endpoints": [
         "https://github.com/AqilbekAbilaev/ozendb/releases/latest/download/latest.json"
       ]
