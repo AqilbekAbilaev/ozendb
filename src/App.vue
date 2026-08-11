@@ -6,6 +6,7 @@ import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
 import { errText } from './utils/errors'
 import { mergeBindings, matchBinding } from './utils/keybindings'
+import { HELP_URLS, isHelpLink } from './constants/helpLinks'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
@@ -314,21 +315,6 @@ const activeCollectionKey = computed(() => {
     : null
 })
 
-// Help-menu link targets. Default to the project's real GitHub repo (from the git
-// remote); retarget as needed once dedicated pages exist.
-const HELP_REPO = 'https://github.com/AqilbekAbilaev/ozendb'
-const HELP_URLS = {
-  'help:license':         HELP_REPO,
-  'help:gallery':         `${HELP_REPO}#readme`,
-  'help:whats_new':       `${HELP_REPO}/releases`,
-  'help:updates':         `${HELP_REPO}/releases`,
-  'help:support':         `${HELP_REPO}/issues`,
-  'help:feature_request': `${HELP_REPO}/issues/new`,
-  'help:feedback':        `${HELP_REPO}/issues/new`,
-  'help:tutorials':       `${HELP_REPO}/wiki`,
-  'help:knowledge_base':  `${HELP_REPO}/wiki`,
-}
-
 // Dispatch an Index menu action to the active Index Manager tab. Each tab owns
 // its own state (selectedIndex, form, etc.) and exposes a handler API on the tab
 // object via _idxApi. The menu only fires when the active tab is an index tab.
@@ -340,6 +326,12 @@ function indexMenuAction(method, ...args) {
 // Routes menu-bar actions (emitted by id) to the same handlers the toolbar and
 // right-click menus already use. The menu bar never emits a disabled item.
 function handleMenuAction(id) {
+  // Help links open the project's GitHub (issues / releases / repo) — one table, one
+  // behavior, so they're handled before the switch rather than as nine empty arms.
+  if (isHelpLink(id)) {
+    openUrl(HELP_URLS[id]).catch(() => showToast('Could not open link'))
+    return
+  }
   switch (id) {
     // --- direct modals / app ---
     case 'file:connect':     modalsApi.openModal('connectionManager'); return
@@ -348,19 +340,6 @@ function handleMenuAction(id) {
     case 'help:shortcuts':   preferencesInitialTab.value = 'keyboard'; modalsApi.openModal('preferences'); return
     case 'help:quickstart':  openQuickstart(); return
     case 'help:about':       modalsApi.openModal('about'); return
-    // Help links open the project's GitHub (issues / releases / repo). Configurable —
-    // retarget any URL in HELP_URLS.
-    case 'help:license':
-    case 'help:gallery':
-    case 'help:whats_new':
-    case 'help:updates':
-    case 'help:support':
-    case 'help:feature_request':
-    case 'help:feedback':
-    case 'help:tutorials':
-    case 'help:knowledge_base':
-      openUrl(HELP_URLS[id]).catch(() => showToast('Could not open link'))
-      return
     case 'coll:vqb': {
       const tab = menuTarget('collection')
       if (!tab || tab.kind !== 'collection' || !tab.collectionName) {
