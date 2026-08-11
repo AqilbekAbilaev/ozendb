@@ -1,6 +1,6 @@
 [package]
 name = "ozendb"
-version = "0.1.3"
+version = "0.1.4"
 description = "An open-source, free desktop GUI for managing MongoDB — a community alternative to Studio 3T."
 authors = ["Akhilbek Abilaev <abilaevaqil@gmail.com>"]
 edition = "2021"
