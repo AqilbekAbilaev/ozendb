@@ -37,9 +37,10 @@ longer-term goal of supporting more databases.
 
 ## Planned 📋
 
-- **Reschema** — collection schema transformation and migration tool (rebuilding from the ground
-   up). The requirements document this entry used to link to is not in the repository; the spec
-   needs rewriting before work starts.
+- **Reschema** — collection schema transformation and migration tool. Deliberately deferred: the
+   earlier requirements document was removed rather than carried forward, so that the core
+   querying, results and admin features are finished to a solid standard first and Reschema is
+   built on top of them.
 - **Interactive OIDC sign-in (human SSO)** — the device-authorization browser-login flow
    with token caching and trusted-endpoint config, for Atlas / enterprise single sign-on.
    Workload-identity OIDC (`MONGODB-OIDC` with `ENVIRONMENT` / `TOKEN_RESOURCE`) already ships;
