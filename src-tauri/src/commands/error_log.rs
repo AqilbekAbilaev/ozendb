@@ -33,6 +33,9 @@ pub struct ReportContext {
     pub version: &'static str,
     pub os: &'static str,
     pub arch: &'static str,
+    /// The user's home directory, so the report can replace it with `~`. Our own file
+    /// paths are the one place a recorded message carries the account name.
+    pub home: String,
 }
 
 #[tauri::command]
@@ -41,5 +44,8 @@ pub async fn error_report_context() -> Result<ReportContext, AppError> {
         version: env!("CARGO_PKG_VERSION"),
         os: std::env::consts::OS,
         arch: std::env::consts::ARCH,
+        home: std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .unwrap_or_default(),
     })
 }
