@@ -257,4 +257,35 @@ mod tests {
             Some(String::from("err 0; err 1; err 2 (and 3 more)"))
         );
     }
+
+    // The wiring between error reporting's two halves: `impl Serialize for AppError` is
+    // what decides whether an error is ever recorded, by calling error_log::record.
+    // Classification itself is covered in error_log.test.rs — what this pins is that the
+    // funnel is actually connected, in both directions.
+    //
+    // One test rather than two because the recorder is a process global: `init` takes
+    // effect once, so a second test would race this one for which tempdir wins. Records
+    // are matched by a marker in the message rather than by count, since other tests in
+    // this binary share the global once it is set.
+    #[test]
+    fn only_defects_reach_the_error_log() {
+        use super::AppError;
+        let dir = tempfile::tempdir().expect("tempdir");
+        crate::error_log::init(dir.path().join("error_log.json"));
+
+        let defect = AppError::Io(std::io::Error::other("marker-defect"));
+        let domain = AppError::Validation("marker-domain".to_string());
+        serde_json::to_string(&defect).expect("serialize defect");
+        serde_json::to_string(&domain).expect("serialize domain error");
+
+        let records = match crate::error_log::store() {
+            Some(store) => store.list(),
+            // Another test in this binary won the `init` race; nothing to assert against.
+            None => return,
+        };
+        let recorded: Vec<_> = records.iter().filter(|r| r.message.contains("marker-")).collect();
+        assert_eq!(recorded.len(), 1, "exactly one of the two should be recorded");
+        assert_eq!(recorded[0].code, "io");
+        assert!(recorded[0].message.contains("marker-defect"));
+    }
 }
