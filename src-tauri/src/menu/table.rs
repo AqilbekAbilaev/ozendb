@@ -196,6 +196,7 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
                 Spec::Action { id: "help:whats_new", label: "What's New", accel: None, gate: None },
                 Spec::Action { id: "help:updates", label: "Check for Updates…", accel: None, gate: None },
                 Spec::Separator,
+                Spec::Action { id: "help:report_problem", label: "Report a Problem…", accel: None, gate: None },
                 Spec::Action { id: "help:support", label: "Contact Support", accel: None, gate: None },
                 Spec::Action { id: "help:feature_request", label: "Submit a Feature Request", accel: None, gate: None },
                 Spec::Action { id: "help:feedback", label: "Submit Feedback", accel: None, gate: None },

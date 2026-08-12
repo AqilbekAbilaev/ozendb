@@ -86,6 +86,9 @@ impl serde::Serialize for AppError {
             "validation" | "bson" => {}
             _ => eprintln!("[ozendb] error [{}]: {}", code, self),
         }
+        // Persist the ones that are ours to fix (see error_log::is_defect) so they can
+        // be reported later. A failed login or an unreachable host is not one of them.
+        crate::error_log::record(code, &self.to_string());
         // For MongoDB errors the driver's Display can be a `{:?}` debug dump (notably
         // write/insert errors), so route them through the humanizer; every other variant
         // already Displays as a readable sentence.

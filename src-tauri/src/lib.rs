@@ -10,6 +10,7 @@ mod commands;
 mod collection_history;
 mod default_queries;
 mod error;
+mod error_log;
 mod export_watermarks;
 mod folders;
 mod history;
@@ -58,12 +59,23 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // A panic is always our defect, and the default hook only writes to stderr — which
+    // nobody sees in a bundled app. Record it, then chain to the default so a terminal
+    // run still prints the backtrace. Panics before setup are dropped (no store yet).
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        error_log::record("panic", &info.to_string());
+        default_hook(info);
+    }));
+
     tauri::Builder::default()
         .setup(|app| {
             let data_dir = match app.path().app_data_dir() {
                 Ok(val) => val,
                 Err(e) => return Err(e.into()),
             };
+            // Before any store, so a failure setting the others is itself recordable.
+            error_log::init(data_dir.join("error_log.json"));
             app.manage(FolderStorage::new(data_dir.join("folders.json")));
             app.manage(HistoryStorage::new(data_dir.join("history.json")));
             app.manage(SavedQueryStorage::new(data_dir.join("saved_queries.json")));
@@ -271,6 +283,10 @@ pub fn run() {
             delete_folder,
             move_connection_to_folder,
             list_operations,
+            list_error_log,
+            clear_error_log,
+            record_frontend_error,
+            error_report_context,
             clear_operations,
             menu::set_menu_context,
         ])

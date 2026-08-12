@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { HELP_URLS, isHelpLink } from './helpLinks'
+import { HELP_URLS, HELP_MODALS, isHelpLink } from './helpLinks'
+import { MODALS } from './modalRegistry'
 
 // The menu ids in this table are the contract with src-tauri/src/menu/table.rs — an id
 // that drifts out of step goes silently dead, because handleMenuAction falls through to
@@ -33,6 +34,23 @@ describe('HELP_URLS', () => {
   it('points every entry at a real https URL', () => {
     for (const url of Object.values(HELP_URLS)) {
       expect(url).toMatch(/^https:\/\//)
+    }
+  })
+})
+
+// Same contract as HELP_URLS: these ids exist in src-tauri/src/menu/table.rs, and each
+// value must name a real row in the modal registry or the menu item opens nothing.
+describe('HELP_MODALS', () => {
+  it('maps help ids to registered modals', () => {
+    for (const [id, modal] of Object.entries(HELP_MODALS)) {
+      expect(id.startsWith('help:')).toBe(true)
+      expect(MODALS[modal]).toBeTruthy()
+    }
+  })
+
+  it('never collides with the URL table — an id does one thing or the other', () => {
+    for (const id of Object.keys(HELP_MODALS)) {
+      expect(isHelpLink(id)).toBe(false)
     }
   })
 })

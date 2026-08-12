@@ -28,6 +28,7 @@ pub mod folders;
 pub mod portmap;
 pub mod history;
 pub mod operations;
+pub mod error_log;
 pub mod updater;
 
 pub use connection::*;
@@ -51,6 +52,7 @@ pub use folders::*;
 pub use portmap::*;
 pub use history::*;
 pub use operations::*;
+pub use error_log::*;
 pub use updater::*;
 
 // Helper modules carved out of this file when it outgrew the size limit. Unlike the

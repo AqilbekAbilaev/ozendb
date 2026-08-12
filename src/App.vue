@@ -6,7 +6,7 @@ import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
 import { errText } from './utils/errors'
 import { mergeBindings, matchBinding } from './utils/keybindings'
-import { HELP_URLS, RELEASES_URL, isHelpLink } from './constants/helpLinks'
+import { HELP_URLS, HELP_MODALS, RELEASES_URL, isHelpLink } from './constants/helpLinks'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
@@ -338,12 +338,13 @@ function indexMenuAction(method, ...args) {
 // Routes menu-bar actions (emitted by id) to the same handlers the toolbar and
 // right-click menus already use. The menu bar never emits a disabled item.
 function handleMenuAction(id) {
-  // Help links open the project's GitHub (issues / releases / repo) — one table, one
-  // behavior, so they're handled before the switch rather than as nine empty arms.
+  // Help items are tables, not switch arms: most open the project's GitHub, the rest
+  // open an app-level modal (see constants/helpLinks).
   if (isHelpLink(id)) {
     openUrl(HELP_URLS[id]).catch(() => showToast('Could not open link'))
     return
   }
+  if (HELP_MODALS[id]) { modalsApi.openModal(HELP_MODALS[id]); return }
   switch (id) {
     // --- direct modals / app ---
     case 'file:connect':     modalsApi.openModal('connectionManager'); return
@@ -351,7 +352,6 @@ function handleMenuAction(id) {
     case 'edit:preferences': preferencesInitialTab.value = 'general'; modalsApi.openModal('preferences'); return
     case 'help:shortcuts':   preferencesInitialTab.value = 'keyboard'; modalsApi.openModal('preferences'); return
     case 'help:quickstart':  openQuickstart(); return
-    case 'help:about':       modalsApi.openModal('about'); return
     case 'help:updates':     updater.checkNow(); return
     case 'coll:vqb': {
       const tab = menuTarget('collection')

@@ -19,6 +19,7 @@ export const MODALS = {
   about:             { component: lazy(() => import('../components/app/AboutModal.vue')),                level: null },
   preferences:       { component: lazy(() => import('../components/app/PreferencesModal.vue')),          level: null },
   update:            { component: lazy(() => import('../components/app/UpdateModal.vue')),               level: null },
+  errorReport:       { component: lazy(() => import('../components/app/ErrorReportModal.vue')),          level: null },
 
   // ── connection level ──
   serverStatus: { component: lazy(() => import('../components/admin/ServerStatusModal.vue')), level: 'connection' },

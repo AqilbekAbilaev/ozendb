@@ -21,6 +21,14 @@ export const HELP_URLS = {
   'help:knowledge_base':  `${HELP_REPO}/wiki`,
 }
 
+// Help items that open an app-level modal instead of a URL. Same idea as HELP_URLS:
+// a table beats a switch arm apiece, and it keeps the ids next to the ones they sit
+// beside in the Help menu.
+export const HELP_MODALS = {
+  'help:about':          'about',
+  'help:report_problem': 'errorReport',
+}
+
 /// Whether a menu id is one of the plain "open a URL" help items.
 export function isHelpLink(id) {
   return Object.prototype.hasOwnProperty.call(HELP_URLS, id)
