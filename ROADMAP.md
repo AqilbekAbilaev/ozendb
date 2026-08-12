@@ -7,7 +7,10 @@ longer-term goal of supporting more databases.
 
  - **Foundation** — Tauri + Vue desktop app with a native system menu; async connection pool;
    a Rust backend with unit and integration tests; crash-safe atomic storage; Linux/WebKitGTK
-   rendering and text-editing fixes; downloadable pre-built binaries for macOS, Windows, and Linux.
+   rendering and text-editing fixes; downloadable pre-built binaries for macOS, Windows, and Linux;
+   signed automatic updates, checked on launch and from the Help menu (macOS, Windows and Linux
+   AppImage — `.deb`/`.rpm` installs belong to the package manager and are pointed at the
+   downloads page instead).
 - **Connections** — Connection Manager (create / edit / duplicate / import / export / delete);
    structured connection fields with a live Test Connection; passwords in the OS keychain;
    TLS/SSL; SSH tunnels with trust-on-first-use host-key verification; OIDC workload-identity
@@ -34,9 +37,9 @@ longer-term goal of supporting more databases.
 
 ## Planned 📋
 
-- **Column reorder** — drag-to-reorder columns in table view with persistence (in development).
-- **Reschema** — collection schema transformation and migration tool (rebuilding from the ground up,
-   see [RESCHEMA_REQUIREMENTS](RESCHEMA_REQUIREMENTS.md)).
+- **Reschema** — collection schema transformation and migration tool (rebuilding from the ground
+   up). The requirements document this entry used to link to is not in the repository; the spec
+   needs rewriting before work starts.
 - **Interactive OIDC sign-in (human SSO)** — the device-authorization browser-login flow
    with token caching and trusted-endpoint config, for Atlas / enterprise single sign-on.
    Workload-identity OIDC (`MONGODB-OIDC` with `ENVIRONMENT` / `TOKEN_RESOURCE`) already ships;
