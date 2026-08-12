@@ -129,3 +129,7 @@ jobs:
           releaseDraft: true
           prerelease: ${{ github.ref_type != 'tag' }}
           args: ${{ matrix.args }}
+          # The .sig files are noise on the release page: the updater never fetches
+          # them, because latest.json embeds each bundle's signature inline. Turning
+          # this off does not affect the latest.json generator.
+          uploadUpdaterSignatures: false
