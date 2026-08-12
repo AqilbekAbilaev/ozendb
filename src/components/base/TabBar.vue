@@ -208,6 +208,18 @@ function onTabClick(t) {
   emit('activate-tab', t.id)
 }
 
+// The workspace always keeps one tab open, so the lone Quickstart tab has no ✕ — and
+// middle-click must honour the same rule rather than being a second way to empty the strip.
+function closable(t) {
+  return props.tabs.length > 1 || t.kind !== 'quickstart'
+}
+
+// Middle-click closes a tab, as in a browser's tab strip. Drag ignores non-left buttons
+// already (see onTabMouseDown), so this can't collide with a reorder.
+function onTabAuxClick(t) {
+  if (closable(t)) emit('close-tab', t.id)
+}
+
 onUnmounted(() => {
   document.removeEventListener('mousemove', onTabMove)
   document.removeEventListener('mouseup', onTabUp)
@@ -230,11 +242,12 @@ onUnmounted(() => {
       }"
       @mousedown="onTabMouseDown($event, t)"
       @click="onTabClick(t)"
+      @auxclick.middle.prevent="onTabAuxClick(t)"
       @contextmenu.prevent="emit('tab-context', { id: t.id, x: $event.clientX, y: $event.clientY })"
     >
       <span v-if="colorHex(tabColor(t))" class="dot" :style="{ background: colorHex(tabColor(t)) }"></span>
       <span class="title">{{ t.title }}</span>
-      <span v-if="tabs.length > 1 || t.kind !== 'quickstart'" class="x" @click.stop="emit('close-tab', t.id)">
+      <span v-if="closable(t)" class="x" @click.stop="emit('close-tab', t.id)">
         <BaseIcon name="close" :size="12" />
       </span>
     </button>
