@@ -124,9 +124,14 @@ export function useSessionPersistence({ runRestoredTab }) {
       if (saved?.length) {
         const conns = await invoke('list_connections')
         const validIds = new Set(conns.map(c => c.id))
+        // Never restore a tab that's already open. A second restore (App.vue remounting
+        // over the module-scope `tabs` store — HMR does this) would otherwise push the
+        // whole saved set on top of itself, and the doubled set gets persisted: that's
+        // how one session grew to 9,182 tabs with 5 distinct ids.
+        const open = new Set(tabs.value.map(t => t.id))
         const restored = saved
           // drop tabs for deleted connections (import tabs key on connId)
-          .filter(t => validIds.has(t.connectionId || t.connId))
+          .filter(t => validIds.has(t.connectionId || t.connId) && !open.has(t.id))
           .map(t => t.kind === 'import'
             ? (t.format === 'csv'
               ? {
