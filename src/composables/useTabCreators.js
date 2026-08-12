@@ -1,7 +1,7 @@
 import { nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { parseField } from '../utils/queryParser'
-import { tabs, activeTabId, activateTab } from '../stores/tabs'
+import { tabs, activeTabId, activateTab, newTabId } from '../stores/tabs'
 
 // Every "open a tab" entry point in the app. The tab *state* and its mutations live in
 // stores/tabs.js; these are the constructors that decide what a newly opened tab of each
@@ -21,7 +21,7 @@ export function useTabCreators({
   async function openCollectionTab({ connectionId, connectionName, dbName, collectionName, filter }, startMode = 'find') {
     // Every open creates a new tab — the same collection may be opened in several
     // tabs (Studio-3T behavior). No dedup/focus-existing here by design.
-    const id = 't' + Date.now()
+    const id = newTabId()
     tabs.value.push({
       id: id, kind: 'collection',
       title: collectionName,
@@ -96,7 +96,7 @@ export function useTabCreators({
       t.kind === 'collection' && t.mode === 'sql' &&
       t.connectionId === connectionId && t.dbName === dbName && t.collectionName === collectionName)
     if (existing) { activeTabId.value = existing.id; return }
-    const id = 't' + Date.now()
+    const id = newTabId()
     tabs.value.push({
       id: id, kind: 'collection',
       title: 'SQL: ' + collectionName,
@@ -118,7 +118,7 @@ export function useTabCreators({
   // Open an IntelliShell tab scoped to a connection + database. Each shell tab has
   // its own backend JS session (sessionId), so variables persist across runs.
   function openShellTab({ connectionId, connectionName, dbName }) {
-    const id = 't' + Date.now()
+    const id = newTabId()
     tabs.value.push({
       id: id, kind: 'shell',
       title: 'mongosh: ' + dbName,
@@ -142,7 +142,7 @@ export function useTabCreators({
     const existing = tabs.value.find(t =>
       t.kind === 'indexes' && t.connId === connId && t.dbName === dbName && t.collName === collName)
     if (existing) { activeTabId.value = existing.id; return }
-    const id = 't' + Date.now()
+    const id = newTabId()
     tabs.value.push({
       id: id, kind: 'indexes',
       title: 'Index Manager: ' + collName,
@@ -158,7 +158,7 @@ export function useTabCreators({
     const existing = tabs.value.find(t =>
       t.kind === kind && t.connId === connId && t.dbName === dbName && t.collName === collName)
     if (existing) { activeTabId.value = existing.id; return }
-    const id = 't' + Date.now()
+    const id = newTabId()
     tabs.value.push({
       id: id, kind: kind, title: titlePrefix + ': ' + collName,
       connId: connId, connName: connName, dbName: dbName, collName: collName,
@@ -211,7 +211,7 @@ export function useTabCreators({
     const suffix = source === 'query' ? ' (query)'
       : source === 'selected' ? ` (${(target.selectedIds || []).length} selected)`
       : ''
-    const id = 't' + Date.now()
+    const id = newTabId()
     tabs.value.push({
       id: id, kind: 'export', title: 'Export: ' + collName + suffix,
       connId: connId, connName: connName, dbName: dbName, collName: collName,
@@ -230,7 +230,7 @@ export function useTabCreators({
   function openSearchTab({ connId, connName, dbName }) {
     const existing = tabs.value.find(t => t.kind === 'search' && t.connId === connId && t.dbName === dbName)
     if (existing) { activeTabId.value = existing.id; return }
-    const id = 't' + Date.now()
+    const id = newTabId()
     tabs.value.push({
       id: id, kind: 'search', title: 'Search: ' + dbName,
       connId: connId, connName: connName, dbName: dbName,
@@ -244,7 +244,7 @@ export function useTabCreators({
   // sources) lets the tab return on restart. Each source targets a db.collection on
   // this connection; Run loops over the sources on the frontend.
   function openImportTab({ connId, connName, dbName, collName }, format) {
-    const id = 't' + Date.now()
+    const id = newTabId()
     const base = {
       id: id, kind: 'import',
       title: 'Import: ' + collName,
@@ -285,7 +285,7 @@ export function useTabCreators({
       activateTab(existing.id)
       return
     }
-    const id = 't' + Date.now()
+    const id = newTabId()
     tabs.value.push({ id: id, kind: 'quickstart', title: 'Quickstart' })
     activateTab(id)
   }

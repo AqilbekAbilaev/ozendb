@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   tabs, activeTabId, activeTab, pruneActiveTab, setRunRestoredTab,
-  activateTab, cycleTab, closeTab, handleTabAction,
+  activateTab, cycleTab, closeTab, handleTabAction, newTabId,
 } from './tabs'
 
 // Closing a shell tab tears down its engine session; that call is the one side effect
@@ -221,5 +221,15 @@ describe('activateTab', () => {
     seed(['a', 'b'], 'b')
     activateTab('a')
     expect(runRestoredTab).not.toHaveBeenCalled()
+  })
+})
+
+// Tab ids used to be 't' + Date.now(), so two tabs opened in the same millisecond —
+// which happens when several are created programmatically — shared an id. Duplicate
+// ids make closeTab/activateTab hit whichever copy comes first.
+describe('newTabId', () => {
+  it('gives every tab a distinct id even when created in one tick', () => {
+    const ids = new Set(Array.from({ length: 1000 }, newTabId))
+    expect(ids.size).toBe(1000)
   })
 })

@@ -18,6 +18,13 @@ export const tabs = ref([
 ])
 export const activeTabId = ref('t0')
 
+// Every tab id comes from here. It used to be `'t' + Date.now()` at each creation site,
+// which collides whenever two tabs are created within the same millisecond — and a
+// duplicate id silently breaks closeTab/activateTab, which both act on the first match.
+export function newTabId() {
+  return crypto.randomUUID()
+}
+
 // `tabs.value.find(t => t.id === activeTabId.value)` was written out at ~a dozen call
 // sites across App.vue and three composables. Undefined when no tab is open.
 export const activeTab = computed(() => tabs.value.find(t => t.id === activeTabId.value))
@@ -111,7 +118,7 @@ export function moveTab(id, beforeId) {
 export function duplicateTab(tabId) {
   const src = tabs.value.find(t => t.id === tabId)
   if (!src) return
-  const id = 't' + Date.now()
+  const id = newTabId()
   if (src.kind === 'shell') {
     tabs.value.push({
       id: id, kind: 'shell', title: src.title,
