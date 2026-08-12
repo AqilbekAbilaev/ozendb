@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { summarize, buildIssueBody, buildIssueUrl } from './errorReport'
+import { summarize, buildIssueBody, buildIssueUrl, describeError, scrub } from './errorReport'
 
 // The one rule this file has to keep: a recorded message can name the user's hosts,
 // databases and documents, so it must not reach the issue body unless asked for.
@@ -8,7 +8,7 @@ const RECORDS = [
   { code: 'io', message: 'tabs.json is unwritable', at: 1_700_000_001_000 },
   { code: 'shell', message: 'boom again', at: 1_700_000_002_000 },
 ]
-const CONTEXT = { version: '0.1.4', os: 'linux', arch: 'x86_64' }
+const CONTEXT = { version: '0.1.4', os: 'linux', arch: 'x86_64', home: '/home/devalyus' }
 
 describe('summarize', () => {
   it('counts each code, most frequent first', () => {
@@ -68,5 +68,56 @@ describe('buildIssueUrl', () => {
     const body = new URL(url).searchParams.get('body')
     expect(body).toContain('prod-cluster.example.com')
     expect(body).toContain('### Environment')
+  })
+})
+
+// A record is only worth having if it names the error. WebKit's `stack` is the frame
+// list alone — no "Error: message" header, unlike V8 — so reading `stack` and falling
+// back to `message` recorded a bare "@" for every frontend error until this was fixed.
+describe('describeError', () => {
+  it('keeps the message when the stack is WebKit-style frames only', () => {
+    const err = { name: 'Error', message: 'probe2', stack: 'global code@' }
+    expect(describeError(err)).toBe('Error: probe2\nglobal code@')
+  })
+
+  it('does not repeat the message when the stack is V8-style', () => {
+    const err = { name: 'TypeError', message: 'x is not a function', stack: 'TypeError: x is not a function\n    at foo.js:1' }
+    expect(describeError(err)).toBe(err.stack)
+  })
+
+  it('falls back to the message when there is no stack at all', () => {
+    expect(describeError({ name: 'RangeError', message: 'too big' })).toBe('RangeError: too big')
+  })
+
+  it('stringifies a rejection that was never an Error', () => {
+    expect(describeError('just a string')).toBe('just a string')
+    expect(describeError(42)).toBe('42')
+    expect(describeError(null)).toBe('')
+  })
+})
+
+// Recorded messages are our own code, but our own file paths sit under the user's home
+// directory and name their account — the one identifier worth removing from a report.
+describe('scrub', () => {
+  it('replaces the home directory with ~', () => {
+    expect(scrub('failed to write /home/devalyus/.local/share/x.json', '/home/devalyus'))
+      .toBe('failed to write ~/.local/share/x.json')
+  })
+
+  it('replaces every occurrence, not just the first', () => {
+    expect(scrub('/home/d/a and /home/d/b', '/home/d')).toBe('~/a and ~/b')
+  })
+
+  it('leaves the text alone when the home path is unknown', () => {
+    expect(scrub('/home/devalyus/x', '')).toBe('/home/devalyus/x')
+  })
+})
+
+describe('buildIssueBody — account name', () => {
+  it('shortens home paths in the detail block', () => {
+    const records = [{ code: 'io', message: 'cannot write /home/devalyus/.local/share/tabs.json', at: 1 }]
+    const body = buildIssueBody(records, CONTEXT, true)
+    expect(body).toContain('~/.local/share/tabs.json')
+    expect(body).not.toContain('/home/devalyus')
   })
 })

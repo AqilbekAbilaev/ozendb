@@ -14,6 +14,20 @@ import { HELP_REPO } from '../constants/helpLinks'
 // ones, so the cap drops the tail rather than rotating.
 const MAX_PER_SESSION = 20
 
+// One error as reportable text. Engines disagree about `stack`: V8 starts it with
+// "Error: message", JavaScriptCore (our WebKit webview) gives only the frames — so
+// preferring `stack` alone drops the message entirely and records a bare "@". Compose
+// both, unless the stack already carries the message.
+export function describeError(err) {
+  if (!err || typeof err !== 'object' || typeof err.message !== 'string') {
+    return err == null ? '' : String(err)
+  }
+  const headline = `${err.name || 'Error'}: ${err.message}`
+  const stack = typeof err.stack === 'string' ? err.stack : ''
+  if (!stack) return headline
+  return stack.startsWith(err.name || 'Error') ? stack : `${headline}\n${stack}`
+}
+
 export function installErrorReporting() {
   let sent = 0
 
@@ -26,10 +40,12 @@ export function installErrorReporting() {
   }
 
   window.addEventListener('error', (e) => {
-    report(e.error?.stack || e.message)
+    report(describeError(e.error) || e.message)
   })
   window.addEventListener('unhandledrejection', (e) => {
-    report(e.reason?.stack || e.reason?.message || e.reason)
+    // Marked so an unhandled rejection is distinguishable from a thrown error: they
+    // arrive with identical text otherwise, and they're different bugs to chase.
+    report(`Unhandled rejection: ${describeError(e.reason)}`)
   })
 
   return report
@@ -47,9 +63,18 @@ export function summarize(records) {
     .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
 }
 
-// The issue body. Codes, counts and build context always; the messages themselves only
-// when the user asks for them, because a message can name their hosts, databases and
-// documents. Newest messages first — the last failure is usually the one they hit.
+// The one identifier our own messages can carry is a file path under the user's home
+// directory, which names their account. Swapped for `~` on the way into a report; the
+// local log keeps the real path, since that's the copy they diagnose with.
+export function scrub(text, home) {
+  if (!home) return text
+  return text.split(home).join('~')
+}
+
+// The issue body. Codes, counts and build context always; the messages themselves
+// unless the user opts out — everything recorded is our own code (the allowlist keeps
+// queries, documents and hosts out by construction), and a report without them says
+// nothing actionable. Newest first: the last failure is usually the one they hit.
 export function buildIssueBody(records, context, includeDetail) {
   const lines = [
     '### Environment',
@@ -69,7 +94,7 @@ export function buildIssueBody(records, context, includeDetail) {
   if (includeDetail && records.length) {
     lines.push('', '### Details', '', '```')
     for (const r of [...records].reverse()) {
-      lines.push(`[${new Date(r.at).toISOString()}] ${r.code}: ${r.message}`)
+      lines.push(`[${new Date(r.at).toISOString()}] ${r.code}: ${scrub(r.message, context.home)}`)
     }
     lines.push('```')
   }

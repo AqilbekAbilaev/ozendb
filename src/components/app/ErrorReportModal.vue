@@ -18,7 +18,9 @@ defineEmits(['close'])
 
 const records = ref([])
 const context = ref({ version: '', os: '', arch: '' })
-const includeDetail = ref(false)
+// On by default: everything recorded is OzenDB's own code, and a report of bare counts
+// gives the maintainer nothing to act on. Unticking it falls back to codes only.
+const includeDetail = ref(true)
 const loading = ref(true)
 
 const summary = computed(() => summarize(records.value))
@@ -88,7 +90,7 @@ function when(at) {
           <BaseCheckbox v-model="includeDetail" />
           <span>
             Include the messages above in the report.
-            <em>They may name your hosts, databases or documents.</em>
+            <em>Recommended — without them a report is just a count. Paths are shortened to <code>~</code>.</em>
           </span>
         </label>
       </template>
@@ -137,7 +139,9 @@ function when(at) {
 .er-list li:last-child { border-bottom: none; }
 .er-code { font-family: var(--mono); color: var(--danger); }
 .er-when { color: var(--text-faint); }
-.er-msg { font-family: var(--mono); word-break: break-word; color: var(--text-dim); }
+/* Stack frames arrive newline-separated; without pre-wrap they collapse into one
+   unreadable line (break-word still handles a frame too long for the column). */
+.er-msg { font-family: var(--mono); white-space: pre-wrap; word-break: break-word; color: var(--text-dim); }
 
 .er-detail { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; }
 .er-detail em { color: var(--text-faint); font-style: normal; }
