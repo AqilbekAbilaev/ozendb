@@ -176,8 +176,14 @@ function secsText(row) {
             <th class="col-type">Type</th>
             <th class="col-ns">Namespace</th>
             <th class="col-secs">Running</th>
+            <th class="col-plan">Plan</th>
+            <th class="col-app">App</th>
+            <th class="col-user">User</th>
+            <th class="col-wait">Waiting</th>
+            <th class="col-yields">Yields</th>
             <th class="col-client">Client</th>
             <th class="col-comment">Comment</th>
+            <th class="col-command">Command</th>
           </tr>
         </thead>
         <tbody>
@@ -192,8 +198,15 @@ function secsText(row) {
             <td class="col-type">{{ row.type || '—' }}</td>
             <td class="col-ns mono">{{ row.ns || '—' }}</td>
             <td class="col-secs">{{ secsText(row) }}</td>
+            <td class="col-plan">{{ row.plan || '—' }}</td>
+            <td class="col-app">{{ row.app || '—' }}</td>
+            <td class="col-user">{{ row.user || '—' }}</td>
+            <td class="col-wait">{{ row.waiting ? 'yes' : '—' }}</td>
+            <td class="col-yields">{{ row.yields }}</td>
             <td class="col-client">{{ row.client || row.desc || '—' }}</td>
             <td class="col-comment mono">{{ row.comment || '—' }}</td>
+            <!-- Truncated to one line; the full command is in the JSON and Tree views. -->
+            <td class="col-command mono" :title="row.command">{{ row.command || '—' }}</td>
           </tr>
         </tbody>
       </table>
@@ -262,6 +275,12 @@ function secsText(row) {
 .col-type { width: 96px; }
 .col-secs { width: 84px; }
 .col-client { width: 170px; }
+.col-plan { width: 130px; }
+.col-app { width: 130px; }
+.col-user { width: 110px; }
+.col-wait { width: 74px; }
+.col-yields { width: 70px; }
+.col-command { max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
 
 .cops-status {
   display: flex; align-items: center; gap: 6px;

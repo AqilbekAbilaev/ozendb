@@ -8,7 +8,12 @@ const reply = {
     {
       type: 'op', desc: 'conn114', connectionId: 114, client: '127.0.0.1:49368',
       opid: 1380004, op: 'query', ns: 'testify.groups', secs_running: 16,
-      command: { find: 'groups', comment: 'q1786608095277-cd5un7', filter: {} },
+      appName: 'OzenDB', planSummary: 'COLLSCAN', numYields: 1, waitingForLock: false,
+      effectiveUsers: [{ user: 'dalton', db: 'admin' }],
+      command: {
+        find: 'groups', comment: 'q1786608095277-cd5un7', filter: {},
+        lsid: { id: 'uuid' }, $db: 'testify', $readPreference: { mode: 'primary' },
+      },
     },
     { type: 'op', desc: 'Checkpointer', opid: 1379562, op: 'none', ns: '' },
     {
@@ -40,6 +45,47 @@ describe('normalizeOps', () => {
   // "the server's own housekeeping" from "someone's query".
   it('marks server threads as sys ops', () => {
     expect(normalizeOps(reply).map(o => o.sys)).toEqual([false, true, false])
+  })
+
+  it('reads the columns that explain a slow op', () => {
+    const [query] = normalizeOps(reply)
+    expect(query).toMatchObject({
+      plan: 'COLLSCAN', app: 'OzenDB', user: 'dalton', yields: 1, waiting: false,
+    })
+  })
+
+  // The client's own name is the readable one; a driver-only connection (our own, most
+  // services) has none, so the driver stands in rather than an empty cell.
+  it('falls back to the driver when the client set no application name', () => {
+    const ops = normalizeOps({ inprog: [{
+      opid: 1, connectionId: 1, clientMetadata: { driver: { name: 'mongo-rust-driver' } },
+    }] })
+    expect(ops[0].app).toBe('mongo-rust-driver')
+  })
+
+  describe('command summary', () => {
+    // Session ids, $db and read preference are on every command and say nothing about
+    // what it does — they'd push the actual query out of a one-line cell.
+    it('drops the per-command boilerplate', () => {
+      const summary = normalizeOps(reply)[0].command
+      expect(summary).toContain('find')
+      expect(summary).toContain('groups')
+      expect(summary).not.toContain('lsid')
+      expect(summary).not.toContain('$db')
+      expect(summary).not.toContain('$readPreference')
+    })
+
+    it('truncates a long command rather than letting it run away', () => {
+      const ops = normalizeOps({ inprog: [{
+        opid: 1, connectionId: 1, command: { find: 'c', filter: { note: 'x'.repeat(400) } },
+      }] })
+      expect(ops[0].command.length).toBeLessThanOrEqual(121)
+      expect(ops[0].command.endsWith('…')).toBe(true)
+    })
+
+    it('is empty for an op with no command', () => {
+      expect(normalizeOps(reply)[1].command).toBe('')
+    })
   })
 
   it('survives a reply with nothing in progress', () => {

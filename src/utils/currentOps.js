@@ -1,6 +1,20 @@
 // Pure list maths for the Current Operations tab: turning a `currentOp` reply into the
 // rows the table draws, and keeping ops that have finished on screen for a moment.
 
+// Fields every command carries that describe the session rather than the work — they'd
+// crowd the actual query out of a one-line cell.
+const COMMAND_NOISE = ['lsid', '$db', '$readPreference', '$clusterTime', 'signature']
+const COMMAND_MAX = 120
+
+// A one-line rendering of the op's command for the table. The whole document is a click
+// away in the JSON and Tree views, so this only has to be recognisable.
+function commandSummary(command) {
+  if (!command || typeof command !== 'object') return ''
+  const text = JSON.stringify(command, (key, value) => (COMMAND_NOISE.includes(key) ? undefined : value))
+  if (!text || text === '{}') return ''
+  return text.length > COMMAND_MAX ? text.slice(0, COMMAND_MAX) + '…' : text
+}
+
 // One row per in-progress operation. `raw` is kept whole so the pane can show the
 // original document for the selected op.
 export function normalizeOps(reply) {
@@ -16,6 +30,14 @@ export function normalizeOps(reply) {
     // The run id the query runner stamps on every find/aggregate, which is what ties a
     // row here back to a query tab in this app.
     comment: (op.command && op.command.comment) || '',
+    // Why an op is slow: the plan it chose, whether it's blocked, how hard it's been
+    // fighting for the server, and who is running it.
+    plan: op.planSummary || '',
+    app: op.appName || (op.clientMetadata && op.clientMetadata.driver && op.clientMetadata.driver.name) || '',
+    user: (op.effectiveUsers && op.effectiveUsers[0] && op.effectiveUsers[0].user) || '',
+    yields: op.numYields ?? 0,
+    waiting: !!op.waitingForLock,
+    command: commandSummary(op.command),
     // Server housekeeping (Checkpointer, JournalFlusher…) runs on no client connection.
     sys: op.connectionId == null,
     expiredAt: null,
