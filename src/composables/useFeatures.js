@@ -20,7 +20,7 @@ export function useFeatures({
   // injected functions
   showToast, applyColorTag, menuTarget,
   handleTabAction, openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab,
-  openSchemaTab, openSearchTab,
+  openSchemaTab, openSearchTab, openCurrentOpsTab,
   openExportSource, openImportWizard, exportDatabase, importDatabase,
 }) {
   const { pasteClipboard } = dbActions
@@ -138,7 +138,7 @@ export function useFeatures({
     // ── connection-scoped info modals ──
     'Server Status':           modalFeature('serverStatus'),
     'Server Status Charts':    modalFeature('serverCharts'),
-    'Current Operations':      modalFeature('currentOps'),
+    'Current Operations':      { requires: 'connection', run: (n) => openCurrentOpsTab(pick(n, CONN)) },
     'Build Info':              { requires: 'connection', run: (n) => openServerInfo(n, 'build',   'Build Info') },
     'Host Info':               { requires: 'connection', run: (n) => openServerInfo(n, 'host',    'Host Info') },
     'Replica Set Status':      { requires: 'connection', run: (n) => openServerInfo(n, 'replica', 'Replica Set Status') },

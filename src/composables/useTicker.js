@@ -1,7 +1,8 @@
-import { ref, watchEffect, onScopeDispose } from 'vue'
+import { ref, watchEffect, onScopeDispose, toValue } from 'vue'
 
 // A clock that only ticks while `active` is true, so an idle app isn't re-rendering
 // on a timer it has nothing to show for. Read `now` to display live elapsed time.
+// `intervalMs` may be a ref — changing it re-arms the timer at the new rate.
 export function useTicker(active, intervalMs = 100) {
   const now = ref(Date.now())
   let id = null
@@ -14,9 +15,9 @@ export function useTicker(active, intervalMs = 100) {
 
   watchEffect(() => {
     stop()
-    if (!active.value) return
+    if (!toValue(active)) return
     now.value = Date.now()
-    id = setInterval(() => { now.value = Date.now() }, intervalMs)
+    id = setInterval(() => { now.value = Date.now() }, toValue(intervalMs))
   })
 
   onScopeDispose(stop)

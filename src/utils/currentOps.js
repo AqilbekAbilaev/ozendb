@@ -1,0 +1,47 @@
+// Pure list maths for the Current Operations tab: turning a `currentOp` reply into the
+// rows the table draws, and keeping ops that have finished on screen for a moment.
+
+// One row per in-progress operation. `raw` is kept whole so the pane can show the
+// original document for the selected op.
+export function normalizeOps(reply) {
+  const inprog = reply && Array.isArray(reply.inprog) ? reply.inprog : []
+  return inprog.map((op) => ({
+    key: String(op.opid ?? ''),
+    opid: op.opid ?? null,
+    type: op.op || '',
+    ns: op.ns || '',
+    secs: op.secs_running != null ? Number(op.secs_running) : 0,
+    desc: op.desc || '',
+    client: op.client || '',
+    // The run id the query runner stamps on every find/aggregate, which is what ties a
+    // row here back to a query tab in this app.
+    comment: (op.command && op.command.comment) || '',
+    // Server housekeeping (Checkpointer, JournalFlusher…) runs on no client connection.
+    sys: op.connectionId == null,
+    expiredAt: null,
+    raw: op,
+  }))
+}
+
+// Merge a fresh poll into what's on screen. An op the server no longer reports is not
+// removed straight away — a query that takes less than one poll interval would otherwise
+// never be seen at all — it's stamped `expiredAt` and kept for `retainMs`.
+export function mergeRetained(prev, next, retainMs, now) {
+  const arriving = new Map(next.map((op) => [op.key, op]))
+  const merged = []
+
+  for (const old of prev) {
+    const still = arriving.get(old.key)
+    if (still) {
+      merged.push({ ...still, expiredAt: null })
+      arriving.delete(old.key)
+      continue
+    }
+    // Stamp the moment it went, not this poll, so the countdown runs from the disappearance.
+    const expiredAt = old.expiredAt ?? now
+    if (now - expiredAt < retainMs) merged.push({ ...old, expiredAt: expiredAt })
+  }
+
+  for (const op of arriving.values()) merged.push(op)
+  return merged
+}

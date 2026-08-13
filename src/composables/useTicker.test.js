@@ -49,6 +49,21 @@ describe('useTicker', () => {
     expect(now.value).toBe(stopped)
   })
 
+  // The Current Operations tab picks its own poll frequency, so the interval has to be
+  // able to change under a running ticker.
+  it('re-arms when a reactive interval changes', async () => {
+    const every = ref(1000)
+    const { out: now } = run(() => useTicker(ref(true), every))
+
+    await vi.advanceTimersByTimeAsync(500)
+    const beforeChange = now.value
+    every.value = 100
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(150)
+
+    expect(now.value).toBeGreaterThan(beforeChange)
+  })
+
   it('stops when its scope is disposed', async () => {
     const active = ref(true)
     const { out: now, scope } = run(() => useTicker(active, 100))

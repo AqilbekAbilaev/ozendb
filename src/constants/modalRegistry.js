@@ -24,7 +24,6 @@ export const MODALS = {
   // ── connection level ──
   serverStatus: { component: lazy(() => import('../components/admin/ServerStatusModal.vue')), level: 'connection' },
   serverCharts: { component: lazy(() => import('../components/admin/ServerChartsModal.vue')), level: 'connection' },
-  currentOps:   { component: lazy(() => import('../components/admin/CurrentOpsModal.vue')),   level: 'connection' },
   // Build / Host / Replica info share one modal; its feature seeds a { kind, title } payload
   // on top of the node fields (see openServerInfo), so it opens directly, not via modalFeature.
   serverInfo:   { component: lazy(() => import('../components/admin/ServerInfoModal.vue')),   level: 'connection' },

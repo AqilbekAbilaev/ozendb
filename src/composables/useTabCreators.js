@@ -238,6 +238,19 @@ export function useTabCreators({
     activeTabId.value = id
   }
 
+  // Current Operations is connection-scoped: one live view per server, so reopening it
+  // focuses the tab already watching that connection.
+  function openCurrentOpsTab({ connId, connName }) {
+    const existing = tabs.value.find(t => t.kind === 'currentOps' && t.connId === connId)
+    if (existing) { activeTabId.value = existing.id; return }
+    const id = newTabId()
+    tabs.value.push({
+      id: id, kind: 'currentOps', title: 'Current Operations: ' + connName,
+      connId: connId, connName: connName,
+    })
+    activeTabId.value = id
+  }
+
   // Opens an Import tab for a collection with the format chosen in the picker. The
   // pane (ImportPane) mutates the working state (sources, validate, preview) directly
   // on the tab, so it survives tab switches; the persisted subset (format, validate,
@@ -299,6 +312,7 @@ export function useTabCreators({
     openExportSource,
     openExportTab,
     openSearchTab,
+    openCurrentOpsTab,
     openImportTab,
     openQuickstart,
   }

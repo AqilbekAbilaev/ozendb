@@ -13,6 +13,7 @@ const ShellConsole = defineAsyncComponent(() => import('../app/ShellConsole.vue'
 import IndexManagerPane from './IndexManagerPane.vue'
 import SchemaPane from './SchemaPane.vue'
 import SearchPane from './SearchPane.vue'
+import CurrentOpsPane from '../admin/CurrentOpsPane.vue'
 import ImportPane from './ImportPane.vue'
 import CsvImportPane from './CsvImportPane.vue'
 import ExportPane from './ExportPane.vue'
@@ -325,6 +326,9 @@ async function applyFromBrowser(entry) {
 
     <!-- Search -->
     <SearchPane v-else-if="activeTab.kind === 'search'" :active-tab="activeTab" />
+
+    <!-- Current Operations -->
+    <CurrentOpsPane v-else-if="activeTab.kind === 'currentOps'" :active-tab="activeTab" />
 
     <!-- Tasks (app-level) -->
 

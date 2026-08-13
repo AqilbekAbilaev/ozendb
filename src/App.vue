@@ -272,7 +272,7 @@ const {
   openSchemaTab,
   openExportSource,
   openExportTab,
-  openSearchTab,
+  openSearchTab, openCurrentOpsTab,
   openImportTab,
   openQuickstart,
 } = useTabCreators({
@@ -314,7 +314,7 @@ const { handleContextAction, handleTool, menuNode } = useFeatures({
   handleTabAction: handleTabAction, openCollectionTab: openCollectionTab,
   openShellTab: openShellTab, openIndexManagerTab: openIndexManagerTab, openSqlTab: openSqlTab,
   openSchemaTab: openSchemaTab,
-  openSearchTab: openSearchTab,
+  openSearchTab: openSearchTab, openCurrentOpsTab: openCurrentOpsTab,
   openExportSource: openExportSource, openImportWizard: openImportWizard,
   exportDatabase: exportDatabase, importDatabase: importDatabase,
 })
