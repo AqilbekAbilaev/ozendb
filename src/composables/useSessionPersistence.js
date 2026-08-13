@@ -1,6 +1,7 @@
 import { watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { tabs, activeTabId, activeTab } from '../stores/tabs'
+import { opsDefaults } from './useCurrentOps'
 
 // Tab-session persistence. Persists open collection/shell/import/index tabs (and which one is active)
 // so they return after a restart. Only the persistable fields are projected — result sets
@@ -76,6 +77,18 @@ export function useSessionPersistence({ runRestoredTab }) {
         dbName: t.dbName, collName: t.collName,
       }
     }
+    if (t.kind === 'currentOps') {
+      // Current Operations tab: identity + the toolbar settings that define what it
+      // watches. The operations themselves are live server state, so they aren't stored.
+      return {
+        id: t.id, kind: 'currentOps', title: t.title, color: t.color,
+        connId: t.connId, connName: t.connName,
+        frequency: t.frequency, retention: t.retention,
+        ownOnly: !!t.ownOnly, showSys: !!t.showSys,
+        slowOnly: !!t.slowOnly, slowSecs: t.slowSecs,
+        dbName: t.dbName, collName: t.collName, view: t.view,
+      }
+    }
     if (t.mode === 'sql') {
       // SQL tab: a collection tab whose query is SQL. Only identity + the SQL text
       // are stored; the translated find pieces are re-derived on the next Run.
@@ -102,7 +115,7 @@ export function useSessionPersistence({ runRestoredTab }) {
     return {
       activeTabId: activeTabId.value,
       tabs: tabs.value
-        .filter(t => t.kind === 'collection' || t.kind === 'shell' || t.kind === 'import' || t.kind === 'indexes' || t.kind === 'export')
+        .filter(t => t.kind === 'collection' || t.kind === 'shell' || t.kind === 'import' || t.kind === 'indexes' || t.kind === 'export' || t.kind === 'currentOps')
         .map(projectTab),
     }
   }
@@ -198,6 +211,18 @@ export function useSessionPersistence({ runRestoredTab }) {
                 id: t.id, kind: 'indexes', title: t.title, color: t.color,
                 connId: t.connId, connName: t.connName,
                 dbName: t.dbName, collName: t.collName,
+              }
+            : t.kind === 'currentOps'
+            ? {
+                // Current Operations tab: defaults first, then the saved settings on top —
+                // the runtime state (ops, grid) starts empty and the pane polls on mount.
+                ...opsDefaults(),
+                id: t.id, kind: 'currentOps', title: t.title, color: t.color,
+                connId: t.connId, connName: t.connName,
+                frequency: t.frequency ?? 2000, retention: t.retention ?? 10_000,
+                ownOnly: !!t.ownOnly, showSys: !!t.showSys,
+                slowOnly: !!t.slowOnly, slowSecs: t.slowSecs ?? 3,
+                dbName: t.dbName || '', collName: t.collName || '', view: t.view || 'table',
               }
             : t.mode === 'sql'
             ? {
