@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -91,20 +91,19 @@ async function killSelected() {
   await kill(op.opid)
 }
 
-// Keyed on the connection rather than onMounted: Vue reuses this component instance when
-// the user switches between two Current Operations tabs, so mount fires only once.
-watch(() => props.activeTab.connId, () => {
-  rows.value = []
+// Refresh whenever this pane comes up, and whenever it is pointed at another tab: Vue
+// reuses one instance across tabs of this kind, so mount alone fires only once. The list
+// is only wiped when the connection genuinely changes — what it holds is the tab's, and
+// re-reading it is what makes finished operations survive a trip to another tab.
+onMounted(load)
+watch(() => props.activeTab.connId, (connId, previous) => {
+  if (previous !== undefined) rows.value = []
   resetKill()
   load()
-}, { immediate: true })
+})
 
 // An armed kill must not survive the selection moving to a different operation.
 watch(selectedOpid, resetKill)
-
-// A tab switch unmounts the pane; drop the list so the next mount starts clean rather
-// than briefly showing what a different connection was doing.
-onUnmounted(() => { rows.value = [] })
 
 const updatedText = computed(() =>
   updatedAt.value ? new Date(updatedAt.value).toLocaleTimeString() : '—'

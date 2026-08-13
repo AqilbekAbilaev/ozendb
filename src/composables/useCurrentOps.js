@@ -29,8 +29,9 @@ export const RETENTIONS = [
 ]
 
 // What a freshly opened Current Operations tab starts with. They live on the tab (see
-// below), so the tab creator seeds them there.
-export const OPS_DEFAULTS = {
+// below), so the tab creator seeds them there. A factory, not a constant: the arrays and
+// the column order are mutated per tab, and a shared instance would tie two tabs together.
+export const opsDefaults = () => ({
   frequency: 2000,
   retention: 10_000,
   ownOnly: false,
@@ -40,6 +41,10 @@ export const OPS_DEFAULTS = {
   dbName: '',
   collName: '',
   view: 'table',
+  // The operations last seen, with their retention stamps. On the tab rather than in the
+  // pane because watching an op means leaving this tab — you start a query elsewhere and
+  // cancel it elsewhere — and a list that resets on every return retains nothing.
+  ops: [],
   // The shared result grid reads its state off the tab, exactly as a collection tab does.
   results: [],
   // The grid's drill-down breadcrumb roots itself on this label.
@@ -50,7 +55,7 @@ export const OPS_DEFAULTS = {
   selectedRows: [],
   drillPath: [],
   colOrder: {},
-}
+})
 
 // The live state behind the Current Operations tab: what the server is doing, refreshed
 // on a timer the user picks. `tab` is a getter — one pane instance is reused across tabs
@@ -63,7 +68,7 @@ export function useCurrentOps(tab) {
     get: () => tab()[key],
     set: (value) => { tab()[key] = value },
   })
-  const rows = ref([])
+  const rows = setting('ops')
   const error = ref(null)
   const errorCode = ref(null)
   const loading = ref(false)
