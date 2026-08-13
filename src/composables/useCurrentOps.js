@@ -39,6 +39,7 @@ export const OPS_DEFAULTS = {
   slowSecs: 3,
   dbName: '',
   collName: '',
+  view: 'table',
 }
 
 // The live state behind the Current Operations tab: what the server is doing, refreshed
@@ -69,6 +70,7 @@ export function useCurrentOps(tab) {
   const slowSecs = setting('slowSecs')
   const dbName = setting('dbName')
   const collName = setting('collName')
+  const view = setting('view')
 
   // One request at a time: a server slower than the poll rate would otherwise stack up
   // requests it can't answer.
@@ -143,6 +145,7 @@ export function useCurrentOps(tab) {
     slowSecs: slowSecs,
     dbName: dbName,
     collName: collName,
+    view: view,
     load: load,
     kill: kill,
   }

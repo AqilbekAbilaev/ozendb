@@ -6,6 +6,8 @@ import BaseButton from '../base/BaseButton.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
 import StateMessage from '../base/StateMessage.vue'
+import JsonResultView from '../results/JsonResultView.vue'
+import TreeResultView from '../results/TreeResultView.vue'
 import { useCurrentOps, FREQUENCIES, RETENTIONS, SLOW_THRESHOLDS } from '../../composables/useCurrentOps'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 
@@ -18,9 +20,31 @@ const props = defineProps({
 
 const {
   rows, visible, error, errorCode, loading, updatedAt,
-  frequency, retention, ownOnly, showSys, slowOnly, slowSecs, dbName, collName,
+  frequency, retention, ownOnly, showSys, slowOnly, slowSecs, dbName, collName, view,
   load, kill,
 } = useCurrentOps(() => props.activeTab)
+
+// The same three result views the collection tabs offer. Table is the curated columns
+// below; JSON and Tree render the whole currentOp document, so nothing is hidden — they
+// are the shared viewers, fed the raw documents.
+const VIEWS = [
+  { value: 'table', label: 'Table View' },
+  { value: 'json',  label: 'JSON View' },
+  { value: 'tree',  label: 'Tree View' },
+]
+const rawDocs = computed(() => visible.value.map(row => row.raw))
+
+// Loading / error / empty are a property of the data, not of the chosen view, so the
+// message replaces whichever view is selected.
+const stateMode = computed(() => {
+  if (loading.value) return 'loading'
+  if (error.value && !rows.value.length) return 'error'
+  if (!visible.value.length) return 'empty'
+  return null
+})
+const emptyLabel = computed(() =>
+  rows.value.length ? 'No operations match these filters' : 'No operations currently in progress'
+)
 
 // Namespace pickers. The database list is loaded once; an empty value is the "all" sentinel.
 const ALL = ''
@@ -127,14 +151,25 @@ function secsText(row) {
       <BaseSelect v-model="frequency" class="tb-select" size="sm" :options="FREQUENCIES" />
       <label class="tb-opt">Retain finished ops for:</label>
       <BaseSelect v-model="retention" class="tb-select" size="sm" :options="RETENTIONS" />
+      <span class="spacer"></span>
+      <BaseSelect v-model="view" class="tb-view" size="sm" :options="VIEWS" />
     </div>
 
+    <!-- Nothing to show yet: one message for every view -->
+    <div v-if="stateMode" class="cops-body">
+      <StateMessage v-if="stateMode === 'loading'" mode="loading" label="Fetching current operations…" />
+      <StateMessage v-else-if="stateMode === 'error'" mode="error" :message="error" :code="errorCode" />
+      <StateMessage v-else mode="empty" :label="emptyLabel" />
+    </div>
+
+    <!-- JSON / Tree are the shared result viewers over the whole op documents. They size
+         themselves as flex children of the pane, so they sit outside the scrolling body. -->
+    <JsonResultView v-else-if="view === 'json'" :results="rawDocs" />
+    <TreeResultView v-else-if="view === 'tree'" :results="rawDocs" />
+
     <!-- Operations -->
-    <div class="cops-body">
-      <StateMessage v-if="loading" mode="loading" label="Fetching current operations…" />
-      <StateMessage v-else-if="error && !rows.length" mode="error" :message="error" :code="errorCode" />
-      <StateMessage v-else-if="!visible.length" mode="empty" :label="rows.length ? 'No operations match these filters' : 'No operations currently in progress'" />
-      <table v-else class="cops-table">
+    <div v-else class="cops-body">
+      <table class="cops-table">
         <thead>
           <tr>
             <th class="col-opid">Op ID</th>
@@ -234,5 +269,7 @@ function secsText(row) {
   background: var(--bg-toolbar); border-top: 1px solid var(--border); flex: none;
 }
 .cops-status .spacer { flex: 1; }
+.cops-toolbar .spacer { flex: 1; }
+.tb-view { flex: none; width: 122px; }
 .cops-err { color: var(--danger-text); }
 </style>
