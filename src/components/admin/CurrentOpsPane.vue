@@ -188,7 +188,14 @@ const updatedText = computed(() =>
 </template>
 
 <style scoped>
-.cops { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-window); }
+/* min-height + overflow match .result-content, the container the shared grid is built to
+   sit in: without them the grid's wide content stretches the pane instead of scrolling
+   inside it, and the horizontal scrollbar never appears. */
+.cops {
+  flex: 1; display: flex; flex-direction: column;
+  min-width: 0; min-height: 0; overflow: hidden;
+  background: var(--bg-window);
+}
 
 .crumbs {
   display: flex; align-items: center; gap: 7px;
