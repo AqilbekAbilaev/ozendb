@@ -157,3 +157,35 @@ describe('filterOps', () => {
     expect(filterOps(expired, { slowOnly: true, slowSecs: 30 }).length).toBe(1)
   })
 })
+
+// Two queries against the same collection are two operations with two opids. Nothing on
+// the way to the grid may key on the namespace, or the second one silently disappears.
+describe('several operations on one collection', () => {
+  const twoOnPeople = {
+    inprog: [
+      { opid: 11, connectionId: 1, op: 'query', ns: 'testify.people', secs_running: 3,
+        command: { find: 'people', comment: 'q1-aaa' } },
+      { opid: 12, connectionId: 2, op: 'query', ns: 'testify.people', secs_running: 1,
+        command: { find: 'people', comment: 'q2-bbb' } },
+    ],
+  }
+
+  it('keeps both through normalize and filter', () => {
+    const rows = normalizeOps(twoOnPeople)
+    expect(rows.map(r => r.opid)).toEqual([11, 12])
+    expect(filterOps(rows, { dbName: 'testify', collName: 'people' })).toHaveLength(2)
+  })
+
+  it('keeps both across a refresh', () => {
+    const first = normalizeOps(twoOnPeople)
+    const merged = mergeRetained(first, normalizeOps(twoOnPeople), 10_000, 1000)
+    expect(merged.map(r => r.opid)).toEqual([11, 12])
+  })
+
+  it('retains the one that finishes while the other runs on', () => {
+    const both = normalizeOps(twoOnPeople)
+    const onlyFirst = { inprog: [twoOnPeople.inprog[0]] }
+    const merged = mergeRetained(both, normalizeOps(onlyFirst), 10_000, 1000)
+    expect(merged.map(r => [r.opid, r.expiredAt])).toEqual([[11, null], [12, 1000]])
+  })
+})

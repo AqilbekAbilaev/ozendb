@@ -239,11 +239,11 @@ export function useTabCreators({
     activeTabId.value = id
   }
 
-  // Current Operations is connection-scoped: one live view per server, so reopening it
-  // focuses the tab already watching that connection.
+  // Current Operations is connection-scoped, and every open makes its own tab (as opening
+  // a collection does): two views of the same server can watch it through different
+  // filters — one on a namespace, one on slow ops only — and silently focusing an
+  // existing tab would take one of those away.
   function openCurrentOpsTab({ connId, connName }) {
-    const existing = tabs.value.find(t => t.kind === 'currentOps' && t.connId === connId)
-    if (existing) { activeTabId.value = existing.id; return }
     const id = newTabId()
     tabs.value.push({
       id: id, kind: 'currentOps', title: 'Current Operations: ' + connName,

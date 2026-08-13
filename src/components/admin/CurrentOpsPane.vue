@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -83,13 +83,14 @@ const collOptions = computed(() => {
     ...((db && db.collections) || []).map(c => ({ value: c, label: c })),
   ]
 })
-onMounted(async () => {
+// Reloaded when the pane moves to a tab on another server, for the same reason.
+watch(() => props.activeTab.connId, async (connId) => {
   try {
-    databases.value = await invoke('list_databases', { id: props.activeTab.connId })
+    databases.value = await invoke('list_databases', { id: connId })
   } catch (_) {
     // The pickers stay on "all" — a missing database list must not stop the ops view.
   }
-})
+}, { immediate: true })
 // Switching database invalidates the chosen collection.
 watch(dbName, () => { collName.value = ALL })
 
@@ -109,16 +110,13 @@ async function killSelected() {
   await kill(op.opid)
 }
 
-// Refresh whenever this pane comes up, and whenever it is pointed at another tab: Vue
-// reuses one instance across tabs of this kind, so mount alone fires only once. The list
-// is only wiped when the connection genuinely changes — what it holds is the tab's, and
-// re-reading it is what makes finished operations survive a trip to another tab.
-onMounted(load)
-watch(() => props.activeTab.connId, (connId, previous) => {
-  if (previous !== undefined) rows.value = []
+// Vue reuses one pane instance across every tab of this kind, so mount fires only once —
+// the tab id is what says "you are now showing a different one". Nothing is cleared: each
+// tab's operations, settings and column order are its own, held on the tab itself.
+watch(() => props.activeTab.id, () => {
   resetKill()
   load()
-})
+}, { immediate: true })
 
 // An armed kill must not survive the selection moving to a different operation.
 watch(selectedOpid, resetKill)

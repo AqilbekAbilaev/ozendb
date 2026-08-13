@@ -104,3 +104,24 @@ describe('across a tab switch', () => {
     expect(reopened.retainedCount.value).toBe(1)
   })
 })
+
+// Current Operations opens as many tabs as you like — two views of one server, watching it
+// through different filters. That only holds while no state is shared between them.
+describe('two tabs at once', () => {
+  it('gives each tab its own operations, filters and column order', async () => {
+    const a = newTab({ id: 'a', retention: 0 })
+    const b = newTab({ id: 'b' })
+
+    expect(a.ops).not.toBe(b.ops)
+    expect(a.colOrder).not.toBe(b.colOrder)
+
+    invoke.mockResolvedValue({ inprog: [{ opid: 7, connectionId: 1, ns: 'db.c' }] })
+    await useCurrentOps(() => a).load()
+
+    expect(a.ops).toHaveLength(1)
+    expect(b.ops).toHaveLength(0)
+
+    a.slowOnly = true
+    expect(b.slowOnly).toBe(false)
+  })
+})
