@@ -40,6 +40,16 @@ export const OPS_DEFAULTS = {
   dbName: '',
   collName: '',
   view: 'table',
+  // The shared result grid reads its state off the tab, exactly as a collection tab does.
+  results: [],
+  // The grid's drill-down breadcrumb roots itself on this label.
+  collectionName: 'Current Operations',
+  hasRun: false,
+  isRunning: false,
+  selectedRow: -1,
+  selectedRows: [],
+  drillPath: [],
+  colOrder: {},
 }
 
 // The live state behind the Current Operations tab: what the server is doing, refreshed
@@ -116,9 +126,31 @@ export function useCurrentOps(tab) {
     slowOnly: slowOnly.value, slowSecs: slowSecs.value, showSys: showSys.value,
   }))
 
+  // What the grid's selected row is, as an opid — the identity that survives a refresh.
+  const selectedOpid = computed(() => {
+    const row = visible.value[tab().selectedRow]
+    return row ? row.opid : null
+  })
+
+  // The grid renders the documents the server sent, untouched — the row objects above are
+  // only how this composable filters and retains them.
+  watch(visible, (list, previous) => {
+    const tab_ = tab()
+    // The selection is an index into a list a poll can reshuffle, so read which operation
+    // it pointed at in the OLD list, then find that operation in the new one. Otherwise a
+    // kill lands on whatever slid into that row.
+    const wasOn = previous ? previous[tab_.selectedRow] : null
+    tab_.results = list.map(row => row.raw)
+    tab_.hasRun = true
+    tab_.selectedRow = wasOn ? list.findIndex(row => row.opid === wasOn.opid) : -1
+    tab_.selectedRows = tab_.selectedRow >= 0 ? [tab_.selectedRow] : []
+  })
+
   // Own/sys ops are server-side flags, so changing them needs a fresh reply rather than
   // a re-filter of what's already on screen.
   watch([ownOnly, showSys], () => { rows.value = []; load() })
+
+  const retainedCount = computed(() => visible.value.filter(row => row.expiredAt).length)
 
   const polling = computed(() => frequency.value > 0)
   const now = useTicker(polling, frequency)
@@ -133,6 +165,8 @@ export function useCurrentOps(tab) {
   return {
     rows: rows,
     visible: visible,
+    selectedOpid: selectedOpid,
+    retainedCount: retainedCount,
     error: error,
     errorCode: errorCode,
     loading: loading,

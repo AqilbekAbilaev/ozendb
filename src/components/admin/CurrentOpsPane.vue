@@ -6,6 +6,7 @@ import BaseButton from '../base/BaseButton.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
 import StateMessage from '../base/StateMessage.vue'
+import ResultTable from '../results/ResultTable.vue'
 import JsonResultView from '../results/JsonResultView.vue'
 import TreeResultView from '../results/TreeResultView.vue'
 import { useCurrentOps, FREQUENCIES, RETENTIONS, SLOW_THRESHOLDS } from '../../composables/useCurrentOps'
@@ -21,12 +22,18 @@ const props = defineProps({
 const {
   rows, visible, error, errorCode, loading, updatedAt,
   frequency, retention, ownOnly, showSys, slowOnly, slowSecs, dbName, collName, view,
-  load, kill,
+  selectedOpid, retainedCount, load, kill,
 } = useCurrentOps(() => props.activeTab)
 
-// The same three result views the collection tabs offer. Table is the curated columns
-// below; JSON and Tree render the whole currentOp document, so nothing is hidden — they
-// are the shared viewers, fed the raw documents.
+// The grid owns the drill-down path, kept on the tab like every other collection grid.
+const drillPath = computed({
+  get: () => props.activeTab.drillPath || [],
+  set: (value) => { props.activeTab.drillPath = value },
+})
+
+// The same three result views a collection tab offers, over the same shared components.
+// All three show the currentOp documents exactly as the server sent them — every field,
+// nothing curated away; the grid's own column reorder and drill-down do the rest.
 const VIEWS = [
   { value: 'table', label: 'Table View' },
   { value: 'json',  label: 'JSON View' },
@@ -70,9 +77,6 @@ onMounted(async () => {
 // Switching database invalidates the chosen collection.
 watch(dbName, () => { collName.value = ALL })
 
-// The selection is the opid, not the row: every poll replaces the row objects, so a
-// held object would go stale the moment the table refreshed.
-const selectedOpid = ref(null)
 const selected = computed(() => visible.value.find(r => r.opid === selectedOpid.value) || null)
 const { pendingId: pendingKill, confirmDelete: confirmKill, reset: resetKill } = useConfirmDelete()
 
@@ -81,15 +85,16 @@ const { pendingId: pendingKill, confirmDelete: confirmKill, reset: resetKill } =
 async function killSelected() {
   const op = selected.value
   if (!op || op.expiredAt) return
+  // Armed against this opid, so a list that reshuffles between the two clicks re-arms
+  // rather than killing whatever is now under the cursor.
   if (!confirmKill(op.opid)) return
-  if (await kill(op.opid)) selectedOpid.value = null
+  await kill(op.opid)
 }
 
 // Keyed on the connection rather than onMounted: Vue reuses this component instance when
 // the user switches between two Current Operations tabs, so mount fires only once.
 watch(() => props.activeTab.connId, () => {
   rows.value = []
-  selectedOpid.value = null
   resetKill()
   load()
 }, { immediate: true })
@@ -104,10 +109,6 @@ onUnmounted(() => { rows.value = [] })
 const updatedText = computed(() =>
   updatedAt.value ? new Date(updatedAt.value).toLocaleTimeString() : '—'
 )
-
-function secsText(row) {
-  return row.secs != null ? `${row.secs}s` : '—'
-}
 </script>
 
 <template>
@@ -167,56 +168,20 @@ function secsText(row) {
     <JsonResultView v-else-if="view === 'json'" :results="rawDocs" />
     <TreeResultView v-else-if="view === 'tree'" :results="rawDocs" />
 
-    <!-- Operations -->
-    <div v-else class="cops-body">
-      <table class="cops-table">
-        <thead>
-          <tr>
-            <th class="col-opid">Op ID</th>
-            <th class="col-type">Type</th>
-            <th class="col-ns">Namespace</th>
-            <th class="col-secs">Running</th>
-            <th class="col-plan">Plan</th>
-            <th class="col-app">App</th>
-            <th class="col-user">User</th>
-            <th class="col-wait">Waiting</th>
-            <th class="col-yields">Yields</th>
-            <th class="col-client">Client</th>
-            <th class="col-comment">Comment</th>
-            <th class="col-command">Command</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in visible"
-            :key="row.key"
-            class="cops-row"
-            :class="{ expired: row.expiredAt, selected: row.opid === selectedOpid }"
-            @click="selectedOpid = row.opid"
-          >
-            <td class="col-opid mono">{{ row.opid }}</td>
-            <td class="col-type">{{ row.type || '—' }}</td>
-            <td class="col-ns mono">{{ row.ns || '—' }}</td>
-            <td class="col-secs">{{ secsText(row) }}</td>
-            <td class="col-plan">{{ row.plan || '—' }}</td>
-            <td class="col-app">{{ row.app || '—' }}</td>
-            <td class="col-user">{{ row.user || '—' }}</td>
-            <td class="col-wait">{{ row.waiting ? 'yes' : '—' }}</td>
-            <td class="col-yields">{{ row.yields }}</td>
-            <td class="col-client">{{ row.client || row.desc || '—' }}</td>
-            <td class="col-comment mono">{{ row.comment || '—' }}</td>
-            <!-- Truncated to one line; the full command is in the JSON and Tree views. -->
-            <td class="col-command mono" :title="row.command">{{ row.command || '—' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <!-- Operations: the shared result grid over the currentOp documents, read-only. -->
+    <ResultTable
+      v-else
+      :active-tab="activeTab"
+      :readonly="true"
+      v-model:drillPath="drillPath"
+    />
 
     <!-- Status bar -->
     <div class="cops-status">
       <span>Showing {{ visible.length }} of {{ rows.length }} operation{{ rows.length === 1 ? '' : 's' }}</span>
       <span class="spacer"></span>
       <span v-if="error" class="cops-err">{{ error }}</span>
+      <span v-else-if="retainedCount" class="cops-retained">{{ retainedCount }} finished, still shown</span>
       <span v-else>updated {{ updatedText }}</span>
     </div>
   </div>
@@ -251,36 +216,6 @@ function secsText(row) {
 .tb-select { flex: none; width: 92px; }
 
 .cops-body { flex: 1; overflow: auto; min-height: 0; }
-.cops-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.cops-table thead th {
-  position: sticky; top: 0; z-index: 1;
-  text-align: left; font-weight: 600; color: var(--text-dim);
-  background: var(--bg-panel); padding: 6px 10px;
-  border-bottom: 1px solid var(--border); border-right: 1px solid var(--border-soft);
-}
-.cops-row td {
-  padding: 5px 10px; color: var(--text); vertical-align: middle;
-  border-bottom: 1px solid var(--grid-line); border-right: 1px solid var(--border-soft);
-  white-space: nowrap;
-}
-.cops-row { cursor: pointer; }
-.cops-row:hover { background: var(--bg-hover); }
-.cops-row.selected { background: var(--accent); }
-.cops-row.selected td { color: #fff; }
-/* An op the server no longer reports, still shown for its retention window. */
-.cops-row.expired td { color: var(--text-faint); font-style: italic; }
-.base-btn.armed { color: var(--danger-text); }
-.mono { font-family: var(--mono); }
-.col-opid { width: 110px; }
-.col-type { width: 96px; }
-.col-secs { width: 84px; }
-.col-client { width: 170px; }
-.col-plan { width: 130px; }
-.col-app { width: 130px; }
-.col-user { width: 110px; }
-.col-wait { width: 74px; }
-.col-yields { width: 70px; }
-.col-command { max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
 
 .cops-status {
   display: flex; align-items: center; gap: 6px;
@@ -291,4 +226,5 @@ function secsText(row) {
 .cops-toolbar .spacer { flex: 1; }
 .tb-view { flex: none; width: 122px; }
 .cops-err { color: var(--danger-text); }
+.cops-retained { color: var(--text-faint); }
 </style>

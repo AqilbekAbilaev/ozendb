@@ -248,8 +248,8 @@ export function useTabCreators({
     tabs.value.push({
       id: id, kind: 'currentOps', title: 'Current Operations: ' + connName,
       connId: connId, connName: connName,
-      // The toolbar settings live on the tab so they survive a tab switch (the pane is
-      // unmounted while another tab is active).
+      // The toolbar settings and the grid's own state live on the tab so they survive a
+      // tab switch (the pane is unmounted while another tab is active).
       ...OPS_DEFAULTS,
     })
     activeTabId.value = id
