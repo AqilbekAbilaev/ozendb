@@ -23,6 +23,7 @@ import Resizer from '../base/Resizer.vue'
 import FieldError from '../base/FieldError.vue'
 import { useDocumentActions } from '../../composables/useDocumentActions'
 import { useToast } from '../../composables/useToast'
+import { useTicker } from '../../composables/useTicker'
 import { PAGE_SIZES } from '../../constants/pageSizes'
 
 const props = defineProps({
@@ -201,6 +202,12 @@ const rangeText = computed(() => {
   }
   return base
 })
+
+// Live counter in the footer while a query is in flight, replaced by the server's
+// own timing once the results land.
+const isRunning = computed(() => !!props.activeTab?.isRunning)
+const now = useTicker(isRunning)
+const runningMs = computed(() => Math.max(0, now.value - (props.activeTab?.startedAt ?? now.value)))
 
 // Count applies to a find filter; aggregate pipelines have no single filter.
 const isCountDisabled = computed(() =>
@@ -434,7 +441,11 @@ function toggleReadOnly() {
         :active="activeTab.isCounting"
         @click="countDocuments"
         @contextmenu="onCountContext"><template v-if="activeTab.isCounting">Counting…</template><template v-else>Count Documents<template v-if="countText != null">: {{ countText }}</template></template></BaseButton>
-      <span class="fitem" v-if="activeTab.elapsedMs != null">
+      <span class="fitem" v-if="activeTab.isRunning">
+        <BaseIcon name="clock" :size="14" />
+        {{ (runningMs / 1000).toFixed(1) }}s
+      </span>
+      <span class="fitem" v-else-if="activeTab.elapsedMs != null">
         <BaseIcon name="clock" :size="14" />
         {{ (activeTab.elapsedMs / 1000).toFixed(3) }}s
       </span>

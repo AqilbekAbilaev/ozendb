@@ -36,6 +36,10 @@ export function useQueryRunner({ showToast }) {
     const tab = tabs.value.find(t => t.id === tabId)
     if (!tab) return
     tab.isRunning = true
+    // Wall clock, and only for the live counter while the query is in flight — the
+    // figure that stays behind is the server's (see below).
+    tab.startedAt = Date.now()
+    tab.elapsedMs = null
     tab.runError = null
     tab.runErrorCode = null
     tab.cancelled = false
@@ -95,6 +99,10 @@ export function useQueryRunner({ showToast }) {
     const tab = tabs.value.find(t => t.id === tabId)
     if (!tab) return
     tab.isRunning = true
+    // Wall clock, and only for the live counter while the query is in flight — the
+    // figure that stays behind is the server's (see below).
+    tab.startedAt = Date.now()
+    tab.elapsedMs = null
     tab.runError = null
     tab.runErrorCode = null
     tab.cancelled = false
