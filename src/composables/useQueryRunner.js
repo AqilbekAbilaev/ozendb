@@ -44,10 +44,9 @@ export function useQueryRunner({ showToast }) {
     tab.countShown = false
     const runId = newRunId()
     tab.runId = runId
-    const t0 = Date.now()
     const { addToHistory = true, ...queryParams } = params
     try {
-      const docs = await invoke('find_documents', {
+      const res = await invoke('find_documents', {
         id:         tab.connectionId,
         database:   tab.dbName,
         collection: tab.collectionName,
@@ -58,9 +57,11 @@ export function useQueryRunner({ showToast }) {
       // replace still update the grid) without deep-proxying every nested field of
       // every document — the result set is display-only and replaced wholesale, so
       // the per-node proxies were pure memory + CPU overhead on large results.
-      tab.results = docs.map((doc) => markRaw(doc))
+      tab.results = res.documents.map((doc) => markRaw(doc))
       tab.hasRun = true
-      tab.elapsedMs = Date.now() - t0
+      // The server's own timing, not the wall clock here — the round trip also pays
+      // for IPC and rendering, which say nothing about how fast the query was.
+      tab.elapsedMs = res.elapsedMs
       showToast(`Query returned ${tab.results.length} document${tab.results.length !== 1 ? 's' : ''} in ${(tab.elapsedMs / 1000).toFixed(3)}s`)
       if (addToHistory) {
         invoke('push_query_history', {
@@ -102,7 +103,6 @@ export function useQueryRunner({ showToast }) {
     tab.countShown = false
     const runId = newRunId()
     tab.runId = runId
-    const t0 = Date.now()
     try {
       const res = await invoke('run_aggregate', {
         id:         tab.connectionId,
@@ -113,7 +113,7 @@ export function useQueryRunner({ showToast }) {
       })
       tab.results = res.documents.map((doc) => markRaw(doc))
       tab.hasRun = true
-      tab.elapsedMs = Date.now() - t0
+      tab.elapsedMs = res.elapsedMs
       if (res.truncated) {
         showToast(`Showing the first ${res.documents.length.toLocaleString()} results — add a $limit stage to narrow it down.`)
       } else {

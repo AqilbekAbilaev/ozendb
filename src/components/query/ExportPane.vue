@@ -57,7 +57,7 @@ async function loadCollectionSample() {
   loading.value = true
   error.value = null
   try {
-    const docs = await invoke('find_documents', {
+    const { documents: docs } = await invoke('find_documents', {
       id: t.value.connId,
       database: t.value.dbName,
       collection: t.value.collName,

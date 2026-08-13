@@ -475,7 +475,7 @@ async function commitInlineEdit() {
       idFilter: buildIdFilter(tab.results[edit.rowIdx]),
       document: JSON.stringify(rootDoc),
     })
-    const refreshed = await invoke('find_documents', {
+    const { documents: refreshed } = await invoke('find_documents', {
       id: tab.connectionId,
       database: tab.dbName,
       collection: tab.collectionName,

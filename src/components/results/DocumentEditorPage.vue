@@ -122,7 +122,7 @@ async function loadTarget(next) {
   loading.value = true
   jsonErr.value = null
   try {
-    const docs = await invoke('find_documents', {
+    const { documents: docs } = await invoke('find_documents', {
       id: next.connId,
       database: next.db,
       collection: next.coll,

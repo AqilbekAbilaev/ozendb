@@ -56,9 +56,21 @@ const AGG_RESULT_CAP: usize = 10_000;
 /// What `run_aggregate` returns: the (possibly capped) result documents plus a
 /// `truncated` flag the UI uses to warn that results were cut at `AGG_RESULT_CAP`.
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AggregateResult {
     pub documents: Vec<serde_json::Value>,
     pub truncated: bool,
+    pub elapsed_ms: u64,
+}
+
+/// What `find_documents` returns. The documents are pre-rendered JSON, and
+/// `elapsed_ms` is the server round-trip alone — measured around the driver call,
+/// so the timing the UI shows excludes connecting, IPC and rendering.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FindResult {
+    pub documents: Box<serde_json::value::RawValue>,
+    pub elapsed_ms: u64,
 }
 
 #[cfg(test)]
@@ -168,7 +180,7 @@ pub async fn find_documents(
     skip: i64,
     limit: i64,
     comment: Option<String>,
-) -> Result<Box<serde_json::value::RawValue>, AppError> {
+) -> Result<FindResult, AppError> {
     let col = ctx.collection(&id, &database, &collection).await?;
 
     let filter_doc = parse_ejson_document(&filter)?;
@@ -194,11 +206,16 @@ pub async fn find_documents(
         query = query.sort(sort_doc);
     }
 
+    let started = std::time::Instant::now();
     let mut cursor = match query.await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
     };
-    collect_json(&mut cursor).await
+    let documents = match collect_json(&mut cursor).await {
+        Ok(val) => val,
+        Err(e) => return Err(e),
+    };
+    Ok(FindResult { documents: documents, elapsed_ms: started.elapsed().as_millis() as u64 })
 }
 
 /// Count the documents matching `filter` (the same filter shape `find_documents`
@@ -542,6 +559,7 @@ pub async fn run_aggregate(
     if let Some(c) = comment.as_deref().filter(|s| !s.is_empty()) {
         aggregate = aggregate.comment(c.to_string());
     }
+    let started = std::time::Instant::now();
     let mut cursor = match aggregate.await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Mongo(e)),
@@ -563,5 +581,9 @@ pub async fn run_aggregate(
         }
         documents.push(serde_json::Value::from(bson::Bson::Document(doc)));
     }
-    Ok(AggregateResult { documents: documents, truncated: truncated })
+    Ok(AggregateResult {
+        documents: documents,
+        truncated: truncated,
+        elapsed_ms: started.elapsed().as_millis() as u64,
+    })
 }
