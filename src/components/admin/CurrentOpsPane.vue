@@ -1,10 +1,11 @@
 <script setup>
-import { computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
 import { useCurrentOps, FREQUENCIES, RETENTIONS } from '../../composables/useCurrentOps'
+import { useConfirmDelete } from '../../composables/useConfirmDelete'
 
 // The Current Operations tab: what the server is doing right now, refreshed on a timer.
 // The list itself, the poll and the retention of finished ops live in useCurrentOps;
@@ -14,15 +15,35 @@ const props = defineProps({
 })
 
 const {
-  rows, error, errorCode, loading, updatedAt, frequency, retention, load,
+  rows, error, errorCode, loading, updatedAt, frequency, retention, load, kill,
 } = useCurrentOps(() => props.activeTab.connId)
+
+// The selection is the opid, not the row: every poll replaces the row objects, so a
+// held object would go stale the moment the table refreshed.
+const selectedOpid = ref(null)
+const selected = computed(() => rows.value.find(r => r.opid === selectedOpid.value) || null)
+const { pendingId: pendingKill, confirmDelete: confirmKill, reset: resetKill } = useConfirmDelete()
+
+// Two-click confirm on the toolbar button, as the drop actions elsewhere do: the first
+// click arms it, the second kills. Killing an operation cannot be taken back.
+async function killSelected() {
+  const op = selected.value
+  if (!op || op.expiredAt) return
+  if (!confirmKill(op.opid)) return
+  if (await kill(op.opid)) selectedOpid.value = null
+}
 
 // Keyed on the connection rather than onMounted: Vue reuses this component instance when
 // the user switches between two Current Operations tabs, so mount fires only once.
 watch(() => props.activeTab.connId, () => {
   rows.value = []
+  selectedOpid.value = null
+  resetKill()
   load()
 }, { immediate: true })
+
+// An armed kill must not survive the selection moving to a different operation.
+watch(selectedOpid, resetKill)
 
 // A tab switch unmounts the pane; drop the list so the next mount starts clean rather
 // than briefly showing what a different connection was doing.
@@ -52,6 +73,16 @@ function secsText(row) {
     <div class="cops-toolbar">
       <BaseButton variant="ghost" size="sm" icon="refresh" :icon-size="16" @click="load()">Refresh</BaseButton>
       <span class="tb-sep"></span>
+      <BaseButton
+        variant="ghost"
+        size="sm"
+        icon="trash"
+        :icon-size="16"
+        :class="{ armed: pendingKill != null }"
+        :disabled="!selected || !!(selected && selected.expiredAt)"
+        @click="killSelected"
+      >{{ pendingKill != null ? 'Confirm kill' : 'Kill Operation' }}</BaseButton>
+      <span class="tb-sep"></span>
       <label class="tb-opt">Update frequency:</label>
       <BaseSelect v-model="frequency" class="tb-select" size="sm" :options="FREQUENCIES" />
       <label class="tb-opt">Retain finished ops for:</label>
@@ -75,7 +106,13 @@ function secsText(row) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in rows" :key="row.key" class="cops-row" :class="{ expired: row.expiredAt }">
+          <tr
+            v-for="row in rows"
+            :key="row.key"
+            class="cops-row"
+            :class="{ expired: row.expiredAt, selected: row.opid === selectedOpid }"
+            @click="selectedOpid = row.opid"
+          >
             <td class="col-opid mono">{{ row.opid }}</td>
             <td class="col-type">{{ row.type || '—' }}</td>
             <td class="col-ns mono">{{ row.ns || '—' }}</td>
@@ -130,8 +167,13 @@ function secsText(row) {
   border-bottom: 1px solid var(--grid-line); border-right: 1px solid var(--border-soft);
   white-space: nowrap;
 }
+.cops-row { cursor: pointer; }
+.cops-row:hover { background: var(--bg-hover); }
+.cops-row.selected { background: var(--accent); }
+.cops-row.selected td { color: #fff; }
 /* An op the server no longer reports, still shown for its retention window. */
 .cops-row.expired td { color: var(--text-faint); font-style: italic; }
+.base-btn.armed { color: var(--danger-text); }
 .mono { font-family: var(--mono); }
 .col-opid { width: 110px; }
 .col-type { width: 96px; }

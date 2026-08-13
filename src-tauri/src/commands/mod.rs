@@ -28,6 +28,7 @@ pub mod folders;
 pub mod portmap;
 pub mod history;
 pub mod operations;
+pub mod ops;
 pub mod error_log;
 pub mod updater;
 
@@ -52,6 +53,7 @@ pub use folders::*;
 pub use portmap::*;
 pub use history::*;
 pub use operations::*;
+pub use ops::*;
 pub use error_log::*;
 pub use updater::*;
 

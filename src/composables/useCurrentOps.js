@@ -57,6 +57,20 @@ export function useCurrentOps(connId) {
     }
   }
 
+  // Kill one operation, then refresh so the table reflects it straight away rather than
+  // at the next poll (which may be seconds away, or off).
+  async function kill(opid) {
+    try {
+      await invoke('kill_op', { id: connId(), opid: opid })
+      await load()
+      return true
+    } catch (e) {
+      error.value = errText(e)
+      errorCode.value = errCode(e)
+      return false
+    }
+  }
+
   const polling = computed(() => frequency.value > 0)
   const now = useTicker(polling, frequency)
   watch(now, load)
@@ -76,5 +90,6 @@ export function useCurrentOps(connId) {
     frequency: frequency,
     retention: retention,
     load: load,
+    kill: kill,
   }
 }

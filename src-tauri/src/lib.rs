@@ -190,6 +190,7 @@ pub fn run() {
             server_status,
             database_stats,
             current_ops,
+            kill_op,
             get_profiling_status,
             set_profiling_level,
             list_profile,
