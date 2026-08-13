@@ -16,18 +16,37 @@ export function useQueryRunner({ showToast }) {
     return 'q' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
   }
 
-  // Best-effort cancel of a tab's in-flight query: ask the server to kill the op
-  // tagged with this run's id. The awaited find/aggregate then rejects, which the
-  // run handlers render as a calm "cancelled" state (because tab.cancelled is set).
+  // A response the tab has moved on from — cancelled, or overtaken by a newer run.
+  // Killing the server op is best-effort (it may already have finished, with the
+  // documents still travelling home), so the cancel has to be honoured here too:
+  // whatever arrives for a stale run is dropped instead of rendered.
+  function isStale(tab, runId) {
+    return tab.cancelled || tab.runId !== runId
+  }
+
+  // Cancel a tab's in-flight query: stop showing it as running straight away, and ask
+  // the server to kill the op tagged with this run's id. Killing nothing is not a
+  // failure — the op can have finished already — so the cancel still holds locally.
   async function cancelQuery(tabId) {
     const tab = tabs.value.find(t => t.id === tabId)
     if (!tab || !tab.isRunning || !tab.runId) return
     tab.cancelled = true
+    tab.isRunning = false
+    tab.runError = 'Query cancelled.'
+    tab.runErrorCode = null
     try {
-      const killed = await invoke('kill_query', { id: tab.connectionId, comment: tab.runId })
-      showToast(killed > 0 ? 'Query cancelled' : 'Query already finished')
+      await invoke('kill_query', { id: tab.connectionId, comment: tab.runId })
+      showToast('Query cancelled')
     } catch (e) {
-      tab.cancelled = false
+      // The server refused to kill the op, so it is still running and its results are
+      // still coming: put the tab back where it was rather than dropping them. Unless
+      // the run has since settled (runId cleared) — restoring then strands a spinner
+      // over a query nobody is waiting for.
+      if (tab.runId) {
+        tab.cancelled = false
+        tab.isRunning = true
+        tab.runError = null
+      }
       showToast('Cancel not permitted on this server: ' + errText(e))
     }
   }
@@ -57,6 +76,7 @@ export function useQueryRunner({ showToast }) {
         ...queryParams,
         comment:    runId,
       })
+      if (isStale(tab, runId)) return
       // markRaw each document so Vue keeps the array reactive (row add / remove /
       // replace still update the grid) without deep-proxying every nested field of
       // every document — the result set is display-only and replaced wholesale, so
@@ -82,16 +102,18 @@ export function useQueryRunner({ showToast }) {
         }).catch(() => {})
       }
     } catch (e) {
-      // A deliberate cancel makes the killed op error — show a calm state, not a scary one.
-      if (tab.cancelled) {
-        tab.runError = 'Query cancelled.'
-        tab.runErrorCode = null
-      } else {
-        tab.runError = errText(e)
-        tab.runErrorCode = errCode(e)
-      }
+      // A killed op errors, and a stale run's error belongs to nothing on screen —
+      // either way the tab already says what it needs to say.
+      if (isStale(tab, runId)) return
+      tab.runError = errText(e)
+      tab.runErrorCode = errCode(e)
     } finally {
-      tab.isRunning = false
+      // Clearing runId marks this run settled: a later response is stale, and a cancel
+      // that lands now has nothing to restore.
+      if (tab.runId === runId) {
+        tab.isRunning = false
+        tab.runId = null
+      }
     }
   }
 
@@ -119,6 +141,7 @@ export function useQueryRunner({ showToast }) {
         ...params,
         comment:    runId,
       })
+      if (isStale(tab, runId)) return
       tab.results = res.documents.map((doc) => markRaw(doc))
       tab.hasRun = true
       tab.elapsedMs = res.elapsedMs
@@ -140,15 +163,18 @@ export function useQueryRunner({ showToast }) {
         pipeline:     tab.pipeline || '',
       }).catch(() => {})
     } catch (e) {
-      if (tab.cancelled) {
-        tab.runError = 'Query cancelled.'
-        tab.runErrorCode = null
-      } else {
-        tab.runError = errText(e)
-        tab.runErrorCode = errCode(e)
-      }
+      // A killed op errors, and a stale run's error belongs to nothing on screen —
+      // either way the tab already says what it needs to say.
+      if (isStale(tab, runId)) return
+      tab.runError = errText(e)
+      tab.runErrorCode = errCode(e)
     } finally {
-      tab.isRunning = false
+      // Clearing runId marks this run settled: a later response is stale, and a cancel
+      // that lands now has nothing to restore.
+      if (tab.runId === runId) {
+        tab.isRunning = false
+        tab.runId = null
+      }
     }
   }
 

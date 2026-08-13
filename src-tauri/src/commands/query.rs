@@ -139,9 +139,15 @@ pub async fn kill_query(
 
     // $currentOp defaults to the authenticated user's own ops, which is exactly
     // the find/aggregate we tagged — and needs no inprog privilege.
+    // The tag rides on the find/aggregate itself, but a long result set is fetched by
+    // getMore ops that carry it on `originatingCommand` instead — match either, or a
+    // cancel mid-fetch finds nothing to kill.
     let pipeline = vec![
         bson::doc! { "$currentOp": {} },
-        bson::doc! { "$match": { "command.comment": &comment } },
+        bson::doc! { "$match": { "$or": [
+            { "command.comment": &comment },
+            { "originatingCommand.comment": &comment },
+        ] } },
     ];
     let mut cursor = match admin.aggregate(pipeline).await {
         Ok(val) => val,
