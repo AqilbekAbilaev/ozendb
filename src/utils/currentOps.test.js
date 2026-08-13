@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeOps, mergeRetained } from './currentOps'
+import { normalizeOps, mergeRetained, filterOps } from './currentOps'
 
 // A trimmed but faithful `currentOp` reply: one app query (tagged with its run id), one
 // internal thread, one driver heartbeat.
@@ -82,5 +82,43 @@ describe('mergeRetained', () => {
   it('appends ops it has not seen before', () => {
     const merged = mergeRetained([row('1')], [row('1'), row('2')], 10_000, 1000)
     expect(merged.map(o => o.key)).toEqual(['1', '2'])
+  })
+})
+
+describe('filterOps', () => {
+  const rows = normalizeOps(reply)  // app query on testify.groups, Checkpointer, a hello on admin.$cmd
+
+  it('keeps everything when nothing is asked of it', () => {
+    expect(filterOps(rows, { showSys: true }).length).toBe(3)
+  })
+
+  // The reason this filter exists: the checkpointer and journal flusher are always
+  // there, and they are never what you opened the tab to look at.
+  it('drops server threads unless sys ops are wanted', () => {
+    expect(filterOps(rows, {}).map(o => o.desc)).toEqual(['conn114', 'conn5'])
+  })
+
+  it('narrows to a database, then to a collection', () => {
+    expect(filterOps(rows, { dbName: 'testify' }).map(o => o.ns)).toEqual(['testify.groups'])
+    expect(filterOps(rows, { dbName: 'testify', collName: 'groups' }).map(o => o.ns)).toEqual(['testify.groups'])
+    expect(filterOps(rows, { dbName: 'testify', collName: 'other' })).toEqual([])
+  })
+
+  // A database whose name is a prefix of another must not drag it in.
+  it('matches a namespace on its whole database name', () => {
+    const ops = normalizeOps({ inprog: [{ opid: 1, connectionId: 1, ns: 'testifyOther.groups' }] })
+    expect(filterOps(ops, { dbName: 'testify' })).toEqual([])
+  })
+
+  it('hides ops running under the slow threshold', () => {
+    expect(filterOps(rows, { slowOnly: true, slowSecs: 3 }).map(o => o.secs)).toEqual([16])
+    expect(filterOps(rows, { slowOnly: true, slowSecs: 30 })).toEqual([])
+  })
+
+  // An op held on screen after it finished has stopped ticking; judging it by the live
+  // threshold would make it vanish the moment it expired.
+  it('keeps retained ops regardless of the slow threshold', () => {
+    const expired = [{ ...rows[2], expiredAt: 1000 }]
+    expect(filterOps(expired, { slowOnly: true, slowSecs: 30 }).length).toBe(1)
   })
 })

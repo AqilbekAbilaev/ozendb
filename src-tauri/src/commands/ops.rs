@@ -4,6 +4,29 @@ use tauri::State;
 
 use super::AppContext;
 
+/// Run admin `currentOp` for a connection — the operations in progress on the server.
+/// Returned raw as JSON; the frontend lists the `inprog` array.
+///
+/// `own_only` maps to `$ownOps`, which filters by authenticated *user* rather than by
+/// connection — on a server without access control it therefore filters nothing. `all`
+/// maps to `$all`, adding idle connections and internal threads.
+#[tauri::command]
+pub async fn current_ops(
+    ctx: State<'_, AppContext>,
+    id: String,
+    own_only: Option<bool>,
+    all: Option<bool>,
+) -> Result<serde_json::Value, AppError> {
+    let client = ctx.client(&id).await?;
+    let command = bson::doc! {
+        "currentOp": 1,
+        "$ownOps": own_only.unwrap_or(false),
+        "$all": all.unwrap_or(false),
+    };
+    let result = client.database("admin").run_command(command).await?;
+    Ok(serde_json::Value::from(bson::Bson::Document(result)))
+}
+
 /// An opid as the server reports it: an integer on mongod, a `"shard:opid"` string on
 /// mongos. It arrives from the frontend as JSON, and `killOp` matches on type — a number
 /// that reaches the server as a Double kills nothing — so the conversion is explicit.

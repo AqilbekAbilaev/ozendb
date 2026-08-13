@@ -1,7 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { errText, errCode } from '../utils/errors'
-import { normalizeOps, mergeRetained } from '../utils/currentOps'
+import { normalizeOps, mergeRetained, filterOps } from '../utils/currentOps'
 import { useTicker } from './useTicker'
 
 // Poll rates offered in the toolbar. 0 is "Off" — the tab then only refreshes on demand.
@@ -10,6 +10,14 @@ export const FREQUENCIES = [
   { value: 1000, label: '1 sec' },
   { value: 2000, label: '2 sec' },
   { value: 5000, label: '5 sec' },
+]
+
+// Thresholds offered for "Show only slow ops".
+export const SLOW_THRESHOLDS = [
+  { value: 1,  label: '1 sec' },
+  { value: 3,  label: '3 sec' },
+  { value: 5,  label: '5 sec' },
+  { value: 10, label: '10 sec' },
 ]
 
 // How long an operation stays on screen after the server stops reporting it.
@@ -32,6 +40,15 @@ export function useCurrentOps(connId) {
   const frequency = ref(2000)
   const retention = ref(10_000)
 
+  // Filters. Own/sys are asked of the server as well (see the command), because $ownOps
+  // is the only side that knows which user this connection authenticates as.
+  const ownOnly = ref(false)
+  const showSys = ref(false)
+  const slowOnly = ref(false)
+  const slowSecs = ref(3)
+  const dbName = ref('')
+  const collName = ref('')
+
   // One request at a time: a server slower than the poll rate would otherwise stack up
   // requests it can't answer.
   let inFlight = false
@@ -41,7 +58,7 @@ export function useCurrentOps(connId) {
     inFlight = true
     loading.value = rows.value.length === 0
     try {
-      const reply = await invoke('current_ops', { id: connId() })
+      const reply = await invoke('current_ops', { id: connId(), ownOnly: ownOnly.value, all: showSys.value })
       rows.value = mergeRetained(rows.value, normalizeOps(reply), retention.value, Date.now())
       updatedAt.value = Date.now()
       error.value = null
@@ -71,6 +88,15 @@ export function useCurrentOps(connId) {
     }
   }
 
+  const visible = computed(() => filterOps(rows.value, {
+    dbName: dbName.value, collName: collName.value,
+    slowOnly: slowOnly.value, slowSecs: slowSecs.value, showSys: showSys.value,
+  }))
+
+  // Own/sys ops are server-side flags, so changing them needs a fresh reply rather than
+  // a re-filter of what's already on screen.
+  watch([ownOnly, showSys], () => { rows.value = []; load() })
+
   const polling = computed(() => frequency.value > 0)
   const now = useTicker(polling, frequency)
   watch(now, load)
@@ -83,12 +109,19 @@ export function useCurrentOps(connId) {
 
   return {
     rows: rows,
+    visible: visible,
     error: error,
     errorCode: errorCode,
     loading: loading,
     updatedAt: updatedAt,
     frequency: frequency,
     retention: retention,
+    ownOnly: ownOnly,
+    showSys: showSys,
+    slowOnly: slowOnly,
+    slowSecs: slowSecs,
+    dbName: dbName,
+    collName: collName,
     load: load,
     kill: kill,
   }

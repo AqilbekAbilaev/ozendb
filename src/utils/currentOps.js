@@ -23,6 +23,20 @@ export function normalizeOps(reply) {
   }))
 }
 
+// Whittle the list down to what the toolbar asks for. `showSys` is a client-side filter
+// as well as a server flag, because the internal threads are reported either way.
+export function filterOps(rows, { dbName, collName, slowOnly, slowSecs, showSys } = {}) {
+  const prefix = dbName ? (collName ? `${dbName}.${collName}` : `${dbName}.`) : ''
+  return rows.filter((op) => {
+    if (!showSys && op.sys) return false
+    if (prefix && !(collName ? op.ns === prefix : op.ns.startsWith(prefix))) return false
+    // A retained op has stopped running, so its last-seen duration is not something the
+    // live threshold can fairly judge.
+    if (slowOnly && !op.expiredAt && op.secs < (slowSecs || 0)) return false
+    return true
+  })
+}
+
 // Merge a fresh poll into what's on screen. An op the server no longer reports is not
 // removed straight away — a query that takes less than one poll interval would otherwise
 // never be seen at all — it's stamped `expiredAt` and kept for `retainMs`.

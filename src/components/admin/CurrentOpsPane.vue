@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseSelect from '../base/BaseSelect.vue'
+import BaseCheckbox from '../base/BaseCheckbox.vue'
 import StateMessage from '../base/StateMessage.vue'
-import { useCurrentOps, FREQUENCIES, RETENTIONS } from '../../composables/useCurrentOps'
+import { useCurrentOps, FREQUENCIES, RETENTIONS, SLOW_THRESHOLDS } from '../../composables/useCurrentOps'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 
 // The Current Operations tab: what the server is doing right now, refreshed on a timer.
@@ -15,13 +17,39 @@ const props = defineProps({
 })
 
 const {
-  rows, error, errorCode, loading, updatedAt, frequency, retention, load, kill,
+  rows, visible, error, errorCode, loading, updatedAt,
+  frequency, retention, ownOnly, showSys, slowOnly, slowSecs, dbName, collName,
+  load, kill,
 } = useCurrentOps(() => props.activeTab.connId)
+
+// Namespace pickers. The database list is loaded once; an empty value is the "all" sentinel.
+const ALL = ''
+const databases = ref([])
+const dbOptions = computed(() => [
+  { value: ALL, label: 'All databases' },
+  ...databases.value.map(d => ({ value: d.name, label: d.name })),
+])
+const collOptions = computed(() => {
+  const db = databases.value.find(d => d.name === dbName.value)
+  return [
+    { value: ALL, label: 'All collections' },
+    ...((db && db.collections) || []).map(c => ({ value: c, label: c })),
+  ]
+})
+onMounted(async () => {
+  try {
+    databases.value = await invoke('list_databases', { id: props.activeTab.connId })
+  } catch (_) {
+    // The pickers stay on "all" — a missing database list must not stop the ops view.
+  }
+})
+// Switching database invalidates the chosen collection.
+watch(dbName, () => { collName.value = ALL })
 
 // The selection is the opid, not the row: every poll replaces the row objects, so a
 // held object would go stale the moment the table refreshed.
 const selectedOpid = ref(null)
-const selected = computed(() => rows.value.find(r => r.opid === selectedOpid.value) || null)
+const selected = computed(() => visible.value.find(r => r.opid === selectedOpid.value) || null)
 const { pendingId: pendingKill, confirmDelete: confirmKill, reset: resetKill } = useConfirmDelete()
 
 // Two-click confirm on the toolbar button, as the drop actions elsewhere do: the first
@@ -65,8 +93,20 @@ function secsText(row) {
       <BaseIcon name="connect" :size="15" class="c-ic" />
       <span class="crumb">{{ activeTab.connName }}</span>
       <BaseIcon name="caret" :size="11" class="sep" />
-      <BaseIcon name="clock" :size="15" class="c-ic" />
-      <span class="crumb">Current Operations</span>
+      <BaseIcon name="dbSmall" :size="15" class="c-ic" />
+      <BaseSelect v-model="dbName" class="cr-select" size="sm" :options="dbOptions" />
+      <BaseIcon name="caret" :size="11" class="sep" />
+      <BaseIcon name="collSmall" :size="15" class="c-ic" />
+      <BaseSelect v-model="collName" class="cr-select" size="sm" :options="collOptions" :disabled="!dbName" />
+    </div>
+
+    <!-- Filters -->
+    <div class="cops-filters">
+      <label class="tb-opt">Filters:</label>
+      <label class="cops-opt"><BaseCheckbox v-model="slowOnly" /> Show only slow ops</label>
+      <BaseSelect v-model="slowSecs" class="tb-select" size="sm" :options="SLOW_THRESHOLDS" :disabled="!slowOnly" />
+      <label class="cops-opt" title="Operations run by the user this connection authenticates as"><BaseCheckbox v-model="ownOnly" /> Show own ops only</label>
+      <label class="cops-opt" title="Internal server threads and idle connections"><BaseCheckbox v-model="showSys" /> Show sys ops</label>
     </div>
 
     <!-- Toolbar -->
@@ -93,7 +133,7 @@ function secsText(row) {
     <div class="cops-body">
       <StateMessage v-if="loading" mode="loading" label="Fetching current operations…" />
       <StateMessage v-else-if="error && !rows.length" mode="error" :message="error" :code="errorCode" />
-      <StateMessage v-else-if="!rows.length" mode="empty" label="No operations currently in progress" />
+      <StateMessage v-else-if="!visible.length" mode="empty" :label="rows.length ? 'No operations match these filters' : 'No operations currently in progress'" />
       <table v-else class="cops-table">
         <thead>
           <tr>
@@ -107,7 +147,7 @@ function secsText(row) {
         </thead>
         <tbody>
           <tr
-            v-for="row in rows"
+            v-for="row in visible"
             :key="row.key"
             class="cops-row"
             :class="{ expired: row.expiredAt, selected: row.opid === selectedOpid }"
@@ -126,7 +166,7 @@ function secsText(row) {
 
     <!-- Status bar -->
     <div class="cops-status">
-      <span>{{ rows.length }} operation{{ rows.length === 1 ? '' : 's' }}</span>
+      <span>Showing {{ visible.length }} of {{ rows.length }} operation{{ rows.length === 1 ? '' : 's' }}</span>
       <span class="spacer"></span>
       <span v-if="error" class="cops-err">{{ error }}</span>
       <span v-else>updated {{ updatedText }}</span>
@@ -144,6 +184,14 @@ function secsText(row) {
 }
 .sep { color: var(--text-faint); }
 .c-ic { color: var(--text-faint); }
+
+.cops-filters {
+  display: flex; align-items: center; gap: 12px;
+  padding: 6px 14px; flex: none;
+  border-bottom: 1px solid var(--border);
+}
+.cops-opt { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+.cr-select { flex: none; width: 170px; }
 
 .cops-toolbar {
   display: flex; align-items: center; gap: 6px;

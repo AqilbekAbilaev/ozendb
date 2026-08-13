@@ -408,19 +408,6 @@ pub async fn database_stats(
     Ok(serde_json::Value::from(bson::Bson::Document(result)))
 }
 
-/// Run admin `currentOp` for a connection — the operations currently in progress on
-/// the server. Returned raw as JSON; the frontend lists the `inprog` array.
-#[tauri::command]
-pub async fn current_ops(
-    ctx: State<'_, AppContext>,
-    id: String,
-) -> Result<serde_json::Value, AppError> {
-    let client = ctx.client(&id).await?;
-    let command = bson::doc! { "currentOp": 1 };
-    let result = client.database("admin").run_command(command).await?;
-    Ok(serde_json::Value::from(bson::Bson::Document(result)))
-}
-
 #[tauri::command]
 pub async fn list_indexes(
     ctx: State<'_, AppContext>,
