@@ -20,9 +20,9 @@ const props = defineProps({
   activeTab: { type: Object,  required: true },
   vqbOpen:   { type: Boolean, default: false },
   drillPath: { type: Array,   default: () => [] },  // field-name path navigated into
-  // Read-only grid (e.g. IntelliShell results, which aren't a single editable
-  // collection): disables inline cell editing. Drill-down still works.
+  // Read-only grid (IntelliShell, Current Operations): no inline cell editing; drill-down still works.
   readonly:  { type: Boolean, default: false },
+  rowClass:  { type: Function, default: null },  // extra per-row class, by row index
 })
 
 // The drag-to-VQB outputs (`vqb-drop`, `dragged-field`, `drag-over-section`) are
@@ -688,7 +688,7 @@ onUnmounted(() => window.removeEventListener('focus', repaintGridOnFocus))
             v-for="vrow in virtualRows"
             :key="vrow.index"
             class="datarow"
-            :class="{ selrow: isRowSelected(vrow.index), stripe: vrow.index % 2 === 1 }"
+            :class="[{ selrow: isRowSelected(vrow.index), stripe: vrow.index % 2 === 1 }, rowClass && rowClass(vrow.index)]"
             @click="selectRow($event, vrow.index)"
           >
             <td class="rownum">{{ vrow.index + 1 }}</td>

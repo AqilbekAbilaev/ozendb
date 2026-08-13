@@ -156,6 +156,7 @@ export function useCurrentOps(tab) {
   watch([ownOnly, showSys], () => { rows.value = []; load() })
 
   const retainedCount = computed(() => visible.value.filter(row => row.expiredAt).length)
+  const idleCount = computed(() => visible.value.filter(row => row.idle).length)
 
   const polling = computed(() => frequency.value > 0)
   const now = useTicker(polling, frequency)
@@ -172,6 +173,7 @@ export function useCurrentOps(tab) {
     visible: visible,
     selectedOpid: selectedOpid,
     retainedCount: retainedCount,
+    idleCount: idleCount,
     error: error,
     errorCode: errorCode,
     loading: loading,

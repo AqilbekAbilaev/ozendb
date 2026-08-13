@@ -49,6 +49,34 @@ describe('normalizeOps', () => {
     expect(normalizeOps(reply).map(o => o.sys)).toEqual([false, true, false])
   })
 
+  describe('idle entries', () => {
+    // Only reported once $all is on (our "show sys ops"), and they are connections and
+    // bookkeeping rather than work in progress — killing one achieves nothing.
+    it('marks a connection the server says is not active', () => {
+      const ops = normalizeOps({ inprog: [{ opid: 1, connectionId: 1, active: false }] })
+      expect(ops[0].idle).toBe(true)
+    })
+
+    it('marks entries that are not operations at all', () => {
+      const ops = normalizeOps({ inprog: [
+        { opid: 1, connectionId: 1, type: 'idleSession', active: true },
+        { opid: 2, connectionId: 1, type: 'idleCursor', active: true },
+      ] })
+      expect(ops.map(o => o.idle)).toEqual([true, true])
+    })
+
+    // Absent is not the same as false. Dimming a running operation would state something
+    // untrue about the server; leaving an idle one undimmed merely withholds a hint.
+    it('treats a missing active flag as running', () => {
+      const ops = normalizeOps({ inprog: [{ opid: 1, connectionId: 1 }] })
+      expect(ops[0].idle).toBe(false)
+    })
+
+    it('leaves a running operation alone', () => {
+      expect(normalizeOps(reply)[0].idle).toBe(false)
+    })
+  })
+
   it('survives a reply with nothing in progress', () => {
     expect(normalizeOps({ inprog: [], ok: 1 })).toEqual([])
     expect(normalizeOps(null)).toEqual([])

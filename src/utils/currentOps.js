@@ -16,6 +16,10 @@ export function normalizeOps(reply) {
     client: op.client || '',
     // Server housekeeping (Checkpointer, JournalFlusher…) runs on no client connection.
     sys: op.connectionId == null,
+    // Reported but not working: a connection the server says is inactive, or an entry
+    // that isn't an operation ($currentOp also reports idleSession / idleCursor). A
+    // missing `active` is read as running — see the specs.
+    idle: op.active === false || (!!op.type && op.type !== 'op'),
     expiredAt: null,
     raw: op,
   }))

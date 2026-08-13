@@ -22,7 +22,7 @@ const props = defineProps({
 const {
   rows, visible, error, errorCode, loading, updatedAt,
   frequency, retention, ownOnly, showSys, slowOnly, slowSecs, dbName, collName, view,
-  selectedOpid, retainedCount, load, kill,
+  selectedOpid, retainedCount, idleCount, load, kill,
 } = useCurrentOps(() => props.activeTab)
 
 // The grid owns the drill-down path, kept on the tab like every other collection grid.
@@ -40,6 +40,22 @@ const VIEWS = [
   { value: 'tree',  label: 'Tree View' },
 ]
 const rawDocs = computed(() => visible.value.map(row => row.raw))
+
+// Rows the grid can't know about: an operation the server has stopped reporting (kept for
+// its retention window) and one it reports as not running. The grid renders documents,
+// which carry neither notion, so both are marked from here.
+const rowClass = (index) => {
+  const row = visible.value[index]
+  if (!row) return null
+  if (row.expiredAt) return 'op-finished'
+  return row.idle ? 'op-idle' : null
+}
+
+// What the status bar says on the right, when there is anything worth saying.
+const noteText = computed(() => [
+  retainedCount.value ? `${retainedCount.value} finished, still shown` : '',
+  idleCount.value ? `${idleCount.value} idle` : '',
+].filter(Boolean).join(' · '))
 
 // Loading / error / empty are a property of the data, not of the chosen view, so the
 // message replaces whichever view is selected.
@@ -78,13 +94,15 @@ onMounted(async () => {
 watch(dbName, () => { collName.value = ALL })
 
 const selected = computed(() => visible.value.find(r => r.opid === selectedOpid.value) || null)
+// Killing is only meaningful for an operation that is actually running now.
+const killable = computed(() => !!selected.value && !selected.value.expiredAt && !selected.value.idle)
 const { pendingId: pendingKill, confirmDelete: confirmKill, reset: resetKill } = useConfirmDelete()
 
 // Two-click confirm on the toolbar button, as the drop actions elsewhere do: the first
 // click arms it, the second kills. Killing an operation cannot be taken back.
 async function killSelected() {
   const op = selected.value
-  if (!op || op.expiredAt) return
+  if (!killable.value) return
   // Armed against this opid, so a list that reshuffles between the two clicks re-arms
   // rather than killing whatever is now under the cursor.
   if (!confirmKill(op.opid)) return
@@ -143,7 +161,7 @@ const updatedText = computed(() =>
         icon="trash"
         :icon-size="16"
         :class="{ armed: pendingKill != null }"
-        :disabled="!selected || !!(selected && selected.expiredAt)"
+        :disabled="!killable"
         @click="killSelected"
       >{{ pendingKill != null ? 'Confirm kill' : 'Kill Operation' }}</BaseButton>
       <span class="tb-sep"></span>
@@ -172,6 +190,7 @@ const updatedText = computed(() =>
       v-else
       :active-tab="activeTab"
       :readonly="true"
+      :row-class="rowClass"
       v-model:drillPath="drillPath"
     />
 
@@ -180,8 +199,10 @@ const updatedText = computed(() =>
       <span>Showing {{ visible.length }} of {{ rows.length }} operation{{ rows.length === 1 ? '' : 's' }}</span>
       <span class="spacer"></span>
       <span v-if="error" class="cops-err">{{ error }}</span>
-      <span v-else-if="retainedCount" class="cops-retained">{{ retainedCount }} finished, still shown</span>
-      <span v-else>updated {{ updatedText }}</span>
+      <template v-else>
+        <span v-if="noteText" class="cops-note">{{ noteText }}</span>
+        <span>updated {{ updatedText }}</span>
+      </template>
     </div>
   </div>
 </template>
@@ -232,5 +253,12 @@ const updatedText = computed(() =>
 .cops-toolbar .spacer { flex: 1; }
 .tb-view { flex: none; width: 122px; }
 .cops-err { color: var(--danger-text); }
-.cops-retained { color: var(--text-faint); }
+.cops-note { color: var(--text-faint); }
+
+/* Rows inside the shared grid (its markup, hence :deep): finished operations kept for
+   their retention window, and connections the server reports as not running.
+   Dimmed with opacity rather than colour — each cell's value carries its own type colour
+   on an inner span, which any colour rule here would lose to. */
+.cops :deep(tr.datarow.op-finished) { opacity: .45; font-style: italic; }
+.cops :deep(tr.datarow.op-idle) { opacity: .6; }
 </style>
