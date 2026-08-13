@@ -28,26 +28,47 @@ export const RETENTIONS = [
   { value: 30_000, label: '30 sec' },
 ]
 
+// What a freshly opened Current Operations tab starts with. They live on the tab (see
+// below), so the tab creator seeds them there.
+export const OPS_DEFAULTS = {
+  frequency: 2000,
+  retention: 10_000,
+  ownOnly: false,
+  showSys: false,
+  slowOnly: false,
+  slowSecs: 3,
+  dbName: '',
+  collName: '',
+}
+
 // The live state behind the Current Operations tab: what the server is doing, refreshed
-// on a timer the user picks. `connId` is a getter so the tab it serves can change.
-export function useCurrentOps(connId) {
+// on a timer the user picks. `tab` is a getter — one pane instance is reused across tabs
+// of this kind, so every read has to go to whichever tab is active now.
+export function useCurrentOps(tab) {
+  // The toolbar settings are stored on the tab rather than in local refs: a tab switch
+  // unmounts the pane, and settings that reset themselves on the way back are worse than
+  // no settings at all.
+  const setting = (key) => computed({
+    get: () => tab()[key],
+    set: (value) => { tab()[key] = value },
+  })
   const rows = ref([])
   const error = ref(null)
   const errorCode = ref(null)
   const loading = ref(false)
   const updatedAt = ref(null)
 
-  const frequency = ref(2000)
-  const retention = ref(10_000)
+  const frequency = setting('frequency')
+  const retention = setting('retention')
 
   // Filters. Own/sys are asked of the server as well (see the command), because $ownOps
   // is the only side that knows which user this connection authenticates as.
-  const ownOnly = ref(false)
-  const showSys = ref(false)
-  const slowOnly = ref(false)
-  const slowSecs = ref(3)
-  const dbName = ref('')
-  const collName = ref('')
+  const ownOnly = setting('ownOnly')
+  const showSys = setting('showSys')
+  const slowOnly = setting('slowOnly')
+  const slowSecs = setting('slowSecs')
+  const dbName = setting('dbName')
+  const collName = setting('collName')
 
   // One request at a time: a server slower than the poll rate would otherwise stack up
   // requests it can't answer.
@@ -58,7 +79,7 @@ export function useCurrentOps(connId) {
     inFlight = true
     loading.value = rows.value.length === 0
     try {
-      const reply = await invoke('current_ops', { id: connId(), ownOnly: ownOnly.value, all: showSys.value })
+      const reply = await invoke('current_ops', { id: tab().connId, ownOnly: ownOnly.value, all: showSys.value })
       rows.value = mergeRetained(rows.value, normalizeOps(reply), retention.value, Date.now())
       updatedAt.value = Date.now()
       error.value = null
@@ -78,7 +99,7 @@ export function useCurrentOps(connId) {
   // at the next poll (which may be seconds away, or off).
   async function kill(opid) {
     try {
-      await invoke('kill_op', { id: connId(), opid: opid })
+      await invoke('kill_op', { id: tab().connId, opid: opid })
       await load()
       return true
     } catch (e) {

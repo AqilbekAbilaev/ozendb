@@ -20,7 +20,7 @@ const {
   rows, visible, error, errorCode, loading, updatedAt,
   frequency, retention, ownOnly, showSys, slowOnly, slowSecs, dbName, collName,
   load, kill,
-} = useCurrentOps(() => props.activeTab.connId)
+} = useCurrentOps(() => props.activeTab)
 
 // Namespace pickers. The database list is loaded once; an empty value is the "all" sentinel.
 const ALL = ''

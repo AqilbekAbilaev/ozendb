@@ -2,6 +2,7 @@ import { nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { parseField } from '../utils/queryParser'
 import { tabs, activeTabId, activateTab, newTabId } from '../stores/tabs'
+import { OPS_DEFAULTS } from './useCurrentOps'
 
 // Every "open a tab" entry point in the app. The tab *state* and its mutations live in
 // stores/tabs.js; these are the constructors that decide what a newly opened tab of each
@@ -247,6 +248,9 @@ export function useTabCreators({
     tabs.value.push({
       id: id, kind: 'currentOps', title: 'Current Operations: ' + connName,
       connId: connId, connName: connName,
+      // The toolbar settings live on the tab so they survive a tab switch (the pane is
+      // unmounted while another tab is active).
+      ...OPS_DEFAULTS,
     })
     activeTabId.value = id
   }
