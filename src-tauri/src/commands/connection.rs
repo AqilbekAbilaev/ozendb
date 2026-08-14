@@ -406,7 +406,7 @@ pub async fn update_connection(
     ctx: State<'_, AppContext>,
     id: String,
     fields: ConnectionFields,
-) -> Result<(), AppError> {
+) -> Result<ConnectionConfig, AppError> {
     // Preserve last_accessed, folder membership, and the open state from the
     // existing record (the edit dialog doesn't carry these fields).
     let existing = ctx.storage.find(&id);
@@ -453,7 +453,7 @@ pub async fn update_connection(
         crate::keychain::delete(&format!("{}::ssh-key-pass", id));
     }
 
-    match ctx.storage.update(config) {
+    match ctx.storage.update(config.clone()) {
         Ok(val) => val,
         Err(e) => return Err(e),
     };
@@ -461,7 +461,9 @@ pub async fn update_connection(
     // Evict cached client so the next operation reconnects with updated credentials.
     ctx.pool.remove(&id).await;
 
-    Ok(())
+    // Returned so the frontend refreshes its copies from what was actually stored,
+    // rather than rebuilding the record from the form a second time.
+    Ok(config)
 }
 
 #[tauri::command]

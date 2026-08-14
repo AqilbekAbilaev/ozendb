@@ -398,30 +398,7 @@ async function save() {
     const fields = formFields()
 
     if (isEditMode) {
-      await invoke('update_connection', { id: props.editConn.id, fields })
-      const updated = {
-        ...props.editConn,
-        name:            fields.name,
-        hosts:           fields.hosts,
-        connection_type: fields.connectionType,
-        replica_set_name: fields.replicaSetName,
-        options:         fields.options,
-        username:        fields.username,
-        auth_db:         fields.authDb,
-        auth_mechanism:  fields.authMechanism,
-        tls:                            fields.tls,
-        tls_ca_file:                    fields.tlsCaFile,
-        tls_cert_key_file:              fields.tlsCertKeyFile,
-        tls_allow_invalid_certificates: fields.tlsAllowInvalidCertificates,
-        ssh_enabled:  fields.sshEnabled,
-        ssh_host:     fields.sshHost,
-        ssh_port:     fields.sshPort,
-        ssh_user:     fields.sshUser,
-        ssh_auth:     fields.sshAuth,
-        ssh_key_file: fields.sshKeyFile,
-        tag:             fields.tag,
-        read_only:       fields.readOnly,
-      }
+      const updated = await invoke('update_connection', { id: props.editConn.id, fields })
       emit('updated', updated)
       // The sidebar keeps its own copy of the list, as it does for new connections.
       await tauriEmit('connection-updated', updated)
