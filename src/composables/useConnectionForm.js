@@ -375,7 +375,9 @@ export function useConnectionForm(editConn) {
       if (isEditMode && fields.name === editConn.name) {
         fields.name = `${fields.name} (copy)`
       }
-      return await create(fields)
+      // Secret fields are blank unless retyped, and a copy has nothing stored under its
+      // own id yet — so it inherits the original's rather than authenticating as nobody.
+      return await create(fields, editConn.id)
     } catch (e) {
       status.value = { type: 'error', message: errText(e) }
       isSaving.value = false
@@ -383,8 +385,8 @@ export function useConnectionForm(editConn) {
     }
   }
 
-  async function create(fields) {
-    const id = await invoke('save_connection', { fields })
+  async function create(fields, copySecretsFrom = null) {
+    const id = await invoke('save_connection', { fields, copySecretsFrom })
     const conn = {
       id:              id,
       name:            fields.name,

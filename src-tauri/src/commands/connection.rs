@@ -245,13 +245,25 @@ pub(crate) fn usable_secrets(config: &ConnectionConfig) -> (bool, bool, bool) {
     (has_user, ssh_password, ssh_passphrase)
 }
 
+/// Save a new connection. `copy_secrets_from` is the id this one was copied from, if
+/// any: the editor leaves secret fields blank to mean "keep the existing one", which for
+/// a copy means the source's, since the new id has nothing stored under it yet.
 #[tauri::command]
 pub async fn save_connection(
     ctx: State<'_, AppContext>,
     fields: ConnectionFields,
+    copy_secrets_from: Option<String>,
 ) -> Result<String, AppError> {
     let id = Uuid::new_v4().to_string();
     let (password, ssh_password, ssh_passphrase) = fields.secrets();
+
+    // Inherit first, so anything actually typed into the form overwrites it below.
+    if let Some(source) = copy_secrets_from.as_deref() {
+        match copy_secrets(source, &id) {
+            Ok(val) => val,
+            Err(e) => return Err(e),
+        };
+    }
     // A newly saved connection starts at the root (no folder) and opened in the sidebar.
     let config = fields.into_config(id.clone(), None, None, true);
 

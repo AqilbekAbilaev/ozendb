@@ -228,6 +228,27 @@ describe('saveAsNew', () => {
     expect(invoke).not.toHaveBeenCalledWith('update_connection', expect.anything())
   })
 
+  it('tells the backend to inherit the original\'s secrets', async () => {
+    // The password field is blank unless retyped — it means "keep the existing one" —
+    // so without this the copy is saved with no password and cannot authenticate.
+    const f = useConnectionForm(stored())
+    await f.saveAsNew()
+
+    const [, args] = invoke.mock.calls.find(([cmd]) => cmd === 'save_connection')
+    expect(args.copySecretsFrom).toBe('c1')
+    expect(args.fields.password).toBe(null)
+  })
+
+  it('does not inherit secrets for a connection created from scratch', async () => {
+    const f = useConnectionForm(null)
+    f.password.value = 'typed'
+    await f.save()
+
+    const [, args] = invoke.mock.calls.find(([cmd]) => cmd === 'save_connection')
+    expect(args.copySecretsFrom).toBe(null)
+    expect(args.fields.password).toBe('typed')
+  })
+
   it('suffixes the name only when it would collide with the original', async () => {
     const same = useConnectionForm(stored())
     expect((await same.saveAsNew()).conn.name).toBe('prod (copy)')
