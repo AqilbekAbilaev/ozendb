@@ -94,6 +94,7 @@ async function saveAsNew() {
         <div v-if="activeTab === 'server'" class="nc-form">
           <FormField label="Connection type">
             <SegmentedControl
+              class="nc-seg"
               :model-value="connType"
               :options="[{ value: 'standalone', label: 'Standalone' }, { value: 'replica', label: 'Replica Set' }, { value: 'sharded', label: 'Sharded' }, { value: 'srv', label: 'DNS Seedlist (SRV)' }]"
               @update:model-value="connType = $event"
@@ -191,6 +192,7 @@ async function saveAsNew() {
             </FormField>
             <FormField label="Authentication">
               <SegmentedControl
+                class="nc-seg"
                 :model-value="sshAuth"
                 :options="[{ value: 'password', label: 'Password' }, { value: 'key', label: 'Private key' }]"
                 @update:model-value="sshAuth = $event"

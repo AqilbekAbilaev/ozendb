@@ -517,14 +517,6 @@ pub async fn disconnect(
     Ok(())
 }
 
-/// Whether a live client is currently pooled for this connection. The pool is the real
-/// live state — it's what `disconnect` clears and what an edit evicts — so this is what
-/// "connected" means anywhere in the UI.
-#[tauri::command]
-pub async fn is_connected(ctx: State<'_, AppContext>, id: String) -> Result<bool, AppError> {
-    Ok(ctx.pool.get(&id).await.is_some())
-}
-
 #[tauri::command]
 pub fn set_connection_open(
     ctx: State<'_, AppContext>,

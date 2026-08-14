@@ -4,6 +4,7 @@ import { emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
 import { connectionTargetChanged } from '../utils/connectionTarget.js'
+import { hasLoadedData } from '../stores/connectionData.js'
 import { OPTION_GROUPS, KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
 
 // Options managed by dedicated fields outside the catalog (so they aren't treated as
@@ -336,13 +337,12 @@ export function useConnectionForm(editConn) {
     try {
       const fields = formFields()
       if (isEditMode) {
-        if (connectionTargetChanged(editConn, fields)
-            && await invoke('is_connected', { id: editConn.id })) {
+        if (connectionTargetChanged(editConn, fields) && hasLoadedData(editConn.id)) {
           status.value = {
             type: 'error',
-            message: `${editConn.name} is connected. Pointing it at a different server `
-              + 'would leave its open databases describing the old one — disconnect it '
-              + 'first, or save these settings as a new connection.',
+            message: `${editConn.name} is open in the sidebar. Pointing it at a different `
+              + 'server would leave the databases listed there describing the old one — '
+              + 'disconnect it first, or save these settings as a new connection.',
           }
           blockedByLiveConnection.value = true
           isSaving.value = false

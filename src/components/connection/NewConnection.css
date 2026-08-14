@@ -101,3 +101,9 @@
   border-radius: 4px;
   padding: 1px 6px;
 }
+
+/* The segmented controls sit in a FormField, which is a flex column — so its children
+   stretch to full width by default, leaving dead border to the right of the buttons.
+   Scoped here rather than on the component: it also appears in flex rows (the query
+   bar, the explain toolbar), where align-self would top-align it instead. */
+.nc-seg { align-self: flex-start; }

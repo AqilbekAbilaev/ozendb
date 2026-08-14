@@ -163,15 +163,24 @@ describe('edit-mode seeding', () => {
 })
 
 const { invoke } = await import('@tauri-apps/api/core')
+const { connDatabases } = await import('../stores/connectionData.js')
 
-describe('refusing an edit to a live connection', () => {
+// The sidebar having databases loaded for a connection is what makes an edit risky:
+// what's on screen came from the server it currently points at.
+function sidebarShows(id) {
+  connDatabases.value[id] = [{ name: 'admin', collections: [], accessible: true }]
+}
+
+describe('refusing an edit that would strand the sidebar', () => {
   beforeEach(() => {
+    connDatabases.value = {}
     invoke.mockReset()
     invoke.mockImplementation((cmd) =>
-      Promise.resolve(cmd === 'is_connected' ? true : cmd === 'save_connection' ? 'new-id' : {}))
+      Promise.resolve(cmd === 'save_connection' ? 'new-id' : {}))
   })
 
-  it('refuses when the edit moves a connected connection to another server', async () => {
+  it('refuses when the edit moves a connection the sidebar is showing', async () => {
+    sidebarShows('c1')
     const f = useConnectionForm(stored())
     f.hosts.value = [{ host: 'db2', port: 27017 }]
 
@@ -180,9 +189,10 @@ describe('refusing an edit to a live connection', () => {
     expect(invoke).not.toHaveBeenCalledWith('update_connection', expect.anything())
   })
 
-  it('allows changes that leave the target alone, even while connected', async () => {
+  it('allows changes that leave the target alone, even while open', async () => {
     // A rename or a timeout applies to a live connection safely — the pool is evicted
-    // and the next operation reconnects.
+    // and the next operation reconnects, and nothing on screen becomes wrong.
+    sidebarShows('c1')
     const f = useConnectionForm(stored())
     f.connName.value = 'renamed'
     f.advancedOptions.value.socketTimeoutMS = '9000'
@@ -191,8 +201,8 @@ describe('refusing an edit to a live connection', () => {
     expect(f.blockedByLiveConnection.value).toBe(false)
   })
 
-  it('allows moving a connection that is not connected', async () => {
-    invoke.mockImplementation((cmd) => Promise.resolve(cmd === 'is_connected' ? false : {}))
+  it('allows moving a connection the sidebar is not showing', async () => {
+    // Nothing on screen describes the old server, so there is nothing to strand.
     const f = useConnectionForm(stored())
     f.hosts.value = [{ host: 'db2', port: 27017 }]
 
@@ -201,6 +211,7 @@ describe('refusing an edit to a live connection', () => {
   })
 
   it('clears the refusal when the next save attempt is allowed', async () => {
+    sidebarShows('c1')
     const f = useConnectionForm(stored())
     f.hosts.value = [{ host: 'db2', port: 27017 }]
     await f.save()
@@ -247,6 +258,56 @@ describe('saveAsNew', () => {
     const [, args] = invoke.mock.calls.find(([cmd]) => cmd === 'save_connection')
     expect(args.copySecretsFrom).toBe(null)
     expect(args.fields.password).toBe('typed')
+  })
+
+  it('copies every setting of the original, changing only the name', async () => {
+    const original = stored({
+      username: 'admin',
+      auth_db: 'authdb',
+      auth_mechanism: 'SCRAM-SHA-1',
+      hosts: [{ host: 'a', port: 1 }, { host: 'b', port: 2 }],
+      connection_type: 'replica',
+      replica_set_name: 'rs0',
+      tls: true,
+      tls_ca_file: '/ca.pem',
+      tls_allow_invalid_certificates: true,
+      ssh_enabled: true,
+      ssh_host: 'bastion',
+      ssh_port: 2222,
+      ssh_user: 'ubuntu',
+      ssh_auth: 'key',
+      ssh_key_file: '/id_ed25519',
+      tag: 'red',
+      read_only: true,
+      options: { retryWrites: 'true', zlibCompressionLevel: '6' },
+    })
+    const f = useConnectionForm(original)
+    await f.saveAsNew()
+
+    const [, args] = invoke.mock.calls.find(([cmd]) => cmd === 'save_connection')
+    expect(args.fields).toMatchObject({
+      username: 'admin',
+      authDb: 'authdb',
+      authMechanism: 'SCRAM-SHA-1',
+      hosts: [{ host: 'a', port: 1 }, { host: 'b', port: 2 }],
+      connectionType: 'replica',
+      replicaSetName: 'rs0',
+      tls: true,
+      tlsCaFile: '/ca.pem',
+      tlsAllowInvalidCertificates: true,
+      sshEnabled: true,
+      sshHost: 'bastion',
+      sshPort: 2222,
+      sshUser: 'ubuntu',
+      sshAuth: 'key',
+      sshKeyFile: '/id_ed25519',
+      tag: 'red',
+      readOnly: true,
+    })
+    expect(args.fields.options).toMatchObject({ retryWrites: 'true', zlibCompressionLevel: '6' })
+    // Secrets stay blank in the form; the backend inherits them from the original.
+    expect(args.copySecretsFrom).toBe('c1')
+    expect(args.fields.name).toBe('prod (copy)')
   })
 
   it('suffixes the name only when it would collide with the original', async () => {

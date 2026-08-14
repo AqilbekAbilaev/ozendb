@@ -10,6 +10,7 @@ import StatsTip from './StatsTip.vue'
 import { useStatsTip } from '../../composables/useStatsTip'
 import { colorHex } from '../../utils/tabColor.js'
 import { applyConnectionUpdate } from '../../utils/connectionList.js'
+import { connDatabases } from '../../stores/connectionData.js'
 
 const props = defineProps({
   activeCollectionKey: String,
@@ -23,7 +24,6 @@ const emit = defineEmits(['select-collection', 'expanded', 'context-menu', 'sele
 const connections = ref([])
 const expandedConns = ref({})      // connId → boolean
 const loadingConns = ref({})       // connId → boolean
-const connDatabases = ref({})      // connId → DatabaseInfo[]
 const connErrors = ref({})         // connId → { message, code } (or null)
 const expandedDbs = ref({})        // "connId/dbName" → boolean
 const selectedKey = ref(null)      // collection row highlighted by a single click
