@@ -40,7 +40,7 @@ const {
   sshKeyPassphrase, pickSshKey,
   selectedTag, readOnly,
   advancedOptions, optionVisible, optionDisabled, groupSetCount, openGroups, toggleGroup,
-  status, isTesting, isSaving,
+  status, isTesting, isSaving, blockedByLiveConnection,
   testConnection,
 } = form
 
@@ -54,6 +54,11 @@ function startForm(parsed) {
 
 async function save() {
   const result = await form.save()
+  if (result) emit(result.event, result.conn)
+}
+
+async function saveAsNew() {
+  const result = await form.saveAsNew()
   if (result) emit(result.event, result.conn)
 }
 </script>
@@ -338,6 +343,12 @@ async function save() {
         </BaseButton>
         <span class="spacer"></span>
         <BaseButton bordered @click="$emit('close')">Cancel</BaseButton>
+        <BaseButton
+          v-if="blockedByLiveConnection"
+          bordered
+          :disabled="isSaving"
+          @click="saveAsNew"
+        >Save as new connection</BaseButton>
         <BaseButton variant="primary" :disabled="isSaving" @click="save">
           {{ isSaving ? 'Saving…' : (isEditMode ? 'Save Changes' : 'Save') }}
         </BaseButton>

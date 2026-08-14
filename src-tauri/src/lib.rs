@@ -174,6 +174,7 @@ pub fn run() {
             list_connections,
             delete_connection,
             disconnect,
+            is_connected,
             set_connection_open,
             set_connection_tag,
             update_last_accessed,

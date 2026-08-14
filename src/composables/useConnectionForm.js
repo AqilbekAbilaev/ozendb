@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
+import { connectionTargetChanged } from '../utils/connectionTarget.js'
 import { OPTION_GROUPS, KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
 
 // Options managed by dedicated fields outside the catalog (so they aren't treated as
@@ -221,6 +222,9 @@ export function useConnectionForm(editConn) {
   const status    = ref(null)
   const isTesting = ref(false)
   const isSaving  = ref(false)
+  // Set when an edit was refused because the connection is live, which is what puts
+  // the "Save as new connection" action on the footer.
+  const blockedByLiveConnection = ref(false)
 
   // The form as the backend takes it — shared by Save and Test Connection, so both
   // describe the same connection and the test can't pass on a URI Save wouldn't produce.
@@ -327,33 +331,72 @@ export function useConnectionForm(editConn) {
     }
     status.value = null
     isSaving.value = true
+    blockedByLiveConnection.value = false
 
     try {
       const fields = formFields()
       if (isEditMode) {
+        if (connectionTargetChanged(editConn, fields)
+            && await invoke('is_connected', { id: editConn.id })) {
+          status.value = {
+            type: 'error',
+            message: `${editConn.name} is connected. Pointing it at a different server `
+              + 'would leave its open databases describing the old one — disconnect it '
+              + 'first, or save these settings as a new connection.',
+          }
+          blockedByLiveConnection.value = true
+          isSaving.value = false
+          return null
+        }
         const conn = await invoke('update_connection', { id: editConn.id, fields })
         await tauriEmit('connection-updated', conn)
         return { event: 'updated', conn: conn }
       }
 
-      const id = await invoke('save_connection', { fields })
-      const conn = {
-        id:              id,
-        name:            fields.name,
-        hosts:           fields.hosts,
-        connection_type: fields.connectionType,
-        options:         fields.options,
-        tag:             fields.tag,
-        read_only:       fields.readOnly,
-        last_accessed:   null,
-      }
-      await tauriEmit('connection-saved', conn)
-      return { event: 'saved', conn: conn }
+      return await create(fields)
     } catch (e) {
       status.value = { type: 'error', message: errText(e) }
       isSaving.value = false
       return null
     }
+  }
+
+  /**
+   * Save the current form as a separate connection, leaving the edited one untouched.
+   * Offered when an edit is refused because the connection is live.
+   */
+  async function saveAsNew() {
+    status.value = null
+    isSaving.value = true
+    try {
+      const fields = formFields()
+      // Same name as the connection it came from would be indistinguishable in the
+      // list; "(copy)" matches what duplicating a connection produces.
+      if (isEditMode && fields.name === editConn.name) {
+        fields.name = `${fields.name} (copy)`
+      }
+      return await create(fields)
+    } catch (e) {
+      status.value = { type: 'error', message: errText(e) }
+      isSaving.value = false
+      return null
+    }
+  }
+
+  async function create(fields) {
+    const id = await invoke('save_connection', { fields })
+    const conn = {
+      id:              id,
+      name:            fields.name,
+      hosts:           fields.hosts,
+      connection_type: fields.connectionType,
+      options:         fields.options,
+      tag:             fields.tag,
+      read_only:       fields.readOnly,
+      last_accessed:   null,
+    }
+    await tauriEmit('connection-saved', conn)
+    return { event: 'saved', conn: conn }
   }
 
   return {
@@ -366,7 +409,7 @@ export function useConnectionForm(editConn) {
     sshKeyPassphrase, pickSshKey,
     selectedTag, readOnly,
     advancedOptions, optionVisible, optionDisabled, groupSetCount, openGroups, toggleGroup,
-    status, isTesting, isSaving,
-    buildOptions, formFields, applyParsed, testConnection, save,
+    status, isTesting, isSaving, blockedByLiveConnection,
+    buildOptions, formFields, applyParsed, testConnection, save, saveAsNew,
   }
 }

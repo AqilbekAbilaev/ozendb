@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // The composable talks to Tauri only inside save/testConnection; these stubs keep the
 // module importable so the field logic — which is what these specs cover — can run.
@@ -159,5 +159,81 @@ describe('edit-mode seeding', () => {
     expect(fields.replicaSetName).toBe('rs0')
     expect(fields.readOnly).toBe(true)
     expect(fields.tag).toBe('red')
+  })
+})
+
+const { invoke } = await import('@tauri-apps/api/core')
+
+describe('refusing an edit to a live connection', () => {
+  beforeEach(() => {
+    invoke.mockReset()
+    invoke.mockImplementation((cmd) =>
+      Promise.resolve(cmd === 'is_connected' ? true : cmd === 'save_connection' ? 'new-id' : {}))
+  })
+
+  it('refuses when the edit moves a connected connection to another server', async () => {
+    const f = useConnectionForm(stored())
+    f.hosts.value = [{ host: 'db2', port: 27017 }]
+
+    expect(await f.save()).toBe(null)
+    expect(f.blockedByLiveConnection.value).toBe(true)
+    expect(invoke).not.toHaveBeenCalledWith('update_connection', expect.anything())
+  })
+
+  it('allows changes that leave the target alone, even while connected', async () => {
+    // A rename or a timeout applies to a live connection safely — the pool is evicted
+    // and the next operation reconnects.
+    const f = useConnectionForm(stored())
+    f.connName.value = 'renamed'
+    f.advancedOptions.value.socketTimeoutMS = '9000'
+
+    expect(await f.save()).not.toBe(null)
+    expect(f.blockedByLiveConnection.value).toBe(false)
+  })
+
+  it('allows moving a connection that is not connected', async () => {
+    invoke.mockImplementation((cmd) => Promise.resolve(cmd === 'is_connected' ? false : {}))
+    const f = useConnectionForm(stored())
+    f.hosts.value = [{ host: 'db2', port: 27017 }]
+
+    expect(await f.save()).not.toBe(null)
+    expect(f.blockedByLiveConnection.value).toBe(false)
+  })
+
+  it('clears the refusal when the next save attempt is allowed', async () => {
+    const f = useConnectionForm(stored())
+    f.hosts.value = [{ host: 'db2', port: 27017 }]
+    await f.save()
+    expect(f.blockedByLiveConnection.value).toBe(true)
+
+    f.hosts.value = [{ host: 'db1', port: 27017 }]
+    await f.save()
+    expect(f.blockedByLiveConnection.value).toBe(false)
+  })
+})
+
+describe('saveAsNew', () => {
+  beforeEach(() => {
+    invoke.mockReset()
+    invoke.mockImplementation((cmd) => Promise.resolve(cmd === 'save_connection' ? 'new-id' : true))
+  })
+
+  it('creates a separate connection and leaves the edited one untouched', async () => {
+    const f = useConnectionForm(stored())
+    f.hosts.value = [{ host: 'db2', port: 27017 }]
+
+    const result = await f.saveAsNew()
+    expect(result.event).toBe('saved')
+    expect(result.conn.id).toBe('new-id')
+    expect(invoke).not.toHaveBeenCalledWith('update_connection', expect.anything())
+  })
+
+  it('suffixes the name only when it would collide with the original', async () => {
+    const same = useConnectionForm(stored())
+    expect((await same.saveAsNew()).conn.name).toBe('prod (copy)')
+
+    const renamed = useConnectionForm(stored())
+    renamed.connName.value = 'staging'
+    expect((await renamed.saveAsNew()).conn.name).toBe('staging')
   })
 })
