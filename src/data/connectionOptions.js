@@ -90,3 +90,57 @@ export const OPTION_GROUPS = [
 // Flat list of every catalog key — used to tell catalog-managed options apart
 // from any unknown options a stored config may carry (which are preserved).
 export const KNOWN_OPTION_KEYS = OPTION_GROUPS.flatMap(g => g.options.map(o => o.key))
+
+// The editor's tabs, and the fixed choice lists its selects offer. Constants rather
+// than form state, so they live with the option catalog instead of in the dialog.
+export const TABS = [
+  ['server', 'Server'],
+  ['auth', 'Authentication'],
+  ['ssh', 'SSH Tunnel'],
+  ['ssl', 'SSL'],
+  ['advanced', 'Advanced'],
+]
+
+// `available: false` modes are shown disabled and badged "soon" rather than hidden,
+// so the list reads as the full set of what MongoDB supports.
+export const AUTH_MODES = [
+  { value: 'none',          label: 'None',                            available: true  },
+  { value: 'SCRAM-SHA-256', label: 'Basic (SCRAM-SHA-256)',           available: true  },
+  { value: 'SCRAM-SHA-1',   label: 'Legacy (SCRAM-SHA-1)',            available: true  },
+  { value: 'PLAIN',         label: 'LDAP (PLAIN)',                    available: true  },
+  { value: 'X509',          label: 'X.509',                           available: false },
+  { value: 'GSSAPI',        label: 'Kerberos (GSSAPI)',               available: false },
+  { value: 'AWS',           label: 'AWS Identity and Access Management (IAM)', available: false },
+  { value: 'OIDC',          label: 'OIDC — workload identity',        available: true  },
+]
+
+export const AUTH_MODE_OPTIONS = AUTH_MODES.map((m) => ({
+  value: m.value, label: m.label, disabled: !m.available, soon: !m.available,
+}))
+
+export const READ_PREF_OPTIONS = [
+  { value: '',                   label: 'Primary (default)' },
+  { value: 'primaryPreferred',   label: 'Primary preferred' },
+  { value: 'secondary',          label: 'Secondary' },
+  { value: 'secondaryPreferred', label: 'Secondary preferred' },
+  { value: 'nearest',            label: 'Nearest' },
+]
+
+export const BOOL_OPTIONS = [
+  { value: '',      label: '(default)' },
+  { value: 'true',  label: 'true' },
+  { value: 'false', label: 'false' },
+]
+
+// `test` is the driver's built-in test flow (reads a token file); azure/gcp need a
+// TOKEN_RESOURCE (the audience).
+export const OIDC_ENVIRONMENTS = [
+  { value: 'azure', label: 'Azure' },
+  { value: 'gcp',   label: 'GCP' },
+  { value: 'test',  label: 'Test' },
+]
+
+// An Advanced enum field's choices: '(default)' plus the catalog's allowed values.
+export function enumOptions(opt) {
+  return [{ value: '', label: '(default)' }, ...opt.values.map((v) => ({ value: v, label: v }))]
+}

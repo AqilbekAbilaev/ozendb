@@ -17,7 +17,6 @@ const LIMIT = 600
 const GRANDFATHERED = {
   'src/components/results/ResultTable.vue': 793,
   'src/App.vue': 859,
-  'src/components/connection/NewConnection.vue': 715,
   'src-tauri/src/shell/bridge/mod.rs': 824,
   'src-tauri/src/commands/admin.rs': 820,
   'src-tauri/src/commands/sql/mod.rs': 676,
