@@ -18,7 +18,7 @@ import FieldError from '../base/FieldError.vue'
 import FormField from '../base/FormField.vue'
 import HintText from '../base/HintText.vue'
 import { OPTION_GROUPS, KNOWN_OPTION_KEYS } from '../../data/connectionOptions.js'
-import { partitionUriOptions } from '../../utils/connectionUri.js'
+import { parseConnectionUri } from '../../utils/connectionUri.js'
 
 const props = defineProps({
   editConn: { type: Object, default: null },
@@ -331,125 +331,31 @@ function formFields() {
   }
 }
 
-// Parses a pasted MongoDB URI into the form fields so the user can review and
-// adjust before saving. Hand-rolled rather than relying on the browser's URL
-// parser, which throws on a multi-host seed list (`host1,host2,…`) — the
-// standard replica-set / cluster format. Returns true if `raw` looked like a
-// MongoDB connection string.
+// Fills the form from a pasted connection string so the user can review and adjust
+// before saving. Returns true if `raw` looked like a MongoDB URI. A null field means
+// the string said nothing about it, so the form keeps its own default.
 function parseUri(raw) {
-  const scheme = raw.match(/^mongodb(\+srv)?:\/\//)
-  if (!scheme) return false
-  const isSrv = !!scheme[1]
-  let rest = raw.slice(scheme[0].length)
+  const parsed = parseConnectionUri(raw, KNOWN_OPTION_KEYS)
+  if (!parsed) return false
 
-  // Peel off the query string (everything after the first '?').
-  let queryStr = ''
-  const qIdx = rest.indexOf('?')
-  if (qIdx !== -1) {
-    queryStr = rest.slice(qIdx + 1)
-    rest = rest.slice(0, qIdx)
-  }
+  const set = (field, value) => { if (value !== null) field.value = value }
 
-  // Peel off the optional /database path (first '/').
-  let dbPath = ''
-  const slashIdx = rest.indexOf('/')
-  if (slashIdx !== -1) {
-    dbPath = rest.slice(slashIdx + 1)
-    rest = rest.slice(0, slashIdx)
-  }
-
-  // Split userinfo from hosts at the LAST '@' so an unescaped '@' inside a
-  // password is tolerated — the host portion never contains '@'.
-  let userInfo = ''
-  let hostsPart = rest
-  const atIdx = rest.lastIndexOf('@')
-  if (atIdx !== -1) {
-    userInfo = rest.slice(0, atIdx)
-    hostsPart = rest.slice(atIdx + 1)
-  }
-
-  const decode = (s) => { try { return decodeURIComponent(s) } catch (_) { return s } }
-
-  if (userInfo) {
-    const cIdx = userInfo.indexOf(':')
-    if (cIdx === -1) {
-      username.value = decode(userInfo)
-      password.value = ''
-    } else {
-      username.value = decode(userInfo.slice(0, cIdx))
-      password.value = decode(userInfo.slice(cIdx + 1))
-    }
-  }
-
-  // Parse the comma-separated seed list. host:port splits at the last ':' to
-  // leave IPv6 brackets alone. SRV uses a single hostname with no port.
-  const list = hostsPart.split(',').filter(Boolean)
-  if (isSrv) {
-    hosts.value = [{ host: list[0] || 'localhost', port: 27017 }]
-  } else if (list.length) {
-    hosts.value = list.map((hp) => {
-      const colonIdx = hp.lastIndexOf(':')
-      if (colonIdx === -1 || hp.includes(']')) {
-        return { host: hp || 'localhost', port: 27017 }
-      }
-      return {
-        host: hp.slice(0, colonIdx) || 'localhost',
-        port: parseInt(hp.slice(colonIdx + 1)) || 27017,
-      }
-    })
-  } else {
-    hosts.value = [{ host: 'localhost', port: 27017 }]
-  }
-
-  connType.value = isSrv ? 'srv' : 'standalone'
-  authDb.value = decode(dbPath) || 'admin'
-
-  const params = new URLSearchParams(queryStr)
-  const rs = params.get('replicaSet')
-  if (rs) {
-    connType.value = 'replica'
-    replicaSetName.value = rs
-  }
-  const authSource = params.get('authSource')
-  if (authSource) authDb.value = authSource
-
-  const mech = params.get('authMechanism')
-  if (mech) {
-    const mechMap = { 'MONGODB-X509': 'X509', 'MONGODB-AWS': 'AWS', 'MONGODB-OIDC': 'OIDC' }
-    authMode.value = mechMap[mech] || mech
-  } else if (!username.value) {
-    authMode.value = 'none'
-  }
-
-  // Recover OIDC environment / token resource from authMechanismProperties so an imported
-  // OIDC string round-trips (buildOptions re-emits it from these fields on save).
-  if (authMode.value === 'OIDC') {
-    const amp = params.get('authMechanismProperties') || ''
-    for (const part of amp.split(',')) {
-      const idx = part.indexOf(':')
-      if (idx === -1) continue
-      const key = part.slice(0, idx).trim()
-      const value = part.slice(idx + 1).trim()
-      if (key === 'ENVIRONMENT') oidcEnvironment.value = value || 'azure'
-      if (key === 'TOKEN_RESOURCE') oidcTokenResource.value = value
-    }
-  }
-
-  if (params.get('tls') === 'true' || params.get('ssl') === 'true') {
-    useTls.value = true
-    if (params.get('tlsAllowInvalidCertificates') === 'true') tlsAllowInvalidCerts.value = true
-  }
-
-  // Route every remaining option so the import preserves it (Studio 3T parity): catalog
-  // keys fill the Advanced tab, read preference / TLS files fill their dedicated fields,
-  // and anything else is kept verbatim to be re-emitted on save.
-  const routed = partitionUriOptions(params, KNOWN_OPTION_KEYS)
-  Object.assign(advancedOptions.value, routed.known)
-  importedExtraOptions.value = routed.extra
-  if (routed.readPreference) readPreference.value = routed.readPreference
-  if (routed.tlsCaFile) tlsCaFile.value = routed.tlsCaFile
-  if (routed.tlsCertKeyFile) tlsCertKeyFile.value = routed.tlsCertKeyFile
-  if (routed.tls) useTls.value = true
+  set(username, parsed.username)
+  set(password, parsed.password)
+  set(hosts, parsed.hosts)
+  set(connType, parsed.connectionType)
+  set(replicaSetName, parsed.replicaSetName)
+  set(authDb, parsed.authDb)
+  set(authMode, parsed.authMode)
+  set(oidcEnvironment, parsed.oidcEnvironment)
+  set(oidcTokenResource, parsed.oidcTokenResource)
+  set(useTls, parsed.tls)
+  set(tlsAllowInvalidCerts, parsed.tlsAllowInvalidCerts)
+  set(tlsCaFile, parsed.tlsCaFile)
+  set(tlsCertKeyFile, parsed.tlsCertKeyFile)
+  set(readPreference, parsed.readPreference)
+  Object.assign(advancedOptions.value, parsed.advancedOptions)
+  importedExtraOptions.value = parsed.extraOptions
 
   return true
 }
