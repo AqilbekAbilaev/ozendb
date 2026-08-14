@@ -124,6 +124,20 @@ fn secrets_are_lifted_out_and_never_reach_the_config() {
 }
 
 #[test]
+fn a_tested_form_is_dialled_the_way_it_will_be_saved() {
+    // Test Connection used to build its own URI in the frontend, which never emitted
+    // replicaSet and mapped only OIDC — so a green test said nothing about the
+    // connection that got saved. Both paths now run the form through `build_uri`.
+    let uri = crate::uri::build_uri(
+        &fields().into_config(String::from("c1"), None, None, false),
+        Some("pw"),
+    );
+
+    assert_eq!(uri.contains("replicaSet=rs0"), true, "replica set must reach the URI");
+    assert_eq!(uri.contains("authMechanism=MONGODB-X509"), true, "short names are mapped");
+}
+
+#[test]
 fn a_username_keeps_the_password() {
     let mut c = config();
     c.username = Some(String::from("admin"));

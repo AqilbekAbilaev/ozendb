@@ -301,37 +301,34 @@ const TABS = [
   ['advanced', 'Advanced'],
 ]
 
-// Builds a temporary URI from form fields — used only for Test Connection.
-function buildUriForTest() {
-  const isSrv = connType.value === 'srv'
-  const scheme = isSrv ? 'mongodb+srv' : 'mongodb'
-  let uri = `${scheme}://`
-  if (username.value && password.value) {
-    uri += `${encodeURIComponent(username.value)}:${encodeURIComponent(password.value)}@`
-  } else if (username.value) {
-    uri += `${encodeURIComponent(username.value)}@`
+// The form as the backend takes it — shared by Save and Test Connection, so both
+// describe the same connection and the test can't pass on a URI Save wouldn't produce.
+function formFields() {
+  return {
+    name:            connName.value.trim(),
+    hosts:           hosts.value.map(h => ({ host: h.host, port: Number(h.port) || 27017 })),
+    connectionType:  connType.value,
+    replicaSetName:  replicaSetName.value || null,
+    options:         buildOptions(),
+    username:        authMode.value !== 'none' ? (username.value || null) : null,
+    password:        authMode.value !== 'none' ? (password.value || null) : null,
+    authDb:          authMode.value !== 'none' ? (authDb.value || null) : null,
+    authMechanism:   authMode.value,
+    tls:                          useTls.value,
+    tlsCaFile:                    useTls.value ? (tlsCaFile.value || null) : null,
+    tlsCertKeyFile:               useTls.value ? (tlsCertKeyFile.value || null) : null,
+    tlsAllowInvalidCertificates:  useTls.value ? tlsAllowInvalidCerts.value : false,
+    sshEnabled:    useSsh.value,
+    sshHost:       useSsh.value ? (sshHost.value || null) : null,
+    sshPort:       Number(sshPort.value) || 22,
+    sshUser:       useSsh.value ? (sshUser.value || null) : null,
+    sshAuth:       useSsh.value ? sshAuth.value : null,
+    sshKeyFile:    (useSsh.value && sshAuth.value === 'key') ? (sshKeyFile.value || null) : null,
+    sshPassword:   (useSsh.value && sshAuth.value === 'password') ? (sshPassword.value || null) : null,
+    sshPassphrase: (useSsh.value && sshAuth.value === 'key') ? (sshKeyPassphrase.value || null) : null,
+    tag:             selectedTag.value !== 'none' ? selectedTag.value : null,
+    readOnly:        readOnly.value,
   }
-  uri += isSrv
-    ? hosts.value[0].host
-    : hosts.value.map(h => `${h.host}:${h.port}`).join(',')
-  uri += `/${authDb.value || 'admin'}`
-  const params = []
-  if (useTls.value) {
-    params.push('tls=true')
-    if (tlsCaFile.value) params.push(`tlsCAFile=${encodeURIComponent(tlsCaFile.value)}`)
-    if (tlsCertKeyFile.value) params.push(`tlsCertificateKeyFile=${encodeURIComponent(tlsCertKeyFile.value)}`)
-    if (tlsAllowInvalidCerts.value) params.push('tlsAllowInvalidCertificates=true')
-  }
-  // OIDC needs its mechanism in the test URI (other mechanisms negotiate via credentials).
-  if (authMode.value === 'OIDC') {
-    params.push('authMechanism=MONGODB-OIDC')
-  }
-  // Advanced-tab options, appended verbatim to mirror the backend's passthrough.
-  for (const [key, value] of Object.entries(buildOptions())) {
-    params.push(`${key}=${value}`)
-  }
-  if (params.length) uri += `?${params.join('&')}`
-  return uri
 }
 
 // Parses a pasted MongoDB URI into the form fields so the user can review and
@@ -496,7 +493,10 @@ async function testConnection() {
         authMechanism: authMode.value,
       })
     } else {
-      await invoke('test_connection', { uri: buildUriForTest() })
+      await invoke('test_connection', {
+        id: isEditMode ? props.editConn.id : null,
+        fields: formFields(),
+      })
     }
     status.value = { type: 'success', message: 'Connected successfully.' }
   } catch (e) {
@@ -514,31 +514,7 @@ async function save() {
   status.value = null
   isSaving.value = true
   try {
-    const fields = {
-      name:            connName.value.trim(),
-      hosts:           hosts.value.map(h => ({ host: h.host, port: Number(h.port) || 27017 })),
-      connectionType:  connType.value,
-      replicaSetName:  replicaSetName.value || null,
-      options:         buildOptions(),
-      username:        authMode.value !== 'none' ? (username.value || null) : null,
-      password:        authMode.value !== 'none' ? (password.value || null) : null,
-      authDb:          authMode.value !== 'none' ? (authDb.value || null) : null,
-      authMechanism:   authMode.value,
-      tls:                          useTls.value,
-      tlsCaFile:                    useTls.value ? (tlsCaFile.value || null) : null,
-      tlsCertKeyFile:               useTls.value ? (tlsCertKeyFile.value || null) : null,
-      tlsAllowInvalidCertificates:  useTls.value ? tlsAllowInvalidCerts.value : false,
-      sshEnabled:    useSsh.value,
-      sshHost:       useSsh.value ? (sshHost.value || null) : null,
-      sshPort:       Number(sshPort.value) || 22,
-      sshUser:       useSsh.value ? (sshUser.value || null) : null,
-      sshAuth:       useSsh.value ? sshAuth.value : null,
-      sshKeyFile:    (useSsh.value && sshAuth.value === 'key') ? (sshKeyFile.value || null) : null,
-      sshPassword:   (useSsh.value && sshAuth.value === 'password') ? (sshPassword.value || null) : null,
-      sshPassphrase: (useSsh.value && sshAuth.value === 'key') ? (sshKeyPassphrase.value || null) : null,
-      tag:             selectedTag.value !== 'none' ? selectedTag.value : null,
-      readOnly:        readOnly.value,
-    }
+    const fields = formFields()
 
     if (isEditMode) {
       await invoke('update_connection', { id: props.editConn.id, fields })

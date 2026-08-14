@@ -92,8 +92,22 @@ impl ConnectionFields {
     }
 }
 
+/// Test the connection the editor currently describes, without saving it. The URI comes
+/// from `uri::build_uri` — the same function the real connect path uses — so a green test
+/// means the connection will be dialled exactly the way it was tested.
+///
+/// `id` is set when editing an existing connection, where a blank password field means
+/// "keep the stored one" (the rule `update_connection` follows); the secret then comes
+/// from the keychain rather than the form.
 #[tauri::command]
-pub async fn test_connection(uri: String) -> Result<(), AppError> {
+pub async fn test_connection(id: Option<String>, fields: ConnectionFields) -> Result<(), AppError> {
+    let password = match fields.password.clone().filter(|s| !s.is_empty()) {
+        Some(typed) => Some(typed),
+        None => id.as_deref().and_then(crate::keychain::get),
+    };
+    let config = fields.into_config(id.unwrap_or_default(), None, None, false);
+    let uri = uri::build_uri(&config, password.as_deref());
+
     match uri::tcp_probe(&uri).await {
         Ok(val) => val,
         Err(e) => return Err(e),
