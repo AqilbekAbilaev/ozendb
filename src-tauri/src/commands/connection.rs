@@ -310,6 +310,31 @@ pub fn connection_uri(ctx: State<'_, AppContext>, id: String) -> Result<String, 
     Ok(crate::uri::build_uri(&config, None))
 }
 
+/// The three keychain keys a connection may hold a secret under. Secrets are keyed by
+/// connection id, with the SSH ones under composite keys.
+fn secret_keys(id: &str) -> [String; 3] {
+    [
+        id.to_string(),
+        format!("{}::ssh-pass", id),
+        format!("{}::ssh-key-pass", id),
+    ]
+}
+
+/// Copy every secret one connection holds to another id's keys. A copy of a connection
+/// is a new id with nothing stored under it, so without this it would authenticate as
+/// nobody while looking correctly configured.
+fn copy_secrets(from: &str, to: &str) -> Result<(), AppError> {
+    for (source, target) in secret_keys(from).iter().zip(secret_keys(to).iter()) {
+        if let Some(secret) = crate::keychain::get(source) {
+            match crate::keychain::set(target, &secret) {
+                Ok(val) => val,
+                Err(e) => return Err(e),
+            };
+        }
+    }
+    Ok(())
+}
+
 /// Duplicate a saved connection: clone its config under a new id and a "(copy)"
 /// name, carry over any keychain secrets to the new id, and persist it. The copy
 /// starts closed (not shown in the sidebar) and with no last-accessed time.
@@ -330,25 +355,10 @@ pub fn duplicate_connection(
     copy.open = false;
 
     // Carry over keychain secrets (main password + SSH secrets) to the new id's keys.
-    if let Some(pw) = crate::keychain::get(&id) {
-        match crate::keychain::set(&new_id, &pw) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-    }
-    if let Some(sp) = crate::keychain::get(&format!("{}::ssh-pass", id)) {
-        match crate::keychain::set(&format!("{}::ssh-pass", new_id), &sp) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-    }
-    if let Some(pp) = crate::keychain::get(&format!("{}::ssh-key-pass", id)) {
-        match crate::keychain::set(&format!("{}::ssh-key-pass", new_id), &pp) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-    }
-
+    match copy_secrets(&id, &new_id) {
+        Ok(val) => val,
+        Err(e) => return Err(e),
+    };
     match ctx.storage.add(copy.clone()) {
         Ok(val) => val,
         Err(e) => return Err(e),

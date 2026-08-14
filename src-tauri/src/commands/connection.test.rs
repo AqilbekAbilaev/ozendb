@@ -192,3 +192,41 @@ fn each_ssh_auth_method_keeps_only_its_own_secret() {
         "switching to key auth retires the ssh password"
     );
 }
+
+#[test]
+fn the_frontends_payload_deserializes_with_its_secrets() {
+    // The exact shape `formFields()` sends. A key that doesn't line up here means the
+    // secret silently arrives as None and never reaches the keychain.
+    let json = r#"{
+        "name": "prod",
+        "hosts": [{"host": "db1", "port": 27017}],
+        "connectionType": "standalone",
+        "replicaSetName": null,
+        "options": {},
+        "username": "admin",
+        "password": "s3cret",
+        "authDb": "admin",
+        "authMechanism": "SCRAM-SHA-256",
+        "tls": false,
+        "tlsCaFile": null,
+        "tlsCertKeyFile": null,
+        "tlsAllowInvalidCertificates": false,
+        "sshEnabled": false,
+        "sshHost": null,
+        "sshPort": 22,
+        "sshUser": null,
+        "sshAuth": null,
+        "sshKeyFile": null,
+        "sshPassword": "sshpw",
+        "sshPassphrase": "phrase",
+        "tag": null,
+        "readOnly": false
+    }"#;
+
+    let fields: ConnectionFields = serde_json::from_str(json).unwrap();
+    let (password, ssh_password, ssh_passphrase) = fields.secrets();
+
+    assert_eq!(password.as_deref(), Some("s3cret"));
+    assert_eq!(ssh_password.as_deref(), Some("sshpw"));
+    assert_eq!(ssh_passphrase.as_deref(), Some("phrase"));
+}
