@@ -143,7 +143,6 @@ function oidcMechanismProperties() {
   return properties
 }
 
-
 // ssl tab
 const useTls              = ref(isEditMode ? !!props.editConn.tls : false)
 const tlsCaFile           = ref(isEditMode ? (props.editConn.tls_ca_file ?? '') : '')
@@ -287,7 +286,6 @@ const status    = ref(null)
 const isTesting = ref(false)
 const isSaving  = ref(false)
 
-
 const TABS = [
   ['server', 'Server'],
   ['auth', 'Authentication'],
@@ -425,6 +423,8 @@ async function save() {
         read_only:       fields.readOnly,
       }
       emit('updated', updated)
+      // The sidebar keeps its own copy of the list, as it does for new connections.
+      await tauriEmit('connection-updated', updated)
     } else {
       const id = await invoke('save_connection', { fields })
       const conn = {

@@ -9,6 +9,7 @@ import BaseButton from '../base/BaseButton.vue'
 import StatsTip from './StatsTip.vue'
 import { useStatsTip } from '../../composables/useStatsTip'
 import { colorHex } from '../../utils/tabColor.js'
+import { applyConnectionUpdate } from '../../utils/connectionList.js'
 
 const props = defineProps({
   activeCollectionKey: String,
@@ -67,6 +68,9 @@ onMounted(async () => {
     if (!connections.value.some(c => c.id === e.payload.id)) {
       connections.value.push(e.payload)
     }
+  })
+  await listen('connection-updated', (e) => {
+    connections.value = applyConnectionUpdate(connections.value, e.payload)
   })
   await listen('connection-deleted', (e) => {
     disconnectConn(e.payload.id, { persist: false })
