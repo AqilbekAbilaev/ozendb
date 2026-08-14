@@ -10,15 +10,13 @@ import BaseModal from '../base/BaseModal.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
-import BaseTextarea from '../base/BaseTextarea.vue'
 import SegmentedControl from '../base/SegmentedControl.vue'
 import TabStrip from '../base/TabStrip.vue'
 import Disclosure from '../base/Disclosure.vue'
-import FieldError from '../base/FieldError.vue'
 import FormField from '../base/FormField.vue'
 import HintText from '../base/HintText.vue'
 import { OPTION_GROUPS, KNOWN_OPTION_KEYS } from '../../data/connectionOptions.js'
-import { parseConnectionUri } from '../../utils/connectionUri.js'
+import ConnectionIntro from './ConnectionIntro.vue'
 
 const props = defineProps({
   editConn: { type: Object, default: null },
@@ -28,10 +26,7 @@ const emit = defineEmits(['close', 'saved', 'updated'])
 const isEditMode = !!props.editConn
 
 // ── step: 'intro' | 'form'  (edit mode always starts on form)
-const step     = ref(isEditMode ? 'form' : 'intro')
-const mode     = ref('uri')
-const pastedUri = ref('')
-const uriError  = ref('')
+const step = ref(isEditMode ? 'form' : 'intro')
 
 // ── form state — pre-filled from editConn in edit mode
 const connName  = ref(isEditMode ? props.editConn.name : 'New Connection')
@@ -331,13 +326,15 @@ function formFields() {
   }
 }
 
-// Fills the form from a pasted connection string so the user can review and adjust
-// before saving. Returns true if `raw` looked like a MongoDB URI. A null field means
-// the string said nothing about it, so the form keeps its own default.
-function parseUri(raw) {
-  const parsed = parseConnectionUri(raw, KNOWN_OPTION_KEYS)
-  if (!parsed) return false
+// Opens the form, pre-filled from the intro step's connection string when there was
+// one. A null field means the string said nothing about it, so the form keeps its own
+// default. `parsed` is null when the user chose to configure the connection by hand.
+function startForm(parsed) {
+  step.value = 'form'
+  activeTab.value = 'server'
+  if (!parsed) return
 
+  connName.value = 'Imported from URI'
   const set = (field, value) => { if (value !== null) field.value = value }
 
   set(username, parsed.username)
@@ -356,26 +353,6 @@ function parseUri(raw) {
   set(readPreference, parsed.readPreference)
   Object.assign(advancedOptions.value, parsed.advancedOptions)
   importedExtraOptions.value = parsed.extraOptions
-
-  return true
-}
-
-function goNext() {
-  if (mode.value === 'uri') {
-    const raw = pastedUri.value.trim()
-    if (!raw) {
-      uriError.value = 'Paste a connection string, or choose "Manually configure" below.'
-      return
-    }
-    if (!parseUri(raw)) {
-      uriError.value = 'That doesn’t look like a MongoDB connection string (expected mongodb:// or mongodb+srv://).'
-      return
-    }
-    connName.value = 'Imported from URI'
-  }
-  uriError.value = ''
-  step.value = 'form'
-  activeTab.value = 'server'
 }
 
 async function testConnection() {
@@ -471,42 +448,7 @@ async function save() {
 </script>
 
 <template>
-  <!-- ── Intro step ─────────────────────────────────── -->
-  <BaseModal v-if="step === 'intro'" title="New Connection" width="640px" max-width="94vw" @close="$emit('close')">
-      <div class="nci-body">
-        <p class="nci-lead">
-          If you have a connection string (SRV or standard), e.g. for your MongoDB deployment,
-          you can paste it here and OzenDB will auto-configure your connection settings for you.
-        </p>
-
-        <label class="nci-radio" @click="mode = 'uri'">
-          <span class="radio" :class="{ on: mode === 'uri' }"></span>
-          <span class="nci-radio-lbl">Paste your connection string (SRV or standard) here:</span>
-        </label>
-        <div class="nci-uri-wrap">
-          <span class="nci-uri-lbl">URI:</span>
-          <BaseTextarea
-            class="nci-uri"
-            :disabled="mode !== 'uri'"
-            v-model="pastedUri"
-            placeholder="mongodb+srv://user:password@cluster.mongodb.net/"
-          />
-        </div>
-
-        <FieldError :text="uriError" class="nci-error" />
-
-        <label class="nci-radio" @click="mode = 'manual'; uriError = ''">
-          <span class="radio" :class="{ on: mode === 'manual' }"></span>
-          <span class="nci-radio-lbl">Manually configure my connection settings</span>
-        </label>
-      </div>
-
-      <div class="cm-footer">
-        <span class="spacer"></span>
-        <BaseButton bordered @click="$emit('close')">Cancel</BaseButton>
-        <BaseButton variant="primary" @click="goNext">Next</BaseButton>
-      </div>
-  </BaseModal>
+  <ConnectionIntro v-if="step === 'intro'" @close="$emit('close')" @next="startForm" />
 
   <!-- ── Form step ──────────────────────────────────── -->
   <BaseModal v-else :title="isEditMode ? 'Edit Connection' : 'New Connection'" width="720px" max-width="94vw" height="600px" max-height="92vh" @close="$emit('close')">

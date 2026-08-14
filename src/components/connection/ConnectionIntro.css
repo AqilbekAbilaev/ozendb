@@ -1,0 +1,32 @@
+.nci-body { padding: 22px 24px 8px; }
+.nci-lead { font-size: 13.5px; line-height: 1.6; color: var(--text); margin: 0 0 22px; }
+.nci-radio {
+  display: flex; align-items: center; gap: 11px;
+  cursor: pointer; margin: 0 0 4px;
+}
+.nci-radio-lbl { font-size: 14px; color: var(--text); font-weight: 600; }
+.radio {
+  width: 17px; height: 17px; border-radius: 50%;
+  border: 1.5px solid var(--text-faint); flex: none;
+  display: grid; place-items: center;
+}
+.radio.on { border-color: var(--accent); }
+.radio.on::after {
+  content: ""; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--accent);
+}
+.nci-uri-wrap {
+  display: flex; gap: 12px; margin: 14px 0 22px; padding-left: 28px;
+}
+.nci-uri-lbl { font-size: 13px; color: var(--text-dim); padding-top: 8px; flex: none; }
+.base-textarea.nci-uri { flex: 1; min-height: 90px; }
+.nci-uri:disabled { opacity: .5; }
+.nci-error { margin: 12px 0 0; line-height: 1.5; }
+
+/* Duplicated from NewConnection.css rather than shared: both stylesheets are `scoped`,
+   so the form step's copy can't reach this component's markup. */
+.cm-footer {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-top: 1px solid var(--border); flex: none;
+}
+.spacer { flex: 1; }
