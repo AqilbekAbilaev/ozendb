@@ -541,7 +541,7 @@ async function save() {
     }
 
     if (isEditMode) {
-      await invoke('update_connection', { id: props.editConn.id, ...fields })
+      await invoke('update_connection', { id: props.editConn.id, fields })
       const updated = {
         ...props.editConn,
         name:            fields.name,
@@ -567,7 +567,7 @@ async function save() {
       }
       emit('updated', updated)
     } else {
-      const id = await invoke('save_connection', fields)
+      const id = await invoke('save_connection', { fields })
       const conn = {
         id:              id,
         name:            fields.name,

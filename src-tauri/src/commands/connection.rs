@@ -10,6 +10,88 @@ use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
 
+/// The connection editor's form, exactly as the frontend sends it. `save_connection`
+/// and `update_connection` take the same payload; the fields the editor doesn't own
+/// (id, folder, last_accessed, open) are supplied by the caller instead.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionFields {
+    pub name: String,
+    pub hosts: Vec<HostEntry>,
+    pub connection_type: String,
+    pub replica_set_name: Option<String>,
+    pub username: Option<String>,
+    pub auth_db: Option<String>,
+    pub auth_mechanism: Option<String>,
+    pub options: std::collections::BTreeMap<String, String>,
+    pub tls: bool,
+    pub tls_ca_file: Option<String>,
+    pub tls_cert_key_file: Option<String>,
+    pub tls_allow_invalid_certificates: bool,
+    pub ssh_enabled: bool,
+    pub ssh_host: Option<String>,
+    pub ssh_port: u16,
+    pub ssh_user: Option<String>,
+    pub ssh_auth: Option<String>,
+    pub ssh_key_file: Option<String>,
+    pub tag: Option<String>,
+    pub read_only: bool,
+    // Secrets ride in the same payload but have no place in `ConnectionConfig` —
+    // they go to the keychain and nowhere else.
+    pub password: Option<String>,
+    pub ssh_password: Option<String>,
+    pub ssh_passphrase: Option<String>,
+}
+
+impl ConnectionFields {
+    /// The stored config this form describes. The four fields the editor doesn't
+    /// carry come from the caller: a new connection invents them, an edit preserves
+    /// the existing record's.
+    fn into_config(
+        self,
+        id: String,
+        folder_id: Option<String>,
+        last_accessed: Option<String>,
+        open: bool,
+    ) -> ConnectionConfig {
+        ConnectionConfig {
+            id: id,
+            name: self.name,
+            hosts: self.hosts,
+            connection_type: self.connection_type,
+            replica_set_name: self.replica_set_name,
+            username: self.username,
+            auth_db: self.auth_db,
+            auth_mechanism: self.auth_mechanism,
+            options: self.options,
+            tls: self.tls,
+            tls_ca_file: self.tls_ca_file,
+            tls_cert_key_file: self.tls_cert_key_file,
+            tls_allow_invalid_certificates: self.tls_allow_invalid_certificates,
+            ssh_enabled: self.ssh_enabled,
+            ssh_host: self.ssh_host,
+            ssh_port: self.ssh_port,
+            ssh_user: self.ssh_user,
+            ssh_auth: self.ssh_auth,
+            ssh_key_file: self.ssh_key_file,
+            tag: self.tag,
+            read_only: self.read_only,
+            folder_id: folder_id,
+            last_accessed: last_accessed,
+            open: open,
+        }
+    }
+
+    /// The three secrets, lifted out before `into_config` consumes the form.
+    fn secrets(&self) -> (Option<String>, Option<String>, Option<String>) {
+        (
+            self.password.clone(),
+            self.ssh_password.clone(),
+            self.ssh_passphrase.clone(),
+        )
+    }
+}
+
 #[tauri::command]
 pub async fn test_connection(uri: String) -> Result<(), AppError> {
     match uri::tcp_probe(&uri).await {
@@ -152,59 +234,12 @@ pub(crate) fn usable_secrets(config: &ConnectionConfig) -> (bool, bool, bool) {
 #[tauri::command]
 pub async fn save_connection(
     ctx: State<'_, AppContext>,
-    name: String,
-    hosts: Vec<HostEntry>,
-    connection_type: String,
-    replica_set_name: Option<String>,
-    username: Option<String>,
-    password: Option<String>,
-    auth_db: Option<String>,
-    auth_mechanism: Option<String>,
-    options: std::collections::BTreeMap<String, String>,
-    tls: bool,
-    tls_ca_file: Option<String>,
-    tls_cert_key_file: Option<String>,
-    tls_allow_invalid_certificates: bool,
-    ssh_enabled: bool,
-    ssh_host: Option<String>,
-    ssh_port: u16,
-    ssh_user: Option<String>,
-    ssh_auth: Option<String>,
-    ssh_key_file: Option<String>,
-    ssh_password: Option<String>,
-    ssh_passphrase: Option<String>,
-    tag: Option<String>,
-    read_only: bool,
+    fields: ConnectionFields,
 ) -> Result<String, AppError> {
     let id = Uuid::new_v4().to_string();
-    let config = ConnectionConfig {
-        id: id.clone(),
-        name: name,
-        hosts: hosts,
-        connection_type: connection_type,
-        replica_set_name: replica_set_name,
-        username: username,
-        auth_db: auth_db,
-        auth_mechanism: auth_mechanism,
-        options: options,
-        tls: tls,
-        tls_ca_file: tls_ca_file,
-        tls_cert_key_file: tls_cert_key_file,
-        tls_allow_invalid_certificates: tls_allow_invalid_certificates,
-        ssh_enabled: ssh_enabled,
-        ssh_host: ssh_host,
-        ssh_port: ssh_port,
-        ssh_user: ssh_user,
-        ssh_auth: ssh_auth,
-        ssh_key_file: ssh_key_file,
-        tag: tag,
-        read_only: read_only,
-        // A newly saved connection starts at the root (no folder).
-        folder_id: None,
-        last_accessed: None,
-        // A newly saved connection is opened in the sidebar.
-        open: true,
-    };
+    let (password, ssh_password, ssh_passphrase) = fields.secrets();
+    // A newly saved connection starts at the root (no folder) and opened in the sidebar.
+    let config = fields.into_config(id.clone(), None, None, true);
 
     // Store password in OS keychain before persisting the rest to disk.
     let pw_ref = password.as_deref().filter(|s| !s.is_empty());
@@ -356,29 +391,7 @@ pub fn import_connections(ctx: State<'_, AppContext>, path: String) -> Result<us
 pub async fn update_connection(
     ctx: State<'_, AppContext>,
     id: String,
-    name: String,
-    hosts: Vec<HostEntry>,
-    connection_type: String,
-    replica_set_name: Option<String>,
-    username: Option<String>,
-    password: Option<String>,
-    auth_db: Option<String>,
-    auth_mechanism: Option<String>,
-    options: std::collections::BTreeMap<String, String>,
-    tls: bool,
-    tls_ca_file: Option<String>,
-    tls_cert_key_file: Option<String>,
-    tls_allow_invalid_certificates: bool,
-    ssh_enabled: bool,
-    ssh_host: Option<String>,
-    ssh_port: u16,
-    ssh_user: Option<String>,
-    ssh_auth: Option<String>,
-    ssh_key_file: Option<String>,
-    ssh_password: Option<String>,
-    ssh_passphrase: Option<String>,
-    tag: Option<String>,
-    read_only: bool,
+    fields: ConnectionFields,
 ) -> Result<(), AppError> {
     // Preserve last_accessed, folder membership, and the open state from the
     // existing record (the edit dialog doesn't carry these fields).
@@ -387,32 +400,8 @@ pub async fn update_connection(
     let folder_id = existing.as_ref().and_then(|c| c.folder_id.clone());
     let open = existing.as_ref().map(|c| c.open).unwrap_or(true);
 
-    let config = ConnectionConfig {
-        id: id.clone(),
-        name: name,
-        hosts: hosts,
-        connection_type: connection_type,
-        replica_set_name: replica_set_name,
-        username: username,
-        auth_db: auth_db,
-        auth_mechanism: auth_mechanism,
-        options: options,
-        tls: tls,
-        tls_ca_file: tls_ca_file,
-        tls_cert_key_file: tls_cert_key_file,
-        tls_allow_invalid_certificates: tls_allow_invalid_certificates,
-        ssh_enabled: ssh_enabled,
-        ssh_host: ssh_host,
-        ssh_port: ssh_port,
-        ssh_user: ssh_user,
-        ssh_auth: ssh_auth,
-        ssh_key_file: ssh_key_file,
-        tag: tag,
-        read_only: read_only,
-        folder_id: folder_id,
-        last_accessed: last_accessed,
-        open: open,
-    };
+    let (password, ssh_password, ssh_passphrase) = fields.secrets();
+    let config = fields.into_config(id.clone(), folder_id, last_accessed, open);
 
     // Update keychain only when a new secret is supplied; empty = keep existing.
     let pw_ref = password.as_deref().filter(|s| !s.is_empty());
