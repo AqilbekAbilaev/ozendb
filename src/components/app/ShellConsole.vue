@@ -6,6 +6,7 @@ import { errText } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import TabStrip from '../base/TabStrip.vue'
+import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 import ResultTable from '../results/ResultTable.vue'
 import TreeView from '../base/TreeView.vue'
 import { mongoStringify, syntaxHighlight } from '../../utils/mongoFormat'
@@ -229,6 +230,9 @@ function formatScalar(value) {
 
 <template>
   <div class="shell">
+    <!-- Connection → database, same crumb bar the collection panes show -->
+    <CollectionCrumbs :conn="activeTab.connectionName" :db="activeTab.dbName" />
+
     <!-- Toolbar -->
     <div class="shell-toolbar">
       <BaseButton variant="ghost" size="sm" class="run" @click="run()" :disabled="activeTab.isRunning">
@@ -265,7 +269,6 @@ function formatScalar(value) {
         <BaseIcon name="save" :size="16" class="ic" /> Save
       </BaseButton>
       <span class="tb-spacer"></span>
-      <span class="shell-db"><BaseIcon name="dbSmall" :size="14" /> {{ activeTab.dbName }}</span>
     </div>
 
     <!-- Editor: CodeMirror (JS highlighting + Mongo autocomplete) -->
@@ -363,7 +366,6 @@ function formatScalar(value) {
 }
 .tb-sep { width: 1px; align-self: stretch; background: var(--border-soft); margin: 4px 6px; }
 .tb-spacer { flex: 1; }
-.shell-db { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 12.5px; padding: 5px 10px; }
 
 /* history dropdown (mirrors QueryBar) */
 .hist-wrap { position: relative; }

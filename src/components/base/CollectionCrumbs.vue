@@ -23,9 +23,11 @@ defineProps({
     <BaseIcon name="caret" :size="11" class="sep" />
     <BaseIcon name="dbSmall" :size="15" class="c-ic" />
     <span class="crumb">{{ db }}</span>
-    <BaseIcon name="caret" :size="11" class="sep" />
-    <BaseIcon name="collSmall" :size="15" class="c-ic" />
-    <span class="crumb">{{ coll }}</span>
+    <template v-if="coll">
+      <BaseIcon name="caret" :size="11" class="sep" />
+      <BaseIcon name="collSmall" :size="15" class="c-ic" />
+      <span class="crumb">{{ coll }}</span>
+    </template>
     <template v-if="label">
       <BaseIcon name="caret" :size="11" class="sep" />
       <BaseIcon :name="icon" :size="15" class="c-ic" />
