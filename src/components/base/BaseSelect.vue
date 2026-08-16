@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 
 // Themeable dropdown select. Native <select> can't style its option popup — WebKit
@@ -82,11 +82,20 @@ function onKey(e) {
 function onReflow() {
   if (open.value) positionMenu()
 }
+// The repositioning listeners only matter while the menu is open — attaching them
+// permanently would run a capture-phase scroll handler per scroll event app-wide.
+watch(open, (isOpen) => {
+  if (isOpen) {
+    window.addEventListener('resize', onReflow)
+    window.addEventListener('scroll', onReflow, true)
+  } else {
+    window.removeEventListener('resize', onReflow)
+    window.removeEventListener('scroll', onReflow, true)
+  }
+})
 onMounted(() => {
   document.addEventListener('mousedown', onDocPointer, true)
   document.addEventListener('keydown', onKey)
-  window.addEventListener('resize', onReflow)
-  window.addEventListener('scroll', onReflow, true)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onDocPointer, true)

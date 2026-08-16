@@ -88,7 +88,7 @@ const dialogStyle = computed(() => ({
 .bm-dialog {
   background: var(--bg-window);
   border-radius: 10px;
-  box-shadow: 0 30px 80px rgba(0,0,0,.65), 0 0 0 1px var(--border);
+  box-shadow: 0 8px 24px rgba(0,0,0,.45), 0 0 0 1px var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;

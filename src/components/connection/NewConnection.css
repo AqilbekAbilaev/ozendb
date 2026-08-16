@@ -13,7 +13,7 @@
 }
 
 /* ── Tab body ── */
-.nc-body { flex: 1; overflow-y: auto; padding: 18px; }
+.nc-body { flex: 1; overflow-y: auto; padding: 18px; contain: content; }
 .nc-form { display: flex; flex-direction: column; gap: 15px; max-width: 560px; }
 .nc-file-row { display: flex; gap: 8px; align-items: center; }
 .nc-inline  { display: flex; align-items: center; gap: 8px; }

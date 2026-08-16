@@ -17,6 +17,7 @@ import {
 } from '../../data/connectionOptions.js'
 import ConnectionIntro from './ConnectionIntro.vue'
 import { useConnectionForm } from '../../composables/useConnectionForm.js'
+import { useMomentumScroll } from '../../composables/useMomentumScroll.js'
 
 const props = defineProps({
   editConn: { type: Object, default: null },
@@ -61,6 +62,10 @@ async function saveAsNew() {
   const result = await form.saveAsNew()
   if (result) emit(result.event, result.conn)
 }
+
+// Touchpad swipes glide after the fingers lift, matching the app's panes.
+const bodyEl = ref(null)
+useMomentumScroll(bodyEl)
 </script>
 
 <template>
@@ -88,7 +93,7 @@ async function saveAsNew() {
       </div>
 
       <!-- Tab body -->
-      <div class="nc-body">
+      <div ref="bodyEl" class="nc-body">
 
         <!-- Server -->
         <div v-if="activeTab === 'server'" class="nc-form">
