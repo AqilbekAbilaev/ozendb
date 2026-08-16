@@ -9,7 +9,7 @@ import BaseCheckbox from '../base/BaseCheckbox.vue'
 import TabStrip from '../base/TabStrip.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
-import ShortcutsPane from './ShortcutsPane.vue'
+import ShortcutsPane from '../panes/ShortcutsPane.vue'
 import { PAGE_SIZES } from '../../constants/pageSizes'
 
 // App preferences. Persisted via update_settings (a partial merge on the backend);

@@ -3,7 +3,7 @@ import { computed, ref, inject, watch, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
-import IndexAddDialog from './IndexAddDialog.vue'
+import IndexAddDialog from '../query/IndexAddDialog.vue'
 import {
   isProtectedIndex, isIndexHidden, indexKeyLabel, indexType, indexProperties,
 } from '../../utils/indexSpec'

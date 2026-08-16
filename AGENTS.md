@@ -50,7 +50,7 @@ App.vue  (composes the panes; owns split-pane sizing and handleContextAction)
   └── base/ContextMenu.vue       (handled entirely in App.vue's handleContextAction)
 ```
 
-Components are grouped by area under `src/components/`: `admin/`, `app/`, `base/`, `connection/`, `query/`, `results/`, `tools/`.
+Components are grouped by area under `src/components/`: `admin/`, `app/`, `base/`, `connection/`, `panes/` (the tab-area panes), `query/`, `results/`, `tools/`.
 
 Most app state and logic live in `src/composables/*` (`useModals`, `useQueryRunner`, `useDbActions`, `useMenu`, `useOperations`, `useSessionPersistence`, …) — `useModals` owns the open-state for every modal. App.vue composes these and passes props/handlers down; treat the composable as the source of truth for its slice.
 

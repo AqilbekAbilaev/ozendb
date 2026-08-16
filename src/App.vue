@@ -32,7 +32,7 @@ import ContextMenu from './components/base/ContextMenu.vue'
 import AppModals from './components/app/AppModals.vue'
 import Resizer from './components/base/Resizer.vue'
 import Toolbar from './components/app/Toolbar.vue'
-import OperationsPane from './components/app/OperationsPane.vue'
+import OperationsPane from './components/panes/OperationsPane.vue'
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
