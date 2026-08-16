@@ -27,6 +27,7 @@
   --danger-hover:  #a93226;
   --danger-text:   #e0706a;   /* error/danger message text */
   --danger-bg:     #3a1a1a;   /* error-callout background */
+  --on-accent:     #ffffff;   /* text/glyph on filled accent/danger fills */
   --bg-menu:       #2b2d31;   /* context / dropdown / cell menus */
   --bg-field:      #2a2c30;   /* raised input-like fields (query bar) */
   --success-bg:     #1a3a1a;  /* success callout (connection test) */
@@ -77,6 +78,7 @@
   --danger-hover:  #b83232;
   --danger-text:   #c0392b;
   --danger-bg:     #fbeae8;
+  --on-accent:     #ffffff;   /* text/glyph on filled accent/danger fills */
   --bg-menu:       #ffffff;
   --bg-field:      #ffffff;
   --success-bg:     #e6f4ea;
