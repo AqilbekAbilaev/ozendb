@@ -2,9 +2,6 @@
 import { computed, useSlots, Comment, Text } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 
-// Themeable button — the single home for button styling that was copy-pasted
-// across ~20 scoped <style> blocks, so migrated call sites can delete theirs.
-// Single root: native attrs and extra classes fall through to the <button>.
 const props = defineProps({
   variant: { type: String, default: 'default' },
   size: { type: String, default: 'md' },
@@ -54,6 +51,7 @@ const resolvedIconSize = computed(() => props.iconSize || (props.size === 'sm' ?
   border-radius: 5px;
   border: none;
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
   background: var(--bg-toolbar);
   color: var(--text);
@@ -70,28 +68,17 @@ const resolvedIconSize = computed(() => props.iconSize || (props.size === 'sm' ?
 .base-btn.v-danger { background: var(--danger); color: var(--on-accent); }
 .base-btn.v-danger:hover:not(:disabled) { background: var(--danger-hover); }
 
-/* Ghost — transparent at rest, fills on hover (toolbar rows). Keeps the original
-   toolbars' compact, padding-driven metrics regardless of `size`. */
-.base-btn.v-ghost {
-  background: transparent;
-  height: auto;
-  padding: 4px 9px;
-  font-size: 12.5px;
-  border-radius: 6px;
-}
+/* Ghost — transparent at rest, fills on hover (toolbar rows). */
+.base-btn.v-ghost { background: transparent; }
 .base-btn.v-ghost:hover:not(:disabled) { background: var(--bg-hover); }
 .base-btn.v-ghost:disabled { color: var(--text-faint); }
 .base-btn.v-ghost.active { background: var(--bg-hover); }
 
 .base-btn.s-sm { height: 24px; padding: 0 11px; font-size: 12px; }
 
-/* The extra class beats .s-sm for ghost buttons without relying on rule order. */
-.base-btn.v-ghost.s-sm { height: auto; padding: 4px 9px; font-size: 12.5px; }
-
 .base-btn.bordered {
   background: var(--bg-input);
   border: 1px solid var(--border-soft);
-  border-radius: 6px;
 }
 .base-btn.bordered:hover:not(:disabled) { background: var(--bg-hover); }
 .base-btn.bordered.v-primary { border-color: var(--accent); }
@@ -106,7 +93,6 @@ const resolvedIconSize = computed(() => props.iconSize || (props.size === 'sm' ?
   gap: 0;
   background: none;
   border: 1px solid transparent;
-  border-radius: 6px;
   color: var(--text-dim);
   display: grid;
   place-items: center;
