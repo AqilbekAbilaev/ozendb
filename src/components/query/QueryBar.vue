@@ -209,14 +209,14 @@ watch(() => props.activeTab && props.activeTab.id, () => {
       :options="[{ value: 'find', label: 'Find' }, { value: 'aggregate', label: 'Aggregate' }]"
       @update:model-value="setMode"
     />
-    <BaseButton variant="ghost" size="sm" class="run" @click="emit('run')" :disabled="activeTab.isRunning || !runValid">
+    <BaseButton variant="ghost" class="run" @click="emit('run')" :disabled="activeTab.isRunning || !runValid">
       <BaseIcon name="run" :size="18" class="ic" />
       {{ activeTab.isRunning ? 'Running…' : 'Run' }}
     </BaseButton>
     <template v-if="!isAggregate">
-      <BaseButton variant="ghost" size="sm" @click="emit('open-browser')"><BaseIcon name="load" :size="18" class="ic" /> Load query</BaseButton>
+      <BaseButton variant="ghost" class="qbar-load" @click="emit('open-browser')"><BaseIcon name="load" :size="18" class="ic" /> Load query</BaseButton>
       <div class="save-wrap">
-        <BaseButton variant="ghost" size="sm" :active="showSaveForm" @click="showSaveForm = !showSaveForm">
+        <BaseButton variant="ghost" :active="showSaveForm" @click="showSaveForm = !showSaveForm">
           <BaseIcon name="save" :size="18" class="ic" /> Save query
         </BaseButton>
         <div v-if="showSaveForm" class="save-backdrop" @mousedown.self="showSaveForm = false"></div>
@@ -234,7 +234,7 @@ watch(() => props.activeTab && props.activeTab.id, () => {
         </div>
       </div>
       <div class="hist-wrap">
-        <BaseButton variant="ghost" size="sm" :active="historyMenu" @click="openHistoryMenu">
+        <BaseButton variant="ghost" :active="historyMenu" @click="openHistoryMenu">
           <BaseIcon name="history" :size="18" class="ic" /> Query history
         </BaseButton>
         <div v-if="historyMenu" class="hist-backdrop" @mousedown.self="historyMenu = false"></div>
@@ -262,7 +262,7 @@ watch(() => props.activeTab && props.activeTab.id, () => {
         </div>
       </div>
       <div class="default-wrap">
-        <BaseButton variant="ghost" size="sm" :active="showDefaultMenu" @click="showDefaultMenu = !showDefaultMenu">
+        <BaseButton variant="ghost" :active="showDefaultMenu" @click="showDefaultMenu = !showDefaultMenu">
           <BaseIcon name="anchor" :size="18" class="ic" /> Set default query
           <BaseIcon name="caretDown" :size="11" class="drop" />
         </BaseButton>
@@ -276,15 +276,15 @@ watch(() => props.activeTab && props.activeTab.id, () => {
           </MenuItem>
         </div>
       </div>
-      <BaseButton variant="ghost" size="sm" @click="emit('copy-query')">
+      <BaseButton variant="ghost" class="qbar-copy" @click="emit('copy-query')">
         <BaseIcon name="copy" :size="18" class="ic" /> Copy
       </BaseButton>
-      <BaseButton variant="ghost" size="sm" :disabled="!clipboardQuery" @click="emit('paste-query')">
+      <BaseButton variant="ghost" class="qbar-paste" :disabled="!clipboardQuery" @click="emit('paste-query')">
         <BaseIcon name="paste" :size="18" class="ic" /> Paste
       </BaseButton>
     </template>
     <span class="qbar-spacer"></span>
-    <BaseButton v-if="!isAggregate" size="sm" bordered class="vqb-toggle" :class="{ on: vqbOpen }" @click="emit('toggle-vqb')">
+    <BaseButton v-if="!isAggregate" bordered class="vqb-toggle" :class="{ on: vqbOpen }" @click="emit('toggle-vqb')">
       <BaseIcon name="aggregate" :size="15" /> Visual Query Builder
     </BaseButton>
   </div>
@@ -352,6 +352,16 @@ watch(() => props.activeTab && props.activeTab.id, () => {
 .vqb-toggle:disabled { opacity: .4; }
 
 .mode-toggle { margin-right: 6px; }
+
+/* Narrow windows: trailing actions disappear rather than wrap. Window-width
+   heuristics — the bar's real width also depends on the sidebar (320px default),
+   so the thresholds are deliberately conservative. */
+@media (max-width: 1540px) { .vqb-toggle { display: none; } }
+@media (max-width: 1400px) { .vqb-toggle, .qbar-copy, .qbar-paste { display: none; } }
+@media (max-width: 1260px) {
+  .vqb-toggle, .qbar-copy, .qbar-paste, .qbar-load,
+  .save-wrap, .hist-wrap, .default-wrap { display: none; }
+}
 
 .qparse-error { padding: 4px 12px 6px; flex: none; }
 
