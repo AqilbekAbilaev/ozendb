@@ -35,6 +35,9 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     // Index-menu actions operate on the index selected in the Indexes dialog, which
     // is independent of the tab/tree selection — so it's passed in directly.
     hasIndex: !!indexSelected,
+    // The active tab's read-only lock disables the write actions (see writable.js).
+    // Only the tab can carry it — the sidebar selection never locks anything.
+    readOnly: !!(tab && tab.readOnly),
   }
 }
 

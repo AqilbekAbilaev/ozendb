@@ -1,4 +1,4 @@
-use super::{menus, Gate, Spec};
+use super::{is_write_action, menus, Gate, Spec};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{
@@ -6,9 +6,9 @@ use tauri::{
     AppHandle, Wry,
 };
 
-// Managed state: the gated items and their gate, so `set_menu_context` can flip
-// their enabled flag without rebuilding the whole menu.
-pub struct MenuItems(pub Mutex<Vec<(MenuItem<Wry>, Gate)>>);
+// Managed state: the gated items, their gate, and whether they are write actions
+// (so `set_menu_context` can also disable them under the read-only lock).
+pub struct MenuItems(pub Mutex<Vec<(MenuItem<Wry>, Gate, bool)>>);
 
 // Whether native accelerators should be attached. On Linux/WebKitGTK, registering
 // accelerators (especially the predefined clipboard ones) makes the menu swallow
@@ -25,7 +25,7 @@ fn build_submenu(
     name: &str,
     specs: &[Spec],
     overrides: &HashMap<String, String>,
-    gated: &mut Vec<(MenuItem<Wry>, Gate)>,
+    gated: &mut Vec<(MenuItem<Wry>, Gate, bool)>,
 ) -> tauri::Result<Submenu<Wry>> {
     let submenu = match Submenu::new(app, name, true) {
         Ok(val) => val,
@@ -111,7 +111,7 @@ fn build_submenu(
                     Err(e) => return Err(e),
                 };
                 if let Some(gate_value) = gate {
-                    gated.push((item.clone(), *gate_value));
+                    gated.push((item.clone(), *gate_value, is_write_action(id)));
                 }
             }
         }
@@ -228,12 +228,12 @@ fn build_app_menu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
 pub fn build(
     app: &AppHandle,
     overrides: &HashMap<String, String>,
-) -> tauri::Result<(Menu<Wry>, Vec<(MenuItem<Wry>, Gate)>)> {
+) -> tauri::Result<(Menu<Wry>, Vec<(MenuItem<Wry>, Gate, bool)>)> {
     let menu = match Menu::new(app) {
         Ok(val) => val,
         Err(e) => return Err(e),
     };
-    let mut gated: Vec<(MenuItem<Wry>, Gate)> = Vec::new();
+    let mut gated: Vec<(MenuItem<Wry>, Gate, bool)> = Vec::new();
 
     #[cfg(target_os = "macos")]
     {

@@ -1,6 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { errText } from '../utils/errors'
+import { canWriteTab, isWriteAction } from '../utils/writable'
 import { inspectField, setFieldValue, addFieldValue, removeField, renameField, getContainer } from '../utils/docEdit'
 import { valueToClipboard, valueToEjson, documentToClipboard, fieldPath } from '../utils/clipboardCopy'
 
@@ -30,6 +31,14 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   const showDeleteConfirm = ref(false)
   const crudError        = ref(null)
 
+  // Read-only lock: every write entry point refuses with the same message (the
+  // toolbar buttons disable themselves; the native menu and keybindings land here).
+  function ensureWritable() {
+    if (canWriteTab(activeTab())) return true
+    showToast('Read-only mode is on — flip the lock to edit')
+    return false
+  }
+
   // Open the new-document pop-out window (Rust open_document_window, mode 'insert') — the
   // same window kind as View/Edit, seeded with an empty skeleton. Replaced the in-app
   // insert modal.
@@ -39,6 +48,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       showToast('Open a collection first')
       return
     }
+    if (!ensureWritable()) return
     const target = {
       connId: tab.connectionId,
       db: tab.dbName,
@@ -76,6 +86,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // is 'edit' (the single reusable editor window) or 'view' (an unlimited read-only
   // display window).
   function openDocumentWindow(tab, doc, mode) {
+    if (mode === 'edit' && !ensureWritable()) return
     const target = {
       connId: tab.connectionId,
       db: tab.dbName,
@@ -175,6 +186,9 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   function runDocMenuAction(action) {
     const tab = activeTab()
     if (!tab || tab.kind !== 'collection') return
+    // The read-only lock applies to every write action, whatever the entry point
+    // (the native menu and keybindings bypass the disabled toolbar buttons).
+    if (isWriteAction(action) && !ensureWritable()) return
 
     // Collection-wide actions — no row selection required.
     switch (action) {

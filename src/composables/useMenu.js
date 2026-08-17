@@ -32,6 +32,7 @@ export function useMenu({ treeSelection, treeConnectionCount, selectedIndex }) {
       hasDocument: ctx.hasDocument,
       hasField: ctx.hasField,
       hasIndex: ctx.hasIndex,
+      readOnly: ctx.readOnly,
     }).catch(() => {})
   }, { immediate: true })
 

@@ -61,6 +61,7 @@ pub struct MenuContext {
     pub has_document: bool,
     pub has_field: bool,
     pub has_index: bool,
+    pub read_only: bool,
 }
 
 // Whether an item with the given gate should be enabled in the given context.
@@ -76,6 +77,33 @@ pub fn gate_enabled(gate: Gate, context: &MenuContext) -> bool {
         Gate::DocumentField => context.has_field,
         Gate::Index => context.has_index,
     }
+}
+
+// The document/collection write actions, disabled while the active tab's read-only
+// lock is on. Mirrored by WRITE_ACTIONS in src/utils/writable.js — keep both in
+// step; the tests pin the exact set on each side.
+pub const WRITE_ACTIONS: &[&str] = &[
+    "doc:edit_json",
+    "doc:delete",
+    "doc:add_field",
+    "doc:edit_value",
+    "doc:rename_field",
+    "doc:remove_field",
+    "coll:insert_document",
+    "coll:update_dialog",
+    "coll:delete_dialog",
+    "coll:clear",
+    "edit:paste_documents",
+];
+
+pub fn is_write_action(id: &str) -> bool {
+    WRITE_ACTIONS.contains(&id)
+}
+
+// Full enablement for a gated item: the selection gate AND (for write actions) an
+// unlocked tab. `is_write` is the item's write flag (see is_write_action).
+pub fn item_enabled(gate: Gate, is_write: bool, context: &MenuContext) -> bool {
+    gate_enabled(gate, context) && (!is_write || !context.read_only)
 }
 
 // One row in a submenu.
@@ -117,6 +145,7 @@ pub fn set_menu_context(
     has_document: bool,
     has_field: bool,
     has_index: bool,
+    read_only: bool,
 ) -> Result<(), String> {
     let context = MenuContext {
         has_connection: has_connection,
@@ -126,13 +155,14 @@ pub fn set_menu_context(
         has_document: has_document,
         has_field: has_field,
         has_index: has_index,
+        read_only: read_only,
     };
     let guard = match items.0.lock() {
         Ok(val) => val,
         Err(e) => return Err(e.to_string()),
     };
-    for (item, gate) in guard.iter() {
-        let enabled = gate_enabled(*gate, &context);
+    for (item, gate, is_write) in guard.iter() {
+        let enabled = item_enabled(*gate, *is_write, &context);
         match item.set_enabled(enabled) {
             Ok(val) => val,
             Err(e) => return Err(e.to_string()),
@@ -159,6 +189,7 @@ mod tests {
             has_document: false,
             has_field: false,
             has_index: false,
+            read_only: false,
         }
     }
 
@@ -172,6 +203,7 @@ mod tests {
             has_document: has_document,
             has_field: has_field,
             has_index: false,
+            read_only: false,
         }
     }
 
@@ -185,6 +217,21 @@ mod tests {
             has_document: false,
             has_field: false,
             has_index: has_index,
+            read_only: false,
+        }
+    }
+
+    // Full context with the read-only lock flag (write-gate tests).
+    fn locked_context() -> MenuContext {
+        MenuContext {
+            has_connection: true,
+            has_database: true,
+            has_collection: true,
+            any_connection: true,
+            has_document: true,
+            has_field: true,
+            has_index: false,
+            read_only: true,
         }
     }
 
@@ -230,6 +277,60 @@ mod tests {
         assert!(!gate_enabled(Gate::Index, &index_context(false)));
         // An index row is selected in the open Indexes dialog: they enable.
         assert!(gate_enabled(Gate::Index, &index_context(true)));
+    }
+
+    #[test]
+    fn write_actions_disable_while_the_tab_is_locked() {
+        // Every write action is off under the lock, even with full selection context.
+        for id in WRITE_ACTIONS {
+            let gate = gate_of(id);
+            assert!(
+                !item_enabled(gate, is_write_action(id), &locked_context()),
+                "{id} should be disabled while read-only"
+            );
+            // Same action, unlocked context: the gate alone decides.
+            assert_eq!(
+                item_enabled(gate, is_write_action(id), &doc_context(true, true)),
+                gate_enabled(gate, &doc_context(true, true)),
+                "{id} should enable when unlocked"
+            );
+        }
+    }
+
+    #[test]
+    fn read_only_actions_stay_enabled_while_the_tab_is_locked() {
+        // View and copy actions are read-only: the lock never disables them.
+        for id in ["doc:view_json", "edit:copy", "edit:copy_document", "edit:copy_value"] {
+            assert!(!is_write_action(id), "{id} should not be a write action");
+            assert!(
+                item_enabled(gate_of(id), is_write_action(id), &locked_context()),
+                "{id} should stay enabled while read-only"
+            );
+        }
+    }
+
+    #[test]
+    fn write_action_list_matches_the_expected_set() {
+        let mut list: Vec<&str> = WRITE_ACTIONS.to_vec();
+        list.sort();
+        assert_eq!(list, vec![
+            "coll:clear",
+            "coll:delete_dialog",
+            "coll:insert_document",
+            "coll:update_dialog",
+            "doc:add_field",
+            "doc:delete",
+            "doc:edit_json",
+            "doc:edit_value",
+            "doc:remove_field",
+            "doc:rename_field",
+            "edit:paste_documents",
+        ]);
+        // Every write action must be gated (the set_menu_context loop only walks
+        // gated items, so an ungated write action could never be disabled).
+        for id in WRITE_ACTIONS {
+            assert!(gate_of_opt(id).is_some(), "{id} should be gated");
+        }
     }
 
     #[test]

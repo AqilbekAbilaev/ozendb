@@ -15,7 +15,7 @@ describe('deriveMenuContext', () => {
   it('is all-false with no tab, no selection, no connections', () => {
     expect(deriveMenuContext(null, null, 0)).toEqual({
       hasConnection: false, hasDatabase: false, hasCollection: false, anyConnection: false,
-      hasDocument: false, hasField: false, hasIndex: false,
+      hasDocument: false, hasField: false, hasIndex: false, readOnly: false,
     })
   })
 
@@ -96,6 +96,16 @@ describe('deriveMenuContext', () => {
     expect(deriveMenuContext(null, null, 0, false).hasIndex).toBe(false)
     // An index selected → on, regardless of the tab/tree selection.
     expect(deriveMenuContext(null, null, 0, true).hasIndex).toBe(true)
+  })
+
+  it('readOnly comes from the active tab, never the sidebar', () => {
+    const collSel = { connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection' }
+    // A locked tab locks the context even with no sidebar selection.
+    expect(deriveMenuContext({ ...collectionTab, readOnly: true }, null, 1).readOnly).toBe(true)
+    // An unlocked tab stays unlocked even when a sidebar node is selected.
+    expect(deriveMenuContext(collectionTab, collSel, 1).readOnly).toBe(false)
+    // The sidebar selection alone (Quickstart active) never locks anything.
+    expect(deriveMenuContext(quickstart, collSel, 1).readOnly).toBe(false)
   })
 })
 
