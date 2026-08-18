@@ -18,7 +18,6 @@ const GRANDFATHERED = {
   'src/components/results/ResultTable.vue': 793,
   'src/App.vue': 859,
   'src-tauri/src/shell/bridge/mod.rs': 824,
-  'src-tauri/src/commands/admin.rs': 820,
   'src-tauri/src/commands/sql/mod.rs': 676,
 }
 
