@@ -1,12 +1,13 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlparser::ast::{
-    BinaryOperator, Expr as SqlExpr, GroupByExpr, Ident, LimitClause, ObjectName, OrderBy,
-    OrderByKind, Query, SelectItem, SetExpr, Statement, TableFactor, UnaryOperator,
-    Value as SqlValue,
+    Expr as SqlExpr, GroupByExpr, Ident, LimitClause, ObjectName, OrderBy, OrderByKind, Query,
+    SelectItem, SetExpr, Statement, TableFactor, UnaryOperator, Value as SqlValue,
 };
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser as SqlParser;
+
+mod filter;
 
 // Translate a simple SQL SELECT into the pieces of a MongoDB find query, the way
 // Studio-3T's "SQL Query" surface does. Parsing is delegated to the `sqlparser`
@@ -83,119 +84,6 @@ impl J {
                     })
                     .collect();
                 format!("{{\n{}\n{pad}}}", inner.join(",\n"))
-            }
-        }
-    }
-}
-
-// ── Condition / expression tree ────────────────────────────────────
-// A field-level condition and a boolean tree over such conditions. The AST from
-// `sqlparser` is lowered into these before emitting MQL, so the mapping logic stays
-// independent of the parser's representation.
-enum Cond {
-    Eq(J),
-    Ne(J),
-    Lt(J),
-    Lte(J),
-    Gt(J),
-    Gte(J),
-    In(Vec<J>),
-    Nin(Vec<J>),
-    Regex(String),
-    NotRegex(String),
-    Between(J, J),
-    IsNull,
-    IsNotNull,
-}
-
-enum Expr {
-    And(Vec<Expr>),
-    Or(Vec<Expr>),
-    Leaf(String, Cond),
-}
-
-// SQL LIKE → anchored regex, escaping regex metacharacters and mapping % → .* and _ → .
-fn like_to_regex(pattern: &str) -> String {
-    let mut out = String::from("^");
-    for ch in pattern.chars() {
-        match ch {
-            '%' => out.push_str(".*"),
-            '_' => out.push('.'),
-            '.' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|' | '\\' => {
-                out.push('\\');
-                out.push(ch);
-            }
-            other => out.push(other),
-        }
-    }
-    out.push('$');
-    out
-}
-
-// ── Expr → JSON ────────────────────────────────────────────────────
-fn cond_to_j(cond: Cond) -> J {
-    match cond {
-        Cond::Eq(value) => value,
-        Cond::Ne(value) => J::Obj(vec![("$ne".to_string(), value)]),
-        Cond::Lt(value) => J::Obj(vec![("$lt".to_string(), value)]),
-        Cond::Lte(value) => J::Obj(vec![("$lte".to_string(), value)]),
-        Cond::Gt(value) => J::Obj(vec![("$gt".to_string(), value)]),
-        Cond::Gte(value) => J::Obj(vec![("$gte".to_string(), value)]),
-        Cond::In(values) => J::Obj(vec![("$in".to_string(), J::Arr(values))]),
-        Cond::Nin(values) => J::Obj(vec![("$nin".to_string(), J::Arr(values))]),
-        Cond::Regex(pattern) => J::Obj(vec![("$regex".to_string(), J::Str(pattern))]),
-        Cond::NotRegex(pattern) => J::Obj(vec![(
-            "$not".to_string(),
-            J::Obj(vec![("$regex".to_string(), J::Str(pattern))]),
-        )]),
-        Cond::Between(low, high) => {
-            J::Obj(vec![("$gte".to_string(), low), ("$lte".to_string(), high)])
-        }
-        Cond::IsNull => J::Null,
-        Cond::IsNotNull => J::Obj(vec![("$ne".to_string(), J::Null)]),
-    }
-}
-
-// True when every part is a single-key object and all keys are distinct, so an
-// AND can be flattened into one filter object instead of an $and array.
-fn can_merge(parts: &[J]) -> bool {
-    let mut keys: Vec<&str> = Vec::new();
-    for part in parts {
-        match part {
-            J::Obj(entries) if entries.len() == 1 => {
-                let key = entries[0].0.as_str();
-                if keys.iter().any(|existing| *existing == key) {
-                    return false;
-                }
-                keys.push(key);
-            }
-            _ => return false,
-        }
-    }
-    true
-}
-
-fn expr_to_j(expr: Expr) -> J {
-    match expr {
-        Expr::Leaf(field, cond) => J::Obj(vec![(field, cond_to_j(cond))]),
-        Expr::Or(children) => {
-            let parts: Vec<J> = children.into_iter().map(expr_to_j).collect();
-            J::Obj(vec![("$or".to_string(), J::Arr(parts))])
-        }
-        Expr::And(children) => {
-            let parts: Vec<J> = children.into_iter().map(expr_to_j).collect();
-            if can_merge(&parts) {
-                let mut merged: Vec<(String, J)> = Vec::new();
-                for part in parts {
-                    if let J::Obj(entries) = part {
-                        for entry in entries {
-                            merged.push(entry);
-                        }
-                    }
-                }
-                J::Obj(merged)
-            } else {
-                J::Obj(vec![("$and".to_string(), J::Arr(parts))])
             }
         }
     }
@@ -306,161 +194,6 @@ fn value_from_expr(expr: &SqlExpr) -> Result<J, String> {
         },
         SqlExpr::UnaryOp { op: UnaryOperator::Plus, expr } => value_from_expr(expr),
         other => Err(format!("Expected a value, found `{other}`")),
-    }
-}
-
-fn string_literal(expr: &SqlExpr) -> Result<String, String> {
-    match value_from_expr(expr) {
-        Ok(J::Str(text)) => Ok(text),
-        Ok(_) => Err("Expected a pattern string".to_string()),
-        Err(e) => Err(e),
-    }
-}
-
-// Lower a single (non-boolean) comparison node into a field + condition.
-fn convert_leaf(expr: &SqlExpr) -> Result<Expr, String> {
-    match expr {
-        SqlExpr::Nested(inner) => convert_leaf(inner),
-        SqlExpr::IsNull(inner) => {
-            let field = match ident_field(inner) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            Ok(Expr::Leaf(field, Cond::IsNull))
-        }
-        SqlExpr::IsNotNull(inner) => {
-            let field = match ident_field(inner) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            Ok(Expr::Leaf(field, Cond::IsNotNull))
-        }
-        SqlExpr::Like { negated, any, expr: field_expr, pattern, .. } => {
-            if *any {
-                return Err("LIKE ANY is not supported".to_string());
-            }
-            let field = match ident_field(field_expr) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            let pattern = match string_literal(pattern) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            let regex = like_to_regex(&pattern);
-            let cond = if *negated { Cond::NotRegex(regex) } else { Cond::Regex(regex) };
-            Ok(Expr::Leaf(field, cond))
-        }
-        SqlExpr::InList { expr: field_expr, list, negated } => {
-            let field = match ident_field(field_expr) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            if list.is_empty() {
-                return Err("IN list cannot be empty".to_string());
-            }
-            let mut values: Vec<J> = Vec::new();
-            for item in list {
-                match value_from_expr(item) {
-                    Ok(val) => values.push(val),
-                    Err(e) => return Err(e),
-                }
-            }
-            let cond = if *negated { Cond::Nin(values) } else { Cond::In(values) };
-            Ok(Expr::Leaf(field, cond))
-        }
-        SqlExpr::Between { expr: field_expr, negated, low, high } => {
-            if *negated {
-                return Err("NOT BETWEEN is not supported yet".to_string());
-            }
-            let field = match ident_field(field_expr) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            let low = match value_from_expr(low) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            let high = match value_from_expr(high) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            Ok(Expr::Leaf(field, Cond::Between(low, high)))
-        }
-        SqlExpr::BinaryOp { left, op, right } => {
-            let field = match ident_field(left) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            let value = match value_from_expr(right) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-            let cond = match op {
-                BinaryOperator::Eq => Cond::Eq(value),
-                BinaryOperator::NotEq => Cond::Ne(value),
-                BinaryOperator::Lt => Cond::Lt(value),
-                BinaryOperator::LtEq => Cond::Lte(value),
-                BinaryOperator::Gt => Cond::Gt(value),
-                BinaryOperator::GtEq => Cond::Gte(value),
-                other => return Err(format!("Unsupported operator `{other}`")),
-            };
-            Ok(Expr::Leaf(field, cond))
-        }
-        other => Err(format!("Unsupported condition: `{other}`")),
-    }
-}
-
-// Collect the operands of a left-associative chain of the same boolean operator
-// into one flat list (so `a AND b AND c` merges rather than nesting). Parentheses
-// (Nested) are a boundary — they recurse through convert_where instead.
-fn flatten_bool(expr: &SqlExpr, op: &BinaryOperator, out: &mut Vec<Expr>) -> Result<(), String> {
-    match expr {
-        SqlExpr::BinaryOp { left, op: inner, right } if inner == op => {
-            match flatten_bool(left, op, out) {
-                Ok(()) => {}
-                Err(e) => return Err(e),
-            }
-            flatten_bool(right, op, out)
-        }
-        other => match convert_where(other) {
-            Ok(val) => {
-                out.push(val);
-                Ok(())
-            }
-            Err(e) => Err(e),
-        },
-    }
-}
-
-fn convert_where(expr: &SqlExpr) -> Result<Expr, String> {
-    match expr {
-        SqlExpr::Nested(inner) => convert_where(inner),
-        SqlExpr::BinaryOp { left, op: BinaryOperator::And, right } => {
-            let mut parts: Vec<Expr> = Vec::new();
-            match flatten_bool(left, &BinaryOperator::And, &mut parts) {
-                Ok(()) => {}
-                Err(e) => return Err(e),
-            }
-            match flatten_bool(right, &BinaryOperator::And, &mut parts) {
-                Ok(()) => {}
-                Err(e) => return Err(e),
-            }
-            Ok(Expr::And(parts))
-        }
-        SqlExpr::BinaryOp { left, op: BinaryOperator::Or, right } => {
-            let mut parts: Vec<Expr> = Vec::new();
-            match flatten_bool(left, &BinaryOperator::Or, &mut parts) {
-                Ok(()) => {}
-                Err(e) => return Err(e),
-            }
-            match flatten_bool(right, &BinaryOperator::Or, &mut parts) {
-                Ok(()) => {}
-                Err(e) => return Err(e),
-            }
-            Ok(Expr::Or(parts))
-        }
-        other => convert_leaf(other),
     }
 }
 
@@ -636,8 +369,8 @@ pub(crate) fn sql_to_mql(sql: &str) -> Result<MqlQuery, String> {
         Err(e) => return Err(e),
     };
     let filter = match &select.selection {
-        Some(expr) => match convert_where(expr) {
-            Ok(val) => expr_to_j(val),
+        Some(expr) => match filter::convert_where(expr) {
+            Ok(val) => filter::expr_to_j(val),
             Err(e) => return Err(e),
         },
         None => J::Obj(Vec::new()),
