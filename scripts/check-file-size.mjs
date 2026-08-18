@@ -17,7 +17,6 @@ const LIMIT = 600
 const GRANDFATHERED = {
   'src/components/results/ResultTable.vue': 793,
   'src/App.vue': 859,
-  'src-tauri/src/shell/bridge/mod.rs': 824,
 }
 
 // git ls-files keeps us to real sources — no node_modules, no target/, no generated code.
