@@ -1,10 +1,6 @@
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, markRaw } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { invoke } from '@tauri-apps/api/core'
-import { errText } from '../../utils/errors'
-import { valueToClipboard } from '../../utils/clipboardCopy'
-import { dbRefOf, idFilterString } from '../../utils/dbRef'
 import { guessType, TYPE_CLASS, formatCell, columns, getAtPath } from '../../utils/resultGrid'
 import { useResultSearch } from '../../composables/useResultSearch'
 import { useColumnReorder } from '../../composables/useColumnReorder'
@@ -12,6 +8,7 @@ import { useColumnResize } from '../../composables/useColumnResize'
 import { useRowSelection } from '../../composables/useRowSelection'
 import { useFieldDrag } from '../../composables/useFieldDrag'
 import { useMomentumScroll } from '../../composables/useMomentumScroll'
+import { useGridCellActions } from '../../composables/useGridCellActions'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import SearchBar from '../base/SearchBar.vue'
@@ -60,14 +57,6 @@ function onCellMouseDown(e, col, value) {
   beginDrag(e, col, value)
 }
 
-function onCellClick(e, rowIdx, col) {
-  if (suppressNextClick.value) { suppressNextClick.value = false; return }
-  // Shift / Ctrl+Cmd on a cell click select rows (document-level), not a single cell.
-  if (e.shiftKey) { selectRangeTo(rowIdx); selectedCol.value = null; cellCtx.value = null; return }
-  if (e.metaKey || e.ctrlKey) { toggleRow(rowIdx); selectedCol.value = null; cellCtx.value = null; return }
-  selectCell(rowIdx, col)
-}
-
 // Filler rows pad the grid below real documents so the row stripes/borders
 // reach the bottom of the viewport instead of stopping after a fixed count —
 // recomputed from the actual container height so it still covers tall windows.
@@ -113,8 +102,23 @@ const {
   setSingleRow, selectRangeTo, toggleRow, applyRowGesture,
 } = useRowSelection({ activeTab: () => props.activeTab })
 
-const cellCtx     = ref(null)  // { x, y, row, col } | null — right-click menu
-const inlineEdit  = ref(null)  // { rowIdx, col, raw } | null — in-place primitive edit
+const {
+  cellCtx, inlineEdit, cellRef, copySelection, openCellCtx, cellCtxPick,
+  followReference, startInlineEdit, commitInlineEdit, cancelInlineEdit,
+  onCellClick, selectRow, selectCell, openCellDrill, goToDrillLevel,
+} = useGridCellActions({
+  activeTab:  () => props.activeTab,
+  drillPath:  () => props.drillPath,
+  readonly:   () => props.readonly,
+  gridDocs:   () => gridDocs.value,
+  selectedCol: selectedCol,
+  suppressNextClick: suppressNextClick,
+  setSingleRow: setSingleRow,
+  selectRangeTo: selectRangeTo,
+  toggleRow: toggleRow,
+  applyRowGesture: applyRowGesture,
+  emit:       emit,
+})
 
 const vFocus = { mounted(el) { el.focus(); el.select() } }
 
@@ -301,203 +305,6 @@ watch([() => props.activeTab?.id, () => props.activeTab?.results, () => props.dr
     }
   }, { flush: 'post' })
 
-function isDrillable(col, val) {
-  return guessType(col, val) === 'obj'
-}
-
-function openCellDrill(rowIdx, col) {
-  const tab = props.activeTab
-  if (!tab) return
-  const val = gridDocs.value[rowIdx]?.[col]
-  if (!isDrillable(col, val)) return
-  emit('update:drillPath', [...props.drillPath, col])
-  selectedCol.value = null
-  tab.selectedRow = -1
-}
-
-function goToDrillLevel(level) {
-  emit('update:drillPath', level < 0 ? [] : props.drillPath.slice(0, level + 1))
-  selectedCol.value = null
-  if (props.activeTab) props.activeTab.selectedRow = -1
-}
-
-// Row-area click (row number / filler): apply the gesture, clear any cell selection.
-function selectRow(e, rowIdx) {
-  applyRowGesture(e, rowIdx)
-  selectedCol.value = null
-  cellCtx.value = null
-}
-
-// Single-row + single-cell selection (right-click, programmatic). No modifiers.
-function selectCell(rowIdx, col) {
-  setSingleRow(rowIdx)
-  selectedCol.value = col
-  cellCtx.value = null
-}
-
-// Shell-style serialization of a cell value for the clipboard. Shared with the Edit
-// menu's Copy (see utils/clipboardCopy) so inline and menu copies stay identical.
-function cellCopyValue(val) {
-  return valueToClipboard(val)
-}
-
-function copySelectedCell() {
-  const tab = props.activeTab
-  if (!tab || tab.selectedRow < 0 || !selectedCol.value) return
-  const val = gridDocs.value[tab.selectedRow]?.[selectedCol.value]
-  navigator.clipboard.writeText(cellCopyValue(val))
-}
-
-function copySelectedDocument() {
-  const tab = props.activeTab
-  if (!tab || tab.selectedRow < 0) return
-  navigator.clipboard.writeText(JSON.stringify(tab.results[tab.selectedRow], null, 2))
-}
-
-// Ctrl/Cmd+C: copy the selection. A single cell → that value; a single row → its
-// document; multiple rows → a JSON array of the selected documents (in row order).
-function copySelection() {
-  const tab = props.activeTab
-  if (!tab) return
-  const rows = tab.selectedRows && tab.selectedRows.length
-    ? tab.selectedRows
-    : (tab.selectedRow >= 0 ? [tab.selectedRow] : [])
-  if (!rows.length) return
-  if (rows.length === 1) {
-    selectedCol.value ? copySelectedCell() : copySelectedDocument()
-    return
-  }
-  const docs = rows.map((i) => tab.results[i]).filter((d) => d != null)
-  navigator.clipboard.writeText(JSON.stringify(docs, null, 2))
-}
-
-function openCellCtx(e, rowIdx, col) {
-  e.preventDefault()
-  selectCell(rowIdx, col)
-  cellCtx.value = { x: e.clientX, y: e.clientY, row: rowIdx, col: col }
-}
-
-function cellCtxPick(action) {
-  const docs = gridDocs.value
-  const val = docs[cellCtx.value?.row]?.[cellCtx.value?.col]
-  if (action === 'copy-value') {
-    navigator.clipboard.writeText(cellCopyValue(val))
-  } else if (action === 'copy-json') {
-    navigator.clipboard.writeText(JSON.stringify(val, null, 2))
-  } else if (action === 'copy-doc') {
-    navigator.clipboard.writeText(JSON.stringify(docs[cellCtx.value.row], null, 2))
-  }
-  cellCtx.value = null
-}
-
-// The DBRef in the right-clicked cell, if any — drives the "Follow Reference" menu item.
-const cellRef = computed(() => {
-  if (!cellCtx.value) return null
-  const val = gridDocs.value[cellCtx.value.row]?.[cellCtx.value.col]
-  return dbRefOf(val)
-})
-
-// Open the referenced document: a new collection tab on the DBRef's collection (its own
-// $db if given, else the current tab's database) filtered to `{ _id: <$id> }`.
-function followReference() {
-  const ref = cellRef.value
-  const tab = props.activeTab
-  if (!ref || !tab) { cellCtx.value = null; return }
-  emit('follow-reference', {
-    connectionId: tab.connectionId,
-    connectionName: tab.connectionName,
-    dbName: ref.db || tab.dbName,
-    collectionName: ref.ref,
-    filter: idFilterString(ref.id),
-  })
-  cellCtx.value = null
-}
-
-// ── inline cell editing ────────────────────────────────
-function buildIdFilter(doc) {
-  return JSON.stringify({ _id: doc._id })
-}
-
-function startInlineEdit(rowIdx, col) {
-  if (props.readonly) return
-  const tab = props.activeTab
-  if (!tab) return
-  const val = gridDocs.value[rowIdx]?.[col]
-  const type = guessType(col, val)
-  // Nested objects/arrays drill in; ObjectId (incl. _id) is not editable (replace_document
-  // preserves _id, and editing a raw hex id is error-prone). Everything else — string,
-  // number, boolean, date and Decimal128 — edits inline.
-  if (type === 'obj' || type === 'id') return
-  // formatCell unwraps Extended-JSON scalars ($date → ISO string, $numberDecimal → the
-  // decimal string, $numberLong → the integer string) into their editable text form.
-  const raw = formatCell(col, val)
-  inlineEdit.value = { rowIdx: rowIdx, col: col, raw: raw }
-}
-
-async function commitInlineEdit() {
-  const edit = inlineEdit.value
-  if (!edit) return
-  inlineEdit.value = null
-  const tab = props.activeTab
-  if (!tab) return
-  const docs = gridDocs.value
-  const originalVal = docs[edit.rowIdx]?.[edit.col]
-  // Preserve the original BSON type on write-back, keyed off what the cell was. Date and
-  // Decimal128 are re-wrapped as Extended JSON so the backend (which decodes the whole
-  // document as bson::Bson) stores them as DateTime / Decimal128 again, not plain strings.
-  // Invalid input (e.g. a non-ISO date) fails the backend's Extended-JSON parse and
-  // surfaces as a crud error rather than silently corrupting the type.
-  const type = guessType(edit.col, originalVal)
-  let newVal
-  if (type === 'num') {
-    const n = Number(edit.raw)
-    newVal = isNaN(n) ? edit.raw : n
-  } else if (type === 'bool') {
-    newVal = edit.raw === 'true'
-  } else if (type === 'date') {
-    newVal = { $date: edit.raw }
-  } else if (type === 'decimal') {
-    newVal = { $numberDecimal: edit.raw }
-  } else {
-    newVal = edit.raw
-  }
-  const rootDoc = JSON.parse(JSON.stringify(tab.results[edit.rowIdx]))
-  let cur = rootDoc
-  for (const key of props.drillPath) {
-    cur = cur[key]
-  }
-  cur[edit.col] = newVal
-  try {
-    await invoke('replace_document', {
-      id: tab.connectionId,
-      database: tab.dbName,
-      collection: tab.collectionName,
-      idFilter: buildIdFilter(tab.results[edit.rowIdx]),
-      document: JSON.stringify(rootDoc),
-    })
-    const { documents: refreshed } = await invoke('find_documents', {
-      id: tab.connectionId,
-      database: tab.dbName,
-      collection: tab.collectionName,
-      filter: buildIdFilter(tab.results[edit.rowIdx]),
-      projection: '{}',
-      sort: '{}',
-      skip: 0,
-      limit: 1,
-    })
-    if (refreshed.length) {
-      tab.results.splice(edit.rowIdx, 1, markRaw(refreshed[0]))
-    } else {
-      tab.results.splice(edit.rowIdx, 1)
-    }
-  } catch (e) {
-    emit('crud-error', errText(e))
-  }
-}
-
-function cancelInlineEdit() {
-  inlineEdit.value = null
-}
 
 function handleKeydown(e) {
   // Don't hijack keys while the user is typing in a field (query bar, modals,
