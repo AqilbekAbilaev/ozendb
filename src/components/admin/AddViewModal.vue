@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { createView } from '../../engines/mongodb/api/resources'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseTextarea from '../base/BaseTextarea.vue'
@@ -36,13 +36,12 @@ async function confirm() {
   saving.value = true
   error.value = null
   try {
-    await invoke('create_view', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      name: viewName,
-      viewOn: source.value.trim(),
-      pipeline: pp.ejson,
-    })
+    await createView(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      viewName,
+      source.value.trim(),
+      pp.ejson,
+    )
     showToast(`View "${viewName}" created`)
     emit('saved', props.target.connId)
     emit('close')

@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { dropCollection } from '../../engines/mongodb/api/resources'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
@@ -25,10 +25,10 @@ async function confirm() {
   deleting.value = true
   error.value = null
   try {
-    await invoke('drop_collection', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
+    await dropCollection({
+      connectionId: props.target.connId,
+      database:     props.target.dbName,
+      collection:   props.target.collName,
     })
     tabs.value = tabs.value.filter(t => !(t.kind === 'collection'
       && t.connectionId === props.target.connId

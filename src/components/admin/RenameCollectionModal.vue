@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { renameCollection } from '../../engines/mongodb/api/resources'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -34,12 +34,10 @@ async function confirm() {
   saving.value = true
   error.value = null
   try {
-    await invoke('rename_collection', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
-      newName: newName,
-    })
+    await renameCollection(
+      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      newName,
+    )
     const open = tabs.value.find(t => t.kind === 'collection'
       && t.connectionId === props.target.connId
       && t.dbName === props.target.dbName
