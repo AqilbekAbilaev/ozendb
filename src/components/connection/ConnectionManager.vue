@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import * as connApi from '../../engines/mongodb/api/connections'
 import { listen, emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
@@ -27,7 +28,7 @@ const showNewConnection = ref(false)
 const showEditConnection = ref(false)
 
 onMounted(async () => {
-  connections.value = await invoke('list_connections')
+  connections.value = await connApi.listConnections()
   await loadFolders()
   listen('connection-saved', (e) => {
     if (!connections.value.find(c => c.id === e.payload.id))
@@ -92,7 +93,7 @@ function onConnectionUpdated(conn) {
 async function deleteSelected() {
   if (!selectedId.value) return
   const deletedId = selectedId.value
-  await invoke('delete_connection', { id: deletedId })
+  await connApi.deleteConnection(deletedId)
   connections.value = connections.value.filter(c => c.id !== deletedId)
   selectedId.value = null
   // Tell the sidebar to drop it too if it was open (mirrors connection-saved).
@@ -113,7 +114,7 @@ async function connectSelected() {
 async function duplicateSelected() {
   if (!selectedId.value) return
   try {
-    const copy = await invoke('duplicate_connection', { id: selectedId.value })
+    const copy = await connApi.duplicateConnection(selectedId.value)
     connections.value.push(copy)
     selectedId.value = copy.id
     showToast(`Duplicated as "${copy.name}"`)
@@ -125,7 +126,7 @@ async function duplicateSelected() {
 async function copyUri() {
   if (!selectedId.value) return
   try {
-    const uri = await invoke('connection_uri', { id: selectedId.value })
+    const uri = await connApi.connectionUri(selectedId.value)
     await navigator.clipboard.writeText(uri)
     showToast('Connection URI copied (password excluded)')
   } catch (e) {
@@ -146,7 +147,7 @@ async function exportConnections() {
   }
   if (!path) return  // user cancelled
   try {
-    const count = await invoke('export_connections', { path: path })
+    const count = await connApi.exportConnections(path)
     showToast(`Exported ${count} connection${count !== 1 ? 's' : ''} (passwords excluded)`)
   } catch (e) {
     showToast('Export failed: ' + errText(e))
@@ -166,8 +167,8 @@ async function importConnections() {
   }
   if (!path) return  // user cancelled
   try {
-    const count = await invoke('import_connections', { path: String(path) })
-    connections.value = await invoke('list_connections')
+    const count = await connApi.importConnections(String(path))
+    connections.value = await connApi.listConnections()
     showToast(`Imported ${count} connection${count !== 1 ? 's' : ''} — re-enter passwords to connect`)
   } catch (e) {
     showToast('Import failed: ' + errText(e))

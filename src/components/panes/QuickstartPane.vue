@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, inject, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listConnections } from '../../engines/mongodb/api/connections'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -27,7 +27,7 @@ const loading = ref(true)
 // backend to store an epoch/ISO timestamp.
 onMounted(async () => {
   try {
-    const conns = await invoke('list_connections')
+    const conns = await listConnections()
     recent.value = (conns || [])
       .filter(c => c.last_accessed)
       .sort((a, b) => (Date.parse(b.last_accessed) || 0) - (Date.parse(a.last_accessed) || 0))

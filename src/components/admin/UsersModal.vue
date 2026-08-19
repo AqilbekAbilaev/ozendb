@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listConnections } from '../../engines/mongodb/api/connections'
 import { errText } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -105,7 +106,7 @@ async function openCopyPanel() {
   copyError.value = null
   copyTargetDb.value = props.target.dbName
   try {
-    connections.value = await invoke('list_connections')
+    connections.value = await listConnections()
     copyTargetConn.value = props.target.connId
   } catch (e) {
     copyError.value = errText(e)
