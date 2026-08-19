@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { testConnection, testSshConnection, saveConnection, updateConnection } from '../engines/mongodb/api/connections'
 import { emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
@@ -288,7 +288,7 @@ export function useConnectionForm(editConn) {
     isTesting.value = true
     try {
       if (useSsh.value) {
-        await invoke('test_ssh_connection', {
+        await testSshConnection({
           sshHost:       sshHost.value,
           sshPort:       Number(sshPort.value) || 22,
           sshUser:       sshUser.value,
@@ -304,10 +304,7 @@ export function useConnectionForm(editConn) {
           authMechanism: authMode.value,
         })
       } else {
-        await invoke('test_connection', {
-          id: isEditMode ? editConn.id : null,
-          fields: formFields(),
-        })
+        await testConnection(isEditMode ? editConn.id : null, formFields())
       }
       status.value = { type: 'success', message: 'Connected successfully.' }
     } catch (e) {
@@ -348,7 +345,7 @@ export function useConnectionForm(editConn) {
           isSaving.value = false
           return null
         }
-        const conn = await invoke('update_connection', { id: editConn.id, fields })
+        const conn = await updateConnection(editConn.id, fields)
         await tauriEmit('connection-updated', conn)
         return { event: 'updated', conn: conn }
       }
@@ -386,7 +383,7 @@ export function useConnectionForm(editConn) {
   }
 
   async function create(fields, copySecretsFrom = null) {
-    const id = await invoke('save_connection', { fields, copySecretsFrom })
+    const id = await saveConnection(fields, copySecretsFrom)
     const conn = {
       id:              id,
       name:            fields.name,
