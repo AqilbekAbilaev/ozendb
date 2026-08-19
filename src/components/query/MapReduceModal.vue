@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { mapReduce } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
@@ -32,15 +32,15 @@ async function run() {
   error.value = null
   result.value = null
   try {
-    result.value = await invoke('map_reduce', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
-      map: map.value,
-      reduce: reduce.value,
-      finalize: finalize.value,
-      outCollection: outCollection.value,
-    })
+    result.value = await mapReduce(
+      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      {
+        map:          map.value,
+        reduce:       reduce.value,
+        finalize:     finalize.value,
+        outCollection: outCollection.value,
+      },
+    )
   } catch (e) {
     error.value = errText(e)
   } finally {

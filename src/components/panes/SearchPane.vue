@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { searchCollections } from '../../engines/mongodb/api/queries'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -75,15 +76,16 @@ async function search() {
   errorCode.value = null
   result.value = null
   try {
-    const res = await invoke('search_collections', {
-      id: props.activeTab.connId,
-      database: selectedDb.value,
-      collection: selectedColl.value || null,
-      term: t,
-      scope: scope.value,
-      matchCase: matchCase.value,
-      regex: regex.value,
-    })
+    const res = await searchCollections(
+      { connectionId: props.activeTab.connId, database: selectedDb.value },
+      t,
+      {
+        collection: selectedColl.value || null,
+        scope:      scope.value,
+        matchCase:  matchCase.value,
+        regex:      regex.value,
+      },
+    )
     result.value = res
     applied.value = { term: t, matchCase: matchCase.value, regex: regex.value }
   } catch (e) {
