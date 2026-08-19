@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { collectionStats } from '../engines/mongodb/api/queries'
+import { createIndex, dropIndex, indexStats, listIndexes, setIndexHidden } from '../engines/mongodb/api/indexes'
 import { errText, errMessage } from '../utils/errors'
 import { isProtectedIndex, indexSpecJson } from '../utils/indexSpec'
 // NOTE: indexSpecJson is needed because copyIndex() calls it. App.vue ALSO keeps
@@ -9,6 +10,12 @@ import { isProtectedIndex, indexSpecJson } from '../utils/indexSpec'
 // `showToast` is injected so the composable stays UI-agnostic.
 export function useIndexes({ showToast }) {
   const indexesTarget   = ref(null)  // { connId, dbName, collName } | null
+
+  // API target derived from the current indexes dialog target.
+  function apiTarget() {
+    const t = indexesTarget.value
+    return { connectionId: t.connId, database: t.dbName, collection: t.collName }
+  }
   const indexesList     = ref([])
   const indexesLoading  = ref(false)
   const indexesError    = ref(null)
@@ -45,11 +52,7 @@ export function useIndexes({ showToast }) {
     indexesLoading.value = true
     indexesError.value = null
     try {
-      indexesList.value = await invoke('list_indexes', {
-        id: target.connId,
-        database: target.dbName,
-        collection: target.collName,
-      })
+      indexesList.value = await listIndexes(apiTarget())
       // Re-point the selection at the reloaded index object (a fresh list replaces
       // the old references); clear it if that index no longer exists.
       if (selectedIndex.value) {
@@ -69,11 +72,7 @@ export function useIndexes({ showToast }) {
   // and Usage columns just read "n/a" for those entries.
   async function loadIndexMetrics(target) {
     try {
-      const stats = await invoke('collection_stats', {
-        id: target.connId,
-        database: target.dbName,
-        collection: target.collName,
-      })
+      const stats = await collectionStats(apiTarget())
       const sizes = {}
       for (const entry of (stats.indexes || [])) sizes[entry.name] = entry.size
       indexSizes.value = sizes
@@ -83,11 +82,7 @@ export function useIndexes({ showToast }) {
       indexTotalSize.value = null
     }
     try {
-      const stats = await invoke('index_stats', {
-        id: target.connId,
-        database: target.dbName,
-        collection: target.collName,
-      })
+      const stats = await indexStats(apiTarget())
       const usage = {}
       for (const entry of stats) {
         const ops = entry && entry.accesses && entry.accesses.ops
@@ -150,20 +145,9 @@ export function useIndexes({ showToast }) {
     indexesError.value = null
     try {
       if (editing) {
-        await invoke('drop_index', {
-          id: target.connId,
-          database: target.dbName,
-          collection: target.collName,
-          name: indexEditOriginalName.value,
-        })
+        await dropIndex(apiTarget(), indexEditOriginalName.value)
       }
-      await invoke('create_index', {
-        id: target.connId,
-        database: target.dbName,
-        collection: target.collName,
-        keys: keys,
-        options: options || '{}',
-      })
+      await createIndex(apiTarget(), keys, options || '{}')
       closeIndexForm()
       await loadIndexes()
       showToast(editing ? 'Index updated' : 'Index created')
@@ -184,12 +168,7 @@ export function useIndexes({ showToast }) {
     if (!target) return
     indexesError.value = null
     try {
-      await invoke('drop_index', {
-        id: target.connId,
-        database: target.dbName,
-        collection: target.collName,
-        name: name,
-      })
+      await dropIndex(apiTarget(), name)
       pendingDropIndex.value = null
       await loadIndexes()
       showToast(`Index "${name}" dropped`)
@@ -235,11 +214,7 @@ export function useIndexes({ showToast }) {
     indexDetailsStats.value = null
     indexDetailsLoading.value = true
     try {
-      const all = await invoke('index_stats', {
-        id: target.connId,
-        database: target.dbName,
-        collection: target.collName,
-      })
+      const all = await indexStats(apiTarget())
       indexDetailsStats.value = all.find(s => s.name === idx.name) || null
     } catch (e) {
       // $indexStats can be unsupported (older server, non-replicated deployment);
@@ -292,12 +267,7 @@ export function useIndexes({ showToast }) {
     dropIndexBusy.value = true
     dropIndexError.value = null
     try {
-      await invoke('drop_index', {
-        id: target.connId,
-        database: target.dbName,
-        collection: target.collName,
-        name: drop.name,
-      })
+      await dropIndex(apiTarget(), drop.name)
       dropIndexTarget.value = null
       await loadIndexes()
       showToast(`Index "${drop.name}" dropped`)
@@ -320,13 +290,7 @@ export function useIndexes({ showToast }) {
     const name = idx.name
     indexesError.value = null
     try {
-      await invoke('set_index_hidden', {
-        id: target.connId,
-        database: target.dbName,
-        collection: target.collName,
-        name: name,
-        hidden: hidden,
-      })
+      await setIndexHidden(apiTarget(), name, hidden)
       await loadIndexes()
       showToast(hidden ? `Index "${name}" hidden` : `Index "${name}" unhidden`)
     } catch (e) {

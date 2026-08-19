@@ -52,11 +52,15 @@ export function explainAggregate(target, pipeline, verbosity) {
   return invoke('explain_aggregate', collectionPayload(target, { pipeline, verbosity }))
 }
 
+export function collectionStats(target) {
+  return invoke('collection_stats', collectionPayload(target))
+}
+
 // On-disk sizes for the Explain plan's Collection/Index target nodes, normalized
 // from the raw collection_stats response. Best-effort by contract: callers treat a
 // rejection here as "skip the size nodes", never as an explain failure.
 export async function loadExplainStorage(target) {
-  const stats = await invoke('collection_stats', collectionPayload(target))
+  const stats = await collectionStats(target)
   const indexSizes = {}
   for (const ix of (stats.indexes || [])) indexSizes[ix.name] = ix.size
   return { dataSize: stats.size, indexSizes }

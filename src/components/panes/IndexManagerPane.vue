@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref, inject, watch, onMounted, onUnmounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import IndexAddDialog from '../query/IndexAddDialog.vue'
+import { createIndex, dropIndex, indexStats, listIndexes, setIndexHidden } from '../../engines/mongodb/api/indexes'
+import { collectionStats } from '../../engines/mongodb/api/queries'
 import {
   isProtectedIndex, isIndexHidden, indexKeyLabel, indexType, indexProperties,
 } from '../../utils/indexSpec'
@@ -43,9 +44,7 @@ async function loadIndexes() {
   localIndexesLoading.value = true
   localIndexesError.value = null
   try {
-    localIndexesList.value = await invoke('list_indexes', {
-      id: t.connId, database: t.dbName, collection: t.collName,
-    })
+    localIndexesList.value = await listIndexes({ connectionId: t.connId, database: t.dbName, collection: t.collName })
   } catch (e) {
     localIndexesError.value = errText(e)
     localIndexesList.value = []
@@ -57,9 +56,7 @@ async function loadIndexes() {
 
 async function loadIndexMetrics(t) {
   try {
-    const stats = await invoke('collection_stats', {
-      id: t.connId, database: t.dbName, collection: t.collName,
-    })
+    const stats = await collectionStats({ connectionId: t.connId, database: t.dbName, collection: t.collName })
     const sizes = {}
     for (const entry of (stats.indexes || [])) sizes[entry.name] = entry.size
     localIndexSizes.value = sizes
@@ -69,9 +66,7 @@ async function loadIndexMetrics(t) {
     localIndexTotalSize.value = null
   }
   try {
-    const stats = await invoke('index_stats', {
-      id: t.connId, database: t.dbName, collection: t.collName,
-    })
+    const stats = await indexStats({ connectionId: t.connId, database: t.dbName, collection: t.collName })
     const usage = {}
     for (const entry of stats) {
       const ops = entry && entry.accesses && entry.accesses.ops
@@ -130,15 +125,9 @@ async function submitIndex({ keys, options }) {
   localIndexesError.value = null
   try {
     if (editing) {
-      await invoke('drop_index', {
-        id: t.connId, database: t.dbName, collection: t.collName,
-        name: localIndexFormSeed.value?.name,
-      })
+      await dropIndex({ connectionId: t.connId, database: t.dbName, collection: t.collName }, localIndexFormSeed.value?.name)
     }
-    await invoke('create_index', {
-      id: t.connId, database: t.dbName, collection: t.collName,
-      keys: keys, options: options || '{}',
-    })
+    await createIndex({ connectionId: t.connId, database: t.dbName, collection: t.collName }, keys, options || '{}')
     localIndexFormOpen.value = false
     localIndexFormMode.value = 'create'
     localIndexFormSeed.value = null
@@ -171,10 +160,7 @@ async function toggleHidden() {
   const hidden = !isIndexHidden(it)
   localIndexesError.value = null
   try {
-    await invoke('set_index_hidden', {
-      id: t.connId, database: t.dbName, collection: t.collName,
-      name: it.name, hidden: hidden,
-    })
+    await setIndexHidden({ connectionId: t.connId, database: t.dbName, collection: t.collName }, it.name, hidden)
     await loadIndexes()
     showToast(hidden ? `Index "${it.name}" hidden` : `Index "${it.name}" unhidden`)
   } catch (e) {
