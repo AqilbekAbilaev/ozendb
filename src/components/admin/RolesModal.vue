@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listRoles } from '../../engines/mongodb/api/admin'
 import { errText } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -19,7 +19,7 @@ const roles = ref([])
 
 onMounted(async () => {
   try {
-    roles.value = await invoke('list_roles', { id: props.target.connId, database: props.target.dbName })
+    roles.value = await listRoles({ connectionId: props.target.connId, database: props.target.dbName })
   } catch (e) {
     error.value = errText(e)
   } finally {

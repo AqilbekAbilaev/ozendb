@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { dropFunction, listFunctions, saveFunction } from '../../engines/mongodb/api/admin'
 import { errText } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -32,7 +32,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    functions.value = await invoke('list_functions', { id: props.target.connId, database: props.target.dbName })
+    functions.value = await listFunctions({ connectionId: props.target.connId, database: props.target.dbName })
   } catch (e) {
     error.value = errText(e)
   } finally {
@@ -58,12 +58,11 @@ async function saveFunction() {
   busy.value = true
   editError.value = null
   try {
-    await invoke('save_function', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      name: name,
-      body: editing.value.body,
-    })
+    await saveFunction(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      name,
+      editing.value.body,
+    )
     editing.value = null
     await load()
   } catch (e) {
@@ -77,7 +76,7 @@ async function dropFunction(fn) {
   if (!confirmDelete(fn.name)) return
   busy.value = true
   try {
-    await invoke('drop_function', { id: props.target.connId, database: props.target.dbName, name: fn.name })
+    await dropFunction({ connectionId: props.target.connId, database: props.target.dbName }, fn.name)
     await load()
   } catch (e) {
     error.value = errText(e)

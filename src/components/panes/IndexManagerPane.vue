@@ -4,7 +4,7 @@ import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import IndexAddDialog from '../query/IndexAddDialog.vue'
 import { createIndex, dropIndex, indexStats, listIndexes, setIndexHidden } from '../../engines/mongodb/api/indexes'
-import { collectionStats } from '../../engines/mongodb/api/queries'
+import { collectionStats } from '../../engines/mongodb/api/admin'
 import {
   isProtectedIndex, isIndexHidden, indexKeyLabel, indexType, indexProperties,
 } from '../../utils/indexSpec'

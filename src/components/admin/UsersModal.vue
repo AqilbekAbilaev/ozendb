@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { createUser, dropUser, listUsers, copyUsersToConnection } from '../../engines/mongodb/api/admin'
 import { listConnections } from '../../engines/mongodb/api/connections'
 import { errText } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
@@ -38,7 +38,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    users.value = await invoke('list_users', { id: props.target.connId, database: props.target.dbName })
+    users.value = await listUsers({ connectionId: props.target.connId, database: props.target.dbName })
   } catch (e) {
     error.value = errText(e)
   } finally {
@@ -55,13 +55,12 @@ async function createUser() {
   busy.value = true
   createError.value = null
   try {
-    await invoke('create_user', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      username: name,
-      password: newPassword.value,
-      roles: roles,
-    })
+    await createUser(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      name,
+      newPassword.value,
+      roles,
+    )
     showCreate.value = false
     newName.value = ''
     newPassword.value = ''
@@ -78,7 +77,7 @@ async function dropUser(user) {
   if (!confirmDelete(user.user)) return
   busy.value = true
   try {
-    await invoke('drop_user', { id: props.target.connId, database: props.target.dbName, username: user.user })
+    await dropUser({ connectionId: props.target.connId, database: props.target.dbName }, user.user)
     await load()
   } catch (e) {
     error.value = errText(e)
@@ -120,12 +119,11 @@ async function runCopyUsers() {
   copyError.value = null
   copyResults.value = null
   try {
-    copyResults.value = await invoke('copy_users_to_connection', {
-      sourceId: props.target.connId,
-      sourceDatabase: props.target.dbName,
-      targetId: copyTargetConn.value,
-      targetDatabase: targetDb,
-    })
+    copyResults.value = await copyUsersToConnection(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      copyTargetConn.value,
+      targetDb,
+    )
   } catch (e) {
     copyError.value = errText(e)
   } finally {

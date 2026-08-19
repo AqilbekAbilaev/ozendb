@@ -5,6 +5,7 @@
 // shapes; the rest of the frontend talks targets, not commands.
 
 import { invoke } from '@tauri-apps/api/core'
+import { collectionStats } from './admin'
 import { connectionPayload, collectionPayload } from './payload'
 
 export function runFind(target, query, runId) {
@@ -50,10 +51,6 @@ export function explainFind(target, query, verbosity) {
 
 export function explainAggregate(target, pipeline, verbosity) {
   return invoke('explain_aggregate', collectionPayload(target, { pipeline, verbosity }))
-}
-
-export function collectionStats(target) {
-  return invoke('collection_stats', collectionPayload(target))
 }
 
 // On-disk sizes for the Explain plan's Collection/Index target nodes, normalized

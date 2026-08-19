@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { collectionStats } from '../engines/mongodb/api/queries'
+import { collectionStats } from '../engines/mongodb/api/admin'
 import { createIndex, dropIndex, indexStats, listIndexes, setIndexHidden } from '../engines/mongodb/api/indexes'
 import { errText, errMessage } from '../utils/errors'
 import { isProtectedIndex, indexSpecJson } from '../utils/indexSpec'
