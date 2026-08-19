@@ -1,6 +1,12 @@
 import { computed, nextTick, ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { listConnections } from '../engines/mongodb/api/connections'
+import {
+  listFolders,
+  createFolder,
+  renameFolder,
+  deleteFolder,
+  moveConnectionToFolder,
+} from '../appApi/folders'
 import { errText } from '../utils/errors'
 import { useConfirmDelete } from './useConfirmDelete'
 
@@ -13,7 +19,7 @@ export function useConnectionFolders({ connections, selectedId, filterText, filt
   const ctxMenu = ref(null)
 
   async function loadFolders() {
-    folders.value = await invoke('list_folders')
+    folders.value = await listFolders()
     expandedFolders.value = folders.value.map(folder => folder.id)
   }
 
@@ -69,7 +75,7 @@ export function useConnectionFolders({ connections, selectedId, filterText, filt
     let name = base
     let suffix = 2
     while (existing.has(name)) name = `${base} ${suffix++}`
-    const folder = await invoke('create_folder', { name })
+    const folder = await createFolder(name)
     folders.value.push(folder)
     expandedFolders.value.push(folder.id)
     return folder
@@ -100,7 +106,7 @@ export function useConnectionFolders({ connections, selectedId, filterText, filt
     renamingFolderId.value = null
     if (!name || name === folder.name) return
     try {
-      await invoke('rename_folder', { id: folder.id, name })
+      await renameFolder(folder.id, name)
       const target = folders.value.find(item => item.id === folder.id)
       if (target) target.name = name
     } catch (error) {
@@ -115,7 +121,7 @@ export function useConnectionFolders({ connections, selectedId, filterText, filt
   async function deleteFolder(folder) {
     if (!confirmDelete(folder.id)) return
     try {
-      await invoke('delete_folder', { id: folder.id })
+      await deleteFolder(folder.id)
       folders.value = folders.value.filter(item => item.id !== folder.id)
       connections.value = await listConnections()
     } catch (error) {
@@ -172,7 +178,7 @@ export function useConnectionFolders({ connections, selectedId, filterText, filt
 
   async function applyMove(connId, folderId) {
     try {
-      await invoke('move_connection_to_folder', { id: connId, folderId })
+      await moveConnectionToFolder(connId, folderId)
       const connection = connections.value.find(item => item.id === connId)
       if (connection) connection.folder_id = folderId
       if (folderId && !isExpanded(folderId)) expandedFolders.value.push(folderId)

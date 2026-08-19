@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { listConnections } from '../engines/mongodb/api/connections'
+import { getNodeTags, setConnectionTag, setNodeTag, clearNodeTagsUnder } from '../appApi/tags'
 
 // Colour tags for tree nodes (connection / database / collection). `tagOverrides` maps a
 // node key to a colour and drives the coloured dot shown in the sidebar and on tabs.
@@ -15,7 +15,7 @@ export function useNodeTags() {
   // connection config (conn.tag) and are loaded from list_connections.
   async function loadNodeTags() {
     try {
-      const nodeTags = await invoke('get_node_tags')
+      const nodeTags = await getNodeTags()
       if (nodeTags) tagOverrides.value = { ...nodeTags, ...tagOverrides.value }
     } catch (_) {}
     // Connection-level tags are stored on the connection config, not in the
@@ -43,7 +43,7 @@ export function useNodeTags() {
       // Connection tags live on the connection config (conn.tag). The override gives instant
       // feedback; the command persists it for the next restart.
       tagOverrides.value = { ...tagOverrides.value, [nd.connId]: color }
-      try { await invoke('set_connection_tag', { id: nd.connId, color: color }) } catch (_) {}
+      try { await setConnectionTag(nd.connId, color) } catch (_) {}
       clearPrefix = nd.connId + '/'
     } else {
       // Database/collection tags go in the dedicated node-tag store, keyed by the node's tree
@@ -52,7 +52,7 @@ export function useNodeTags() {
         ? nd.connId + '/' + nd.dbName
         : nd.connId + '/' + nd.dbName + '/' + nd.collName
       tagOverrides.value = { ...tagOverrides.value, [key]: color }
-      try { await invoke('set_node_tag', { key: key, color: color }) } catch (_) {}
+      try { await setNodeTag(key, color) } catch (_) {}
       if (type === 'database') clearPrefix = nd.connId + '/' + nd.dbName + '/'
     }
     if (clearPrefix) {
@@ -62,7 +62,7 @@ export function useNodeTags() {
         if (!k.startsWith(clearPrefix)) pruned[k] = tagOverrides.value[k]
       }
       tagOverrides.value = pruned
-      try { await invoke('clear_node_tags_under', { prefix: clearPrefix }) } catch (_) {}
+      try { await clearNodeTagsUnder(clearPrefix) } catch (_) {}
     }
   }
 
