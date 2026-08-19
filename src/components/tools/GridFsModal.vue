@@ -1,7 +1,17 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
+import {
+  listGridfsBuckets,
+  listGridfsFiles,
+  gridfsUpload,
+  gridfsDownload,
+  gridfsDelete,
+  gridfsRename,
+  gridfsSetMetadata,
+  gridfsDropBucket,
+  gridfsCopyBucket,
+} from '../../engines/mongodb/api/gridfs'
 import { errText, errCode } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import { useToast } from '../../composables/useToast'
@@ -88,10 +98,12 @@ async function doRename() {
   busy.value = true
   subError.value = null
   try {
-    await invoke('gridfs_rename', {
-      id: props.target.connId, database: props.target.dbName,
-      bucket: selectedBucket.value, fileId: file.id, newName: name,
-    })
+    await gridfsRename(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      selectedBucket.value,
+      file.id,
+      name,
+    )
     showToast('File renamed')
     renameTarget.value = null
     await loadFiles()
@@ -116,10 +128,12 @@ async function doSetMeta() {
   busy.value = true
   subError.value = null
   try {
-    await invoke('gridfs_set_metadata', {
-      id: props.target.connId, database: props.target.dbName,
-      bucket: selectedBucket.value, fileId: file.id, metadata: ejson,
-    })
+    await gridfsSetMetadata(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      selectedBucket.value,
+      file.id,
+      ejson,
+    )
     showToast('Metadata saved')
     metaTarget.value = null
     await loadFiles()
@@ -136,10 +150,11 @@ async function doCopyBucket() {
   busy.value = true
   subError.value = null
   try {
-    await invoke('gridfs_copy_bucket', {
-      id: props.target.connId, database: props.target.dbName,
-      bucket: selectedBucket.value, newBucket: name,
-    })
+    await gridfsCopyBucket(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      selectedBucket.value,
+      name,
+    )
     showToast(`Bucket copied to "${name}"`)
     copyBucketOpen.value = false
     await loadBuckets()
@@ -158,9 +173,10 @@ async function dropBucket() {
   if (!ok) return
   busy.value = true
   try {
-    await invoke('gridfs_drop_bucket', {
-      id: props.target.connId, database: props.target.dbName, bucket: bucket,
-    })
+    await gridfsDropBucket(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      bucket,
+    )
     showToast(`Dropped bucket "${bucket}"`)
     selectedBucket.value = 'fs'
     await loadBuckets()
@@ -189,7 +205,9 @@ function onBucket(bucket) {
 
 async function loadBuckets() {
   try {
-    buckets.value = await invoke('list_gridfs_buckets', { id: props.target.connId, database: props.target.dbName })
+    buckets.value = await listGridfsBuckets(
+      { connectionId: props.target.connId, database: props.target.dbName },
+    )
     if (buckets.value.length && !buckets.value.includes(selectedBucket.value)) {
       selectedBucket.value = buckets.value[0]
     }
@@ -204,11 +222,10 @@ async function loadFiles() {
   error.value = null
   resetDelete()
   try {
-    files.value = await invoke('list_gridfs_files', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      bucket: selectedBucket.value,
-    })
+    files.value = await listGridfsFiles(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      selectedBucket.value,
+    )
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)
@@ -235,12 +252,11 @@ async function upload() {
   if (!path) return
   busy.value = true
   try {
-    await invoke('gridfs_upload', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      bucket: selectedBucket.value,
+    await gridfsUpload(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      selectedBucket.value,
       path,
-    })
+    )
     showToast('File uploaded')
     await loadBuckets()
     await loadFiles()
@@ -260,13 +276,12 @@ async function download(file) {
   if (!dest) return
   busy.value = true
   try {
-    await invoke('gridfs_download', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      bucket: selectedBucket.value,
-      fileId: file.id,
+    await gridfsDownload(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      selectedBucket.value,
+      file.id,
       dest,
-    })
+    )
     showToast(`Downloaded ${file.filename}`)
   } catch (e) {
     error.value = errText(e)
@@ -280,12 +295,11 @@ async function confirmDelete(file) {
   if (!confirmDeleteFile(file.id)) return
   busy.value = true
   try {
-    await invoke('gridfs_delete', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      bucket: selectedBucket.value,
-      fileId: file.id,
-    })
+    await gridfsDelete(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      selectedBucket.value,
+      file.id,
+    )
     showToast(`Deleted ${file.filename}`)
     await loadFiles()
   } catch (e) {
