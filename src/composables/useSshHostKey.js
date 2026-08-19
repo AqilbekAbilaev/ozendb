@@ -1,5 +1,5 @@
 import { ref, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { respondSshHostKey, forgetSshHost } from '../appApi/sshTrust'
 import { listen } from '@tauri-apps/api/event'
 
 // SSH host-key prompts raised by the backend during a tunnel handshake and the
@@ -18,19 +18,19 @@ export function useSshHostKey() {
 
   function onHostKeyTrust() {
     if (sshHostKeyPrompt.value) {
-      invoke('respond_ssh_host_key', { requestId: sshHostKeyPrompt.value.requestId, trust: true })
+      respondSshHostKey(sshHostKeyPrompt.value.requestId, true)
       sshHostKeyPrompt.value = null
     }
   }
   function onHostKeyCancel() {
     if (sshHostKeyPrompt.value) {
-      invoke('respond_ssh_host_key', { requestId: sshHostKeyPrompt.value.requestId, trust: false })
+      respondSshHostKey(sshHostKeyPrompt.value.requestId, false)
       sshHostKeyPrompt.value = null
     }
   }
   async function onHostKeyForget() {
     if (sshHostKeyChanged.value) {
-      await invoke('forget_ssh_host', { host: sshHostKeyChanged.value.host, port: sshHostKeyChanged.value.port })
+      await forgetSshHost(sshHostKeyChanged.value.host, sshHostKeyChanged.value.port)
       sshHostKeyChanged.value = null
     }
   }

@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { canSelfUpdate } from '../appApi/updater'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 
@@ -45,7 +45,7 @@ export function useUpdater({ showToast, openModal, closeModal, openDownloadsPage
 
   async function probeSelfUpdate() {
     try {
-      return await invoke('can_self_update')
+      return await canSelfUpdate()
     } catch (e) {
       return false
     }

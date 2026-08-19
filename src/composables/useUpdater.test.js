@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
 vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
+vi.mock('../appApi/updater', () => ({ canSelfUpdate: vi.fn() }))
 
-import { invoke } from '@tauri-apps/api/core'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { canSelfUpdate } from '../appApi/updater'
 import { useUpdater } from './useUpdater'
 
 // The updater has two audiences that must not be confused: installs that can replace
@@ -34,7 +34,7 @@ const anUpdate = (over = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  invoke.mockResolvedValue(true)
+  canSelfUpdate.mockResolvedValue(true)
 })
 
 describe('checking', () => {
@@ -83,7 +83,7 @@ describe('checking', () => {
 describe('what an available update offers', () => {
   it('offers an in-place install where the bundle can replace itself', async () => {
     check.mockResolvedValue(anUpdate())
-    invoke.mockResolvedValue(true)
+    canSelfUpdate.mockResolvedValue(true)
     const { api, calls } = harness()
     await api.checkNow()
     expect(calls.opened).toEqual(['update'])
@@ -93,7 +93,7 @@ describe('what an available update offers', () => {
 
   it('offers the downloads page on a deb/rpm install', async () => {
     check.mockResolvedValue(anUpdate())
-    invoke.mockResolvedValue(false)
+    canSelfUpdate.mockResolvedValue(false)
     const { api, calls } = harness()
     await api.checkNow()
     expect(calls.opened).toEqual(['update'])
@@ -104,7 +104,7 @@ describe('what an available update offers', () => {
   // worse than sending a Mac user to a download page that works.
   it('falls back to the downloads page when the platform probe fails', async () => {
     check.mockResolvedValue(anUpdate())
-    invoke.mockRejectedValue(new Error('no such command'))
+    canSelfUpdate.mockRejectedValue(new Error('no such command'))
     const { api } = harness()
     await api.checkNow()
     expect(api.canInstall.value).toBe(false)
@@ -155,7 +155,7 @@ describe('installing', () => {
 describe('dialogProps', () => {
   it('carries everything the dialog renders', async () => {
     check.mockResolvedValue(anUpdate())
-    invoke.mockResolvedValue(true)
+    canSelfUpdate.mockResolvedValue(true)
     const { api } = harness()
     await api.checkNow()
     expect(api.dialogProps.value).toEqual({
@@ -171,7 +171,7 @@ describe('dialogProps', () => {
 describe('the downloads fallback', () => {
   it('closes the dialog and opens the releases page', async () => {
     check.mockResolvedValue(anUpdate())
-    invoke.mockResolvedValue(false)
+    canSelfUpdate.mockResolvedValue(false)
     const { api, calls } = harness()
     await api.checkNow()
     api.openDownloads()
