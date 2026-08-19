@@ -1,5 +1,5 @@
 import { watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listConnections } from '../engines/mongodb/api/connections'
 import { tabs, activeTabId, activeTab } from '../stores/tabs'
 import { opsDefaults } from './useCurrentOps'
 
@@ -137,7 +137,7 @@ export function useSessionPersistence({ runRestoredTab }) {
       const session = await invoke('get_open_tabs')
       const saved = session?.tabs
       if (saved?.length) {
-        const conns = await invoke('list_connections')
+        const conns = await listConnections()
         const validIds = new Set(conns.map(c => c.id))
         // Never restore a tab that's already open. A second restore (App.vue remounting
         // over the module-scope `tabs` store — HMR does this) would otherwise push the

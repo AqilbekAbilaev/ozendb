@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listConnections } from '../engines/mongodb/api/connections'
 
 // Colour tags for tree nodes (connection / database / collection). `tagOverrides` maps a
 // node key to a colour and drives the coloured dot shown in the sidebar and on tabs.
@@ -21,7 +22,7 @@ export function useNodeTags() {
     // node-tag store. Load them into tagOverrides so tabs (which resolve colour
     // from tagOverrides alone) can see connection-level colours at startup.
     try {
-      const conns = await invoke('list_connections')
+      const conns = await listConnections()
       const connTags = {}
       for (const c of conns) {
         if (c.tag) connTags[c.id] = c.tag

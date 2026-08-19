@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { disconnect } from '../engines/mongodb/api/connections'
 import { TOOLS } from '../constants/tools'
 import { MODALS } from '../constants/modalRegistry'
 import { tabs, activeTab, pruneActiveTab } from '../stores/tabs'
@@ -79,7 +79,7 @@ export function useFeatures({
   }
 
   async function disconnectOne(node, ctx) {
-    try { await invoke('disconnect', { id: node.connId }) } catch (_) {}
+    try { await disconnect(node.connId) } catch (_) {}
     connectionTreeRef.value.disconnectConn(node.connId)
     tabs.value = tabs.value.filter(t => t.connectionId !== node.connId)
     pruneActiveTab()
@@ -88,7 +88,7 @@ export function useFeatures({
   async function disconnectOthers(node) {
     const others = connectionTreeRef.value.getConnections().filter(c => c.id !== node.connId)
     for (const conn of others) {
-      try { await invoke('disconnect', { id: conn.id }) } catch (_) {}
+      try { await disconnect(conn.id) } catch (_) {}
       connectionTreeRef.value.disconnectConn(conn.id)
     }
     tabs.value = tabs.value.filter(t => t.kind !== 'collection' || t.connectionId === node.connId)
@@ -97,7 +97,7 @@ export function useFeatures({
   }
   async function disconnectAll() {
     for (const conn of connectionTreeRef.value.getConnections()) {
-      try { await invoke('disconnect', { id: conn.id }) } catch (_) {}
+      try { await disconnect(conn.id) } catch (_) {}
       connectionTreeRef.value.disconnectConn(conn.id)
     }
     tabs.value = tabs.value.filter(t => t.kind !== 'collection')

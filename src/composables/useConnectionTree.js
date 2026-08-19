@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listConnections } from '../engines/mongodb/api/connections'
 import { listen } from '@tauri-apps/api/event'
 import { errCode, errMessage } from '../utils/errors'
 import { applyConnectionUpdate } from '../utils/connectionList'
@@ -47,7 +47,7 @@ export function useConnectionTree({ props, emit }) {
     // The sidebar shows only the connections that are open; the full saved list
     // lives in the Connection Manager. A connection's `open` flag is persisted, so
     // only the ones that were open before a restart come back.
-    const all = await invoke('list_connections')
+    const all = await listConnections()
     connections.value = all.filter(c => c.open)
     await listen('connection-saved', (e) => {
       if (!connections.value.some(c => c.id === e.payload.id)) {
@@ -163,7 +163,7 @@ export function useConnectionTree({ props, emit }) {
     if (!conn) {
       // Opening a connection that isn't in the sidebar yet: fetch just its config,
       // mark it open (persisted), and add only it — don't reload the whole list.
-      const all = await invoke('list_connections')
+      const all = await listConnections()
       conn = all.find(c => c.id === id)
       if (conn) {
         await invoke('set_connection_open', { id: id, open: true })

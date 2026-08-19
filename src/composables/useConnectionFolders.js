@@ -1,5 +1,6 @@
 import { computed, nextTick, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listConnections } from '../engines/mongodb/api/connections'
 import { errText } from '../utils/errors'
 import { useConfirmDelete } from './useConfirmDelete'
 
@@ -116,7 +117,7 @@ export function useConnectionFolders({ connections, selectedId, filterText, filt
     try {
       await invoke('delete_folder', { id: folder.id })
       folders.value = folders.value.filter(item => item.id !== folder.id)
-      connections.value = await invoke('list_connections')
+      connections.value = await listConnections()
     } catch (error) {
       showToast('Delete folder failed: ' + errText(error))
     }
