@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { getQueryHistory, clearQueryHistory, setDefaultQuery, clearDefaultQuery, saveQuery } from '../../engines/mongodb/api/queryLibrary'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -56,7 +56,7 @@ async function openHistoryMenu() {
   historyLoading.value = true
   historyMenu.value = true
   try {
-    historyEntries.value = await invoke('get_query_history', {
+    historyEntries.value = await getQueryHistory({
       connectionId: tab.connectionId,
       database:     tab.dbName,
       collection:   tab.collectionName,
@@ -103,7 +103,7 @@ async function clearHistory() {
   const tab = props.activeTab
   if (!tab) return
   try {
-    await invoke('clear_query_history', {
+    await clearQueryHistory({
       connectionId: tab.connectionId,
       database:     tab.dbName,
       collection:   tab.collectionName,
@@ -116,18 +116,22 @@ async function setDefaultQuery() {
   const tab = props.activeTab
   if (!tab) return
   try {
-    await invoke('set_default_query', {
-      connectionId: tab.connectionId,
-      database:     tab.dbName,
-      collection:   tab.collectionName,
-      mode:         tab.mode       || 'find',
-      filter:       tab.filter     || '',
-      sort:         tab.sort       || '',
-      projection:   tab.projection || '',
-      skip:         tab.skip       ?? 0,
-      limit:        tab.limit      ?? 50,
-      pipeline:     tab.pipeline   || '',
-    })
+    await setDefaultQuery(
+      {
+        connectionId: tab.connectionId,
+        database:     tab.dbName,
+        collection:   tab.collectionName,
+      },
+      {
+        mode:       tab.mode       || 'find',
+        filter:     tab.filter     || '',
+        sort:       tab.sort       || '',
+        projection: tab.projection || '',
+        skip:       tab.skip       ?? 0,
+        limit:      tab.limit      ?? 50,
+        pipeline:   tab.pipeline   || '',
+      },
+    )
     showDefaultMenu.value = false
     showToast('Default query set for this collection.')
   } catch (e) {
@@ -139,7 +143,7 @@ async function clearDefaultQuery() {
   const tab = props.activeTab
   if (!tab) return
   try {
-    await invoke('clear_default_query', {
+    await clearDefaultQuery({
       connectionId: tab.connectionId,
       database:     tab.dbName,
       collection:   tab.collectionName,
@@ -156,7 +160,7 @@ async function saveCurrentQuery() {
   const name = saveName.value.trim()
   if (!tab || !name) return
   try {
-    await invoke('save_query', {
+    await saveQuery({
       name:       name,
       mode:       tab.mode       || 'find',
       filter:     tab.filter     || '',

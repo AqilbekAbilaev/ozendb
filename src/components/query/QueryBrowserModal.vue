@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listSavedQueries, deleteSavedQuery } from '../../engines/mongodb/api/queryLibrary'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseModal from '../base/BaseModal.vue'
@@ -20,7 +20,7 @@ const filtered = computed(() => {
 
 onMounted(async () => {
   try {
-    entries.value = await invoke('list_saved_queries')
+    entries.value = await listSavedQueries()
   } catch (_) {
     entries.value = []
   }
@@ -39,7 +39,7 @@ function load() {
 async function remove() {
   if (!selected.value) return
   try {
-    await invoke('delete_saved_query', { id: selected.value.id })
+    await deleteSavedQuery(selected.value.id)
     entries.value = entries.value.filter(e => e.id !== selected.value.id)
     selected.value = null
   } catch (_) {}
