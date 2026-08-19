@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, inject } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -109,7 +109,7 @@ async function pasteFromClipboard() {
     return
   }
   try {
-    t.value.filePath = await invoke('stage_import_text', { content: text, format: 'csv' })
+    t.value.filePath = await stageImportText(text, 'csv')
   } catch (e) {
     setError(e)
     return

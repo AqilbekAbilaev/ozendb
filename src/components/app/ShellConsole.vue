@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { listDatabases } from '../../engines/mongodb/api/resources'
+import { readShellScript, writeShellScript } from '../../appApi/files'
 import { runShellCommand, getShellHistory, pushShellCommand, clearShellHistory } from '../../engines/mongodb/api/shell'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
@@ -179,7 +179,7 @@ async function openScript() {
   }
   if (!path) return  // user cancelled
   try {
-    const text = await invoke('read_shell_script', { path: String(path) })
+    const text = await readShellScript(String(path))
     props.activeTab.code = text
     props.activeTab.scriptPath = String(path)
   } catch (e) {
@@ -205,7 +205,7 @@ async function saveScript() {
   }
   if (!path) return  // user cancelled
   try {
-    await invoke('write_shell_script', { path: String(path), contents: contents })
+    await writeShellScript(String(path), contents)
     tab.scriptPath = String(path)
   } catch (e) {
     reportScriptError('Save failed: ' + errText(e))

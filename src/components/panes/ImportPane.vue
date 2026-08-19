@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, inject } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -123,7 +123,7 @@ async function pasteSource() {
 async function stageText(text) {
   let path
   try {
-    path = await invoke('stage_import_text', { content: text, format: t.value.format })
+    path = await stageImportText(text, t.value.format)
   } catch (e) {
     setError(e)
     return
