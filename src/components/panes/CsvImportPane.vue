@@ -2,6 +2,7 @@
 import { ref, computed, watch, inject } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -124,12 +125,7 @@ async function loadPreview() {
   if (!t.value.filePath) return
   previewLoading.value = true
   try {
-    const preview = await invoke('import_preview', {
-      path: t.value.filePath,
-      format: 'csv',
-      limit: PREVIEW_LIMIT,
-      csv: csvPayload(),
-    })
+    const preview = await importPreview(t.value.filePath, 'csv', PREVIEW_LIMIT, csvPayload())
     previewCols.value = preview.columns || []
     previewRows.value = preview.rows || []
     syncFields(previewCols.value)
@@ -182,15 +178,13 @@ async function run() {
   running.value = true
   error.value = null
   try {
-    const count = await invoke('import_collection_mapped', {
-      id: t.value.connId,
-      database: String(t.value.targetDb).trim(),
-      collection: String(t.value.targetColl).trim(),
-      path: t.value.filePath,
-      format: 'csv',
-      mapping: mappingPayload(),
-      csv: csvPayload(),
-    })
+    const count = await importCollectionMapped(
+      { connectionId: t.value.connId, database: String(t.value.targetDb).trim(), collection: String(t.value.targetColl).trim() },
+      t.value.filePath,
+      'csv',
+      mappingPayload(),
+      csvPayload(),
+    )
     showToast(`Imported ${count} document${count === 1 ? '' : 's'}`)
     onImported(t.value.connId)
     done.value = { count: count }

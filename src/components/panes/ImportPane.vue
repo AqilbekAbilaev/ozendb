@@ -2,6 +2,7 @@
 import { ref, computed, watch, inject } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -152,11 +153,7 @@ async function loadPreview() {
   if (!src) return
   previewLoading.value = true
   try {
-    const preview = await invoke('import_preview', {
-      path: src.path,
-      format: t.value.format,
-      limit: PREVIEW_LIMIT,
-    })
+    const preview = await importPreview(src.path, t.value.format, PREVIEW_LIMIT)
     previewCols.value = preview.columns || []
     previewRows.value = preview.rows || []
   } catch (e) {
@@ -180,20 +177,18 @@ async function run() {
     // Optional early validation: confirm each file parses before writing anything.
     if (isJson.value && t.value.validate) {
       for (const s of t.value.sources) {
-        await invoke('import_preview', { path: s.path, format: t.value.format, limit: 1 })
+        await importPreview(s.path, t.value.format, 1)
       }
     }
     let total = 0
     const conns = new Set()
     for (const s of t.value.sources) {
-      const count = await invoke('import_collection_mapped', {
-        id: t.value.connId,
-        database: String(s.targetDb).trim(),
-        collection: String(s.targetColl).trim(),
-        path: s.path,
-        format: t.value.format,
-        mapping: [],
-      })
+      const count = await importCollectionMapped(
+        { connectionId: t.value.connId, database: String(s.targetDb).trim(), collection: String(s.targetColl).trim() },
+        s.path,
+        t.value.format,
+        [],
+      )
       total += count
       conns.add(t.value.connId)
     }

@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/core'
 import { listDatabases } from '../engines/mongodb/api/resources'
+import { copyCollection, copyCollectionToConnection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'
 
 // Clipboard paste for collections and databases, same-connection or cross-server. The
@@ -13,16 +13,18 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
   // documents across via `copy_collection_to_connection`.
   async function copyOneCollection(clip, target, sourceCollection, targetCollection) {
     if (clip.connId === target.connId) {
-      await invoke('copy_collection', {
-        id: clip.connId,
-        sourceDatabase: clip.dbName, sourceCollection: sourceCollection,
-        targetDatabase: target.dbName, targetCollection: targetCollection,
-      })
+      await copyCollection(
+        clip.connId,
+        { database: clip.dbName, collection: sourceCollection },
+        { database: target.dbName, collection: targetCollection },
+      )
     } else {
-      await invoke('copy_collection_to_connection', {
-        sourceId: clip.connId, sourceDatabase: clip.dbName, sourceCollection: sourceCollection,
-        targetId: target.connId, targetDatabase: target.dbName, targetCollection: targetCollection,
-      })
+      await copyCollectionToConnection(
+        clip.connId,
+        { database: clip.dbName, collection: sourceCollection },
+        target.connId,
+        { database: target.dbName, collection: targetCollection },
+      )
     }
   }
 

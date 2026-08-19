@@ -1,6 +1,6 @@
-import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { listDatabases } from '../engines/mongodb/api/resources'
+import { exportCollection, importCollection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'
 
 // Import / export flows. Per-collection export is a workspace tab (see openExportTab in
@@ -50,13 +50,11 @@ export function useDbTransfer({ showToast, connectionTreeRef, openModal }) {
     let failed = 0
     for (const coll of collections) {
       try {
-        await invoke('export_collection', {
-          id: nodeData.connId,
-          database: nodeData.dbName,
-          collection: coll,
-          path: `${dir}/${coll}.json`,
-          format: 'json',
-        })
+        await exportCollection(
+          { connectionId: nodeData.connId, database: nodeData.dbName, collection: coll },
+          `${dir}/${coll}.json`,
+          'json',
+        )
         done++
       } catch (_) {
         failed++
@@ -87,13 +85,11 @@ export function useDbTransfer({ showToast, connectionTreeRef, openModal }) {
       const collection = base.replace(/\.(json|csv)$/i, '')
       const format = p.toLowerCase().endsWith('.csv') ? 'csv' : 'json'
       try {
-        await invoke('import_collection', {
-          id: nodeData.connId,
-          database: nodeData.dbName,
-          collection: collection,
-          path: p,
-          format: format,
-        })
+        await importCollection(
+          { connectionId: nodeData.connId, database: nodeData.dbName, collection },
+          p,
+          format,
+        )
         done++
       } catch (_) {
         failed++

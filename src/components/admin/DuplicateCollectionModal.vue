@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { duplicateCollection } from '../../engines/mongodb/api/transfer'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -33,12 +33,10 @@ async function confirm() {
   saving.value = true
   error.value = null
   try {
-    const count = await invoke('duplicate_collection', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      source: props.target.collName,
-      target: targetName,
-    })
+    const count = await duplicateCollection(
+      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      targetName,
+    )
     showToast(`Copied ${count} document${count === 1 ? '' : 's'} to "${targetName}"`)
     emit('saved', props.target.connId)
     emit('close')

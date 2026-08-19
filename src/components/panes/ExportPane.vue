@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
+import { exportCollectionFields } from '../../engines/mongodb/api/transfer'
+import { runFind } from '../../engines/mongodb/api/queries'
 import { errText, errCode } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -57,16 +58,10 @@ async function loadCollectionSample() {
   loading.value = true
   error.value = null
   try {
-    const { documents: docs } = await invoke('find_documents', {
-      id: t.value.connId,
-      database: t.value.dbName,
-      collection: t.value.collName,
-      filter: t.value.filter || '{}',
-      projection: '{}',
-      sort: '{}',
-      skip: 0,
-      limit: PREVIEW_LIMIT,
-    })
+    const { documents: docs } = await runFind(
+      { connectionId: t.value.connId, database: t.value.dbName, collection: t.value.collName },
+      { filter: t.value.filter || '{}', projection: '{}', sort: '{}', skip: 0, limit: PREVIEW_LIMIT },
+    )
     sampleRows.value = docs || []
     const cols = []
     for (const doc of sampleRows.value) {
@@ -148,16 +143,13 @@ async function run() {
   running.value = true
   error.value = null
   try {
-    const count = await invoke('export_collection_fields', {
-      id: t.value.connId,
-      database: t.value.dbName,
-      collection: t.value.collName,
-      path: String(path),
-      format: t.value.format,
-      fields: mappingPayload(),
-      incremental: t.value.incremental,
-      filter: t.value.filter || '{}',
-    })
+    const count = await exportCollectionFields(
+      { connectionId: t.value.connId, database: t.value.dbName, collection: t.value.collName },
+      String(path),
+      t.value.format,
+      mappingPayload(),
+      { incremental: t.value.incremental, filter: t.value.filter || '{}' },
+    )
     // The tab stays open on success so the mapping can be tweaked and re-run; the
     // result banner replaces the modal's close-on-success.
     t.value.result = { count: count, path: String(path) }
