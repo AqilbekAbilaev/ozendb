@@ -5,21 +5,18 @@
 // shapes; the rest of the frontend talks targets, not commands.
 
 import { invoke } from '@tauri-apps/api/core'
-
-function targetPayload(target, extra = {}) {
-  return { id: target.connectionId, database: target.database, collection: target.collection, ...extra }
-}
+import { connectionPayload, collectionPayload } from './payload'
 
 export function runFind(target, query, runId) {
-  return invoke('find_documents', targetPayload(target, { ...query, comment: runId }))
+  return invoke('find_documents', collectionPayload(target, { ...query, comment: runId }))
 }
 
 export function runAggregate(target, pipeline, runId) {
-  return invoke('run_aggregate', targetPayload(target, { pipeline, comment: runId }))
+  return invoke('run_aggregate', collectionPayload(target, { pipeline, comment: runId }))
 }
 
 export function cancelRun(connectionId, runId) {
-  return invoke('kill_query', { id: connectionId, comment: runId })
+  return invoke('kill_query', connectionPayload(connectionId, { comment: runId }))
 }
 
 export function recordHistory(target, entry) {
@@ -42,18 +39,18 @@ export function translateSqlToMql(sql) {
 }
 
 export function explainFind(target, query, verbosity) {
-  return invoke('explain_query', targetPayload(target, { ...query, verbosity }))
+  return invoke('explain_query', collectionPayload(target, { ...query, verbosity }))
 }
 
 export function explainAggregate(target, pipeline, verbosity) {
-  return invoke('explain_aggregate', targetPayload(target, { pipeline, verbosity }))
+  return invoke('explain_aggregate', collectionPayload(target, { pipeline, verbosity }))
 }
 
 // On-disk sizes for the Explain plan's Collection/Index target nodes, normalized
 // from the raw collection_stats response. Best-effort by contract: callers treat a
 // rejection here as "skip the size nodes", never as an explain failure.
 export async function loadExplainStorage(target) {
-  const stats = await invoke('collection_stats', targetPayload(target))
+  const stats = await invoke('collection_stats', collectionPayload(target))
   const indexSizes = {}
   for (const ix of (stats.indexes || [])) indexSizes[ix.name] = ix.size
   return { dataSize: stats.size, indexSizes }
