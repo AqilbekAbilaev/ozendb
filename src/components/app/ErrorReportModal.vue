@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listErrorLog, getErrorReportContext, clearErrorLog } from '../../appApi/errorLog'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -29,8 +29,8 @@ const newestFirst = computed(() => [...records.value].reverse())
 
 onMounted(async () => {
   try {
-    records.value = await invoke('list_error_log')
-    context.value = await invoke('error_report_context')
+    records.value = await listErrorLog()
+    context.value = await getErrorReportContext()
   } catch (e) {
     // Leaving the list empty is the honest outcome; the modal shows its empty state.
   }
@@ -43,7 +43,7 @@ function report() {
 
 async function clearLog() {
   try {
-    await invoke('clear_error_log')
+    await clearErrorLog()
     records.value = []
   } catch (e) {
     // Nothing useful to say if the log won't clear; the list simply stays as it is.

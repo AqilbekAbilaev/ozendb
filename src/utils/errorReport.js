@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { recordFrontendError } from '../appApi/errorLog'
 import { HELP_REPO } from '../constants/helpLinks'
 
 // Frontend half of error reporting. Two jobs: hand uncaught exceptions to the backend
@@ -36,7 +36,7 @@ export function installErrorReporting() {
   function report(message) {
     if (sent >= MAX_PER_SESSION || !message) return
     sent++
-    invoke('record_frontend_error', { message: String(message).slice(0, 4000) }).catch(() => {})
+    recordFrontendError(message).catch(() => {})
   }
 
   window.addEventListener('error', (e) => {
