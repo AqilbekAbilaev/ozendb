@@ -19,6 +19,27 @@ export function cancelRun(connectionId, runId) {
   return invoke('kill_query', connectionPayload(connectionId, { comment: runId }))
 }
 
+export function countDocuments(target, filter) {
+  return invoke('count_documents', collectionPayload(target, { filter }))
+}
+
+// Collection is optional (null searches the whole database); the optional tuning
+// knobs are only sent when the caller provides them.
+export function searchCollections(target, term, options = {}) {
+  const extra = { term: term }
+  for (const key of ['scope', 'matchCase', 'regex', 'scanLimit', 'maxHits']) {
+    if (options[key] !== undefined) extra[key] = options[key]
+  }
+  return invoke('search_collections', {
+    ...collectionPayload(target, extra),
+    collection: options.collection ?? null,
+  })
+}
+
+export function mapReduce(target, { map, reduce, finalize, outCollection }) {
+  return invoke('map_reduce', collectionPayload(target, { map, reduce, finalize, outCollection }))
+}
+
 export function recordHistory(target, entry) {
   return invoke('push_query_history', {
     connectionId: target.connectionId,

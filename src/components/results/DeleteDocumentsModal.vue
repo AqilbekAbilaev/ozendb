@@ -6,6 +6,7 @@
 // can never run against a scope the user hasn't seen.
 import { ref, computed, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { countDocuments } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
 import { parseField } from '../../utils/queryParser'
 import { predefinedQuery, hasSelectedDocs } from '../../utils/predefinedQuery'
@@ -63,12 +64,10 @@ async function onCount() {
   if (!pf.ok) { error.value = 'Query: ' + pf.error; return }
   busy.value = true
   try {
-    const total = await invoke('count_documents', {
-      id:         props.activeTab.connectionId,
-      database:   props.activeTab.dbName,
-      collection: props.activeTab.collectionName,
-      filter:     pf.ejson,
-    })
+    const total = await countDocuments(
+      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      pf.ejson,
+    )
     matched.value = total
     countedFilter.value = filter.value
   } catch (e) {

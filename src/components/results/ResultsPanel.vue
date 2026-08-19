@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { countDocuments } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
 import { parseField } from '../../utils/queryParser'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -105,12 +105,10 @@ async function fetchCount(tab) {
   const parsed = parseField(tab.filter || '')
   if (!parsed.ok) throw new Error(parsed.error)
   const filter = parsed.ejson
-  const total = await invoke('count_documents', {
-    id:         tab.connectionId,
-    database:   tab.dbName,
-    collection: tab.collectionName,
-    filter:     filter,
-  })
+  const total = await countDocuments(
+    { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+    filter,
+  )
   tab.total = total
   tab.totalFilter = filter
   return total

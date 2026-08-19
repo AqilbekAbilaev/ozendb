@@ -7,6 +7,9 @@ import {
   runFind,
   runAggregate,
   cancelRun,
+  countDocuments,
+  searchCollections,
+  mapReduce,
   recordHistory,
   translateSqlToMql,
   explainFind,
@@ -81,6 +84,97 @@ describe('cancelRun', () => {
     const error = { code: 'command', message: 'no such op' }
     invoke.mockRejectedValue(error)
     await expect(cancelRun('connection-1', 'run-3')).rejects.toBe(error)
+  })
+})
+
+describe('countDocuments', () => {
+  it('translates the target and filter into the count_documents payload', async () => {
+    invoke.mockResolvedValue(42)
+    await countDocuments(target, '{ a: 1 }')
+    expect(invoke).toHaveBeenCalledWith('count_documents', {
+      id:         'connection-1',
+      database:   'app',
+      collection: 'users',
+      filter:     '{ a: 1 }',
+    })
+  })
+
+  it('resolves with the command response unchanged', async () => {
+    invoke.mockResolvedValue(7)
+    await expect(countDocuments(target, '{}')).resolves.toBe(7)
+  })
+
+  it('rejects with the command error unchanged', async () => {
+    const error = { code: 'mongo', message: 'count failed' }
+    invoke.mockRejectedValue(error)
+    await expect(countDocuments(target, '{}')).rejects.toBe(error)
+  })
+})
+
+describe('searchCollections', () => {
+  it('translates the target, term and options into the search_collections payload', async () => {
+    invoke.mockResolvedValue({ hits: [], scanned: 0 })
+    await searchCollections(target, 'needle', { collection: null, scope: 'both', matchCase: true, regex: false })
+    expect(invoke).toHaveBeenCalledWith('search_collections', {
+      id:         'connection-1',
+      database:   'app',
+      collection: null,
+      term:       'needle',
+      scope:      'both',
+      matchCase:  true,
+      regex:      false,
+    })
+  })
+
+  it('omits options that were not provided', async () => {
+    invoke.mockResolvedValue({ hits: [], scanned: 0 })
+    await searchCollections(target, 'needle')
+    expect(invoke).toHaveBeenCalledWith('search_collections', {
+      id:         'connection-1',
+      database:   'app',
+      collection: null,
+      term:       'needle',
+    })
+  })
+
+  it('passes through the optional scan limit and max hits', async () => {
+    invoke.mockResolvedValue({ hits: [], scanned: 0 })
+    await searchCollections(target, 'needle', { scanLimit: 1000, maxHits: 50 })
+    expect(invoke).toHaveBeenCalledWith('search_collections', {
+      id:         'connection-1',
+      database:   'app',
+      collection: null,
+      term:       'needle',
+      scanLimit:  1000,
+      maxHits:    50,
+    })
+  })
+})
+
+describe('mapReduce', () => {
+  it('translates the target and script arguments into the map_reduce payload', async () => {
+    invoke.mockResolvedValue({ results: [] })
+    await mapReduce(target, {
+      map:          'function() { emit(this.a, 1) }',
+      reduce:       'function(k, v) { return Array.sum(v) }',
+      finalize:     '',
+      outCollection: 'counts',
+    })
+    expect(invoke).toHaveBeenCalledWith('map_reduce', {
+      id:            'connection-1',
+      database:      'app',
+      collection:    'users',
+      map:           'function() { emit(this.a, 1) }',
+      reduce:        'function(k, v) { return Array.sum(v) }',
+      finalize:      '',
+      outCollection: 'counts',
+    })
+  })
+
+  it('resolves with the command response unchanged', async () => {
+    const response = { results: [{ _id: 'a', value: 2 }] }
+    invoke.mockResolvedValue(response)
+    await expect(mapReduce(target, { map: '() => {}', reduce: '() => {}', finalize: '', outCollection: '' })).resolves.toBe(response)
   })
 })
 
