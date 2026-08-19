@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
+import { analyzeSchema, exportSchema } from '../../engines/mongodb/api/schema'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -39,12 +39,10 @@ async function analyze() {
   error.value = null
   errorCode.value = null
   try {
-    report.value = await invoke('analyze_schema', {
-      id: props.activeTab.connId,
-      database: props.activeTab.dbName,
-      collection: props.activeTab.collName,
-      sampleSize: sampleSize.value,
-    })
+    report.value = await analyzeSchema(
+      { connectionId: props.activeTab.connId, database: props.activeTab.dbName, collection: props.activeTab.collName },
+      sampleSize.value,
+    )
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)
@@ -83,14 +81,12 @@ async function exportSchema() {
   exporting.value = true
   exportMsg.value = null
   try {
-    const count = await invoke('export_schema', {
-      id: props.activeTab.connId,
-      database: props.activeTab.dbName,
-      collection: props.activeTab.collName,
-      sampleSize: sampleSize.value,
-      path: String(path),
-      format: format,
-    })
+    const count = await exportSchema(
+      { connectionId: props.activeTab.connId, database: props.activeTab.dbName, collection: props.activeTab.collName },
+      sampleSize.value,
+      String(path),
+      format,
+    )
     exportMsg.value = `Exported ${count} field${count === 1 ? '' : 's'} to ${ext.toUpperCase()}`
   } catch (e) {
     exportMsg.value = errText(e)
