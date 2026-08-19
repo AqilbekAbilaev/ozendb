@@ -1,5 +1,6 @@
 import { computed, markRaw, ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { replaceDocument } from '../engines/mongodb/api/documents'
+import { runFind } from '../engines/mongodb/api/queries'
 import { valueToClipboard } from '../utils/clipboardCopy'
 import { dbRefOf, idFilterString } from '../utils/dbRef'
 import { errText } from '../utils/errors'
@@ -176,23 +177,15 @@ export function useGridCellActions({
     const filter = idFilter(tab.results[edit.rowIdx])
 
     try {
-      await invoke('replace_document', {
-        id: tab.connectionId,
-        database: tab.dbName,
-        collection: tab.collectionName,
-        idFilter: filter,
-        document: JSON.stringify(rootDocument),
-      })
-      const { documents } = await invoke('find_documents', {
-        id: tab.connectionId,
-        database: tab.dbName,
-        collection: tab.collectionName,
+      await replaceDocument(
+        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
         filter,
-        projection: '{}',
-        sort: '{}',
-        skip: 0,
-        limit: 1,
-      })
+        JSON.stringify(rootDocument),
+      )
+      const { documents } = await runFind(
+        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        { filter, projection: '{}', sort: '{}', skip: 0, limit: 1 },
+      )
       if (documents.length) tab.results.splice(edit.rowIdx, 1, markRaw(documents[0]))
       else tab.results.splice(edit.rowIdx, 1)
     } catch (error) {

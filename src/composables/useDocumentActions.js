@@ -1,5 +1,12 @@
 import { ref, computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import {
+  deleteDocument,
+  deleteMany,
+  insertDocuments,
+  replaceDocument,
+  clearCollection,
+  openDocumentWindow as openDocumentWindowApi,
+} from '../engines/mongodb/api/documents'
 import { errText } from '../utils/errors'
 import { canWriteTab, isWriteAction } from '../utils/writable'
 import { inspectField, setFieldValue, addFieldValue, removeField, renameField, getContainer } from '../utils/docEdit'
@@ -57,7 +64,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       label: '',
       mode: 'insert',
     }
-    invoke('open_document_window', { target: target })
+    openDocumentWindowApi(target)
   }
 
   // Open the selected document in the pop-out edit window. Reached from the results
@@ -97,7 +104,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
         : String(doc._id),
       mode: mode,
     }
-    invoke('open_document_window', { target: target })
+    openDocumentWindowApi(target)
   }
 
   // Indices of the current row selection (multi-select), falling back to the single active
@@ -129,22 +136,18 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     crudError.value = null
     try {
       if (rows.length === 1) {
-        await invoke('delete_document', {
-          id: tab.connectionId,
-          database: tab.dbName,
-          collection: tab.collectionName,
-          idFilter: buildIdFilter(tab.results[rows[0]]),
-        })
+        await deleteDocument(
+          { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+          buildIdFilter(tab.results[rows[0]]),
+        )
       } else {
         // Bulk delete via a single { _id: { $in: [...] } } filter. The _id values are
         // already in the same Extended-JSON shape buildIdFilter relies on.
         const ids = rows.map((i) => tab.results[i]).filter((d) => d != null).map((d) => d._id)
-        await invoke('delete_many', {
-          id: tab.connectionId,
-          database: tab.dbName,
-          collection: tab.collectionName,
-          filter: JSON.stringify({ _id: { $in: ids } }),
-        })
+        await deleteMany(
+          { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+          JSON.stringify({ _id: { $in: ids } }),
+        )
       }
       showDeleteConfirm.value = false
       tab.selectedRow = -1
@@ -363,12 +366,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     // leave a large paste running with nothing on screen to say so.
     pasteBusy.value = true
     try {
-      const count = await invoke('insert_documents', {
-        id: target.id,
-        database: target.database,
-        collection: target.collection,
-        documents: target.text,
-      })
+      const count = await insertDocuments(target, target.text)
       showToast(`Pasted ${count} document${count !== 1 ? 's' : ''}`)
       requery(true)
     } catch (e) {
@@ -383,13 +381,11 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // refresh the page so the grid reflects it.
   async function saveDocReplacement(newDoc, original) {
     const tab = activeTab()
-    await invoke('replace_document', {
-      id: tab.connectionId,
-      database: tab.dbName,
-      collection: tab.collectionName,
-      idFilter: buildIdFilter(original),
-      document: JSON.stringify(newDoc),
-    })
+    await replaceDocument(
+      { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+      buildIdFilter(original),
+      JSON.stringify(newDoc),
+    )
     requery(true)
   }
 
@@ -438,11 +434,9 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     clearError.value = null
     clearBusy.value = true
     try {
-      const removed = await invoke('clear_collection', {
-        id: tab.connectionId,
-        database: tab.dbName,
-        collection: tab.collectionName,
-      })
+      const removed = await clearCollection(
+        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+      )
       showClearConfirm.value = false
       tab.selectedRow = -1
       tab.selectedField = null
