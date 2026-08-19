@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { createDatabase } from '../../engines/mongodb/api/resources'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -30,11 +30,10 @@ async function confirm() {
   saving.value = true
   error.value = null
   try {
-    await invoke('create_database', {
-      id: props.target.connId,
-      database: database,
-      firstCollection: collName.value.trim(),
-    })
+    await createDatabase(
+      { connectionId: props.target.connId, database: database },
+      collName.value.trim(),
+    )
     showToast(`Database "${database}" created`)
     emit('saved', props.target.connId)
     emit('close')

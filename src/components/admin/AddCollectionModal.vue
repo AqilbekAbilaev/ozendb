@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { createCollection } from '../../engines/mongodb/api/resources'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -44,12 +44,11 @@ async function confirm() {
   saving.value = true
   error.value = null
   try {
-    await invoke('create_collection', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      name: collection,
-      options: built.options,
-    })
+    await createCollection(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      collection,
+      built.options,
+    )
     showToast(`Collection "${collection}" created`)
     emit('saved', props.target.connId)
     emit('close')

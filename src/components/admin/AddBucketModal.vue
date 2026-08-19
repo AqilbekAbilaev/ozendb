@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { createCollection } from '../../engines/mongodb/api/resources'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -32,11 +32,10 @@ async function confirm() {
   error.value = null
   try {
     for (const suffix of ['files', 'chunks']) {
-      await invoke('create_collection', {
-        id: props.target.connId,
-        database: props.target.dbName,
-        name: `${bucket}.${suffix}`,
-      })
+      await createCollection(
+        { connectionId: props.target.connId, database: props.target.dbName },
+        `${bucket}.${suffix}`,
+      )
     }
     showToast(`GridFS bucket "${bucket}" created`)
     emit('saved', props.target.connId)
