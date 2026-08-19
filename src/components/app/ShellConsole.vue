@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listDatabases } from '../../engines/mongodb/api/resources'
+import { runShellCommand, getShellHistory, pushShellCommand, clearShellHistory } from '../../engines/mongodb/api/shell'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -63,7 +64,7 @@ onMounted(async () => {
   // Load this connection's persisted command history so the History dropdown
   // (and recall) spans previous sessions.
   try {
-    const past = await invoke('get_shell_history', { connectionId: props.activeTab.connectionId })
+    const past = await getShellHistory(props.activeTab.connectionId)
     if (Array.isArray(past)) props.activeTab.history = past
   } catch (_) {}
 })
@@ -83,16 +84,14 @@ async function run(codeOverride) {
   tab.isRunning = true
   tab.runError = null
   const t0 = Date.now()
-  invoke('push_shell_command', { connectionId: tab.connectionId, command: code }).catch(() => {})
+  pushShellCommand(tab.connectionId, code).catch(() => {})
   if (!tab.history.includes(code)) tab.history.push(code)
 
   try {
-    const res = await invoke('run_shell_command', {
-      id:        tab.connectionId,
-      database:  tab.dbName,
-      sessionId: tab.sessionId,
-      code:      code,
-    })
+    const res = await runShellCommand(
+      { connectionId: tab.connectionId, database: tab.dbName, sessionId: tab.sessionId },
+      code,
+    )
     tab.elapsedMs = Date.now() - t0
     tab.logs = res.logs || []
     tab.selectedRow = -1
@@ -158,7 +157,7 @@ async function clearHistory() {
   const tab = props.activeTab
   if (!tab) return
   try {
-    await invoke('clear_shell_history', { connectionId: tab.connectionId })
+    await clearShellHistory(tab.connectionId)
     tab.history = []
   } catch (_) {}
 }

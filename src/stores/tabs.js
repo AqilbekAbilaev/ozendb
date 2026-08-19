@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { closeShellSession } from '../engines/mongodb/api/shell'
 
 // The tab spine: the open workspace tabs, which one is active, and every mutation of
 // them (activate/close/cycle/duplicate/reorder/rename).
@@ -73,7 +73,7 @@ export function closeTab(id) {
   if (idx < 0) return
   const closing = tabs.value[idx]
   if (closing.kind === 'shell' && closing.sessionId) {
-    invoke('close_shell_session', { sessionId: closing.sessionId }).catch(() => {})
+    closeShellSession(closing.sessionId).catch(() => {})
   }
   tabs.value.splice(idx, 1)
   // If we closed the active tab, move to an adjacent one (the nearest preceding
