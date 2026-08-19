@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listDatabases } from '../../engines/mongodb/api/resources'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -86,7 +86,7 @@ const collOptions = computed(() => {
 // Reloaded when the pane moves to a tab on another server, for the same reason.
 watch(() => props.activeTab.connId, async (connId) => {
   try {
-    databases.value = await invoke('list_databases', { id: connId })
+    databases.value = await listDatabases(connId)
   } catch (_) {
     // The pickers stay on "all" — a missing database list must not stop the ops view.
   }

@@ -1,5 +1,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { listConnections } from '../engines/mongodb/api/connections'
+import { listDatabases } from '../engines/mongodb/api/resources'
 import { listen } from '@tauri-apps/api/event'
 import { errCode, errMessage } from '../utils/errors'
 import { applyConnectionUpdate } from '../utils/connectionList'
@@ -90,7 +91,7 @@ export function useConnectionTree({ props, emit }) {
       loadingConns.value[id] = true
       connErrors.value[id] = null
       try {
-        connDatabases.value[id] = await invoke('list_databases', { id: id })
+        connDatabases.value[id] = await listDatabases(id)
       } catch (e) {
         connErrors.value[id] = { message: errMessage(e), code: errCode(e) }
         expandedConns.value[id] = false
@@ -235,7 +236,7 @@ export function useConnectionTree({ props, emit }) {
     loadingConns.value[connId] = true
     connErrors.value[connId] = null
     try {
-      connDatabases.value[connId] = await invoke('list_databases', { id: connId })
+      connDatabases.value[connId] = await listDatabases(connId)
     } catch (e) {
       connErrors.value[connId] = { message: errMessage(e), code: errCode(e) }
       expandedConns.value[connId] = false

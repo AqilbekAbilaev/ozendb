@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listDatabases } from '../../engines/mongodb/api/resources'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -51,7 +52,7 @@ const shellExt = shellExtensions({
 // Best-effort: preload this database's collection names for `db.` completion.
 async function loadCollections() {
   try {
-    const dbs = await invoke('list_databases', { id: props.activeTab.connectionId })
+    const dbs = await listDatabases(props.activeTab.connectionId)
     const match = Array.isArray(dbs) ? dbs.find(d => d.name === props.activeTab.dbName) : null
     if (match && Array.isArray(match.collections)) dbCollections.value = match.collections
   } catch (_) {}

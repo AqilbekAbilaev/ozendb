@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { listDatabases } from '../engines/mongodb/api/resources'
 import { errText } from '../utils/errors'
 
 // Clipboard paste for collections and databases, same-connection or cross-server. The
@@ -36,7 +37,7 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
         await copyOneCollection(clip, target, clip.collName, clip.collName)
         showToast(`Pasted "${clip.collName}" into ${target.dbName}${crossServer ? ' (cross-server)' : ''}`)
       } else {
-        const dbs = await invoke('list_databases', { id: clip.connId })
+        const dbs = await listDatabases(clip.connId)
         const collections = (dbs.find(d => d.name === clip.dbName)?.collections) || []
         let done = 0
         for (const coll of collections) {

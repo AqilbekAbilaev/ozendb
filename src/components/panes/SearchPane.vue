@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listDatabases } from '../../engines/mongodb/api/resources'
 import { searchCollections } from '../../engines/mongodb/api/queries'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -45,7 +45,7 @@ const collOptions = computed(() => [
 async function loadDatabases() {
   initErr.value = null
   try {
-    databases.value = await invoke('list_databases', { id: props.activeTab.connId })
+    databases.value = await listDatabases(props.activeTab.connId)
   } catch (e) {
     initErr.value = errText(e)
   }

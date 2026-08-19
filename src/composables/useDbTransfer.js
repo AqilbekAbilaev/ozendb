@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { listDatabases } from '../engines/mongodb/api/resources'
 import { errText } from '../utils/errors'
 
 // Import / export flows. Per-collection export is a workspace tab (see openExportTab in
@@ -38,7 +39,7 @@ export function useDbTransfer({ showToast, connectionTreeRef, openModal }) {
     if (!dir) return  // user cancelled
     let collections = []
     try {
-      const dbs = await invoke('list_databases', { id: nodeData.connId })
+      const dbs = await listDatabases(nodeData.connId)
       collections = (dbs.find(d => d.name === nodeData.dbName)?.collections) || []
     } catch (e) {
       showToast('Export failed: ' + errText(e))
