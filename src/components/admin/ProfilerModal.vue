@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { getProfilingStatus, setProfilingLevel, listProfile } from '../../engines/mongodb/api/admin'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -47,10 +47,9 @@ const currentLevelLabel = computed(() =>
 )
 
 async function fetchStatus() {
-  status.value = await invoke('get_profiling_status', {
-    id: props.target.connId,
-    database: props.target.dbName,
-  })
+  status.value = await getProfilingStatus(
+      { connectionId: props.target.connId, database: props.target.dbName },
+    )
   // Seed the control bar from the live status the first time we learn it.
   if (status.value && typeof status.value.was === 'number') {
     level.value = status.value.was
@@ -61,12 +60,11 @@ async function fetchStatus() {
 }
 
 async function fetchList() {
-  entries.value = await invoke('list_profile', {
-    id: props.target.connId,
-    database: props.target.dbName,
-    limit: 50,
-    slowerThanMs: slowerThan.value != null && slowerThan.value !== '' ? Number(slowerThan.value) : null,
-  })
+  entries.value = await listProfile(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      50,
+      slowerThan.value != null && slowerThan.value !== '' ? Number(slowerThan.value) : null,
+    )
 }
 
 onMounted(async () => {
@@ -86,12 +84,11 @@ async function applyLevel() {
   error.value = null
   errorCode.value = null
   try {
-    await invoke('set_profiling_level', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      level: Number(level.value),
-      slowms: Number(slowms.value),
-    })
+    await setProfilingLevel(
+      { connectionId: props.target.connId, database: props.target.dbName },
+      Number(level.value),
+      Number(slowms.value),
+    )
     await fetchStatus()
     await fetchList()
   } catch (e) {

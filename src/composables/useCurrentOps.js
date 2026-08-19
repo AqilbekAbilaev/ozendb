@@ -1,5 +1,5 @@
 import { ref, computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { currentOps, killOp } from '../engines/mongodb/api/admin'
 import { errText, errCode } from '../utils/errors'
 import { normalizeOps, mergeRetained, filterOps } from '../utils/currentOps'
 import { useTicker } from './useTicker'
@@ -96,7 +96,7 @@ export function useCurrentOps(tab) {
     inFlight = true
     loading.value = rows.value.length === 0
     try {
-      const reply = await invoke('current_ops', { id: tab().connId, ownOnly: ownOnly.value, all: showSys.value })
+      const reply = await currentOps(tab().connId, { ownOnly: ownOnly.value, all: showSys.value })
       rows.value = mergeRetained(rows.value, normalizeOps(reply), retention.value, Date.now())
       updatedAt.value = Date.now()
       error.value = null
@@ -116,7 +116,7 @@ export function useCurrentOps(tab) {
   // at the next poll (which may be seconds away, or off).
   async function kill(opid) {
     try {
-      await invoke('kill_op', { id: tab().connId, opid: opid })
+      await killOp(tab().connId, opid)
       await load()
       return true
     } catch (e) {

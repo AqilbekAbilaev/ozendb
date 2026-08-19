@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { getValidator, setValidator } from '../../engines/mongodb/api/admin'
 import { errText } from '../../utils/errors'
 import { parseField } from '../../utils/queryParser'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -32,11 +32,9 @@ const ACTION_OPTIONS = ['error', 'warn'].map((v) => ({ value: v, label: v }))
 
 onMounted(async () => {
   try {
-    const info = await invoke('get_validator', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
-    })
+    const info = await getValidator(
+      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+    )
     validatorText.value = info.validator || ''
     if (info.validation_level) level.value = info.validation_level
     if (info.validation_action) action.value = info.validation_action
@@ -59,14 +57,12 @@ async function save() {
   saving.value = true
   error.value = null
   try {
-    await invoke('set_validator', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
-      validator: ejson,
-      validationLevel: level.value,
-      validationAction: action.value,
-    })
+    await setValidator(
+      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      ejson,
+      level.value,
+      action.value,
+    )
     emit('saved', props.target.collName)
     emit('close')
   } catch (e) {

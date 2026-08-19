@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { serverStatus } from '../../engines/mongodb/api/admin'
 import { errText } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -37,7 +37,7 @@ function push(key, value) {
 
 async function sample() {
   try {
-    const s = await invoke('server_status', { id: props.target.connId })
+    const s = await serverStatus(props.target.connId)
     error.value = null
     const conn = s.connections || {}
     const net = s.network || {}

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { collectionStats } from '../../engines/mongodb/api/admin'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import RawToggle from '../base/RawToggle.vue'
@@ -25,11 +25,9 @@ const showRaw = ref(false)
 
 onMounted(async () => {
   try {
-    stats.value = await invoke('collection_stats', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
-    })
+    stats.value = await collectionStats(
+      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+    )
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)

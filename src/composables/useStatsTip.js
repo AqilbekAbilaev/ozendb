@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { collectionStats, databaseStats } from '../engines/mongodb/api/admin'
 import { errText } from '../utils/errors'
 import { fmtClock } from '../utils/format'
 
@@ -43,10 +43,8 @@ export function useStatsTip({ delay = HOVER_DELAY, grace = HOVER_GRACE } = {}) {
   async function load(target, mine) {
     try {
       const stats = target.collName
-        ? await invoke('collection_stats', {
-          id: target.connId, database: target.dbName, collection: target.collName,
-        })
-        : await invoke('database_stats', { id: target.connId, database: target.dbName })
+        ? await collectionStats({ connectionId: target.connId, database: target.dbName, collection: target.collName })
+        : await databaseStats({ connectionId: target.connId, database: target.dbName })
       if (mine === seq) tip.value = { ...tip.value, stats: stats, fetchedAt: fmtClock(), error: null }
     } catch (e) {
       if (mine === seq) tip.value = { ...tip.value, error: errText(e) }
