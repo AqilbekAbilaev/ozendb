@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { updateSettings } from '../appApi/settings'
 import { ZOOM_LEVELS, DEFAULT_ZOOM, nearestZoom, stepZoom } from '../utils/zoom'
 
 // UI zoom for the main window.
@@ -24,7 +24,7 @@ export function useZoom({ showToast }) {
       // stored value still applies on the next launch.
     }
     if (persist) {
-      try { await invoke('update_settings', { uiZoom: factor }) } catch (_) {}
+      try { await updateSettings({ uiZoom: factor }) } catch (_) {}
     }
   }
 

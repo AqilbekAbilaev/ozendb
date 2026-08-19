@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { getKeybindings, getSettings, updateKeybindings, updateSettings } from './appApi/settings'
 import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
 import { errText } from './utils/errors'
@@ -75,7 +75,7 @@ onMounted(async () => {
 
   // Load persisted preferences so new tabs adopt the configured default limit.
   try {
-    const settings = await invoke('get_settings')
+    const settings = await getSettings()
     if (settings && Number(settings.default_query_limit)) {
       defaultQueryLimit.value = Number(settings.default_query_limit)
     }
@@ -88,7 +88,7 @@ onMounted(async () => {
 
   // Load custom keyboard shortcuts so the JS handler (Linux) honors rebinds.
   try {
-    const overrides = await invoke('get_keybindings')
+    const overrides = await getKeybindings()
     keyBindings.value = mergeBindings(overrides)
   } catch (_) {}
 
@@ -164,7 +164,7 @@ function applyTheme(next) {
 // the choice survives a restart.
 async function setTheme(next) {
   try {
-    await invoke('update_settings', { defaultQueryLimit: defaultQueryLimit.value, theme: next })
+    await updateSettings({ defaultQueryLimit: defaultQueryLimit.value, theme: next })
   } catch (_) {}
   applyTheme(next)
 }
@@ -416,7 +416,7 @@ function onPrefsSaved(payload) {
 // launch (it's built once from the same store).
 async function onKeybindingsSaved(bindings) {
   try {
-    const saved = await invoke('update_keybindings', { bindings: bindings })
+    const saved = await updateKeybindings(bindings)
     keyBindings.value = mergeBindings(saved)
   } catch (e) {
     showToast(errText(e))

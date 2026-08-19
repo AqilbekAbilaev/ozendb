@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { errText } from '../../utils/errors'
+import { updateSettings } from '../../appApi/settings'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -55,7 +55,7 @@ async function save() {
   saving.value = true
   error.value = null
   try {
-    const settings = await invoke('update_settings', {
+    const settings = await updateSettings({
       defaultQueryLimit: Number(limit.value),
       theme: theme.value,
       defaultResultView: resultView.value,
