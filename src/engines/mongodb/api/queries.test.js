@@ -10,7 +10,6 @@ import {
   countDocuments,
   searchCollections,
   mapReduce,
-  recordHistory,
   translateSqlToMql,
   explainFind,
   explainAggregate,
@@ -175,33 +174,6 @@ describe('mapReduce', () => {
     const response = { results: [{ _id: 'a', value: 2 }] }
     invoke.mockResolvedValue(response)
     await expect(mapReduce(target, { map: '() => {}', reduce: '() => {}', finalize: '', outCollection: '' })).resolves.toBe(response)
-  })
-})
-
-describe('recordHistory', () => {
-  it('translates the target and entry into the push_query_history payload', async () => {
-    invoke.mockResolvedValue(null)
-    await recordHistory(target, {
-      mode:       'find',
-      filter:     '{ a: 1 }',
-      sort:       '{}',
-      projection: '{}',
-      skip:       0,
-      limit:      50,
-      pipeline:   '',
-    })
-    expect(invoke).toHaveBeenCalledWith('push_query_history', {
-      connectionId: 'connection-1',
-      database:     'app',
-      collection:   'users',
-      mode:         'find',
-      filter:       '{ a: 1 }',
-      sort:         '{}',
-      projection:   '{}',
-      skip:         0,
-      limit:        50,
-      pipeline:     '',
-    })
   })
 })
 

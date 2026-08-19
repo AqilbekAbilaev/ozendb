@@ -1,5 +1,6 @@
 import { markRaw } from 'vue'
 import * as qapi from '../engines/mongodb/api/queries'
+import { pushQueryHistory } from '../engines/mongodb/api/queryLibrary'
 import { errText, errCode } from '../utils/errors'
 import { parseField } from '../utils/queryParser'
 import { tabs } from '../stores/tabs'
@@ -86,7 +87,7 @@ export function useQueryRunner({ showToast }) {
       tab.elapsedMs = res.elapsedMs
       showToast(`Query returned ${tab.results.length} document${tab.results.length !== 1 ? 's' : ''} in ${(tab.elapsedMs / 1000).toFixed(3)}s`)
       if (addToHistory) {
-        qapi.recordHistory(
+        pushQueryHistory(
           { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
           {
             mode:       'find',
@@ -146,7 +147,7 @@ export function useQueryRunner({ showToast }) {
       } else {
         showToast(`Aggregation returned ${res.documents.length} document${res.documents.length !== 1 ? 's' : ''} in ${(tab.elapsedMs / 1000).toFixed(3)}s`)
       }
-      qapi.recordHistory(
+      pushQueryHistory(
         { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
         {
           mode:       'aggregate',

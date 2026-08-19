@@ -1,5 +1,5 @@
 import { nextTick } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { getDefaultQuery } from '../engines/mongodb/api/queryLibrary'
 import { parseField } from '../utils/queryParser'
 import { tabs, activeTabId, activateTab, newTabId } from '../stores/tabs'
 import { opsDefaults } from './useCurrentOps'
@@ -55,11 +55,7 @@ export function useTabCreators({
 
     let def = null
     try {
-      def = await invoke('get_default_query', {
-        connectionId: connectionId,
-        database:     dbName,
-        collection:   collectionName,
-      })
+      def = await getDefaultQuery({ connectionId, database: dbName, collection: collectionName })
     } catch (_) {}
 
     // Aggregation tabs open with an empty pipeline; nothing to run until the user writes one.

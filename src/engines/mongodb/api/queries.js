@@ -40,21 +40,6 @@ export function mapReduce(target, { map, reduce, finalize, outCollection }) {
   return invoke('map_reduce', collectionPayload(target, { map, reduce, finalize, outCollection }))
 }
 
-export function recordHistory(target, entry) {
-  return invoke('push_query_history', {
-    connectionId: target.connectionId,
-    database:     target.database,
-    collection:   target.collection,
-    mode:         entry.mode,
-    filter:       entry.filter,
-    sort:         entry.sort,
-    projection:   entry.projection,
-    skip:         entry.skip,
-    limit:        entry.limit,
-    pipeline:     entry.pipeline,
-  })
-}
-
 export function translateSqlToMql(sql) {
   return invoke('translate_sql', { sql })
 }
