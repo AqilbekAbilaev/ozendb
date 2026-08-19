@@ -1,12 +1,12 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
 import { colorHex } from '../../utils/tabColor.js'
-import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import { useToast } from '../../composables/useToast'
+import { useConnectionFolders } from '../../composables/useConnectionFolders'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -26,18 +26,9 @@ const showOnStartup     = ref(false)
 const showNewConnection = ref(false)
 const showEditConnection = ref(false)
 
-// --- Folders (Connection Manager grouping) ---
-const folders          = ref([])
-const expandedFolders  = ref([])      // folder ids currently expanded (default: all)
-const renamingFolderId = ref(null)
-const renameText       = ref('')
-const { pendingId: pendingDeleteId, confirmDelete, reset: resetDelete } = useConfirmDelete()
-const ctxMenu          = ref(null)    // { x, y, connId } for the move-to-folder context menu
-
 onMounted(async () => {
   connections.value = await invoke('list_connections')
-  folders.value = await invoke('list_folders')
-  expandedFolders.value = folders.value.map(f => f.id)  // start expanded
+  await loadFolders()
   listen('connection-saved', (e) => {
     if (!connections.value.find(c => c.id === e.payload.id))
       connections.value.push(e.payload)
@@ -51,6 +42,13 @@ const filtered = computed(() => {
     c.name.toLowerCase().includes(q) || parseDbServer(c).toLowerCase().includes(q)
   )
 })
+
+const {
+  renamingFolderId, renameText, pendingDeleteId, resetDelete,
+  ctxMenu, displayRows, moveMenuModel, loadFolders, isExpanded, toggleFolder, newFolder,
+  startRenameFolder, commitRenameFolder, cancelRenameFolder, deleteFolder, openMoveMenu,
+  onMovePick,
+} = useConnectionFolders({ connections, selectedId, filterText, filtered, showToast })
 
 
 function parseDbServer(conn) {
@@ -176,175 +174,6 @@ async function importConnections() {
   }
 }
 
-// --- Folder grouping ---
-const isFiltering = computed(() => filterText.value.trim().length > 0)
-
-const validFolderIds = computed(() => new Set(folders.value.map(f => f.id)))
-
-// Connections grouped by their folder id (only valid, existing folders count).
-const connsByFolder = computed(() => {
-  const m = new Map()
-  for (const c of connections.value) {
-    if (c.folder_id && validFolderIds.value.has(c.folder_id)) {
-      if (!m.has(c.folder_id)) m.set(c.folder_id, [])
-      m.get(c.folder_id).push(c)
-    }
-  }
-  return m
-})
-
-// Connections at the root: no folder, or a folder that no longer exists.
-const rootConns = computed(() =>
-  connections.value.filter(c => !c.folder_id || !validFolderIds.value.has(c.folder_id))
-)
-
-function isExpanded(id) { return expandedFolders.value.includes(id) }
-
-function toggleFolder(id) {
-  resetDelete()
-  const i = expandedFolders.value.indexOf(id)
-  if (i === -1) expandedFolders.value.push(id)
-  else expandedFolders.value.splice(i, 1)
-}
-
-// An ordered flat list of rows to render: folder headers, their connections
-// (when expanded), then the root connections. While filtering, a flat list of
-// matches with no folder headers.
-const displayRows = computed(() => {
-  if (isFiltering.value) {
-    return filtered.value.map(c => ({ type: 'conn', conn: c, indent: false }))
-  }
-  const rows = []
-  for (const f of folders.value) {
-    const kids = connsByFolder.value.get(f.id) ?? []
-    rows.push({ type: 'folder', folder: f, count: kids.length })
-    if (isExpanded(f.id)) {
-      if (kids.length === 0) rows.push({ type: 'empty', key: 'empty-' + f.id })
-      else for (const c of kids) rows.push({ type: 'conn', conn: c, indent: true })
-    }
-  }
-  for (const c of rootConns.value) rows.push({ type: 'conn', conn: c, indent: false })
-  return rows
-})
-
-// Create a folder with a unique default name and expand it.
-async function createUniqueFolder() {
-  const base = 'New Folder'
-  const existing = new Set(folders.value.map(f => f.name))
-  let name = base
-  let n = 2
-  while (existing.has(name)) name = `${base} ${n++}`
-  const folder = await invoke('create_folder', { name: name })
-  folders.value.push(folder)
-  expandedFolders.value.push(folder.id)
-  return folder
-}
-
-async function newFolder() {
-  // Create, then drop straight into inline rename.
-  try {
-    startRenameFolder(await createUniqueFolder())
-  } catch (e) {
-    showToast('Create folder failed: ' + errText(e))
-  }
-}
-
-function startRenameFolder(f) {
-  renamingFolderId.value = f.id
-  renameText.value = f.name
-  nextTick(() => {
-    const el = document.querySelector('.folder-rename-input')
-    if (el) { el.focus(); el.select() }
-  })
-}
-
-async function commitRenameFolder(f) {
-  const name = renameText.value.trim()
-  renamingFolderId.value = null
-  if (!name || name === f.name) return
-  try {
-    await invoke('rename_folder', { id: f.id, name: name })
-    const target = folders.value.find(x => x.id === f.id)
-    if (target) target.name = name
-  } catch (e) {
-    showToast('Rename failed: ' + errText(e))
-  }
-}
-
-function cancelRenameFolder() {
-  renamingFolderId.value = null
-}
-
-async function deleteFolder(f) {
-  if (!confirmDelete(f.id)) return
-  try {
-    await invoke('delete_folder', { id: f.id })
-    folders.value = folders.value.filter(x => x.id !== f.id)
-    // Connections inside were moved back to root server-side; reload to reflect.
-    connections.value = await invoke('list_connections')
-  } catch (e) {
-    showToast('Delete folder failed: ' + errText(e))
-  }
-}
-
-function openMoveMenu(event, conn) {
-  selectedId.value = conn.id
-  resetDelete()
-  ctxMenu.value = { x: event.clientX, y: event.clientY, connId: conn.id }
-}
-
-// The items for the reused ContextMenu: remove-from-folder (when applicable),
-// the folder list (current folder checked), then a New Folder action.
-const moveMenuModel = computed(() => {
-  if (!ctxMenu.value) return null
-  const conn = connections.value.find(c => c.id === ctxMenu.value.connId)
-  const currentId = conn && validFolderIds.value.has(conn.folder_id) ? conn.folder_id : null
-  const items = []
-  if (currentId) {
-    items.push({ label: 'Remove from Folder', icon: 'close', value: 'root' })
-    items.push({ sep: true })
-  }
-  for (const f of folders.value) {
-    items.push({
-      label: f.name,
-      icon: 'folder',
-      value: 'f:' + f.id,
-      shortcut: f.id === currentId ? '✓' : undefined,
-    })
-  }
-  if (folders.value.length) items.push({ sep: true })
-  items.push({ label: 'New Folder…', icon: 'plus', value: 'new' })
-  return { x: ctxMenu.value.x, y: ctxMenu.value.y, items: items }
-})
-
-async function onMovePick(value) {
-  const connId = ctxMenu.value && ctxMenu.value.connId
-  ctxMenu.value = null
-  if (!connId) return
-  if (value === 'new') {
-    try {
-      const folder = await createUniqueFolder()
-      await applyMove(connId, folder.id)
-      startRenameFolder(folder)
-    } catch (e) {
-      showToast('Create folder failed: ' + errText(e))
-    }
-    return
-  }
-  const folderId = value === 'root' ? null : value.slice(2)  // strip "f:"
-  await applyMove(connId, folderId)
-}
-
-async function applyMove(connId, folderId) {
-  try {
-    await invoke('move_connection_to_folder', { id: connId, folderId: folderId })
-    const c = connections.value.find(x => x.id === connId)
-    if (c) c.folder_id = folderId
-    if (folderId && !isExpanded(folderId)) expandedFolders.value.push(folderId)
-  } catch (e) {
-    showToast('Move failed: ' + errText(e))
-  }
-}
 
 const CM_TOOLS = [
   { name: 'newConn',   label: 'New Connection', action: newConnection },
