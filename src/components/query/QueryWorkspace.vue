@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, watch, defineAsyncComponent } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { translateSqlToMql, explainFind, explainAggregate, loadExplainStorage } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
 import TabBar from '../base/TabBar.vue'
 import QuickstartPane from '../panes/QuickstartPane.vue'
@@ -113,7 +113,7 @@ async function runSql() {
   tab.sqlError = null
   let mql
   try {
-    mql = await invoke('translate_sql', { sql: tab.sql || '' })
+    mql = await translateSqlToMql(tab.sql || '')
   } catch (e) {
     tab.sqlError = errText(e)
     return
@@ -190,13 +190,11 @@ async function runExplain() {
     tab.explainRunning = true
     tab.explainError = null
     try {
-      const result = await invoke('explain_aggregate', {
-        id:         tab.connectionId,
-        database:   tab.dbName,
-        collection: tab.collectionName,
-        pipeline:   parsed.ejson,
-        verbosity:  verbosity,
-      })
+      const result = await explainAggregate(
+        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        parsed.ejson,
+        verbosity,
+      )
       tab.explainResult = result
     } catch (e) {
       tab.explainError = errText(e)
@@ -216,29 +214,26 @@ async function runExplain() {
   tab.explainRunning = true
   tab.explainError = null
   try {
-    const result = await invoke('explain_query', {
-      id:         tab.connectionId,
-      database:   tab.dbName,
-      collection: tab.collectionName,
-      filter:     parsed.filter.ejson,
-      projection: parsed.projection.ejson,
-      sort:       parsed.sort.ejson,
-      skip:       tab.skip || 0,
-      limit:      tab.limit || 50,
-      verbosity:  verbosity,
-    })
+    const result = await explainFind(
+      { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+      {
+        filter:     parsed.filter.ejson,
+        projection: parsed.projection.ejson,
+        sort:       parsed.sort.ejson,
+        skip:       tab.skip || 0,
+        limit:      tab.limit || 50,
+      },
+      verbosity,
+    )
     tab.explainResult = result
     // Best-effort: fetch on-disk sizes for the Collection/Index target nodes. A failure
     // here must never clear the explain or surface an error — just skip the size nodes.
     try {
-      const stats = await invoke('collection_stats', {
-        id:         tab.connectionId,
-        database:   tab.dbName,
-        collection: tab.collectionName,
+      tab.explainStorage = await loadExplainStorage({
+        connectionId: tab.connectionId,
+        database:     tab.dbName,
+        collection:   tab.collectionName,
       })
-      const indexSizes = {}
-      for (const ix of (stats.indexes || [])) indexSizes[ix.name] = ix.size
-      tab.explainStorage = { dataSize: stats.size, indexSizes: indexSizes }
     } catch (e) {
       tab.explainStorage = null
     }

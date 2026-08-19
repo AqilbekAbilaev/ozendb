@@ -1,5 +1,5 @@
 import { markRaw } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import * as qapi from '../engines/mongodb/api/queries'
 import { errText, errCode } from '../utils/errors'
 import { parseField } from '../utils/queryParser'
 import { tabs } from '../stores/tabs'
@@ -35,7 +35,7 @@ export function useQueryRunner({ showToast }) {
     tab.runError = 'Query cancelled.'
     tab.runErrorCode = null
     try {
-      await invoke('kill_query', { id: tab.connectionId, comment: tab.runId })
+      await qapi.cancelRun(tab.connectionId, tab.runId)
       showToast('Query cancelled')
     } catch (e) {
       // The server refused to kill the op, so it is still running and its results are
@@ -69,13 +69,11 @@ export function useQueryRunner({ showToast }) {
     tab.runId = runId
     const { addToHistory = true, ...queryParams } = params
     try {
-      const res = await invoke('find_documents', {
-        id:         tab.connectionId,
-        database:   tab.dbName,
-        collection: tab.collectionName,
-        ...queryParams,
-        comment:    runId,
-      })
+      const res = await qapi.runFind(
+        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        queryParams,
+        runId,
+      )
       if (isStale(tab, runId)) return
       // markRaw each document so Vue keeps the array reactive (row add / remove /
       // replace still update the grid) without deep-proxying every nested field of
@@ -88,18 +86,18 @@ export function useQueryRunner({ showToast }) {
       tab.elapsedMs = res.elapsedMs
       showToast(`Query returned ${tab.results.length} document${tab.results.length !== 1 ? 's' : ''} in ${(tab.elapsedMs / 1000).toFixed(3)}s`)
       if (addToHistory) {
-        invoke('push_query_history', {
-          connectionId: tab.connectionId,
-          database:     tab.dbName,
-          collection:   tab.collectionName,
-          mode:         'find',
-          filter:       tab.filter     || '',
-          sort:         tab.sort       || '',
-          projection:   tab.projection || '',
-          skip:         queryParams.skip  ?? 0,
-          limit:        queryParams.limit ?? 50,
-          pipeline:     '',
-        }).catch(() => {})
+        qapi.recordHistory(
+          { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+          {
+            mode:       'find',
+            filter:     tab.filter     || '',
+            sort:       tab.sort       || '',
+            projection: tab.projection || '',
+            skip:       queryParams.skip  ?? 0,
+            limit:      queryParams.limit ?? 50,
+            pipeline:   '',
+          },
+        ).catch(() => {})
       }
     } catch (e) {
       // A killed op errors, and a stale run's error belongs to nothing on screen —
@@ -134,13 +132,11 @@ export function useQueryRunner({ showToast }) {
     const runId = newRunId()
     tab.runId = runId
     try {
-      const res = await invoke('run_aggregate', {
-        id:         tab.connectionId,
-        database:   tab.dbName,
-        collection: tab.collectionName,
-        ...params,
-        comment:    runId,
-      })
+      const res = await qapi.runAggregate(
+        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        params.pipeline,
+        runId,
+      )
       if (isStale(tab, runId)) return
       tab.results = res.documents.map((doc) => markRaw(doc))
       tab.hasRun = true
@@ -150,18 +146,18 @@ export function useQueryRunner({ showToast }) {
       } else {
         showToast(`Aggregation returned ${res.documents.length} document${res.documents.length !== 1 ? 's' : ''} in ${(tab.elapsedMs / 1000).toFixed(3)}s`)
       }
-      invoke('push_query_history', {
-        connectionId: tab.connectionId,
-        database:     tab.dbName,
-        collection:   tab.collectionName,
-        mode:         'aggregate',
-        filter:       '',
-        sort:         '',
-        projection:   '',
-        skip:         0,
-        limit:        50,
-        pipeline:     tab.pipeline || '',
-      }).catch(() => {})
+      qapi.recordHistory(
+        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        {
+          mode:       'aggregate',
+          filter:     '',
+          sort:       '',
+          projection: '',
+          skip:       0,
+          limit:      50,
+          pipeline:   tab.pipeline || '',
+        },
+      ).catch(() => {})
     } catch (e) {
       // A killed op errors, and a stale run's error belongs to nothing on screen —
       // either way the tab already says what it needs to say.
