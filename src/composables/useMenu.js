@@ -1,5 +1,5 @@
 import { computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { setMenuContext } from '../appApi/menu'
 import { deriveMenuContext, resolveMenuTarget } from '../utils/menuContext'
 import { activeTab } from '../stores/tabs'
 
@@ -24,7 +24,7 @@ export function useMenu({ treeSelection, treeConnectionCount, selectedIndex }) {
   // Push the context down to the native menu so gated items enable/disable in step
   // with the selection. Runs immediately for the initial (empty) state too.
   watch(menuContext, (ctx) => {
-    invoke('set_menu_context', {
+    setMenuContext({
       hasConnection: ctx.hasConnection,
       hasDatabase: ctx.hasDatabase,
       hasCollection: ctx.hasCollection,

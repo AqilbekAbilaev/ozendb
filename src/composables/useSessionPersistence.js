@@ -1,5 +1,6 @@
 import { watch } from 'vue'
 import { listConnections } from '../engines/mongodb/api/connections'
+import { getOpenTabs, setOpenTabs } from '../appApi/session'
 import { tabs, activeTabId, activeTab } from '../stores/tabs'
 import { opsDefaults } from './useCurrentOps'
 
@@ -126,7 +127,7 @@ export function useSessionPersistence({ runRestoredTab }) {
   function scheduleSaveTabs() {
     clearTimeout(saveTabsTimer)
     saveTabsTimer = setTimeout(() => {
-      invoke('set_open_tabs', { session: projectSession() }).catch(() => {})
+      setOpenTabs(projectSession()).catch(() => {})
     }, 400)
   }
 
@@ -134,7 +135,7 @@ export function useSessionPersistence({ runRestoredTab }) {
   // never overwrites tabs.json first.
   async function restoreSession() {
     try {
-      const session = await invoke('get_open_tabs')
+      const session = await getOpenTabs()
       const saved = session?.tabs
       if (saved?.length) {
         const conns = await listConnections()
