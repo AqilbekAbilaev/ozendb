@@ -112,7 +112,7 @@ async function clearHistory() {
   } catch (_) {}
 }
 
-async function setDefaultQuery() {
+async function setStoredDefaultQuery() {
   const tab = props.activeTab
   if (!tab) return
   try {
@@ -139,7 +139,7 @@ async function setDefaultQuery() {
   }
 }
 
-async function clearDefaultQuery() {
+async function clearStoredDefaultQuery() {
   const tab = props.activeTab
   if (!tab) return
   try {
@@ -272,10 +272,10 @@ watch(() => props.activeTab && props.activeTab.id, () => {
         </BaseButton>
         <div v-if="showDefaultMenu" class="default-backdrop" @mousedown.self="showDefaultMenu = false"></div>
         <div v-if="showDefaultMenu" class="default-menu">
-          <MenuItem @click="setDefaultQuery">
+          <MenuItem @click="setStoredDefaultQuery">
             <BaseIcon name="anchor" :size="13" class="ic" /> Set as default for this collection
           </MenuItem>
-          <MenuItem @click="clearDefaultQuery">
+          <MenuItem @click="clearStoredDefaultQuery">
             <BaseIcon name="trash" :size="13" class="ic" /> Clear default
           </MenuItem>
         </div>

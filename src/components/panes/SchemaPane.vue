@@ -64,7 +64,7 @@ const exportFormat = ref('csv')  // 'csv' | 'docx'
 
 // Export the current schema report (Studio-3T's schema documentation) as CSV or a Word
 // document. The backend re-samples with the same sample size so the file matches the view.
-async function exportSchema() {
+async function runSchemaExport() {
   const format = exportFormat.value
   const ext = format === 'docx' ? 'docx' : 'csv'
   let path
@@ -164,7 +164,7 @@ const fields = computed(() => (report.value ? report.value.fields : []))
         bordered
         type="button"
         :disabled="loading || exporting || !fields.length"
-        @click="exportSchema"
+        @click="runSchemaExport"
       >
         <BaseIcon name="export" :size="13" /> {{ exporting ? 'Exporting…' : 'Export' }}
       </BaseButton>

@@ -48,7 +48,7 @@ async function load() {
 
 onMounted(load)
 
-async function createUser() {
+async function onCreateUser() {
   const name = newName.value.trim()
   if (!name || !newPassword.value) return
   const roles = newRoles.value.split(',').map(r => r.trim()).filter(Boolean)
@@ -73,7 +73,7 @@ async function createUser() {
   }
 }
 
-async function dropUser(user) {
+async function onDropUser(user) {
   if (!confirmDelete(user.user)) return
   busy.value = true
   try {
@@ -200,7 +200,7 @@ function copyText(text) {
           <BaseInput v-model="newRoles" placeholder="Roles (comma-separated, e.g. readWrite, read@other)" />
           <div class="um-create-actions">
             <BaseButton bordered @click="showCreate = false">Cancel</BaseButton>
-            <BaseButton variant="primary" :disabled="!newName.trim() || !newPassword || busy" @click="createUser">Create</BaseButton>
+            <BaseButton variant="primary" :disabled="!newName.trim() || !newPassword || busy" @click="onCreateUser">Create</BaseButton>
           </div>
           <FieldError :text="createError" />
         </div>
@@ -222,7 +222,7 @@ function copyText(text) {
                   bordered
                   :variant="pendingDrop === u.user ? 'danger' : 'default'"
                   :disabled="busy"
-                  @click="dropUser(u)"
+                  @click="onDropUser(u)"
                 >{{ pendingDrop === u.user ? 'Confirm' : 'Drop' }}</BaseButton>
               </td>
             </tr>

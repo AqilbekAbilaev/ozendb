@@ -128,7 +128,7 @@ async function goLast() {
   }
 }
 
-async function countDocuments() {
+async function runCount() {
   const tab = props.activeTab
   // Ignore clicks while a count is already in flight: on a large collection each
   // count is a heavy server op, so this stops rapid clicks from stacking counts
@@ -437,7 +437,7 @@ function toggleReadOnly() {
         :icon-size="14"
         :disabled="isCountDisabled"
         :active="activeTab.isCounting"
-        @click="countDocuments"
+        @click="runCount"
         @contextmenu="onCountContext"><template v-if="activeTab.isCounting">Counting…</template><template v-else>Count Documents<template v-if="countText != null">: {{ countText }}</template></template></BaseButton>
       <span class="fitem" v-if="activeTab.isRunning">
         <BaseIcon name="clock" :size="14" />

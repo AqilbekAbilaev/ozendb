@@ -52,7 +52,7 @@ function editFunction(fn) {
   editing.value = { name: fn.name, body: fn.body }
 }
 
-async function saveFunction() {
+async function onSaveFunction() {
   const name = editing.value.name.trim()
   if (!name) { editError.value = 'A function name is required'; return }
   busy.value = true
@@ -72,7 +72,7 @@ async function saveFunction() {
   }
 }
 
-async function dropFunction(fn) {
+async function onDropFunction(fn) {
   if (!confirmDelete(fn.name)) return
   busy.value = true
   try {
@@ -97,7 +97,7 @@ async function dropFunction(fn) {
           <FieldError :text="editError" />
           <div class="fn-actions">
             <BaseButton bordered @click="editing = null">Back</BaseButton>
-            <BaseButton variant="primary" :disabled="!editing.name.trim() || busy" @click="saveFunction">Save</BaseButton>
+            <BaseButton variant="primary" :disabled="!editing.name.trim() || busy" @click="onSaveFunction">Save</BaseButton>
           </div>
         </template>
 
@@ -114,7 +114,7 @@ async function dropFunction(fn) {
               <span class="fn-name">{{ fn.name }}</span>
               <span class="fn-row-act">
                 <BaseButton bordered :disabled="busy" @click="editFunction(fn)">Edit</BaseButton>
-                <BaseButton bordered :variant="pendingDrop === fn.name ? 'danger' : 'default'" :disabled="busy" @click="dropFunction(fn)">
+                <BaseButton bordered :variant="pendingDrop === fn.name ? 'danger' : 'default'" :disabled="busy" @click="onDropFunction(fn)">
                   {{ pendingDrop === fn.name ? 'Confirm' : 'Delete' }}
                 </BaseButton>
               </span>
