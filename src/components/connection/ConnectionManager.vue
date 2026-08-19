@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import * as connApi from '../../engines/mongodb/api/connections'
+import { updateLastAccessed } from '../../appApi/connectionState'
 import { listen, emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
@@ -104,7 +104,7 @@ async function connectSelected() {
   if (!selectedId.value) return
   const now = formatNow()
   try {
-    await invoke('update_last_accessed', { id: selectedId.value, timestamp: now })
+    await updateLastAccessed(selectedId.value, now)
     const conn = connections.value.find(c => c.id === selectedId.value)
     if (conn) conn.last_accessed = now
   } catch {}

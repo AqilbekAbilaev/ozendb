@@ -2,6 +2,7 @@
 import { ref, computed, inject, onMounted } from 'vue'
 import { listConnections } from '../../engines/mongodb/api/connections'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { updateLastAccessed } from '../../appApi/connectionState'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import { formatNow } from '../../utils/format'
@@ -50,7 +51,7 @@ function subtitle(c) {
 
 async function openRecent(c) {
   try {
-    await invoke('update_last_accessed', { id: c.id, timestamp: formatNow() })
+    await updateLastAccessed(c.id, formatNow())
   } catch (_) {}
   handlers.onManagerConnect?.(c.id)
 }

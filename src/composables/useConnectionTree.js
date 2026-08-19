@@ -2,6 +2,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { listConnections } from '../engines/mongodb/api/connections'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { listen } from '@tauri-apps/api/event'
+import { setConnectionOpen } from '../appApi/connectionState'
 import { errCode, errMessage } from '../utils/errors'
 import { applyConnectionUpdate } from '../utils/connectionList'
 import { connDatabases } from '../stores/connectionData'
@@ -167,7 +168,7 @@ export function useConnectionTree({ props, emit }) {
       const all = await listConnections()
       conn = all.find(c => c.id === id)
       if (conn) {
-        await invoke('set_connection_open', { id: id, open: true })
+        await setConnectionOpen(id, true)
         connections.value.push(conn)
       }
     }
@@ -226,7 +227,7 @@ export function useConnectionTree({ props, emit }) {
     // Persist the closed state so it doesn't re-open after restart. Skipped when the
     // connection was deleted (the record is already gone from storage).
     if (persist) {
-      invoke('set_connection_open', { id: connId, open: false })
+      setConnectionOpen(connId, false)
     }
   }
 
