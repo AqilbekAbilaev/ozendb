@@ -91,6 +91,22 @@ describe('updateMany', () => {
       collection: 'users',
       filter:     '{ "a": 1 }',
       update:     '{ "$set": { "b": 2 } }',
+      upsert:     false,
+      multi:      false,
+    })
+  })
+
+  it('passes upsert and multi through when provided', async () => {
+    invoke.mockResolvedValue(5)
+    await updateMany(target, '{ "a": 1 }', '{ "$set": { "b": 2 } }', { upsert: true, multi: true })
+    expect(invoke).toHaveBeenCalledWith('update_many', {
+      id:         'connection-1',
+      database:   'app',
+      collection: 'users',
+      filter:     '{ "a": 1 }',
+      update:     '{ "$set": { "b": 2 } }',
+      upsert:     true,
+      multi:      true,
     })
   })
 })

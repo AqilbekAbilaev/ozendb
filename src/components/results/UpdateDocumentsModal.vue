@@ -5,7 +5,7 @@
 // (Multi on = update_many, off = update_one). Query text is shell syntax, parsed to
 // Extended JSON by the shared query parser (same as the query bar).
 import { ref, computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { updateMany } from '../../engines/mongodb/api/documents'
 import { countDocuments } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
 import { parseField } from '../../utils/queryParser'
@@ -114,15 +114,12 @@ async function onRun() {
   if (!pu.ok) { error.value = 'Update: ' + pu.error; pane.value = 'update'; return }
   busy.value = true
   try {
-    const modified = await invoke('update_many', {
-      id:         props.activeTab.connectionId,
-      database:   props.activeTab.dbName,
-      collection: props.activeTab.collectionName,
-      filter:     pf.ejson,
-      update:     pu.ejson,
-      upsert:     upsert.value,
-      multi:      multi.value,
-    })
+    const modified = await updateMany(
+      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      pf.ejson,
+      pu.ejson,
+      { upsert: upsert.value, multi: multi.value },
+    )
     emit('done', `Updated ${modified} document${modified !== 1 ? 's' : ''}`)
   } catch (e) {
     error.value = errText(e)

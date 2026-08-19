@@ -21,8 +21,13 @@ export function deleteDocument(target, idFilter) {
   return invoke('delete_document', collectionPayload(target, { idFilter }))
 }
 
-export function updateMany(target, filter, update) {
-  return invoke('update_many', collectionPayload(target, { filter, update }))
+export function updateMany(target, filter, update, options = {}) {
+  return invoke('update_many', collectionPayload(target, {
+    filter,
+    update,
+    upsert: options.upsert ?? false,
+    multi: options.multi ?? false,
+  }))
 }
 
 export function deleteMany(target, filter) {

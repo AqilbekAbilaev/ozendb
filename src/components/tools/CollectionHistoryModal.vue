@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { listCollectionHistory, clearCollectionHistory, restoreHistory } from '../../engines/mongodb/api/documents'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -29,11 +29,9 @@ async function load() {
   error.value = null
   errorCode.value = null
   try {
-    entries.value = await invoke('list_collection_history', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
-    })
+    entries.value = await listCollectionHistory(
+      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+    )
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)
@@ -69,7 +67,7 @@ async function restore(entry) {
   notice.value = null
   error.value = null
   try {
-    await invoke('restore_history', { entryId: entry.id })
+    await restoreHistory(entry.id)
     notice.value = `${OP_LABEL[entry.op] || entry.op} document restored`
   } catch (e) {
     error.value = errText(e)
@@ -81,11 +79,9 @@ async function restore(entry) {
 
 async function clearAll() {
   try {
-    await invoke('clear_collection_history', {
-      id: props.target.connId,
-      database: props.target.dbName,
-      collection: props.target.collName,
-    })
+    await clearCollectionHistory(
+      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+    )
     entries.value = []
     notice.value = 'History cleared'
   } catch (e) {

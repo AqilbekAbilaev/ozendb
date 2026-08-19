@@ -5,7 +5,7 @@
 // number that will be removed. Editing the query invalidates the count so the delete
 // can never run against a scope the user hasn't seen.
 import { ref, computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { deleteMany } from '../../engines/mongodb/api/documents'
 import { countDocuments } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
 import { parseField } from '../../utils/queryParser'
@@ -85,12 +85,10 @@ async function onDelete() {
   if (!pf.ok) { error.value = 'Query: ' + pf.error; return }
   busy.value = true
   try {
-    const deleted = await invoke('delete_many', {
-      id:         props.activeTab.connectionId,
-      database:   props.activeTab.dbName,
-      collection: props.activeTab.collectionName,
-      filter:     pf.ejson,
-    })
+    const deleted = await deleteMany(
+      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      pf.ejson,
+    )
     emit('done', `Deleted ${deleted} document${deleted !== 1 ? 's' : ''}`)
   } catch (e) {
     error.value = errText(e)

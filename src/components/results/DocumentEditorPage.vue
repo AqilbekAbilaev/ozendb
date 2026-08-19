@@ -1,10 +1,11 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import CodeEditor from '../base/CodeEditor.vue'
 import BaseButton from '../base/BaseButton.vue'
+import { insertDocument, replaceDocument } from '../../engines/mongodb/api/documents'
+import { runFind } from '../../engines/mongodb/api/queries'
 import { docExtensions } from '../../utils/docEditor'
 import { mongoStringify } from '../../utils/mongoFormat'
 import { parseField } from '../../utils/queryParser'
@@ -122,16 +123,10 @@ async function loadTarget(next) {
   loading.value = true
   jsonErr.value = null
   try {
-    const { documents: docs } = await invoke('find_documents', {
-      id: next.connId,
-      database: next.db,
-      collection: next.coll,
-      filter: next.idFilter,
-      projection: '{}',
-      sort: '{}',
-      skip: 0,
-      limit: 1,
-    })
+    const { documents: docs } = await runFind(
+      { connectionId: next.connId, database: next.db, collection: next.coll },
+      { filter: next.idFilter, projection: '{}', sort: '{}', skip: 0, limit: 1 },
+    )
     const doc = docs && docs.length ? docs[0] : null
     if (!doc) {
       jsonErr.value = 'The document no longer exists.'
@@ -168,20 +163,16 @@ async function onSave(keepOpen) {
   saving.value = true
   try {
     if (isInsert.value) {
-      await invoke('insert_document', {
-        id: target.value.connId,
-        database: target.value.db,
-        collection: target.value.coll,
-        document: parsed.ejson,
-      })
+      await insertDocument(
+        { connectionId: target.value.connId, database: target.value.db, collection: target.value.coll },
+        parsed.ejson,
+      )
     } else {
-      await invoke('replace_document', {
-        id: target.value.connId,
-        database: target.value.db,
-        collection: target.value.coll,
-        idFilter: target.value.idFilter,
-        document: parsed.ejson,
-      })
+      await replaceDocument(
+        { connectionId: target.value.connId, database: target.value.db, collection: target.value.coll },
+        target.value.idFilter,
+        parsed.ejson,
+      )
     }
     await emit('document-saved', {
       connId: target.value.connId,
