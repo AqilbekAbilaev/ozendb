@@ -1,6 +1,23 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { queryDefinitions } from './queryDefinitions'
 import { isResourceRef } from '../../../utils/resourceRef'
+import { duplicateWorkspace, restoreWorkspace, disposeWorkspace } from '../../../workspaces/lifecycle'
+import { registerWorkspaceDefinitions } from '../../../workspaces/registerDefinitions'
+import { closeShellSession } from '../api/shell'
+
+registerWorkspaceDefinitions()
+
+vi.mock('../api/shell', () => ({
+  closeShellSession: vi.fn(() => Promise.resolve()),
+  runShellCommand: vi.fn(),
+  getShellHistory: vi.fn(),
+  pushShellCommand: vi.fn(),
+  clearShellHistory: vi.fn(),
+}))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 const defFor = (type) => queryDefinitions.find(d => d.type === type)
 const ctx = (target, defaults = {}, ids = {}) => ({
@@ -141,5 +158,163 @@ describe('query definitions — no shared mutable state', () => {
     expect(s1.fields.history).not.toBe(s2.fields.history)
     expect(s1.fields.logs).not.toBe(s2.fields.logs)
     expect(s1.fields.drillPath).not.toBe(s2.fields.drillPath)
+  })
+})
+
+const SOURCE = {
+  id: 'src', kind: 'collection', type: 'mongodb.find', engine: 'mongodb',
+  title: 'orders', color: '#f00',
+  connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+  mode: 'find', filter: '{ "a": 1 }', projection: '{ "a": 1 }', sort: '{ "a": -1 }',
+  skip: 2, limit: 25, pipeline: '[{ "$match": {} }]', vqb: { rows: [1] }, colOrder: { a: 0 },
+  results: [{ x: 1 }], hasRun: true, isRunning: true, runError: 'boom',
+  selectedRow: 0, selectedRows: [0], elapsedMs: 12,
+}
+
+describe('lifecycle — duplicate', () => {
+  it('preserves query text exactly and resets runtime', () => {
+    const dup = duplicateWorkspace(SOURCE)
+    expect(dup.filter).toBe('{ "a": 1 }')
+    expect(dup.projection).toBe('{ "a": 1 }')
+    expect(dup.sort).toBe('{ "a": -1 }')
+    expect(dup.skip).toBe(2)
+    expect(dup.limit).toBe(25)
+    expect(dup.mode).toBe('find')
+    expect(dup.results).toEqual([])
+    expect(dup.hasRun).toBe(false)
+    expect(dup.isRunning).toBe(false)
+    expect(dup.runError).toBe(null)
+    expect(dup.selectedRow).toBe(-1)
+    expect(dup.selectedRows).toEqual([])
+    expect(dup.elapsedMs).toBe(null)
+  })
+
+  it('receives the rerun marker so the bridge re-runs it once', () => {
+    const dup = duplicateWorkspace(SOURCE)
+    expect(dup._restored).toBe(true)
+  })
+
+  it('detaches nested VQB and column-order state', () => {
+    const dup = duplicateWorkspace(SOURCE)
+    expect(dup.vqb).not.toBe(SOURCE.vqb)
+    expect(dup.colOrder).not.toBe(SOURCE.colOrder)
+    dup.vqb.rows.push(2)
+    dup.colOrder.a = 9
+    expect(SOURCE.vqb.rows).toEqual([1])
+    expect(SOURCE.colOrder.a).toBe(0)
+  })
+
+  it('aggregate and sql duplicates do not carry the rerun marker', () => {
+    const agg = duplicateWorkspace({ ...SOURCE, type: 'mongodb.aggregate', mode: 'aggregate' })
+    expect(agg._restored).toBeUndefined()
+    const sql = duplicateWorkspace({
+      ...SOURCE, type: 'mongodb.sql_to_mql', mode: 'sql',
+      sql: 'SELECT * FROM orders', sqlError: 'nope', filter: 'x', projection: 'y',
+    })
+    expect(sql._restored).toBeUndefined()
+    expect(sql.sql).toBe('SELECT * FROM orders')
+    expect(sql.sqlError).toBe(null)
+    expect(sql.filter).toBe('')
+    expect(sql.projection).toBe('')
+    expect(sql.pipeline).toBe('')
+  })
+
+  it('shell duplicate clones code but gets a fresh session and cleared output', () => {
+    const shell = {
+      id: 's', kind: 'shell', type: 'mongodb.shell', engine: 'mongodb',
+      title: 'mongosh: shop', color: null,
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
+      sessionId: 'old-session', code: 'db.orders.find()', scriptPath: '/tmp/x.js',
+      history: ['a'], isRunning: true, results: [1], resultView: 'table', resultTab: 'Console',
+      runError: 'boom', elapsedMs: 5, drillPath: ['a'], hasRun: true, selectedRow: 0,
+      selectedRows: [0], logs: ['log'], scalar: 7, hasScalar: true,
+    }
+    const dup = duplicateWorkspace(shell, { ids: { session: () => 'fresh-session' } })
+    expect(dup.sessionId).toBe('fresh-session')
+    expect(dup.code).toBe('db.orders.find()')
+    expect(dup.scriptPath).toBe('/tmp/x.js')
+    expect(dup.history).toEqual([])
+    expect(dup.logs).toEqual([])
+    expect(dup.results).toEqual([])
+    expect(dup.drillPath).toEqual([])
+    expect(dup.isRunning).toBe(false)
+    expect(dup.hasRun).toBe(false)
+    expect(dup.hasScalar).toBe(false)
+    expect(dup.scalar).toBeUndefined()
+    expect(dup.runError).toBe(null)
+  })
+})
+
+describe('lifecycle — restore', () => {
+  const savedFind = {
+    id: 'r1', kind: 'collection', title: 'orders', color: '#0f0',
+    connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+    filter: '{ "a": 1 }', sort: '{ "a": -1 }', projection: '{ "a": 1 }',
+    skip: 2, limit: 25, mode: 'find', pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 },
+  }
+
+  it('find restores editor state with fresh runtime and the one-shot marker', () => {
+    const tab = restoreWorkspace(savedFind)
+    expect(tab.filter).toBe('{ "a": 1 }')
+    expect(tab.sort).toBe('{ "a": -1 }')
+    expect(tab.skip).toBe(2)
+    expect(tab.limit).toBe(25)
+    expect(tab._restored).toBe(true)
+    expect(tab.results).toEqual([])
+    expect(tab.hasRun).toBe(false)
+    expect(tab.elapsedMs).toBe(null)
+    expect(tab.id).toBe('r1')
+  })
+
+  it('aggregate restores its pipeline and does not run', () => {
+    const tab = restoreWorkspace({ ...savedFind, id: 'a', mode: 'aggregate', pipeline: '[{ "$match": {} }]' })
+    expect(tab.mode).toBe('aggregate')
+    expect(tab.pipeline).toBe('[{ "$match": {} }]')
+    expect(tab._restored).toBeUndefined()
+  })
+
+  it('sql restores the SQL text but clears translated pieces and does not run', () => {
+    const tab = restoreWorkspace({ ...savedFind, id: 's', mode: 'sql', sql: 'SELECT 1', readOnly: true })
+    expect(tab.mode).toBe('sql')
+    expect(tab.sql).toBe('SELECT 1')
+    expect(tab.sqlError).toBe(null)
+    expect(tab.filter).toBe('')
+    expect(tab.projection).toBe('')
+    expect(tab.pipeline).toBe('')
+    expect(tab.readOnly).toBe(true)
+    expect(tab._restored).toBeUndefined()
+  })
+
+  it('shell restore gets a fresh session id from the injected source', () => {
+    const tab = restoreWorkspace({
+      id: 'sh', kind: 'shell', title: 'mongosh: shop', color: null,
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
+      sessionId: 'old-session', code: 'db.orders.find()', scriptPath: '/tmp/x.js',
+    }, { ids: { session: () => 'fresh-session' } })
+    expect(tab.sessionId).toBe('fresh-session')
+    expect(tab.code).toBe('db.orders.find()')
+    expect(tab.history).toEqual([])
+    expect(tab.hasScalar).toBe(false)
+  })
+})
+
+describe('lifecycle — shell disposal', () => {
+  it('calls closeSession exactly once per disposed shell workspace', async () => {
+    const shell = {
+      id: 's', kind: 'shell', type: 'mongodb.shell', engine: 'mongodb',
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
+      sessionId: 'sess-1', code: '', history: [], isRunning: false,
+      results: [], resultView: 'table', resultTab: 'Console',
+      runError: null, elapsedMs: null, drillPath: [], hasRun: false,
+      selectedRow: -1, selectedRows: [], logs: [], scalar: undefined, hasScalar: false,
+    }
+    await disposeWorkspace(shell)
+    expect(closeShellSession).toHaveBeenCalledTimes(1)
+    expect(closeShellSession).toHaveBeenCalledWith('sess-1')
+  })
+
+  it('does not dispose non-shell workspaces', async () => {
+    await disposeWorkspace(SOURCE)
+    expect(closeShellSession).not.toHaveBeenCalled()
   })
 })

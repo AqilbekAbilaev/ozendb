@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
-import { closeShellSession } from '../engines/mongodb/api/shell'
 import { createWorkspace } from '../workspaces/createWorkspace'
+import { duplicateWorkspace, disposeWorkspace } from '../workspaces/lifecycle'
 
 // The tab spine: the open workspace tabs, which one is active, and every mutation of
 // them (activate/close/cycle/duplicate/reorder/rename).
@@ -77,9 +77,9 @@ export function closeTab(id) {
   const idx = tabs.value.findIndex(t => t.id === id)
   if (idx < 0) return
   const closing = tabs.value[idx]
-  if (closing.kind === 'shell' && closing.sessionId) {
-    closeShellSession(closing.sessionId).catch(() => {})
-  }
+  // Disposal is definition-owned and best-effort: the helper contains any failure,
+  // and the splice below never waits on it — visual closure stays synchronous.
+  disposeWorkspace(closing)
   tabs.value.splice(idx, 1)
   // If we closed the active tab, move to an adjacent one (the nearest preceding
   // tab, else the new first tab).
@@ -87,6 +87,13 @@ export function closeTab(id) {
     const next = tabs.value[idx - 1] || tabs.value[0]
     activeTabId.value = next ? next.id : null
   }
+}
+
+// Close every tab matching the predicate (disconnect/drop paths). The filtered
+// snapshot hands back ids, so closeTab's splicing can't shift the iteration out
+// from under the caller's live array.
+export function closeWhere(predicate) {
+  tabs.value.filter(t => predicate(t)).map(t => t.id).forEach(closeTab)
 }
 
 // filter/slice below hand back a fresh array, so closeTab's splicing can't shift the
@@ -123,36 +130,12 @@ export function moveTab(id, beforeId) {
 export function duplicateTab(tabId) {
   const src = tabs.value.find(t => t.id === tabId)
   if (!src) return
-  const id = newTabId()
-  if (src.kind === 'shell') {
-    tabs.value.push({
-      id: id, kind: 'shell', title: src.title,
-      connectionId: src.connectionId, connectionName: src.connectionName,
-      dbName: src.dbName,
-      sessionId: (crypto.randomUUID ? crypto.randomUUID() : id),
-      code: src.code || '', history: [], isRunning: false,
-      results: [], resultView: 'table', resultTab: 'Console',
-      runError: null, elapsedMs: null, drillPath: [], hasRun: false, selectedRow: -1, selectedRows: [],
-      logs: [], scalar: undefined, hasScalar: false,
-      color: src.color ?? null,
-    })
-    activeTabId.value = id
-    return
-  }
-  const dup = {
-    id: id, kind: 'collection', title: src.title,
-    connectionId: src.connectionId, connectionName: src.connectionName,
-    dbName: src.dbName, collectionName: src.collectionName,
-    filter: src.filter, projection: src.projection, sort: src.sort,
-    skip: src.skip, limit: src.limit, mode: src.mode, pipeline: src.pipeline,
-    color: src.color ?? null,
-    colOrder: src.colOrder || {},
-    results: [], hasRun: false, isRunning: false, runError: null,
-    selectedRow: -1, selectedRows: [], elapsedMs: null,
-  }
+  const dup = duplicateWorkspace(src)
+  if (!dup) return   // unsupported duplicate (e.g. Quickstart) is a no-op
   tabs.value.push(dup)
-  activeTabId.value = id
-  runRestoredTab(dup)   // re-run from the cloned query state (find mode only)
+  // Activation drives the one-shot rerun marker: find duplicates carry _restored,
+  // so this re-runs their cloned query through the existing bridge exactly once.
+  activateTab(dup.id)
 }
 
 export function openRenameTab(tabId) {

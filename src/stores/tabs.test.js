@@ -8,7 +8,7 @@ registerWorkspaceDefinitions()
 
 const {
   tabs, activeTabId, activeTab, pruneActiveTab, setRunRestoredTab,
-  activateTab, cycleTab, closeTab, handleTabAction, newTabId,
+  activateTab, cycleTab, closeTab, closeWhere, duplicateTab, handleTabAction, newTabId,
 } = await import('./tabs')
 
 // Closing a shell tab tears down its engine session; that call is the one side effect
@@ -93,13 +93,13 @@ describe('closeTab — which tab becomes active', () => {
 
 describe('closeTab — shell session teardown', () => {
   it('closes the engine session behind a shell tab', () => {
-    seed([{ id: 's1', kind: 'shell', sessionId: 'sess-1' }, 'b'], 'b')
+    seed([{ id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: 'sess-1' }, 'b'], 'b')
     closeTab('s1')
     expect(invoke).toHaveBeenCalledWith('close_shell_session', { sessionId: 'sess-1' })
   })
 
   it('does not call the driver for a shell tab that never opened a session', () => {
-    seed([{ id: 's1', kind: 'shell', sessionId: null }, 'b'], 'b')
+    seed([{ id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: null }, 'b'], 'b')
     closeTab('s1')
     expect(invoke).not.toHaveBeenCalled()
   })
@@ -108,6 +108,19 @@ describe('closeTab — shell session teardown', () => {
     seed(['a', 'b'], 'a')
     closeTab('a')
     expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('keeps the removal synchronous while disposal runs in the background', () => {
+    seed([{ id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: 'sess-1' }, 'b'], 's1')
+    closeTab('s1')
+    expect(idsOf()).toEqual(['b'])
+  })
+
+  it('does not block removal when disposal rejects', () => {
+    invoke.mockRejectedValueOnce(new Error('session gone'))
+    seed([{ id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: 'sess-1' }, 'b'], 's1')
+    expect(() => closeTab('s1')).not.toThrow()
+    expect(idsOf()).toEqual(['b'])
   })
 })
 
@@ -242,6 +255,114 @@ describe('activateTab', () => {
     seed(['a', 'b'], 'b')
     activateTab('a')
     expect(runRestoredTab).not.toHaveBeenCalled()
+  })
+})
+
+const FIND_TAB = {
+  id: 'f1', kind: 'collection', type: 'mongodb.find', engine: 'mongodb',
+  title: 'orders', color: '#f00',
+  connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+  mode: 'find', filter: '{ "a": 1 }', projection: '{}', sort: '{}',
+  skip: 0, limit: 25, pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 },
+  results: [{ x: 1 }], hasRun: true, isRunning: false, runError: null,
+  selectedRow: 0, selectedRows: [0], elapsedMs: 12,
+}
+
+describe('duplicateTab', () => {
+  it('appends the duplicate and activates it', () => {
+    seed([FIND_TAB, 'b'], 'b')
+    duplicateTab('f1')
+    expect(tabs.value).toHaveLength(3)
+    expect(activeTabId.value).toBe(tabs.value[2].id)
+    expect(tabs.value[2].id).not.toBe('f1')
+    expect(tabs.value[2].filter).toBe('{ "a": 1 }')
+    expect(tabs.value[2].results).toEqual([])
+  })
+
+  it('re-runs a duplicated find through the existing bridge exactly once', () => {
+    seed([FIND_TAB, 'b'], 'b')
+    duplicateTab('f1')
+    expect(runRestoredTab).toHaveBeenCalledTimes(1)
+    expect(runRestoredTab).toHaveBeenCalledWith(tabs.value[2])
+  })
+
+  it('does not re-run duplicated aggregate or sql tabs', () => {
+    seed([{ ...FIND_TAB, id: 'a', type: 'mongodb.aggregate', mode: 'aggregate', pipeline: '[{}]' }, 'b'], 'b')
+    duplicateTab('a')
+    expect(runRestoredTab).not.toHaveBeenCalled()
+    expect(tabs.value[2].mode).toBe('aggregate')
+    seed([{ ...FIND_TAB, id: 's', type: 'mongodb.sql_to_mql', mode: 'sql', sql: 'SELECT 1' }, 'b'], 'b')
+    duplicateTab('s')
+    expect(runRestoredTab).not.toHaveBeenCalled()
+    expect(tabs.value[2].sql).toBe('SELECT 1')
+  })
+
+  it('is a no-op for an unsupported duplicate', () => {
+    seed([{ id: 'q', kind: 'quickstart', type: 'app.quickstart', title: 'Quickstart' }, 'b'], 'q')
+    duplicateTab('q')
+    expect(tabs.value).toHaveLength(2)
+    expect(activeTabId.value).toBe('q')
+  })
+
+  it('keeps a duplicated shell a shell with a fresh session', () => {
+    seed([{
+      id: 's1', kind: 'shell', type: 'mongodb.shell', engine: 'mongodb', title: 'mongosh: shop',
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
+      sessionId: 'old-session', code: 'db.x.find()', history: [], isRunning: false,
+      results: [], resultView: 'table', resultTab: 'Console',
+      runError: null, elapsedMs: null, drillPath: [], hasRun: false,
+      selectedRow: -1, selectedRows: [], logs: [], scalar: undefined, hasScalar: false,
+    }, 'b'], 'b')
+    duplicateTab('s1')
+    const dup = tabs.value[2]
+    expect(dup.kind).toBe('shell')
+    expect(dup.sessionId).not.toBe('old-session')
+    expect(dup.code).toBe('db.x.find()')
+    expect(dup.history).toEqual([])
+  })
+
+  it('a tool workspace can never become a collection workspace', () => {
+    seed([{
+      id: 'i', kind: 'indexes', type: 'mongodb.indexes', engine: 'mongodb',
+      title: 'Index Manager: orders', connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+    }, 'b'], 'b')
+    duplicateTab('i')
+    const dup = tabs.value[2]
+    expect(dup.kind).toBe('indexes')
+    expect(dup.type).toBe('mongodb.indexes')
+    expect(dup.mode).toBeUndefined()
+    expect(dup.connectionId).toBeUndefined()
+  })
+})
+
+describe('closeWhere', () => {
+  const shellTab = { id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: 'sess-1' }
+
+  it('closes every tab matching the predicate', () => {
+    seed([shellTab, 'b', 'c'], 'c')
+    closeWhere(t => t.kind === 'shell')
+    expect(idsOf()).toEqual(['b', 'c'])
+    expect(activeTabId.value).toBe('c')
+  })
+
+  it('disposes once per removed workspace', () => {
+    seed([shellTab, { ...shellTab, id: 's2', sessionId: 'sess-2' }, 'b'], 'b')
+    closeWhere(t => t.kind === 'shell')
+    expect(invoke).toHaveBeenCalledTimes(2)
+    expect(invoke).toHaveBeenCalledWith('close_shell_session', { sessionId: 'sess-1' })
+    expect(invoke).toHaveBeenCalledWith('close_shell_session', { sessionId: 'sess-2' })
+  })
+
+  it('keeps every matching tab while splicing', () => {
+    seed(['a', shellTab, 'b', { ...shellTab, id: 's3', sessionId: 'sess-3' }, 'c'], 'c')
+    closeWhere(t => t.kind === 'shell')
+    expect(idsOf()).toEqual(['a', 'b', 'c'])
+  })
+
+  it('leaves the array untouched when nothing matches', () => {
+    seed(['a', 'b'], 'a')
+    closeWhere(t => t.kind === 'shell')
+    expect(idsOf()).toEqual(['a', 'b'])
   })
 })
 

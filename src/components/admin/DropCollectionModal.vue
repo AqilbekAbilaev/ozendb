@@ -6,7 +6,9 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
-import { tabs, pruneActiveTab } from '../../stores/tabs'
+import { closeWhere } from '../../stores/tabs'
+import { affectedByResource } from '../../workspaces/lifecycle'
+import { createResourceRef } from '../../utils/resourceRef'
 
 // Collection → Drop Collection…: destructive, so it confirms first. Dropping also closes
 // any open tab on that collection, which would otherwise query something gone.
@@ -30,11 +32,12 @@ async function confirm() {
       database:     props.target.dbName,
       collection:   props.target.collName,
     })
-    tabs.value = tabs.value.filter(t => !(t.kind === 'collection'
-      && t.connectionId === props.target.connId
-      && t.dbName === props.target.dbName
-      && t.collectionName === props.target.collName))
-    pruneActiveTab()
+    // Containment closes every tab scoped into the dropped collection (find/aggregate/
+    // SQL/import/export/indexes/schema), and only those. closeTab runs disposal.
+    closeWhere(affectedByResource(createResourceRef(props.target.connId, [
+      { kind: 'database', name: props.target.dbName },
+      { kind: 'collection', name: props.target.collName },
+    ])))
     showToast(`Collection "${props.target.collName}" dropped`)
     emit('saved', props.target.connId)
     emit('close')

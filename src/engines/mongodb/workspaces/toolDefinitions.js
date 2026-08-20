@@ -1,6 +1,8 @@
 // MongoDB tool workspace definitions (Work 5D): indexes, schema, search, import,
 // export, and current operations. Same contract as the query definitions — fresh
-// flat legacy fields, canonical envelope owned by the generic factory.
+// flat legacy fields, canonical envelope owned by the generic factory. Work 6 adds
+// the duplicate/restore hooks: tool tabs clone their durable configuration (import
+// sources, export mapping, ops settings) and reset their runtime previews/rows.
 import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
@@ -11,6 +13,28 @@ function shortTarget(node) {
     connName: node.connName,
     dbName: node.dbName,
     collName: node.collName,
+  }
+}
+
+// Indexes/Schema/Search tabs are identity-only: the pane reloads its data on mount,
+// so a duplicate is just the same target with a fresh id. Schema and Search stay
+// non-persisted (no restore hook) — restoring them is Work 7's decision.
+function identityTool(kind, titlePrefix) {
+  return {
+    duplicate(workspace) {
+      return {
+        title: workspace.title || titlePrefix + ' ' + (workspace.collName || workspace.dbName),
+        target: resourceFromFeatureNode(shortTarget(workspace)),
+        fields: { kind, ...shortTarget(workspace) },
+      }
+    },
+    restore(saved) {
+      return {
+        title: saved.title || titlePrefix + ' ' + saved.collName,
+        target: resourceFromFeatureNode(shortTarget(saved)),
+        fields: { kind, ...shortTarget(saved) },
+      }
+    },
   }
 }
 
@@ -26,6 +50,7 @@ export const toolDefinitions = [
         fields: { kind: 'indexes', ...shortTarget(ctx.target) },
       }
     },
+    ...identityTool('indexes', 'Index Manager:'),
   },
   {
     type: 'mongodb.schema',
@@ -38,6 +63,7 @@ export const toolDefinitions = [
         fields: { kind: 'schema', ...shortTarget(ctx.target) },
       }
     },
+    duplicate: identityTool('schema', 'Schema:').duplicate,
   },
   {
     type: 'mongodb.search',
@@ -55,6 +81,7 @@ export const toolDefinitions = [
         },
       }
     },
+    duplicate: identityTool('search', 'Search:').duplicate,
   },
   {
     type: 'mongodb.import',
@@ -84,6 +111,84 @@ export const toolDefinitions = [
             previewOpen: false,
           }
       return { title: 'Import: ' + ctx.target.collName, target: resourceFromFeatureNode(target), fields }
+    },
+    duplicate(workspace) {
+      // The durable configuration (source + format options) is cloned; the preview
+      // and the field mapping are re-derived from the source, so they start empty.
+      if (workspace.format === 'csv') {
+        return {
+          title: workspace.title,
+          target: resourceFromFeatureNode(shortTarget(workspace)),
+          fields: {
+            kind: 'import', ...shortTarget(workspace), format: 'csv',
+            subTab: 'source', sourceType: workspace.sourceType || 'file',
+            filePath: workspace.filePath || '',
+            csv: {
+              delimiter: workspace.csv?.delimiter ?? ',',
+              other: workspace.csv?.other ?? '',
+              qualifier: workspace.csv?.qualifier ?? '"',
+              skipLines: workspace.csv?.skipLines ?? 0,
+              hasHeader: workspace.csv?.hasHeader ?? true,
+            },
+            targetDb: workspace.targetDb, targetColl: workspace.targetColl,
+            mode: workspace.mode || 'insert',
+            fields: [],
+          },
+        }
+      }
+      return {
+        title: workspace.title,
+        target: resourceFromFeatureNode(shortTarget(workspace)),
+        fields: {
+          kind: 'import', ...shortTarget(workspace), format: 'json',
+          validate: !!workspace.validate,
+          sources: (workspace.sources || []).map(s => ({
+            path: s.path, name: s.name,
+            targetDb: s.targetDb, targetColl: s.targetColl, mode: s.mode,
+          })),
+          selectedSource: -1,
+          previewOpen: false,
+        },
+      }
+    },
+    restore(saved, ctx) {
+      // Restore re-derives preview state exactly like the current session service:
+      // the CSV options come back with safe defaults, the JSON sources verbatim.
+      if (saved.format === 'csv') {
+        return {
+          title: saved.title,
+          target: resourceFromFeatureNode(shortTarget(saved)),
+          fields: {
+            kind: 'import', ...shortTarget(saved), format: 'csv',
+            subTab: 'source',
+            sourceType: saved.sourceType || 'file', filePath: saved.filePath || '',
+            csv: {
+              delimiter: saved.csv?.delimiter ?? ',', other: saved.csv?.other ?? '',
+              qualifier: saved.csv?.qualifier ?? '"',
+              skipLines: saved.csv?.skipLines ?? 0,
+              hasHeader: saved.csv?.hasHeader ?? true,
+            },
+            targetDb: saved.targetDb, targetColl: saved.targetColl,
+            mode: saved.mode || 'insert',
+            fields: [],
+          },
+        }
+      }
+      const sources = (saved.sources || []).map(s => ({
+        path: s.path, name: s.name,
+        targetDb: s.targetDb, targetColl: s.targetColl, mode: s.mode,
+      }))
+      return {
+        title: saved.title,
+        target: resourceFromFeatureNode(shortTarget(saved)),
+        fields: {
+          kind: 'import', ...shortTarget(saved), format: 'json',
+          validate: !!saved.validate,
+          sources,
+          selectedSource: sources.length ? 0 : -1,
+          previewOpen: false,
+        },
+      }
     },
   },
   {
@@ -120,6 +225,44 @@ export const toolDefinitions = [
         },
       }
     },
+    duplicate(workspace) {
+      // The mapping and the frozen source/filter are the user's curation and must
+      // survive; the result banner is runtime state and starts clear.
+      return {
+        title: workspace.title,
+        target: resourceFromFeatureNode(shortTarget(workspace)),
+        fields: {
+          kind: 'export', ...shortTarget(workspace),
+          step: workspace.step || 0, format: workspace.format || 'json',
+          incremental: !!workspace.incremental,
+          source: workspace.source || 'collection',
+          sourceCount: workspace.sourceCount ?? null,
+          filter: workspace.filter || '{}',
+          fields: (workspace.fields || []).map(f => ({
+            source: f.source, target: f.target, kind: f.kind, include: !!f.include,
+          })),
+          result: null,
+        },
+      }
+    },
+    restore(saved) {
+      return {
+        title: saved.title,
+        target: resourceFromFeatureNode(shortTarget(saved)),
+        fields: {
+          kind: 'export', ...shortTarget(saved),
+          step: saved.step || 0, format: saved.format || 'json',
+          incremental: !!saved.incremental,
+          source: saved.source || 'collection',
+          sourceCount: saved.sourceCount ?? null,
+          filter: saved.filter || '{}',
+          fields: (saved.fields || []).map(f => ({
+            source: f.source, target: f.target, kind: f.kind, include: !!f.include,
+          })),
+          result: null,
+        },
+      }
+    },
   },
   {
     type: 'mongodb.current_operations',
@@ -137,6 +280,42 @@ export const toolDefinitions = [
           // switches (the pane unmounts while another tab is active). opsDefaults is
           // a factory: the arrays and column order are per-tab, never shared.
           ...opsDefaults(),
+        },
+      }
+    },
+    duplicate(workspace) {
+      // The toolbar settings (frequency, filters, view) define what the tab watches;
+      // the operation rows and grid state are live server state and start fresh.
+      return {
+        title: workspace.title,
+        target: resourceFromFeatureNode(shortTarget(workspace)),
+        fields: {
+          kind: 'currentOps', ...shortTarget(workspace),
+          ...opsDefaults(),
+          frequency: workspace.frequency ?? 2000,
+          retention: workspace.retention ?? 10_000,
+          ownOnly: !!workspace.ownOnly, showSys: !!workspace.showSys,
+          slowOnly: !!workspace.slowOnly, slowSecs: workspace.slowSecs ?? 3,
+          dbName: workspace.dbName || '', collName: workspace.collName || '',
+          view: workspace.view || 'table',
+        },
+      }
+    },
+    restore(saved) {
+      // Settings restore over fresh defaults; ops/rows stay empty and the pane
+      // resumes polling on mount.
+      return {
+        title: saved.title,
+        target: resourceFromFeatureNode(shortTarget(saved)),
+        fields: {
+          kind: 'currentOps', ...shortTarget(saved),
+          ...opsDefaults(),
+          frequency: saved.frequency ?? 2000,
+          retention: saved.retention ?? 10_000,
+          ownOnly: !!saved.ownOnly, showSys: !!saved.showSys,
+          slowOnly: !!saved.slowOnly, slowSecs: saved.slowSecs ?? 3,
+          dbName: saved.dbName || '', collName: saved.collName || '',
+          view: saved.view || 'table',
         },
       }
     },

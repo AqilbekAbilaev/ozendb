@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { toolDefinitions } from './toolDefinitions'
 import { isResourceRef } from '../../../utils/resourceRef'
+import { duplicateWorkspace, restoreWorkspace } from '../../../workspaces/lifecycle'
+import { registerWorkspaceDefinitions } from '../../../workspaces/registerDefinitions'
+
+registerWorkspaceDefinitions()
 
 const defFor = (type) => toolDefinitions.find(d => d.type === type)
 const ctx = (target, options = {}) => ({
@@ -157,5 +161,177 @@ describe('mongodb.current_operations', () => {
     expect(a.fields.results).not.toBe(b.fields.results)
     expect(a.fields.selectedRows).not.toBe(b.fields.selectedRows)
     expect(a.fields.colOrder).not.toBe(b.fields.colOrder)
+  })
+})
+
+describe('lifecycle — tools', () => {
+  it('duplicates indexes and schema to the same target (pane reloads its own data)', () => {
+    const idx = duplicateWorkspace({ id: 'i', type: 'mongodb.indexes', kind: 'indexes', title: 'Index Manager: orders', connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' })
+    expect(idx.type).toBe('mongodb.indexes')
+    expect(idx.kind).toBe('indexes')
+    expect(idx.target.segments.map(s => s.name)).toEqual(['shop', 'orders'])
+    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', kind: 'schema', title: 'Schema: orders', connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' })
+    expect(sch.type).toBe('mongodb.schema')
+    expect(sch.kind).toBe('schema')
+  })
+
+  it('schema and search duplicates can never become collection workspaces', () => {
+    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', kind: 'schema', title: 'Schema: orders', connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' })
+    expect(sch.kind).toBe('schema')
+    expect(sch.mode).toBeUndefined()
+    const search = duplicateWorkspace({ id: 'q', type: 'mongodb.search', kind: 'search', title: 'Search: shop', connId: 'c1', connName: 'Sales', dbName: 'shop' })
+    expect(search.kind).toBe('search')
+    expect(search.target.segments.map(s => s.name)).toEqual(['shop'])
+  })
+
+  it('csv import duplicate keeps source and options but resets the mapping', () => {
+    const src = {
+      id: 'i', type: 'mongodb.import', kind: 'import', title: 'Import: orders',
+      connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+      format: 'csv', subTab: 'target', sourceType: 'clipboard', filePath: '/tmp/a.csv',
+      csv: { delimiter: ';', other: '', qualifier: "'", skipLines: 2, hasHeader: false },
+      targetDb: 'shop', targetColl: 'orders', mode: 'upsert',
+      fields: [{ source: 'a', target: 'b' }],
+    }
+    const dup = duplicateWorkspace(src)
+    expect(dup.format).toBe('csv')
+    expect(dup.sourceType).toBe('clipboard')
+    expect(dup.filePath).toBe('/tmp/a.csv')
+    expect(dup.csv).toEqual({ delimiter: ';', other: '', qualifier: "'", skipLines: 2, hasHeader: false })
+    expect(dup.csv).not.toBe(src.csv)
+    expect(dup.targetDb).toBe('shop')
+    expect(dup.mode).toBe('upsert')
+    expect(dup.fields).toEqual([])
+  })
+
+  it('json import duplicate detaches sources and resets preview state', () => {
+    const source = { path: '/a.json', name: 'a', targetDb: 'shop', targetColl: 'orders', mode: 'insert' }
+    const dup = duplicateWorkspace({
+      id: 'i', type: 'mongodb.import', kind: 'import', title: 'Import: orders',
+      connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+      format: 'json', validate: true,
+      sources: [source], selectedSource: 0, previewOpen: true,
+    })
+    expect(dup.validate).toBe(true)
+    expect(dup.sources).toEqual([source])
+    expect(dup.sources).not.toBeUndefined()
+    expect(dup.sources[0]).not.toBe(source)
+    expect(dup.selectedSource).toBe(-1)
+    expect(dup.previewOpen).toBe(false)
+  })
+
+  it('export duplicate persists mapping and filter but clears the result banner', () => {
+    const dup = duplicateWorkspace({
+      id: 'e', type: 'mongodb.export', kind: 'export', title: 'Export: orders',
+      connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+      step: 2, format: 'csv', incremental: true, source: 'query',
+      sourceCount: 5, filter: '{ "a": 1 }',
+      fields: [{ source: 'a', target: 'b', kind: 'string', include: true }],
+      result: { count: 3, path: '/tmp/x.csv' },
+    })
+    expect(dup.filter).toBe('{ "a": 1 }')
+    expect(dup.source).toBe('query')
+    expect(dup.sourceCount).toBe(5)
+    expect(dup.fields).toEqual([{ source: 'a', target: 'b', kind: 'string', include: true }])
+    expect(dup.result).toBe(null)
+  })
+
+  it('current operations duplicate clones settings over fresh defaults', () => {
+    const dup = duplicateWorkspace({
+      id: 'o', type: 'mongodb.current_operations', kind: 'currentOps', title: 'Current Operations: Sales',
+      connId: 'c1', connName: 'Sales',
+      frequency: 500, retention: 30_000, ownOnly: true, showSys: true,
+      slowOnly: true, slowSecs: 7, dbName: 'shop', collName: 'orders', view: 'text',
+      ops: [{ id: 1 }], results: [{ x: 1 }], selectedRows: [0],
+    })
+    expect(dup.frequency).toBe(500)
+    expect(dup.retention).toBe(30_000)
+    expect(dup.ownOnly).toBe(true)
+    expect(dup.showSys).toBe(true)
+    expect(dup.slowOnly).toBe(true)
+    expect(dup.slowSecs).toBe(7)
+    expect(dup.dbName).toBe('shop')
+    expect(dup.view).toBe('text')
+    expect(dup.ops).toEqual([])
+    expect(dup.results).toEqual([])
+    expect(dup.selectedRows).toEqual([])
+    expect(dup.colOrder).toEqual({})
+  })
+})
+
+describe('lifecycle — tool restore', () => {
+  it('csv import restores options with safe defaults when they are missing', () => {
+    const tab = restoreWorkspace({
+      id: 'i', kind: 'import', title: 'Import: orders', color: null,
+      connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+      format: 'csv',
+    })
+    expect(tab.format).toBe('csv')
+    expect(tab.sourceType).toBe('file')
+    expect(tab.filePath).toBe('')
+    expect(tab.csv).toEqual({ delimiter: ',', other: '', qualifier: '"', skipLines: 0, hasHeader: true })
+    expect(tab.mode).toBe('insert')
+    expect(tab.fields).toEqual([])
+  })
+
+  it('json import restores sources and selects the first one', () => {
+    const tab = restoreWorkspace({
+      id: 'i', kind: 'import', title: 'Import: orders', color: null,
+      connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+      format: 'json', validate: true,
+      sources: [{ path: '/a.json', name: 'a', targetDb: 'shop', targetColl: 'orders', mode: 'insert' }],
+    })
+    expect(tab.validate).toBe(true)
+    expect(tab.sources).toHaveLength(1)
+    expect(tab.selectedSource).toBe(0)
+    expect(tab.previewOpen).toBe(false)
+  })
+
+  it('export restore keeps the mapping but clears the run result', () => {
+    const tab = restoreWorkspace({
+      id: 'e', kind: 'export', title: 'Export: orders', color: null,
+      connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+      step: 1, format: 'csv', incremental: true, source: 'collection',
+      sourceCount: null, filter: '{ "a": 1 }',
+      fields: [{ source: 'a', target: 'b', kind: 'string', include: true }],
+    })
+    expect(tab.filter).toBe('{ "a": 1 }')
+    expect(tab.fields).toHaveLength(1)
+    expect(tab.result).toBe(null)
+  })
+
+  it('current operations restore settings over fresh defaults', () => {
+    const tab = restoreWorkspace({
+      id: 'o', kind: 'currentOps', title: 'Current Operations: Sales', color: null,
+      connId: 'c1', connName: 'Sales',
+      frequency: 500, retention: 30_000, ownOnly: true, showSys: true,
+      slowOnly: true, slowSecs: 7, dbName: 'shop', collName: 'orders', view: 'text',
+    })
+    expect(tab.frequency).toBe(500)
+    expect(tab.retention).toBe(30_000)
+    expect(tab.ownOnly).toBe(true)
+    expect(tab.showSys).toBe(true)
+    expect(tab.slowOnly).toBe(true)
+    expect(tab.slowSecs).toBe(7)
+    expect(tab.dbName).toBe('shop')
+    expect(tab.view).toBe('text')
+    expect(tab.ops).toEqual([])
+    expect(tab.results).toEqual([])
+  })
+
+  it('indexes restore keeps identity only', () => {
+    const tab = restoreWorkspace({
+      id: 'x', kind: 'indexes', title: 'Index Manager: orders', color: null,
+      connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+    })
+    expect(tab.kind).toBe('indexes')
+    expect(tab.connId).toBe('c1')
+    expect(tab.collName).toBe('orders')
+    expect(tab.target.segments.map(s => s.name)).toEqual(['shop', 'orders'])
+  })
+
+  it('schema and search remain non-persisted', () => {
+    expect(restoreWorkspace({ id: 's', kind: 'schema' })).toBe(null)
+    expect(restoreWorkspace({ id: 'q', kind: 'search' })).toBe(null)
   })
 })

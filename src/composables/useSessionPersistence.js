@@ -2,7 +2,7 @@ import { watch } from 'vue'
 import { listConnections } from '../engines/mongodb/api/connections'
 import { getOpenTabs, setOpenTabs } from '../appApi/session'
 import { tabs, activeTabId, activeTab } from '../stores/tabs'
-import { opsDefaults } from './useCurrentOps'
+import { restoreWorkspace } from '../workspaces/lifecycle'
 
 // Tab-session persistence. Persists open collection/shell/import/index tabs (and which one is active)
 // so they return after a restart. Only the persistable fields are projected — result sets
@@ -124,7 +124,12 @@ export function useSessionPersistence({ runRestoredTab }) {
   }
 
   let saveTabsTimer = null
+  // A failed restore must never let the debounced autosave persist the truncated
+  // (possibly empty) state that remains. The flag survives until the next restore
+  // attempt; while set, saves are skipped entirely.
+  let restoreFailed = false
   function scheduleSaveTabs() {
+    if (restoreFailed) return
     clearTimeout(saveTabsTimer)
     saveTabsTimer = setTimeout(() => {
       setOpenTabs(projectSession()).catch(() => {})
@@ -132,7 +137,9 @@ export function useSessionPersistence({ runRestoredTab }) {
   }
 
   // Restore the previous session's tabs. Call before startAutoSave so the empty default
-  // never overwrites tabs.json first.
+  // never overwrites tabs.json first. Reconstruction is definition-owned: every saved
+  // record routes through restoreWorkspace, which derives the type from the saved
+  // kind/mode, rebuilds fresh runtime state, and returns null for non-persisted kinds.
   async function restoreSession() {
     try {
       const session = await getOpenTabs()
@@ -148,121 +155,29 @@ export function useSessionPersistence({ runRestoredTab }) {
         const restored = saved
           // drop tabs for deleted connections (import tabs key on connId)
           .filter(t => validIds.has(t.connectionId || t.connId) && !open.has(t.id))
-          .map(t => t.kind === 'import'
-            ? (t.format === 'csv'
-              ? {
-                  // CSV import tab. The field mapping is re-derived from the source
-                  // preview (the referenced file may have changed), so start empty.
-                  id: t.id, kind: 'import', title: t.title, color: t.color,
-                  connId: t.connId, connName: t.connName,
-                  dbName: t.dbName, collName: t.collName,
-                  format: 'csv',
-                  subTab: 'source',
-                  sourceType: t.sourceType || 'file', filePath: t.filePath || '',
-                  csv: {
-                    delimiter: t.csv?.delimiter ?? ',', other: t.csv?.other ?? '',
-                    qualifier: t.csv?.qualifier ?? '"', skipLines: t.csv?.skipLines ?? 0,
-                    hasHeader: t.csv?.hasHeader ?? true,
-                  },
-                  targetDb: t.targetDb, targetColl: t.targetColl, mode: t.mode || 'insert',
-                  fields: [],
-                }
-              : {
-                  // JSON import tab: restore its sources; preview is re-derived on demand.
-                  id: t.id, kind: 'import', title: t.title, color: t.color,
-                  connId: t.connId, connName: t.connName,
-                  dbName: t.dbName, collName: t.collName,
-                  format: t.format, validate: !!t.validate,
-                  sources: (t.sources || []).map(s => ({
-                    path: s.path, name: s.name,
-                    targetDb: s.targetDb, targetColl: s.targetColl, mode: s.mode,
-                  })),
-                  selectedSource: (t.sources && t.sources.length) ? 0 : -1,
-                  previewOpen: false,
-                })
-            : t.kind === 'shell'
-            ? {
-                // Rebuild a shell tab with a fresh backend session (JS contexts are
-                // ephemeral); the editor text is restored, history loads on mount.
-                id: t.id, kind: 'shell', title: t.title, color: t.color,
-                connectionId: t.connectionId, connectionName: t.connectionName,
-                dbName: t.dbName,
-                sessionId: (crypto.randomUUID ? crypto.randomUUID() : t.id),
-                code: t.code || '', scriptPath: t.scriptPath || null, history: [], isRunning: false,
-                results: [], resultView: 'table', resultTab: 'Console',
-                runError: null, elapsedMs: null, drillPath: [], hasRun: false, selectedRow: -1, selectedRows: [],
-                logs: [], scalar: undefined, hasScalar: false,
-              }
-            : t.kind === 'export'
-            ? {
-                // Export tab: mapping and format come back; the preview re-samples on
-                // mount and the result banner starts clear.
-                id: t.id, kind: 'export', title: t.title, color: t.color,
-                connId: t.connId, connName: t.connName,
-                dbName: t.dbName, collName: t.collName,
-                step: t.step || 0, format: t.format || 'json', incremental: !!t.incremental,
-                source: t.source || 'collection', sourceCount: t.sourceCount ?? null,
-                filter: t.filter || '{}',
-                fields: (t.fields || []).map(f => ({
-                  source: f.source, target: f.target, kind: f.kind, include: !!f.include,
-                })),
-                result: null,
-              }
-            : t.kind === 'indexes'
-            ? {
-                // Index Manager tab: identity only; the pane reloads its list on mount.
-                id: t.id, kind: 'indexes', title: t.title, color: t.color,
-                connId: t.connId, connName: t.connName,
-                dbName: t.dbName, collName: t.collName,
-              }
-            : t.kind === 'currentOps'
-            ? {
-                // Current Operations tab: defaults first, then the saved settings on top —
-                // the runtime state (ops, grid) starts empty and the pane polls on mount.
-                ...opsDefaults(),
-                id: t.id, kind: 'currentOps', title: t.title, color: t.color,
-                connId: t.connId, connName: t.connName,
-                frequency: t.frequency ?? 2000, retention: t.retention ?? 10_000,
-                ownOnly: !!t.ownOnly, showSys: !!t.showSys,
-                slowOnly: !!t.slowOnly, slowSecs: t.slowSecs ?? 3,
-                dbName: t.dbName || '', collName: t.collName || '', view: t.view || 'table',
-              }
-            : t.mode === 'sql'
-            ? {
-                // SQL tab: restore the editor text but don't auto-run — the find
-                // pieces are re-derived on the next Run (like a freshly opened tab).
-                id: t.id, kind: 'collection', title: t.title, color: t.color,
-                connectionId: t.connectionId, connectionName: t.connectionName,
-                dbName: t.dbName, collectionName: t.collectionName,
-                mode: 'sql', sql: t.sql || '', sqlError: null,
-                filter: '', projection: '', sort: '', skip: 0, limit: 50, pipeline: '',
-                vqb: null, colOrder: t.colOrder || {},
-                readOnly: !!t.readOnly,
-                results: [], hasRun: false, isRunning: false, runError: null,
-                selectedRow: -1, selectedRows: [], elapsedMs: null,
-              }
-            : {
-                ...t,
-                results: [], hasRun: false, isRunning: false, runError: null,
-                selectedRow: -1, selectedRows: [], elapsedMs: null, _restored: true,
-              })
+          .map(t => restoreWorkspace(t, { defaults: { queryLimit: 50, resultView: 'table' } }))
+          .filter(Boolean)
         if (restored.length) {
           tabs.value.push(...restored)
           if (restored.some(t => t.id === session.activeTabId)) {
             activeTabId.value = session.activeTabId
           }
-          // Lazily run the active restored tab (find mode re-runs its query).
+          // Lazily run the active restored tab (find mode re-runs its query; only
+          // find restores carry the one-shot marker).
           const active = activeTab.value
           if (active && active._restored) runRestoredTab(active)
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      restoreFailed = true
+    }
   }
 
   // Save on any change to the open tabs or the active tab. The watched getter reads only
-  // persistable fields, so result-set updates don't trigger it.
+  // persistable fields, so result-set updates don't trigger it. The stop handle is
+  // returned so callers (and tests) can tear the watcher down.
   function startAutoSave() {
-    watch(() => JSON.stringify(projectSession()), scheduleSaveTabs)
+    return watch(() => JSON.stringify(projectSession()), scheduleSaveTabs)
   }
 
   return {

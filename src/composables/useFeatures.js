@@ -1,7 +1,9 @@
 import { disconnect } from '../engines/mongodb/api/connections'
 import { TOOLS } from '../constants/tools'
 import { MODALS } from '../constants/modalRegistry'
-import { tabs, activeTab, pruneActiveTab } from '../stores/tabs'
+import { closeWhere } from '../stores/tabs'
+import { affectedByResource } from '../workspaces/lifecycle'
+import { createResourceRef } from '../utils/resourceRef'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
@@ -81,8 +83,10 @@ export function useFeatures({
   async function disconnectOne(node, ctx) {
     try { await disconnect(node.connId) } catch (_) {}
     connectionTreeRef.value.disconnectConn(node.connId)
-    tabs.value = tabs.value.filter(t => t.connectionId !== node.connId)
-    pruneActiveTab()
+    // Every tab scoped into this connection is stale once it's gone — including tool
+    // tabs, whose short alias keys the old filter could never see. Containment runs
+    // disposal (shell teardown) through closeTab for each affected workspace.
+    closeWhere(affectedByResource(createResourceRef(node.connId)))
     showToast('Disconnected from ' + ctx.label)
   }
   async function disconnectOthers(node) {
@@ -91,8 +95,11 @@ export function useFeatures({
       try { await disconnect(conn.id) } catch (_) {}
       connectionTreeRef.value.disconnectConn(conn.id)
     }
-    tabs.value = tabs.value.filter(t => t.kind !== 'collection' || t.connectionId === node.connId)
-    pruneActiveTab()
+    // Keep every tab scoped under the surviving connection; close all other
+    // resource-scoped tabs. The old filter closed every non-collection tab — it
+    // killed shells that were still valid and kept stale ones on dropped connections.
+    const keep = affectedByResource(createResourceRef(node.connId))
+    closeWhere(t => !!t.target && !keep(t))
     showToast('Disconnected all other connections')
   }
   async function disconnectAll() {
@@ -100,8 +107,9 @@ export function useFeatures({
       try { await disconnect(conn.id) } catch (_) {}
       connectionTreeRef.value.disconnectConn(conn.id)
     }
-    tabs.value = tabs.value.filter(t => t.kind !== 'collection')
-    pruneActiveTab()
+    // Every resource-scoped tab belongs to a now-disconnected connection; only
+    // resource-less workspaces (Quickstart) survive.
+    closeWhere(t => !!t.target)
     showToast('All connections closed')
   }
   async function refreshSelected(node) {

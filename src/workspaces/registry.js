@@ -60,3 +60,23 @@ export function getWorkspaceDefinition(type) {
   if (!def) throw new Error(`Unknown workspace type: ${type}`)
   return def
 }
+
+// The unversioned persisted session records tabs by legacy kind/mode (Work 5 kept
+// the JSON format unchanged). Maps a saved record to its workspace type; null for
+// kinds that are never persisted (schema, search, quickstart).
+export function workspaceTypeForSaved(saved) {
+  if (!saved || typeof saved !== 'object') return null
+  switch (saved.kind) {
+    case 'collection': {
+      if (saved.mode === 'sql') return 'mongodb.sql_to_mql'
+      if (saved.mode === 'aggregate') return 'mongodb.aggregate'
+      return 'mongodb.find'
+    }
+    case 'shell':    return 'mongodb.shell'
+    case 'import':   return 'mongodb.import'
+    case 'export':   return 'mongodb.export'
+    case 'indexes':  return 'mongodb.indexes'
+    case 'currentOps': return 'mongodb.current_operations'
+    default:         return null
+  }
+}

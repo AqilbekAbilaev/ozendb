@@ -6,7 +6,9 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
-import { tabs, pruneActiveTab } from '../../stores/tabs'
+import { closeWhere } from '../../stores/tabs'
+import { affectedByResource } from '../../workspaces/lifecycle'
+import { createResourceRef } from '../../utils/resourceRef'
 
 // Database → Drop Database…: destructive, so it confirms first. Dropping also closes every
 // open tab pointing into that database — those tabs can no longer resolve anything.
@@ -26,10 +28,10 @@ async function confirm() {
   error.value = null
   try {
     await dropDatabase({ connectionId: props.target.connId, database: props.target.dbName })
-    tabs.value = tabs.value.filter(t => !(t.kind === 'collection'
-      && t.connectionId === props.target.connId
-      && t.dbName === props.target.dbName))
-    pruneActiveTab()
+    // Containment closes every tab scoped into the dropped database (collections,
+    // shells, tools), and only those; connection-scoped tabs like Current Operations
+    // survive. closeTab runs disposal for each removed workspace.
+    closeWhere(affectedByResource(createResourceRef(props.target.connId, [{ kind: 'database', name: props.target.dbName }])))
     showToast(`Database "${props.target.dbName}" dropped`)
     emit('saved', props.target.connId)
     emit('close')
