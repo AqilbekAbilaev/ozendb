@@ -28,7 +28,7 @@ import {
   renameTabTarget, renameTabValue, confirmRenameTab,
 } from './stores/tabs'
 import ConnectionTree from './components/connection/ConnectionTree.vue'
-import QueryWorkspace from './components/query/QueryWorkspace.vue'
+import WorkspaceArea from './components/workspace/WorkspaceArea.vue'
 import ContextMenu from './components/base/ContextMenu.vue'
 import AppModals from './components/app/AppModals.vue'
 import Resizer from './components/base/Resizer.vue'
@@ -544,7 +544,7 @@ provide('appModals', {
       <Resizer v-show="sidebarOpen" v-model="sidebarWidth" axis="x" :min="200" :max="560" />
 
       <!-- Workspace -->
-      <QueryWorkspace
+      <WorkspaceArea
         :tabs="tabs"
         :active-tab-id="activeTabId"
         :tag-overrides="tagOverrides"
