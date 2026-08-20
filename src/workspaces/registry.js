@@ -63,19 +63,25 @@ export function getWorkspaceDefinition(type) {
 
 // The unversioned persisted session records tabs by legacy kind/mode (Work 5 kept
 // the JSON format unchanged). Maps a saved record to its workspace type; null for
-// kinds that are never persisted (schema, search, quickstart).
+// kinds that are never persisted (quickstart) or unreadable shapes. Work 7 adds
+// schema and search to the persisted set; unknown collection modes must never
+// silently become find workspaces, so they map to null and the migration skips
+// them with a warning.
 export function workspaceTypeForSaved(saved) {
   if (!saved || typeof saved !== 'object') return null
   switch (saved.kind) {
     case 'collection': {
       if (saved.mode === 'sql') return 'mongodb.sql_to_mql'
       if (saved.mode === 'aggregate') return 'mongodb.aggregate'
-      return 'mongodb.find'
+      if (!saved.mode || saved.mode === 'find') return 'mongodb.find'
+      return null
     }
     case 'shell':    return 'mongodb.shell'
     case 'import':   return 'mongodb.import'
     case 'export':   return 'mongodb.export'
     case 'indexes':  return 'mongodb.indexes'
+    case 'schema':   return 'mongodb.schema'
+    case 'search':   return 'mongodb.search'
     case 'currentOps': return 'mongodb.current_operations'
     default:         return null
   }

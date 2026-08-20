@@ -319,6 +319,21 @@ describe('lifecycle — tool restore', () => {
     expect(tab.results).toEqual([])
   })
 
+  it('current operations identity stays connection-scoped on duplicate and restore', () => {
+    // dbName/collName are filters, never identity: the target must stay at the
+    // connection level so a database drop does not close the tab.
+    const record = {
+      id: 'o', kind: 'currentOps', title: 'Current Operations: Sales', color: null,
+      connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+      frequency: 500,
+    }
+    const dup = duplicateWorkspace({ type: 'mongodb.current_operations', ...record })
+    expect(dup.target.segments).toEqual([])
+    const restored = restoreWorkspace(record)
+    expect(restored.target.segments).toEqual([])
+    expect(restored.dbName).toBe('shop')
+  })
+
   it('indexes restore keeps identity only', () => {
     const tab = restoreWorkspace({
       id: 'x', kind: 'indexes', title: 'Index Manager: orders', color: null,
@@ -330,8 +345,15 @@ describe('lifecycle — tool restore', () => {
     expect(tab.target.segments.map(s => s.name)).toEqual(['shop', 'orders'])
   })
 
-  it('schema and search remain non-persisted', () => {
-    expect(restoreWorkspace({ id: 's', kind: 'schema' })).toBe(null)
-    expect(restoreWorkspace({ id: 'q', kind: 'search' })).toBe(null)
+  it('restores schema and search as identity-only tabs (Work 7)', () => {
+    const schema = restoreWorkspace({ id: 's', kind: 'schema', title: 'Schema: orders', connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' })
+    expect(schema.type).toBe('mongodb.schema')
+    expect(schema.kind).toBe('schema')
+    expect(schema.connId).toBe('c1')
+
+    const search = restoreWorkspace({ id: 'q', kind: 'search', title: 'Search: shop', connId: 'c1', connName: 'Sales', dbName: 'shop' })
+    expect(search.type).toBe('mongodb.search')
+    expect(search.kind).toBe('search')
+    expect(search.dbName).toBe('shop')
   })
 })

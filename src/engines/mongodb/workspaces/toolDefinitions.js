@@ -16,9 +16,20 @@ function shortTarget(node) {
   }
 }
 
+// Current Operations is connection-scoped: dbName/collName on the tab are *filters*,
+// not identity, so duplicate/restore must not read them into the target (a
+// collection-scoped target would also close the tab when its database drops).
+function connectionScope(node) {
+  return { connId: node.connId, connName: node.connName }
+}
+
+function opsTarget(node) {
+  return resourceFromFeatureNode(connectionScope(node))
+}
+
 // Indexes/Schema/Search tabs are identity-only: the pane reloads its data on mount,
-// so a duplicate is just the same target with a fresh id. Schema and Search stay
-// non-persisted (no restore hook) — restoring them is Work 7's decision.
+// so a duplicate is just the same target with a fresh id. Work 7 makes Schema and
+// Search persist (identity only, like Indexes) — the restore hook is shared too.
 function identityTool(kind, titlePrefix) {
   return {
     duplicate(workspace) {
@@ -50,6 +61,7 @@ export const toolDefinitions = [
         fields: { kind: 'indexes', ...shortTarget(ctx.target) },
       }
     },
+    serialize: () => ({}),
     ...identityTool('indexes', 'Index Manager:'),
   },
   {
@@ -63,7 +75,9 @@ export const toolDefinitions = [
         fields: { kind: 'schema', ...shortTarget(ctx.target) },
       }
     },
+    serialize: () => ({}),
     duplicate: identityTool('schema', 'Schema:').duplicate,
+    restore: identityTool('schema', 'Schema:').restore,
   },
   {
     type: 'mongodb.search',
@@ -81,7 +95,15 @@ export const toolDefinitions = [
         },
       }
     },
+    serialize: () => ({}),
     duplicate: identityTool('search', 'Search:').duplicate,
+    restore(saved) {
+      // Search has no collection, so the shared title fallback must not reach for
+      // collName; dbName is the anchor.
+      const tool = identityTool('search', 'Search:').restore(saved)
+      if (!saved.title) tool.title = 'Search: ' + saved.dbName
+      return tool
+    },
   },
   {
     type: 'mongodb.import',
@@ -111,6 +133,33 @@ export const toolDefinitions = [
             previewOpen: false,
           }
       return { title: 'Import: ' + ctx.target.collName, target: resourceFromFeatureNode(target), fields }
+    },
+    serialize(workspace) {
+      // The durable configuration mirrors what restore accepts: CSV options with
+      // defaults, JSON sources projected down to their four durable fields. Preview
+      // rows and the field mapping are re-derived on mount, never stored.
+      if (workspace.format === 'csv') {
+        return {
+          format: 'csv',
+          sourceType: workspace.sourceType ?? 'file', filePath: workspace.filePath ?? '',
+          csv: {
+            delimiter: workspace.csv?.delimiter ?? ',', other: workspace.csv?.other ?? '',
+            qualifier: workspace.csv?.qualifier ?? '"',
+            skipLines: workspace.csv?.skipLines ?? 0,
+            hasHeader: workspace.csv?.hasHeader ?? true,
+          },
+          targetDb: workspace.targetDb ?? '', targetColl: workspace.targetColl ?? '',
+          mode: workspace.mode ?? 'insert',
+        }
+      }
+      return {
+        format: 'json',
+        validate: !!workspace.validate,
+        sources: (workspace.sources || []).map(s => ({
+          path: s.path, name: s.name,
+          targetDb: s.targetDb, targetColl: s.targetColl, mode: s.mode,
+        })),
+      }
     },
     duplicate(workspace) {
       // The durable configuration (source + format options) is cloned; the preview
@@ -225,6 +274,20 @@ export const toolDefinitions = [
         },
       }
     },
+    serialize(workspace) {
+      // The step, the frozen source/filter and the user's field mapping are the
+      // tab's curation; the result banner is runtime state and never stored.
+      return {
+        step: workspace.step ?? 0, format: workspace.format ?? 'json',
+        incremental: !!workspace.incremental,
+        source: workspace.source ?? 'collection',
+        sourceCount: workspace.sourceCount ?? null,
+        filter: workspace.filter ?? '{}',
+        fields: (workspace.fields || []).map(f => ({
+          source: f.source, target: f.target, kind: f.kind, include: !!f.include,
+        })),
+      }
+    },
     duplicate(workspace) {
       // The mapping and the frozen source/filter are the user's curation and must
       // survive; the result banner is runtime state and starts clear.
@@ -283,12 +346,24 @@ export const toolDefinitions = [
         },
       }
     },
+    serialize(workspace) {
+      // Toolbar settings and the filter scope define what the tab watches; ops rows
+      // and grid state are live server state and never stored.
+      return {
+        frequency: workspace.frequency ?? 2000,
+        retention: workspace.retention ?? 10_000,
+        ownOnly: !!workspace.ownOnly, showSys: !!workspace.showSys,
+        slowOnly: !!workspace.slowOnly, slowSecs: workspace.slowSecs ?? 3,
+        dbName: workspace.dbName || '', collName: workspace.collName || '',
+        view: workspace.view || 'table',
+      }
+    },
     duplicate(workspace) {
       // The toolbar settings (frequency, filters, view) define what the tab watches;
       // the operation rows and grid state are live server state and start fresh.
       return {
         title: workspace.title,
-        target: resourceFromFeatureNode(shortTarget(workspace)),
+        target: opsTarget(workspace),
         fields: {
           kind: 'currentOps', ...shortTarget(workspace),
           ...opsDefaults(),
@@ -303,10 +378,11 @@ export const toolDefinitions = [
     },
     restore(saved) {
       // Settings restore over fresh defaults; ops/rows stay empty and the pane
-      // resumes polling on mount.
+      // resumes polling on mount. The target is the connection, never the filter
+      // scope.
       return {
         title: saved.title,
-        target: resourceFromFeatureNode(shortTarget(saved)),
+        target: opsTarget(saved),
         fields: {
           kind: 'currentOps', ...shortTarget(saved),
           ...opsDefaults(),

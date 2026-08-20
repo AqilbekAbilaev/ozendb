@@ -16,20 +16,50 @@ vi.mock('../appApi/session', () => ({
   setOpenTabs: vi.fn(() => Promise.resolve()),
 }))
 vi.mock('../engines/mongodb/api/connections', () => ({
-  listConnections: vi.fn(() => Promise.resolve([{ id: 'c1' }, { id: 'c2' }])),
+  listConnections: vi.fn(() => Promise.resolve([
+    { id: 'c1', name: 'Sales' },
+    { id: 'c2', name: 'Analytics' },
+  ])),
 }))
 
 const { getOpenTabs, setOpenTabs } = await import('../appApi/session')
 const { listConnections } = await import('../engines/mongodb/api/connections')
 
-const findTab = (id, connId = 'c1') => ({
-  id, kind: 'collection', type: 'mongodb.find', engine: 'mongodb',
-  title: 'orders', color: '#0f0',
-  connectionId: connId, connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+const TARGET = (connId) => ({
+  connectionId: connId,
+  segments: [
+    { kind: 'database', name: 'shop' },
+    { kind: 'collection', name: 'orders' },
+  ],
+})
+
+// A live find tab: canonical envelope + legacy flat fields + runtime junk.
+const liveFind = (id, connId = 'c1') => ({
+  id, type: 'mongodb.find', engine: 'mongodb', title: 'orders', color: '#0f0',
+  target: TARGET(connId),
+  kind: 'collection', connectionId: connId, connectionName: 'Sales',
+  dbName: 'shop', collectionName: 'orders',
   mode: 'find', filter: '{ "a": 1 }', sort: '{}', projection: '{}',
   skip: 0, limit: 25, pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 }, readOnly: false,
   results: [{ x: 1 }], hasRun: true, isRunning: false, runError: null,
   selectedRow: 0, selectedRows: [0], elapsedMs: 12,
+})
+
+const canonicalFind = (id, connId = 'c1') => ({
+  id, type: 'mongodb.find', engine: 'mongodb', title: 'orders', color: '#0f0',
+  target: TARGET(connId),
+  state: {
+    filter: '{ "a": 1 }', sort: '{}', projection: '{}',
+    skip: 0, limit: 25, pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 }, readOnly: false,
+  },
+})
+
+// A legacy unversioned session record (the v1 disk format).
+const legacyFind = (id, connId = 'c1') => ({
+  id, kind: 'collection', title: 'orders', color: '#0f0',
+  connectionId: connId, connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+  mode: 'find', filter: '{ "a": 1 }', sort: '{}', projection: '{}',
+  skip: 0, limit: 25, pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 }, readOnly: false,
 })
 
 function seedStore(arr, activeId) {
@@ -41,11 +71,18 @@ let runRestoredTab
 const autoSaves = []
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   runRestoredTab = vi.fn()
   // Activating a restored tab goes through the store's registered bridge; keep the
-  // store and the composable on the same spy.
+  // store and the composable on the same spy. Default implementations are re-stubbed
+  // here because resetAllMocks wipes them, and tests that need different ones
+  // override below.
   setRunRestoredTab(runRestoredTab)
+  setOpenTabs.mockResolvedValue(Promise.resolve())
+  listConnections.mockResolvedValue([
+    { id: 'c1', name: 'Sales' },
+    { id: 'c2', name: 'Analytics' },
+  ])
 })
 
 afterEach(() => {
@@ -54,77 +91,127 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('projection', () => {
-  it('keeps the current projected session fixture unchanged', async () => {
-    vi.useFakeTimers()
-    const quickstart = { id: 't0', kind: 'quickstart', type: 'app.quickstart', title: 'Quickstart' }
-    seedStore([findTab('f1'), quickstart], 'f1')
-    const { startAutoSave } = useSessionPersistence({ runRestoredTab })
-    autoSaves.push(startAutoSave())
-    tabs.value = [...tabs.value, { ...findTab('f2'), title: 'products', collectionName: 'products' }]
-    await nextTick()
-    vi.advanceTimersByTime(400)
+// Autosave gating is per-instance, so the change must go through the same instance
+// that initialized the session.
+async function savedAfterChange(instance, tab) {
+  vi.useFakeTimers()
+  autoSaves.push(instance.startAutoSave())
+  tabs.value = [...tabs.value, tab]
+  await nextTick()
+  vi.advanceTimersByTime(400)
+}
+
+describe('projection (v2 writes)', () => {
+  it('projects live tabs to canonical v2 records with durable state only', async () => {
+    seedStore([liveFind('f1')], 'f1')
+    const session = useSessionPersistence({ runRestoredTab })
+    await session.initializeSession({ restore: false })
+    await savedAfterChange(session, liveFind('f2'))
     expect(setOpenTabs).toHaveBeenCalledWith({
+      schemaVersion: 2,
       activeTabId: 'f1',
-      tabs: [
-        {
-          id: 'f1', kind: 'collection', title: 'orders', color: '#0f0',
-          connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
-          filter: '{ "a": 1 }', sort: '{}', projection: '{}', skip: 0, limit: 25,
-          mode: 'find', pipeline: '', vqb: { rows: [1] }, readOnly: false, colOrder: { a: 0 },
-        },
-        {
-          id: 'f2', kind: 'collection', title: 'products', color: '#0f0',
-          connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'products',
-          filter: '{ "a": 1 }', sort: '{}', projection: '{}', skip: 0, limit: 25,
-          mode: 'find', pipeline: '', vqb: { rows: [1] }, readOnly: false, colOrder: { a: 0 },
-        },
-      ],
+      tabs: [canonicalFind('f1'), canonicalFind('f2')],
     })
   })
 
-  it('excludes runtime fields from the persisted record', async () => {
+  it('excludes app-level tabs (quickstart) from the session', async () => {
+    seedStore([liveFind('f1'), { id: 't0', type: 'app.quickstart', engine: 'app', kind: 'quickstart', title: 'Quickstart' }], 'f1')
+    const session = useSessionPersistence({ runRestoredTab })
+    await session.initializeSession({ restore: false })
+    await savedAfterChange(session, liveFind('f2'))
+    expect(setOpenTabs).toHaveBeenCalledWith({ schemaVersion: 2, activeTabId: 'f1', tabs: [canonicalFind('f1'), canonicalFind('f2')] })
+  })
+
+  it('does not trigger saves on runtime-only changes', async () => {
+    seedStore([liveFind('f1')], 'f1')
+    const session = useSessionPersistence({ runRestoredTab })
+    await session.initializeSession({ restore: false })
     vi.useFakeTimers()
-    seedStore([findTab('f1')], 'f1')
-    const { startAutoSave } = useSessionPersistence({ runRestoredTab })
-    autoSaves.push(startAutoSave())
-    tabs.value = [...tabs.value, findTab('f2')]
+    autoSaves.push(session.startAutoSave())
+    tabs.value[0].results = [{ y: 2 }]
     await nextTick()
     vi.advanceTimersByTime(400)
-    const persisted = setOpenTabs.mock.calls[0][0]
-    for (const tab of persisted.tabs) {
-      expect(tab.results).toBeUndefined()
-      expect(tab.hasRun).toBeUndefined()
-      expect(tab.selectedRow).toBeUndefined()
-      expect(tab.selectedRows).toBeUndefined()
-      expect(tab.elapsedMs).toBeUndefined()
-      expect(tab.type).toBeUndefined()
-      expect(tab.engine).toBeUndefined()
-    }
+    expect(setOpenTabs).not.toHaveBeenCalled()
   })
 })
 
-describe('restoreSession', () => {
-  it('drops workspaces whose connection was deleted', async () => {
+describe('initializeSession', () => {
+  it('treats a missing file as a fresh session and arms autosave', async () => {
+    seedStore([], null)
+    getOpenTabs.mockResolvedValue(null)
+    const session = useSessionPersistence({ runRestoredTab })
+    const result = await session.initializeSession({ restore: true })
+    expect(result).toEqual({ ok: true, sourceVersion: 2, migrated: false, warnings: [] })
+    expect(tabs.value).toHaveLength(0)
+    await savedAfterChange(session, liveFind('f1'))
+    expect(setOpenTabs).toHaveBeenCalledWith({ schemaVersion: 2, activeTabId: null, tabs: [canonicalFind('f1')] })
+  })
+
+  it('migrates a legacy session and restores tabs with re-injected names', async () => {
     seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({
-      activeTabId: 'r2',
-      tabs: [findTab('r1', 'c1'), findTab('r2', 'c2'), findTab('r3', 'c3')],
+      activeTabId: 'r1',
+      tabs: [legacyFind('r1'), {
+        id: 'sh', kind: 'shell', title: 'mongosh: shop', color: null,
+        connectionId: 'c2', connectionName: 'Analytics', dbName: 'shop',
+        code: 'db.orders.find()', scriptPath: null,
+      }],
     })
-    listConnections.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }])
-    const { restoreSession } = useSessionPersistence({ runRestoredTab })
-    await restoreSession()
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    const result = await initializeSession({ restore: true })
+    expect(result).toEqual({ ok: true, sourceVersion: 1, migrated: true, warnings: [] })
+    const find = tabs.value.find(t => t.id === 'r1')
+    expect(find.type).toBe('mongodb.find')
+    expect(find.filter).toBe('{ "a": 1 }')
+    expect(find.connectionName).toBe('Sales')
+    expect(find.dbName).toBe('shop')
+    expect(find.collectionName).toBe('orders')
+    expect(find.target).toEqual(TARGET('c1'))
+    expect(find.results).toEqual([])
+    const shell = tabs.value.find(t => t.id === 'sh')
+    expect(shell.connectionName).toBe('Analytics')
+    expect(shell.code).toBe('db.orders.find()')
+    expect(activeTabId.value).toBe('r1')
+  })
+
+  it('writes the migrated v2 session back once', async () => {
+    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1')] })
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: false })
+    expect(setOpenTabs).toHaveBeenCalledTimes(1)
+    expect(setOpenTabs).toHaveBeenCalledWith({
+      schemaVersion: 2,
+      activeTabId: 'r1',
+      tabs: [canonicalFind('r1')],
+    })
+  })
+
+  it('drops tabs for deleted connections via migration pruning', async () => {
+    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1', 'c1'), legacyFind('r3', 'c3')] })
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: true })
     const ids = tabs.value.map(t => t.id)
     expect(ids).toContain('r1')
-    expect(ids).toContain('r2')
     expect(ids).not.toContain('r3')
   })
 
+  it('skips pruning when the connection list fails', async () => {
+    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    listConnections.mockRejectedValue(new Error('offline'))
+    getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1', 'c3')] })
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    const result = await initializeSession({ restore: true })
+    expect(result.ok).toBe(true)
+    expect(tabs.value.map(t => t.id)).toContain('r1')
+  })
+
   it('does not restore ids that are already open', async () => {
-    seedStore([findTab('r1'), { id: 't0', kind: 'quickstart', title: 'Quickstart' }], 'r1')
-    getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [findTab('r1'), findTab('r2')] })
-    const { restoreSession } = useSessionPersistence({ runRestoredTab })
-    await restoreSession()
+    seedStore([liveFind('r1'), { id: 't0', kind: 'quickstart', title: 'Quickstart' }], 'r1')
+    getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1'), legacyFind('r2')] })
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: true })
     const ids = tabs.value.map(t => t.id)
     expect(ids.filter(id => id === 'r1')).toHaveLength(1)
     expect(ids).toContain('r2')
@@ -132,20 +219,20 @@ describe('restoreSession', () => {
 
   it('runs the active restored find through the bridge exactly once', async () => {
     seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
-    getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [findTab('r1')] })
-    const { restoreSession } = useSessionPersistence({ runRestoredTab })
-    await restoreSession()
+    getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1')] })
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: true })
     expect(runRestoredTab).toHaveBeenCalledTimes(1)
     expect(runRestoredTab.mock.calls[0][0].id).toBe('r1')
-    await restoreSession() // a second restore must not re-run it
+    await initializeSession({ restore: true }) // a second initialize must not re-run it
     expect(runRestoredTab).toHaveBeenCalledTimes(1)
   })
 
   it('leaves an inactive restored find waiting for activation', async () => {
     seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
-    getOpenTabs.mockResolvedValue({ activeTabId: 't0', tabs: [findTab('r1')] })
-    const { restoreSession } = useSessionPersistence({ runRestoredTab })
-    await restoreSession()
+    getOpenTabs.mockResolvedValue({ activeTabId: 't0', tabs: [legacyFind('r1')] })
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: true })
     expect(runRestoredTab).not.toHaveBeenCalled()
     activateTab('r1')
     expect(runRestoredTab).toHaveBeenCalledTimes(1)
@@ -153,14 +240,11 @@ describe('restoreSession', () => {
 
   it('does not auto-run restored aggregate or sql tabs', async () => {
     seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
-    const aggregate = {
-      ...findTab('a'), type: 'mongodb.aggregate', mode: 'aggregate',
-      pipeline: '[{ "$match": {} }]', filter: '', projection: '', sort: '', skip: 0,
-    }
-    const sql = { ...findTab('s'), type: 'mongodb.sql_to_mql', mode: 'sql', sql: 'SELECT 1' }
+    const aggregate = { ...legacyFind('a'), mode: 'aggregate', pipeline: '[{ "$match": {} }]' }
+    const sql = { ...legacyFind('s'), mode: 'sql', sql: 'SELECT 1' }
     getOpenTabs.mockResolvedValue({ activeTabId: 'a', tabs: [aggregate, sql] })
-    const { restoreSession } = useSessionPersistence({ runRestoredTab })
-    await restoreSession()
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: true })
     expect(runRestoredTab).not.toHaveBeenCalled()
     const agg = tabs.value.find(t => t.id === 'a')
     const sq = tabs.value.find(t => t.id === 's')
@@ -178,21 +262,95 @@ describe('restoreSession', () => {
         sessionId: 'old-session', code: 'db.orders.find()', scriptPath: null,
       }],
     })
-    const { restoreSession } = useSessionPersistence({ runRestoredTab })
-    await restoreSession()
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: true })
     const shell = tabs.value.find(t => t.id === 'sh')
     expect(shell.sessionId).not.toBe('old-session')
     expect(shell.code).toBe('db.orders.find()')
   })
 
-  it('skips autosave after a failed restore so the truncated state never persists', async () => {
-    vi.useFakeTimers()
+  it('restores schema and search as identity-only tabs', async () => {
     seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
-    getOpenTabs.mockRejectedValue(new Error('corrupt file'))
-    const { restoreSession, startAutoSave } = useSessionPersistence({ runRestoredTab })
-    await restoreSession()
+    getOpenTabs.mockResolvedValue({
+      activeTabId: 's',
+      tabs: [
+        { id: 's', kind: 'schema', title: 'Schema: orders', color: null, connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' },
+        { id: 'q', kind: 'search', title: 'Search: shop', color: null, connId: 'c1', connName: 'Sales', dbName: 'shop' },
+      ],
+    })
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: true })
+    const schema = tabs.value.find(t => t.id === 's')
+    const search = tabs.value.find(t => t.id === 'q')
+    expect(schema.type).toBe('mongodb.schema')
+    expect(schema.connName).toBe('Sales')
+    expect(search.type).toBe('mongodb.search')
+    expect(search.dbName).toBe('shop')
+  })
+
+  it('loads and validates without pushing tabs when restore is off', async () => {
+    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1')] })
+    const session = useSessionPersistence({ runRestoredTab })
+    const result = await session.initializeSession({ restore: false })
+    expect(result.ok).toBe(true)
+    expect(tabs.value.map(t => t.id)).toEqual(['t0'])
+    await savedAfterChange(session, liveFind('f1'))
+    expect(setOpenTabs).toHaveBeenCalledTimes(2) // migration writeback + autosave
+  })
+
+  it('keeps autosave armed on a valid v2 file with no migration writeback', async () => {
+    seedStore([], null)
+    getOpenTabs.mockResolvedValue({ schemaVersion: 2, activeTabId: null, tabs: [canonicalFind('r1')] })
+    const session = useSessionPersistence({ runRestoredTab })
+    const result = await session.initializeSession({ restore: false })
+    expect(result).toEqual({ ok: true, sourceVersion: 2, migrated: false, warnings: [] })
+    expect(setOpenTabs).not.toHaveBeenCalled()
+    await savedAfterChange(session, liveFind('f1'))
+    expect(setOpenTabs).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables autosave on a future-version file even when restore is off', async () => {
+    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    getOpenTabs.mockResolvedValue({ schemaVersion: 3, activeTabId: 'r1', tabs: [canonicalFind('r1')] })
+    const session = useSessionPersistence({ runRestoredTab })
+    const result = await session.initializeSession({ restore: false })
+    expect(result).toEqual({ ok: false, reason: 'future-version', schemaVersion: 3 })
+    await savedAfterChange(session, liveFind('f1'))
+    expect(setOpenTabs).not.toHaveBeenCalled()
+  })
+
+  it('disables autosave on an invalid session file', async () => {
+    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    getOpenTabs.mockResolvedValue({ schemaVersion: 2, tabs: 'not-an-array' })
+    const session = useSessionPersistence({ runRestoredTab })
+    const result = await session.initializeSession({ restore: true })
+    expect(result).toEqual({ ok: false, reason: 'invalid-session', schemaVersion: 2 })
+    await savedAfterChange(session, liveFind('f1'))
+    expect(setOpenTabs).not.toHaveBeenCalled()
+  })
+
+  it('disables autosave when the read fails', async () => {
+    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    getOpenTabs.mockRejectedValue(new Error('io error'))
+    const session = useSessionPersistence({ runRestoredTab })
+    const result = await session.initializeSession({ restore: true })
+    expect(result).toEqual({ ok: false, reason: 'read-failed' })
+    await savedAfterChange(session, liveFind('f1'))
+    expect(setOpenTabs).not.toHaveBeenCalled()
+  })
+})
+
+describe('stopAutoSave', () => {
+  it('cancels the watcher and any pending debounced save', async () => {
+    vi.useFakeTimers()
+    seedStore([liveFind('f1')], 'f1')
+    getOpenTabs.mockResolvedValue(null)
+    const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence({ runRestoredTab })
+    await initializeSession({ restore: true })
     autoSaves.push(startAutoSave())
-    tabs.value = [...tabs.value, findTab('f1')]
+    stopAutoSave()
+    tabs.value = [...tabs.value, liveFind('f2')]
     await nextTick()
     vi.advanceTimersByTime(400)
     expect(setOpenTabs).not.toHaveBeenCalled()

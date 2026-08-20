@@ -99,9 +99,8 @@ describe('restoreWorkspace', () => {
     expect(restoreWorkspace({ ...saved, id: 's', mode: 'sql', sql: 'SELECT 1' }).type).toBe('mongodb.sql_to_mql')
   })
 
-  it('returns null for records of non-persisted kinds', () => {
-    expect(restoreWorkspace({ id: 'x', kind: 'schema' })).toBe(null)
-    expect(restoreWorkspace({ id: 'x', kind: 'search' })).toBe(null)
+  it('returns null for records of unreadable kinds and null input', () => {
+    expect(restoreWorkspace({ id: 'x', kind: 'quickstart' })).toBe(null)
     expect(restoreWorkspace(null)).toBe(null)
   })
 

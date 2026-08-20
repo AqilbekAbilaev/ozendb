@@ -95,10 +95,9 @@ onMounted(async () => {
   // Restore persisted database/collection colour tags so they survive a restart.
   await loadNodeTags()
 
-  // Restore the previous session's tabs before wiring up the save watcher, so the
-  // empty default never overwrites tabs.json first. Skipped when the user turned
-  // session restore off (the save watcher below still keeps tabs.json current).
-  if (restoreSessionEnabled.value) await restoreSession()
+  // Load the saved session (always, so a legacy file is migrated and validated)
+  // and restore tabs only when the user opted in; wired before the save watcher.
+  await initializeSession({ restore: restoreSessionEnabled.value })
 
   // Save on any change to the open tabs or the active tab.
   startAutoSave()
@@ -108,6 +107,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  stopAutoSave()
   window.removeEventListener('keydown', onGlobalKeydown)
 });
 
@@ -286,7 +286,7 @@ function onTabContext({ id, x, y }) {
   contextMenu.value = { type: 'tab', x: x, y: y, nodeData: { tabId: id } }
 }
 
-const { restoreSession, startAutoSave } = useSessionPersistence({
+const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence({
   runRestoredTab: runRestoredTab,
 })
 

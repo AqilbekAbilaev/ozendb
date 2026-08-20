@@ -48,7 +48,9 @@ function editorState(workspace) {
 
 // Restore reconstructs the full spine from a projected saved record: the saved
 // editor fields come back verbatim, runtime state starts fresh, and the canonical
-// target is re-derived from the saved identity fields.
+// target is re-derived from the saved identity fields. The flat identity names
+// (connectionName/dbName/collectionName) ride along from the saved record — the
+// canonical target carries no names, and panes still read the flat fields.
 function restoreCollection(saved, defaults = {}) {
   const target = resourceFromFeatureNode(collectionTarget(saved))
   return {
@@ -56,6 +58,10 @@ function restoreCollection(saved, defaults = {}) {
     target,
     fields: {
       ...collectionFields({ target, defaults }),
+      connectionId: saved.connectionId,
+      connectionName: saved.connectionName ?? null,
+      dbName: saved.dbName ?? null,
+      collectionName: saved.collectionName ?? null,
       mode: saved.mode || 'find',
       ...editorState(saved),
     },
@@ -73,6 +79,11 @@ export const queryDefinitions = [
         target: resourceFromFeatureNode(collectionTarget(ctx.target)),
         fields: { ...collectionFields(ctx), mode: 'find', pipeline: '' },
       }
+    },
+    // Work 7: the durable editor state, projected from either a legacy record or a
+    // live tab. Runtime fields (results, selection, errors) are never serialized.
+    serialize(workspace) {
+      return editorState(workspace)
     },
     duplicate(workspace) {
       // Find is the only restored/duplicated query that re-runs automatically, so
@@ -101,6 +112,7 @@ export const queryDefinitions = [
         fields: { ...collectionFields(ctx), mode: 'aggregate', pipeline: '' },
       }
     },
+    serialize: editorState,
     duplicate(workspace) {
       // Clone the pipeline and editor state, reset runtime, and do not run.
       return {
@@ -127,6 +139,14 @@ export const queryDefinitions = [
           sql: 'SELECT *\nFROM ' + ctx.target.collectionName,
           sqlError: null,
         },
+      }
+    },
+    serialize(workspace) {
+      // SQL's translated find pieces are derived state, never stored; only the text
+      // and the display settings come back.
+      return {
+        sql: workspace.sql ?? '', readOnly: !!workspace.readOnly,
+        colOrder: workspace.colOrder ?? null,
       }
     },
     duplicate(workspace) {
@@ -184,6 +204,10 @@ export const queryDefinitions = [
           logs: [], scalar: undefined, hasScalar: false,
         },
       }
+    },
+    serialize(workspace) {
+      // The session is backend state keyed by id; only the editor text is durable.
+      return { code: workspace.code ?? '', scriptPath: workspace.scriptPath ?? null }
     },
     duplicate(workspace, ctx) {
       // Each shell tab owns its backend JS session, so a duplicate opens a fresh one;
