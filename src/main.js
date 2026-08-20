@@ -1,6 +1,10 @@
 import { createApp } from "vue";
 import "./assets/theme.css";
 import "./assets/dialogs.css";
+// Registered before the App.vue tree evaluates: the tab store's module-scope
+// Quickstart (stores/tabs.js) is created through its definition, so it must already
+// exist by the time any tab-shaped code runs.
+import { registerWorkspaceDefinitions } from "./workspaces/registerDefinitions";
 import App from "./App.vue";
 import { installErrorReporting, describeError } from "./utils/errorReport";
 
@@ -11,6 +15,8 @@ document.documentElement.dataset.theme = localStorage.getItem("s4t-theme") || "d
 
 // Installed before mount so an exception thrown during setup is still recorded.
 const report = installErrorReporting();
+
+registerWorkspaceDefinitions();
 
 const app = createApp(App);
 // Vue swallows errors thrown inside components (it logs and carries on), so they never

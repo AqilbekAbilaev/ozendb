@@ -1,15 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import {
+
+// The store's module-scope Quickstart is built through its workspace definition, so
+// definitions must be registered before this module evaluates. Static imports run
+// before this file's body, hence the dynamic import below.
+import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
+registerWorkspaceDefinitions()
+
+const {
   tabs, activeTabId, activeTab, pruneActiveTab, setRunRestoredTab,
   activateTab, cycleTab, closeTab, handleTabAction, newTabId,
-} from './tabs'
+} = await import('./tabs')
 
 // Closing a shell tab tears down its engine session; that call is the one side effect
 // in here worth asserting, so the driver is stubbed rather than the test avoiding it.
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
 }))
-import { invoke } from '@tauri-apps/api/core'
+const { invoke } = await import('@tauri-apps/api/core')
 
 // Pins the tab-mutation behaviour most at risk from a refactor: which tab becomes active
 // after a close, and the bulk closers staying correct while closeTab splices the array
@@ -25,6 +32,20 @@ function seed(ids, activeId) {
   activeTabId.value = activeId
 }
 const idsOf = () => tabs.value.map(t => t.id)
+
+// The store seeds itself with one Quickstart tab (Work 5): created through its
+// definition, not a hand-written literal. Asserted before any test reseeds the ref.
+describe('initial tab', () => {
+  it('is a Quickstart built through its definition with the stable t0 id', () => {
+    expect(tabs.value).toHaveLength(1)
+    const t = tabs.value[0]
+    expect(t.id).toBe('t0')
+    expect(t.kind).toBe('quickstart')
+    expect(t.title).toBe('Quickstart')
+    expect(t.type).toBe('app.quickstart')
+    expect(t.engine).toBe('app')
+  })
+})
 
 beforeEach(() => {
   vi.clearAllMocks()

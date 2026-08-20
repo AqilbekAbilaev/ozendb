@@ -2,9 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
-import { invoke } from '@tauri-apps/api/core'
-import { useQueryRunner } from './useQueryRunner'
-import { tabs } from '../stores/tabs'
+// The store's module-scope Quickstart is built through its workspace definition, so
+// definitions must be registered before the store evaluates. Static imports run
+// before this file's body, hence the dynamic import below.
+import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
+registerWorkspaceDefinitions()
+
+const { invoke } = await import('@tauri-apps/api/core')
+const { useQueryRunner } = await import('./useQueryRunner')
+const { tabs } = await import('../stores/tabs')
 
 // The timing on the toast is the server's, not this process's. Wall clock here also
 // pays for IPC and result marshalling, which grow with the page size and say nothing

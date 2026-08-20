@@ -40,3 +40,23 @@ export function workspaceComponentFor(tab) {
   }
   return WORKSPACE_COMPONENTS[tab.kind] || null
 }
+
+// Definition registry (Work 5). Populated once at startup by registerDefinitions();
+// a duplicate type throws, so a definition file can never silently shadow another.
+// Definitions are kept separate from components on purpose: registerDefinitions
+// aggregates them, and nothing here imports a definition file — that would make the
+// startup registration order depend on import order.
+const definitions = new Map()
+
+export function registerWorkspaceDefinition(def) {
+  if (definitions.has(def.type)) {
+    throw new Error(`Duplicate workspace type: ${def.type}`)
+  }
+  definitions.set(def.type, def)
+}
+
+export function getWorkspaceDefinition(type) {
+  const def = definitions.get(type)
+  if (!def) throw new Error(`Unknown workspace type: ${type}`)
+  return def
+}

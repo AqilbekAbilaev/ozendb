@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { closeShellSession } from '../engines/mongodb/api/shell'
+import { createWorkspace } from '../workspaces/createWorkspace'
 
 // The tab spine: the open workspace tabs, which one is active, and every mutation of
 // them (activate/close/cycle/duplicate/reorder/rename).
@@ -12,9 +13,13 @@ import { closeShellSession } from '../engines/mongodb/api/shell'
 // handed them as the `{ tabs, activeTabId }` params they already expect.
 //
 // The workspace always keeps at least one tab open; App.vue watches the length and
-// reopens Quickstart at zero, since the tab creators still live there.
+// reopens Quickstart at zero, since the tab creators still live there. The initial
+// tab is built through its definition (Work 5), with the stable 't0' id restored
+// through the factory's injected id source. main.js registers all definitions
+// before any module in the App.vue tree evaluates, so this call is always safe;
+// test files that import this store must register first (see their preambles).
 export const tabs = ref([
-  { id: 't0', kind: 'quickstart', title: 'Quickstart' }
+  createWorkspace('app.quickstart', { ids: { workspace: () => 't0' } }),
 ])
 export const activeTabId = ref('t0')
 

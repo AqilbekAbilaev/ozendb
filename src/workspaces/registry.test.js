@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { WORKSPACE_COMPONENTS, workspaceComponentFor } from './registry'
+import { WORKSPACE_COMPONENTS, workspaceComponentFor, registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
+import { registerWorkspaceDefinitions } from './registerDefinitions'
 
 describe('workspaceComponentFor', () => {
   it('resolves every current tab kind', () => {
@@ -53,5 +54,51 @@ describe('workspaceComponentFor', () => {
     // The async wrapper is a component definition, not the pane module itself.
     expect(typeof shell).toBe('object')
     expect(shell).toBe(WORKSPACE_COMPONENTS.shell)
+  })
+})
+
+// Once per file: the definitions map is module-scope, so registering in a hook would
+// throw on the second test.
+registerWorkspaceDefinitions()
+
+describe('workspace definition registry', () => {
+  it('registers every expected workspace type exactly once', () => {
+    const expected = [
+      'app.quickstart',
+      'mongodb.find',
+      'mongodb.aggregate',
+      'mongodb.sql_to_mql',
+      'mongodb.shell',
+      'mongodb.indexes',
+      'mongodb.schema',
+      'mongodb.search',
+      'mongodb.import',
+      'mongodb.export',
+      'mongodb.current_operations',
+    ]
+    for (const type of expected) {
+      expect(getWorkspaceDefinition(type).type).toBe(type)
+    }
+  })
+
+  it('keeps components statically resolvable through the definitions', () => {
+    expect(getWorkspaceDefinition('mongodb.find').component).toBe(WORKSPACE_COMPONENTS.collection)
+    expect(getWorkspaceDefinition('mongodb.shell').component).toBe(WORKSPACE_COMPONENTS.shell)
+    expect(getWorkspaceDefinition('app.quickstart').component).toBe(WORKSPACE_COMPONENTS.quickstart)
+  })
+
+  it('fails on duplicate registration in development and tests', () => {
+    registerWorkspaceDefinition({
+      type: 'test.once', engine: 'test', component: null,
+      create: () => ({ title: 'x', fields: {} }),
+    })
+    expect(() => registerWorkspaceDefinition({
+      type: 'test.once', engine: 'test', component: null,
+      create: () => ({ title: 'x', fields: {} }),
+    })).toThrow(/Duplicate workspace type: test\.once/)
+  })
+
+  it('fails clearly for an unknown type', () => {
+    expect(() => getWorkspaceDefinition('no.such.type')).toThrow(/Unknown workspace type: no\.such\.type/)
   })
 })
