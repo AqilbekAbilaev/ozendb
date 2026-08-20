@@ -9,6 +9,7 @@ registerWorkspaceDefinitions()
 const {
   tabs, activeTabId, activeTab, pruneActiveTab, setRunRestoredTab,
   activateTab, cycleTab, closeTab, closeWhere, duplicateTab, handleTabAction, newTabId,
+  initializeTabs,
 } = await import('./tabs')
 
 // Closing a shell tab tears down its engine session; that call is the one side effect
@@ -33,10 +34,12 @@ function seed(ids, activeId) {
 }
 const idsOf = () => tabs.value.map(t => t.id)
 
-// The store seeds itself with one Quickstart tab (Work 5): created through its
-// definition, not a hand-written literal. Asserted before any test reseeds the ref.
-describe('initial tab', () => {
-  it('is a Quickstart built through its definition with the stable t0 id', () => {
+// The store no longer seeds itself at module scope (see the ordering contract in
+// tabs.js): initializeTabs(), called by main.js after registration, establishes the
+// first tab. Asserted before any test reseeds the ref.
+describe('initializeTabs', () => {
+  it('creates a Quickstart through its definition with the stable t0 id', () => {
+    initializeTabs()
     expect(tabs.value).toHaveLength(1)
     const t = tabs.value[0]
     expect(t.id).toBe('t0')
@@ -44,6 +47,14 @@ describe('initial tab', () => {
     expect(t.title).toBe('Quickstart')
     expect(t.type).toBe('app.quickstart')
     expect(t.engine).toBe('app')
+    expect(activeTabId.value).toBe('t0')
+  })
+
+  it('is a no-op once already initialized', () => {
+    initializeTabs()
+    initializeTabs()
+    expect(tabs.value).toHaveLength(1)
+    expect(activeTabId.value).toBe('t0')
   })
 })
 

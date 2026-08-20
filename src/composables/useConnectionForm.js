@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { testConnection, testSshConnection, saveConnection, updateConnection } from '../engines/mongodb/api/connections'
+import { testConnection as testConnectionApi, testSshConnection, saveConnection, updateConnection } from '../engines/mongodb/api/connections'
 import { emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
@@ -304,7 +304,7 @@ export function useConnectionForm(editConn) {
           authMechanism: authMode.value,
         })
       } else {
-        await testConnection(isEditMode ? editConn.id : null, formFields())
+        await testConnectionApi(isEditMode ? editConn.id : null, formFields())
       }
       status.value = { type: 'success', message: 'Connected successfully.' }
     } catch (e) {

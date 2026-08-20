@@ -12,16 +12,28 @@ import { duplicateWorkspace, disposeWorkspace } from '../workspaces/lifecycle'
 // Exported as refs (not a reactive object) so consumers still awaiting migration can be
 // handed them as the `{ tabs, activeTabId }` params they already expect.
 //
-// The workspace always keeps at least one tab open; App.vue watches the length and
-// reopens Quickstart at zero, since the tab creators still live there. The initial
-// tab is built through its definition (Work 5), with the stable 't0' id restored
-// through the factory's injected id source. main.js registers all definitions
-// before any module in the App.vue tree evaluates, so this call is always safe;
-// test files that import this store must register first (see their preambles).
-export const tabs = ref([
-  createWorkspace('app.quickstart', { ids: { workspace: () => 't0' } }),
-])
-export const activeTabId = ref('t0')
+// No createWorkspace call happens at module scope: a cold import must not depend on
+// the workspace registry being populated, because main.js registers definitions in
+// its body — which runs only after every static import has evaluated. The initial
+// tab is instead created by initializeTabs(), called from main.js once registration
+// is done (see that function for the ordering contract). The workspace always keeps
+// at least one tab open; App.vue watches the length and reopens Quickstart at zero.
+export const tabs = ref([])
+export const activeTabId = ref(null)
+
+// Establishes the initial Quickstart tab through its definition (Work 5), with the
+// stable 't0' id supplied through the factory's injected id source. Idempotent; main.js
+// calls it once, after registerWorkspaceDefinitions() — that explicit order is what
+// makes the createWorkspace here safe. Test files that import this store must register
+// first (see their preambles) and may call initializeTabs for the seeded tab.
+let tabsInitialized = false
+export function initializeTabs() {
+  if (tabsInitialized) return
+  tabsInitialized = true
+  const tab = createWorkspace('app.quickstart', { ids: { workspace: () => 't0' } })
+  tabs.value.push(tab)
+  activeTabId.value = tab.id
+}
 
 // Every tab id comes from here. It used to be `'t' + Date.now()` at each creation site,
 // which collides whenever two tabs are created within the same millisecond — and a

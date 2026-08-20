@@ -38,9 +38,12 @@ export function useTabCreators({
     activeTabId.value = id
 
     // Follow Reference (and any caller supplying a filter) runs that filter immediately,
-    // bypassing the collection's saved default query.
+    // bypassing the collection's saved default query. The exact text is kept on the tab
+    // so the editor, query history, and persisted session agree with what ran; only the
+    // parsed EJSON goes to the query API.
     if (filter) {
       const pf = parseField(filter)
+      tab.filter = filter
       runQuery(id, {
         filter:     pf.ok ? pf.ejson : '{}',
         projection: '{}',

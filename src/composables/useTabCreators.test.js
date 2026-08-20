@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
-// Definitions must be registered before the tab store's module-scope Quickstart is
-// created (stores/tabs.js constructs it through createWorkspace). Static imports
-// evaluate before this module's body, so the store — and everything importing it —
-// is loaded dynamically after the one-time registration.
+// Definitions must be registered before the tab store can build its Quickstart tab
+// (stores/tabs.js creates it through createWorkspace, see initializeTabs). Static
+// imports evaluate before this module's body, so the store — and everything importing
+// it — is loaded dynamically after the one-time registration.
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 registerWorkspaceDefinitions()
 
@@ -208,6 +208,22 @@ describe('initial query execution', () => {
     expect(c.runQuery).toHaveBeenCalledTimes(1)
     expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
       filter: '{"status":"open"}', projection: '{}', sort: '{}', skip: 0, limit: 50,
+    })
+  })
+
+  it('keeps the supplied filter text on the tab so the editor, history, and session agree', async () => {
+    const c = harness()
+    const filter = '{ "status": "open" }'
+    await c.openCollectionTab({ ...COLLECTION, filter })
+    expect(lastTab().filter).toBe(filter) // exact text, not the parsed EJSON sent to the API
+  })
+
+  it('keeps invalid filter text visible while falling back to an empty query', async () => {
+    const c = harness()
+    await c.openCollectionTab({ ...COLLECTION, filter: 'not json' })
+    expect(lastTab().filter).toBe('not json')
+    expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
+      filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 50,
     })
   })
 

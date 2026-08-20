@@ -4,7 +4,7 @@ import {
   listFolders,
   createFolder,
   renameFolder,
-  deleteFolder,
+  deleteFolder as deleteFolderApi,
   moveConnectionToFolder,
 } from '../appApi/folders'
 import { errText } from '../utils/errors'
@@ -121,7 +121,7 @@ export function useConnectionFolders({ connections, selectedId, filterText, filt
   async function deleteFolder(folder) {
     if (!confirmDelete(folder.id)) return
     try {
-      await deleteFolder(folder.id)
+      await deleteFolderApi(folder.id)
       folders.value = folders.value.filter(item => item.id !== folder.id)
       connections.value = await listConnections()
     } catch (error) {

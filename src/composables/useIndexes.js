@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { collectionStats } from '../engines/mongodb/api/admin'
-import { createIndex, dropIndex, indexStats, listIndexes, setIndexHidden } from '../engines/mongodb/api/indexes'
+import { createIndex, dropIndex as dropIndexApi, indexStats, listIndexes, setIndexHidden as setIndexHiddenApi } from '../engines/mongodb/api/indexes'
 import { errText, errMessage } from '../utils/errors'
 import { isProtectedIndex, indexSpecJson } from '../utils/indexSpec'
 // NOTE: indexSpecJson is needed because copyIndex() calls it. App.vue ALSO keeps
@@ -145,7 +145,7 @@ export function useIndexes({ showToast }) {
     indexesError.value = null
     try {
       if (editing) {
-        await dropIndex(apiTarget(), indexEditOriginalName.value)
+        await dropIndexApi(apiTarget(), indexEditOriginalName.value)
       }
       await createIndex(apiTarget(), keys, options || '{}')
       closeIndexForm()
@@ -168,7 +168,7 @@ export function useIndexes({ showToast }) {
     if (!target) return
     indexesError.value = null
     try {
-      await dropIndex(apiTarget(), name)
+      await dropIndexApi(apiTarget(), name)
       pendingDropIndex.value = null
       await loadIndexes()
       showToast(`Index "${name}" dropped`)
@@ -267,7 +267,7 @@ export function useIndexes({ showToast }) {
     dropIndexBusy.value = true
     dropIndexError.value = null
     try {
-      await dropIndex(apiTarget(), drop.name)
+      await dropIndexApi(apiTarget(), drop.name)
       dropIndexTarget.value = null
       await loadIndexes()
       showToast(`Index "${drop.name}" dropped`)
@@ -290,7 +290,7 @@ export function useIndexes({ showToast }) {
     const name = idx.name
     indexesError.value = null
     try {
-      await setIndexHidden(apiTarget(), name, hidden)
+      await setIndexHiddenApi(apiTarget(), name, hidden)
       await loadIndexes()
       showToast(hidden ? `Index "${name}" hidden` : `Index "${name}" unhidden`)
     } catch (e) {

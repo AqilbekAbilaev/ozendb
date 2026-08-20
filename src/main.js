@@ -1,10 +1,12 @@
 import { createApp } from "vue";
 import "./assets/theme.css";
 import "./assets/dialogs.css";
-// Registered before the App.vue tree evaluates: the tab store's module-scope
-// Quickstart (stores/tabs.js) is created through its definition, so it must already
-// exist by the time any tab-shaped code runs.
+// Startup order is explicit: every static import (including App.vue's whole tree)
+// evaluates before this body runs, so any createWorkspace at module scope would hit
+// an empty registry. Definitions are registered first, the initial tab is created
+// second, and only then does Vue mount.
 import { registerWorkspaceDefinitions } from "./workspaces/registerDefinitions";
+import { initializeTabs } from "./stores/tabs";
 import App from "./App.vue";
 import { installErrorReporting, describeError } from "./utils/errorReport";
 
@@ -17,6 +19,7 @@ document.documentElement.dataset.theme = localStorage.getItem("s4t-theme") || "d
 const report = installErrorReporting();
 
 registerWorkspaceDefinitions();
+initializeTabs();
 
 const app = createApp(App);
 // Vue swallows errors thrown inside components (it logs and carries on), so they never

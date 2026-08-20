@@ -319,3 +319,47 @@ describe('saveAsNew', () => {
     expect((await renamed.saveAsNew()).conn.name).toBe('staging')
   })
 })
+
+// The composable's local `testConnection` used to shadow the imported API function
+// (same name, fewer arguments): the non-SSH path recursed into itself and never
+// reached the backend. These cases pin the API boundary through the real API module,
+// which in turn calls the mocked invoke.
+describe('testConnection', () => {
+  beforeEach(() => {
+    invoke.mockReset()
+    invoke.mockResolvedValue(true)
+  })
+
+  it('reaches the backend exactly once for a plain connection', async () => {
+    const f = useConnectionForm(null)
+    f.hosts.value = [{ host: 'localhost', port: 27017 }]
+
+    await f.testConnection()
+
+    expect(invoke).toHaveBeenCalledTimes(1)
+    expect(invoke).toHaveBeenCalledWith('test_connection', expect.anything())
+    expect(f.status.value).toEqual({ type: 'success', message: 'Connected successfully.' })
+  })
+
+  it('records an error status when the backend rejects', async () => {
+    const f = useConnectionForm(null)
+    invoke.mockRejectedValueOnce(new Error('boom'))
+
+    await f.testConnection()
+
+    expect(f.status.value.type).toBe('error')
+    expect(f.status.value.message).toContain('boom')
+  })
+
+  it('goes through the temporary tunnel when SSH is enabled', async () => {
+    const f = useConnectionForm(null)
+    f.useSsh.value = true
+    f.sshHost.value = 'bastion'
+
+    await f.testConnection()
+
+    expect(invoke).toHaveBeenCalledWith('test_ssh_connection', expect.anything())
+    expect(invoke).not.toHaveBeenCalledWith('test_connection', expect.anything())
+    expect(f.status.value.type).toBe('success')
+  })
+})

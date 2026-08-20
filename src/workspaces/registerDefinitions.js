@@ -1,7 +1,7 @@
 // Explicit, ordered registration of every workspace definition (Work 5E). No module
-// side effects: main.js calls this once, before Vue mounts, so the first
-// createWorkspace call — including the tab store's module-scope Quickstart — always
-// finds its definition. Importing this file pulls in no store module, so the
+// side effects: main.js calls this once, before Vue mounts and before the tab store's
+// initializeTabs() — the explicit ordering is what makes any later createWorkspace
+// find its definition. Importing this file pulls in no store module, so the
 // registration order cannot create an import cycle.
 import { registerWorkspaceDefinition } from './registry'
 import { appDefinitions } from './appDefinitions'

@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
-// The store's module-scope Quickstart is built through its workspace definition, so
-// definitions must be registered before the store evaluates. Static imports run
-// before this file's body, hence the dynamic import below.
+// The store may build a Quickstart tab through its workspace definition (see
+// initializeTabs in stores/tabs.js), so definitions are registered before the store
+// evaluates. Static imports run before this file's body, hence the dynamic import.
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 registerWorkspaceDefinitions()
 
