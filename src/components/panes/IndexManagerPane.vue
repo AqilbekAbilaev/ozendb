@@ -101,6 +101,14 @@ onUnmounted(() => {
   if (props.activeTab._idxApi) delete props.activeTab._idxApi
 })
 
+// A confirmed drop runs from the app-level modal against the frozen target (name +
+// collection); when it lands, the pane owning that collection reloads its own list.
+// The modal can outlive this pane instance, so the reload may happen on the pane the
+// user is looking at — which is the one whose table would otherwise go stale.
+watch(() => idx.indexesRevision.value, () => {
+  loadIndexes()
+})
+
 // --- toolbar enablement ---
 const hasSel      = computed(() => !!localSelectedIndex.value)
 const selProtected = computed(() => !!localSelectedIndex.value && isProtectedIndex(localSelectedIndex.value.name))
@@ -168,11 +176,17 @@ async function toggleHidden() {
   }
 }
 
-// Modal/menu actions: sync selection then delegate to shared composable
+// Modal/menu actions: sync selection, then delegate to the shared composable the ones
+// that are app-level modals (View Details, Drop Index, Copy); Edit opens this pane's
+// own dialog instead (the shared composable carries no form state).
 function handleStartEdit() {
   if (selProtected.value) { showToast('The _id index cannot be edited'); return }
+  // Edit opens the pane's own dialog (same form the Add button uses), seeded with the
+  // selected index — the shared composable carries no form state.
   idx.selectedIndex.value = localSelectedIndex.value
-  idx.startEditIndex()
+  localIndexFormMode.value = 'edit'
+  localIndexFormSeed.value = localSelectedIndex.value
+  localIndexFormOpen.value = true
 }
 
 function handleViewDetails() {

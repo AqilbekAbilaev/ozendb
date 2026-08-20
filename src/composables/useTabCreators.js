@@ -38,12 +38,13 @@ export function useTabCreators({
     activeTabId.value = id
 
     // Follow Reference (and any caller supplying a filter) runs that filter immediately,
-    // bypassing the collection's saved default query. The exact text is kept on the tab
-    // so the editor, query history, and persisted session agree with what ran; only the
-    // parsed EJSON goes to the query API.
+    // bypassing the collection's saved default query. When the filter parses, its exact
+    // text is kept on the tab so the editor, query history, and persisted session agree
+    // with what ran; only the parsed EJSON goes to the query API. Text that does not
+    // parse is not retained — an empty query is what runs, so an empty editor is honest.
     if (filter) {
       const pf = parseField(filter)
-      tab.filter = filter
+      if (pf.ok) tab.filter = filter
       runQuery(id, {
         filter:     pf.ok ? pf.ejson : '{}',
         projection: '{}',

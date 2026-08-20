@@ -218,10 +218,11 @@ describe('initial query execution', () => {
     expect(lastTab().filter).toBe(filter) // exact text, not the parsed EJSON sent to the API
   })
 
-  it('keeps invalid filter text visible while falling back to an empty query', async () => {
+  it('does not retain filter text that did not parse — an empty query is what ran', async () => {
     const c = harness()
     await c.openCollectionTab({ ...COLLECTION, filter: 'not json' })
-    expect(lastTab().filter).toBe('not json')
+    // Nothing was persisted for display/history/session to misread as the executed query.
+    expect(lastTab().filter).toBe('')
     expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
       filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 50,
     })

@@ -125,7 +125,9 @@ const { renameTabTarget, renameTabValue, confirmRenameTab } = ctx.tabRename
     <BaseModal v-if="dropIndexTarget" title="Drop Index" @close="dropIndexTarget = null">
         <div class="del-body">
           <p>This permanently drops the index
-            <code>{{ dropIndexTarget.name }}</code>. Queries that relied on it may slow down.
+            <code>{{ dropIndexTarget.name }}</code> from
+            <code>{{ dropIndexTarget.dbName }}.{{ dropIndexTarget.collName }}</code>.
+            Queries that relied on it may slow down.
             This cannot be undone.</p>
           <p class="cc-prompt">Type <code>{{ dropIndexTarget.name }}</code> to confirm:</p>
           <BaseInput
