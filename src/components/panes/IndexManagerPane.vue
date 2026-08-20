@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, inject, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, inject, watch, onUnmounted } from 'vue'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import IndexAddDialog from '../query/IndexAddDialog.vue'
@@ -10,6 +10,7 @@ import {
 } from '../../utils/indexSpec'
 import { errText, errMessage } from '../../utils/errors'
 import { fmtBytes } from '../../utils/format'
+import { useIndexPaneLifecycle } from '../../composables/useIndexPaneLifecycle'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 
 // Each Index Manager tab manages its own index list, selection, and metrics
@@ -38,35 +39,42 @@ const localIndexFormMode   = ref('create')
 const localIndexFormSeed   = ref(null)
 const localIndexCreating   = ref(false)
 const localExpanded        = ref({})
+const lifecycle = useIndexPaneLifecycle()
 
-async function loadIndexes() {
-  const t = props.activeTab
+async function loadIndexes(tab = props.activeTab) {
+  const request = lifecycle.beginLoad(tab)
   localIndexesLoading.value = true
   localIndexesError.value = null
   try {
-    localIndexesList.value = await listIndexes({ connectionId: t.connId, database: t.dbName, collection: t.collName })
+    const indexes = await listIndexes(request.target)
+    if (!lifecycle.isCurrentLoad(request, props.activeTab)) return
+    localIndexesList.value = indexes
   } catch (e) {
+    if (!lifecycle.isCurrentLoad(request, props.activeTab)) return
     localIndexesError.value = errText(e)
     localIndexesList.value = []
   } finally {
-    localIndexesLoading.value = false
+    if (lifecycle.isCurrentLoad(request, props.activeTab)) localIndexesLoading.value = false
   }
-  await loadIndexMetrics(t)
+  await loadIndexMetrics(request)
 }
 
-async function loadIndexMetrics(t) {
+async function loadIndexMetrics(request) {
   try {
-    const stats = await collectionStats({ connectionId: t.connId, database: t.dbName, collection: t.collName })
+    const stats = await collectionStats(request.target)
+    if (!lifecycle.isCurrentLoad(request, props.activeTab)) return
     const sizes = {}
     for (const entry of (stats.indexes || [])) sizes[entry.name] = entry.size
     localIndexSizes.value = sizes
     localIndexTotalSize.value = stats.total_index_size ?? null
   } catch (e) {
+    if (!lifecycle.isCurrentLoad(request, props.activeTab)) return
     localIndexSizes.value = {}
     localIndexTotalSize.value = null
   }
   try {
-    const stats = await indexStats({ connectionId: t.connId, database: t.dbName, collection: t.collName })
+    const stats = await indexStats(request.target)
+    if (!lifecycle.isCurrentLoad(request, props.activeTab)) return
     const usage = {}
     for (const entry of stats) {
       const ops = entry && entry.accesses && entry.accesses.ops
@@ -75,39 +83,11 @@ async function loadIndexMetrics(t) {
     localIndexUsage.value = usage
     localIndexUsageError.value = null
   } catch (e) {
+    if (!lifecycle.isCurrentLoad(request, props.activeTab)) return
     localIndexUsage.value = {}
     localIndexUsageError.value = errMessage(e)
   }
 }
-
-// Reload when the active tab changes to a different collection (Vue reuses the
-// component instance across index tabs since they share the same v-else-if branch).
-watch(() => props.activeTab.connId + ':' + props.activeTab.dbName + ':' + props.activeTab.collName, () => {
-  localIndexesList.value = []
-  localSelectedIndex.value = null
-  idx.selectedIndex.value = null
-  loadIndexes()
-  idx.indexesTarget.value = {
-    connId: props.activeTab.connId,
-    dbName: props.activeTab.dbName,
-    collName: props.activeTab.collName,
-  }
-}, { immediate: true })
-onUnmounted(() => {
-  localIndexesList.value = []
-  localSelectedIndex.value = null
-  idx.selectedIndex.value = null
-  idx.indexesTarget.value = null
-  if (props.activeTab._idxApi) delete props.activeTab._idxApi
-})
-
-// A confirmed drop runs from the app-level modal against the frozen target (name +
-// collection); when it lands, the pane owning that collection reloads its own list.
-// The modal can outlive this pane instance, so the reload may happen on the pane the
-// user is looking at — which is the one whose table would otherwise go stale.
-watch(() => idx.indexesRevision.value, () => {
-  loadIndexes()
-})
 
 // --- toolbar enablement ---
 const hasSel      = computed(() => !!localSelectedIndex.value)
@@ -126,29 +106,39 @@ function selectRow(index) {
 // one modal can be open at a time.
 
 async function submitIndex({ keys, options }) {
-  const t = props.activeTab
   if (!keys || !keys.trim()) return
+  const submission = lifecycle.beginFormSubmit()
+  if (!submission) return
+  const target = submission.target
   const editing = localIndexFormMode.value === 'edit'
   localIndexCreating.value = true
   localIndexesError.value = null
   try {
     if (editing) {
-      await dropIndex({ connectionId: t.connId, database: t.dbName, collection: t.collName }, localIndexFormSeed.value?.name)
+      await dropIndex(target, localIndexFormSeed.value?.name)
     }
-    await createIndex({ connectionId: t.connId, database: t.dbName, collection: t.collName }, keys, options || '{}')
-    localIndexFormOpen.value = false
-    localIndexFormMode.value = 'create'
-    localIndexFormSeed.value = null
-    await loadIndexes()
+    await createIndex(target, keys, options || '{}')
+    if (lifecycle.isCurrentFormSubmit(submission, props.activeTab)) {
+      closeIndexForm()
+    }
+    if (lifecycle.isTargetActive(target, props.activeTab)) await loadIndexes(props.activeTab)
     showToast(editing ? 'Index updated' : 'Index created')
   } catch (e) {
-    localIndexesError.value = errText(e)
+    const message = errText(e)
+    if (lifecycle.isCurrentFormSubmit(submission, props.activeTab)) {
+      localIndexesError.value = message
+    } else {
+      showToast(`${editing ? 'Index update' : 'Index creation'} failed: ${message}`)
+    }
   } finally {
-    localIndexCreating.value = false
+    if (lifecycle.isCurrentFormSubmit(submission, props.activeTab)) {
+      localIndexCreating.value = false
+    }
   }
 }
 
 function openCreateIndex(seed) {
+  lifecycle.captureFormTarget(props.activeTab)
   localIndexFormMode.value = 'create'
   localIndexFormSeed.value = seed || null
   localIndexFormOpen.value = true
@@ -156,23 +146,30 @@ function openCreateIndex(seed) {
 
 function closeIndexForm() {
   localIndexFormOpen.value = false
+  localIndexCreating.value = false
   localIndexesError.value = null
   localIndexFormMode.value = 'create'
   localIndexFormSeed.value = null
+  lifecycle.clearFormTarget()
 }
 
 async function toggleHidden() {
   const it = localSelectedIndex.value
   if (!it) return
-  const t = props.activeTab
+  const target = lifecycle.targetForTab(props.activeTab)
   const hidden = !isIndexHidden(it)
   localIndexesError.value = null
   try {
-    await setIndexHidden({ connectionId: t.connId, database: t.dbName, collection: t.collName }, it.name, hidden)
-    await loadIndexes()
+    await setIndexHidden(target, it.name, hidden)
+    if (lifecycle.isTargetActive(target, props.activeTab)) await loadIndexes(props.activeTab)
     showToast(hidden ? `Index "${it.name}" hidden` : `Index "${it.name}" unhidden`)
   } catch (e) {
-    localIndexesError.value = errText(e)
+    const message = errText(e)
+    if (lifecycle.isTargetActive(target, props.activeTab)) {
+      localIndexesError.value = message
+    } else {
+      showToast(`Index ${hidden ? 'hide' : 'unhide'} failed: ${message}`)
+    }
   }
 }
 
@@ -183,6 +180,7 @@ function handleStartEdit() {
   if (selProtected.value) { showToast('The _id index cannot be edited'); return }
   // Edit opens the pane's own dialog (same form the Add button uses), seeded with the
   // selected index — the shared composable carries no form state.
+  lifecycle.captureFormTarget(props.activeTab)
   idx.selectedIndex.value = localSelectedIndex.value
   localIndexFormMode.value = 'edit'
   localIndexFormSeed.value = localSelectedIndex.value
@@ -214,7 +212,44 @@ const menuApi = {
   openDropIndexConfirm: handleDropIndex,
   setIndexHidden: toggleHidden,
 }
-props.activeTab._idxApi = menuApi
+
+// Vue reuses this pane while switching directly between Index Manager tabs. Move the
+// native-menu API with the active workspace, reset local UI state, and invalidate any
+// async response started by the previous workspace before loading the new target.
+watch(() => props.activeTab, (tab) => {
+  lifecycle.attachMenuApi(tab, menuApi)
+  localIndexesList.value = []
+  localIndexesError.value = null
+  localSelectedIndex.value = null
+  localIndexSizes.value = {}
+  localIndexUsage.value = {}
+  localIndexUsageError.value = null
+  localIndexTotalSize.value = null
+  localExpanded.value = {}
+  closeIndexForm()
+  idx.selectedIndex.value = null
+  idx.indexesTarget.value = {
+    connId: tab.connId,
+    dbName: tab.dbName,
+    collName: tab.collName,
+  }
+  loadIndexes(tab)
+}, { immediate: true })
+
+onUnmounted(() => {
+  lifecycle.detachMenuApi(menuApi)
+  localIndexesList.value = []
+  localSelectedIndex.value = null
+  idx.selectedIndex.value = null
+  idx.indexesTarget.value = null
+})
+
+// A confirmed drop runs from the app-level modal against a frozen target. Reload the
+// active workspace; request generations prevent an older response from overwriting a
+// workspace selected while this refresh is in flight.
+watch(() => idx.indexesRevision.value, () => {
+  loadIndexes(props.activeTab)
+})
 
 // Paste: create an index from a JSON spec on the clipboard
 async function pasteIndex() {
