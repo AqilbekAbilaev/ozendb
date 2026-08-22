@@ -161,6 +161,18 @@ describe('v2 sessions', () => {
     expect(result.session.tabs.map((t) => t.id)).toEqual(['w-find', 'w-export'])
   })
 
+  it('prunes v2 records for connections that no longer exist', () => {
+    const result = migrateSession(sessions.validV2, { connections: new Set(['c2']) })
+
+    expect(result.ok).toBe(true)
+    expect(result.session.tabs).toEqual([])
+    expect(result.session.activeTabId).toBe(null)
+    expect(result.warnings).toEqual(sessions.validV2.tabs.map(tab => ({
+      id: tab.id,
+      message: expect.stringContaining('connection no longer exists: c1'),
+    })))
+  })
+
   it('fails the whole session on an unknown workspace type', () => {
     const result = migrateSession(sessions.v2UnknownType)
     expect(result).toEqual({ ok: false, reason: 'unknown-workspace-type', schemaVersion: 2 })

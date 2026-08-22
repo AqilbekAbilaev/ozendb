@@ -27,6 +27,10 @@ export function isIndexHidden(index) {
   return !!(index && index.hidden)
 }
 
+export function requestedIndexHidden(index, requested) {
+  return requested === undefined ? !isIndexHidden(index) : requested
+}
+
 // The index's "Type" as shown in the Index Manager (mirrors Studio-3T's column):
 // Text / Geospatial / Hashed derived from the special values in the key spec, else
 // "Regular". A compound plain index is still "Regular".

@@ -7,6 +7,7 @@ import { createIndex, dropIndex, indexStats, listIndexes, setIndexHidden } from 
 import { collectionStats } from '../../engines/mongodb/api/admin'
 import {
   isProtectedIndex, isIndexHidden, indexKeyLabel, indexType, indexProperties,
+  requestedIndexHidden,
 } from '../../utils/indexSpec'
 import { errText, errMessage } from '../../utils/errors'
 import { fmtBytes } from '../../utils/format'
@@ -153,11 +154,11 @@ function closeIndexForm() {
   lifecycle.clearFormTarget()
 }
 
-async function toggleHidden() {
+async function toggleHidden(requested) {
   const it = localSelectedIndex.value
   if (!it) return
   const target = lifecycle.targetForTab(props.activeTab)
-  const hidden = !isIndexHidden(it)
+  const hidden = requestedIndexHidden(it, requested)
   localIndexesError.value = null
   try {
     await setIndexHidden(target, it.name, hidden)

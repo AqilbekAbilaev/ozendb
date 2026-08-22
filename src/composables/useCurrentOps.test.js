@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
-import { ref, reactive } from 'vue'
+import { ref, reactive, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useCurrentOps, opsDefaults } from './useCurrentOps'
 
@@ -43,6 +43,18 @@ describe('toolbar settings', () => {
 
     active.value = newTab({ id: 't2', retention: 30_000 })
     expect(retention.value).toBe(30_000)
+  })
+
+  it('does not treat a tab switch as a server-filter change', async () => {
+    const a = newTab({ id: 'a', ownOnly: false, ops: [{ opid: 1 }] })
+    const b = newTab({ id: 'b', ownOnly: true, ops: [{ opid: 2 }] })
+    const active = ref(a)
+    useCurrentOps(() => active.value)
+
+    active.value = b
+    await nextTick()
+
+    expect(b.ops).toEqual([{ opid: 2 }])
   })
 
   it('asks the server for the ops the filters imply', async () => {
@@ -123,5 +135,95 @@ describe('two tabs at once', () => {
 
     a.slowOnly = true
     expect(b.slowOnly).toBe(false)
+  })
+
+  it('keeps overlapping responses on the tabs that requested them', async () => {
+    const a = newTab({ id: 'a', connId: 'c1', frequency: 0, retention: 0 })
+    const b = newTab({ id: 'b', connId: 'c2', frequency: 0, retention: 0 })
+    const active = ref(a)
+    let resolveA
+    const replyA = new Promise(resolve => { resolveA = resolve })
+    invoke
+      .mockImplementationOnce(() => replyA)
+      .mockResolvedValueOnce({ inprog: [{ opid: 2, connectionId: 2, ns: 'b.items' }] })
+    const ops = useCurrentOps(() => active.value)
+
+    const loadA = ops.load()
+    expect(a._opsLoading).toBe(true)
+    active.value = b
+    const loadB = ops.load()
+    await loadB
+    expect(b._opsLoading).toBe(false)
+    expect(a._opsLoading).toBe(true)
+    resolveA({ inprog: [{ opid: 1, connectionId: 1, ns: 'a.items' }] })
+    await loadA
+
+    expect(a.ops.map(op => op.opid)).toEqual([1])
+    expect(b.ops.map(op => op.opid)).toEqual([2])
+    expect(a._opsLoading).toBe(false)
+    expect(invoke).toHaveBeenCalledWith('current_ops', { id: 'c1', ownOnly: false, all: false })
+    expect(invoke).toHaveBeenCalledWith('current_ops', { id: 'c2', ownOnly: false, all: false })
+  })
+
+  it('reloads with new server filters when they change during a request', async () => {
+    const tab = newTab({ frequency: 0, retention: 0 })
+    let resolveInitial
+    invoke
+      .mockImplementationOnce(() => new Promise(resolve => { resolveInitial = resolve }))
+      .mockResolvedValueOnce({ inprog: [{ opid: 2, connectionId: 2, ns: 'db.own' }] })
+    const ops = useCurrentOps(() => tab)
+
+    const initial = ops.load()
+    ops.ownOnly.value = true
+    await nextTick()
+    resolveInitial({ inprog: [{ opid: 1, connectionId: 1, ns: 'db.other' }] })
+    await initial
+    await vi.waitFor(() => expect(tab.ops.map(op => op.opid)).toEqual([2]))
+
+    expect(invoke).toHaveBeenNthCalledWith(1, 'current_ops', { id: 'c1', ownOnly: false, all: false })
+    expect(invoke).toHaveBeenNthCalledWith(2, 'current_ops', { id: 'c1', ownOnly: true, all: false })
+  })
+
+  it('refreshes the initiating server after a delayed kill', async () => {
+    const a = newTab({ id: 'a', connId: 'c1', frequency: 0 })
+    const b = newTab({ id: 'b', connId: 'c2', frequency: 0 })
+    const active = ref(a)
+    let resolveKill
+    invoke.mockImplementation((command) => {
+      if (command === 'kill_op') return new Promise(resolve => { resolveKill = resolve })
+      return Promise.resolve({ inprog: [] })
+    })
+    const ops = useCurrentOps(() => active.value)
+
+    const killing = ops.kill(7)
+    active.value = b
+    await vi.waitFor(() => expect(resolveKill).toBeTypeOf('function'))
+    resolveKill()
+    await killing
+
+    expect(invoke).toHaveBeenCalledWith('kill_op', { id: 'c1', opid: 7 })
+    expect(invoke).toHaveBeenCalledWith('current_ops', { id: 'c1', ownOnly: false, all: false })
+  })
+
+  it('refreshes again when a pre-kill load was already in flight', async () => {
+    const tab = newTab({ frequency: 0, retention: 0 })
+    let resolveInitial
+    invoke.mockImplementation((command) => {
+      if (command === 'kill_op') return Promise.resolve()
+      if (!resolveInitial) {
+        return new Promise(resolve => { resolveInitial = resolve })
+      }
+      return Promise.resolve({ inprog: [] })
+    })
+    const ops = useCurrentOps(() => tab)
+
+    const initial = ops.load()
+    const killing = ops.kill(7)
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('kill_op', { id: 'c1', opid: 7 }))
+    resolveInitial({ inprog: [{ opid: 7, connectionId: 1, ns: 'db.items' }] })
+    await Promise.all([initial, killing])
+
+    expect(invoke.mock.calls.filter(([command]) => command === 'current_ops')).toHaveLength(2)
+    expect(tab.ops).toEqual([])
   })
 })

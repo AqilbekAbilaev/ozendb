@@ -351,7 +351,8 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     }
     pasteConfirm.value = {
       text: text,
-      id: tab.connectionId,
+      workspace: tab,
+      connectionId: tab.connectionId,
       database: tab.dbName,
       collection: tab.collectionName,
     }
@@ -366,9 +367,14 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     // leave a large paste running with nothing on screen to say so.
     pasteBusy.value = true
     try {
-      const count = await insertDocuments(target, target.text)
+      const collectionTarget = {
+        connectionId: target.connectionId,
+        database: target.database,
+        collection: target.collection,
+      }
+      const count = await insertDocuments(collectionTarget, target.text)
       showToast(`Pasted ${count} document${count !== 1 ? 's' : ''}`)
-      requery(true)
+      requery(true, target.workspace)
     } catch (e) {
       showToast(errText(e))
     } finally {

@@ -172,7 +172,7 @@ const {
   docMenuRequest: () => props.docMenuRequest,
   viewMode: viewMode,
   showToast: showToast,
-  requery: (history) => emit('requery', history),
+  requery: (history, tab) => emit('requery', history, tab),
 })
 
 // Cap the paste preview. A few hundred copied documents is a megabyte of text, and

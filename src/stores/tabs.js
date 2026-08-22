@@ -85,7 +85,7 @@ export function cycleTab(delta) {
   activateTab(tabs.value[next].id)
 }
 
-export function closeTab(id) {
+export function closeTab(id, activateFallback = true) {
   const idx = tabs.value.findIndex(t => t.id === id)
   if (idx < 0) return
   const closing = tabs.value[idx]
@@ -95,32 +95,48 @@ export function closeTab(id) {
   tabs.value.splice(idx, 1)
   // If we closed the active tab, move to an adjacent one (the nearest preceding
   // tab, else the new first tab).
-  if (activeTabId.value === id) {
+  if (activateFallback && activeTabId.value === id) {
     const next = tabs.value[idx - 1] || tabs.value[0]
-    activeTabId.value = next ? next.id : null
+    if (next) activateTab(next.id)
+    else activeTabId.value = null
   }
+}
+
+function closeTabs(ids) {
+  const victims = new Set(ids)
+  const original = [...tabs.value]
+  const activeIndex = original.findIndex(t => t.id === activeTabId.value)
+  const activeClosing = activeIndex >= 0 && victims.has(activeTabId.value)
+
+  for (const id of victims) closeTab(id, false)
+  if (!activeClosing) return
+
+  const previous = original.slice(0, activeIndex).reverse().find(t => !victims.has(t.id))
+  const next = previous || original.find(t => !victims.has(t.id))
+  if (next) activateTab(next.id)
+  else activeTabId.value = null
 }
 
 // Close every tab matching the predicate (disconnect/drop paths). The filtered
 // snapshot hands back ids, so closeTab's splicing can't shift the iteration out
 // from under the caller's live array.
 export function closeWhere(predicate) {
-  tabs.value.filter(t => predicate(t)).map(t => t.id).forEach(closeTab)
+  closeTabs(tabs.value.filter(t => predicate(t)).map(t => t.id))
 }
 
 // filter/slice below hand back a fresh array, so closeTab's splicing can't shift the
 // iteration out from under these.
 export function closeTabsExcept(tabId) {
-  tabs.value.filter(t => t.id !== tabId).map(t => t.id).forEach(closeTab)
+  closeTabs(tabs.value.filter(t => t.id !== tabId).map(t => t.id))
 }
 export function closeTabsToSide(tabId, side) {
   const idx = tabs.value.findIndex(t => t.id === tabId)
   if (idx < 0) return
   const victims = side === 'left' ? tabs.value.slice(0, idx) : tabs.value.slice(idx + 1)
-  victims.map(t => t.id).forEach(closeTab)
+  closeTabs(victims.map(t => t.id))
 }
 export function closeAllTabs() {
-  tabs.value.map(t => t.id).forEach(closeTab)
+  closeTabs(tabs.value.map(t => t.id))
 }
 export function moveTabToFront(tabId) {
   const idx = tabs.value.findIndex(t => t.id === tabId)

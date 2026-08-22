@@ -3,6 +3,7 @@ import { ref, watch, nextTick } from 'vue'
 import { getQueryHistory, clearQueryHistory, setDefaultQuery, clearDefaultQuery, saveQuery } from '../../engines/mongodb/api/queryLibrary'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
+import { setCollectionQueryMode } from '../../utils/queryMode'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
@@ -35,7 +36,7 @@ const historyEntries  = ref([])
 const historyLoading  = ref(false)
 
 function setMode(mode) {
-  props.activeTab.mode = mode
+  setCollectionQueryMode(props.activeTab, mode)
 }
 
 // Sort spinner next to the Sort field: sets a one-key `_id` sort and runs.
@@ -84,10 +85,10 @@ async function applyHistoryEntry(entry) {
   const tab = props.activeTab
   if (!tab) return
   if (entry.mode === 'aggregate') {
-    tab.mode     = 'aggregate'
+    setCollectionQueryMode(tab, 'aggregate')
     tab.pipeline = entry.pipeline
   } else {
-    tab.mode       = 'find'
+    setCollectionQueryMode(tab, 'find')
     tab.filter     = entry.filter
     tab.sort       = entry.sort
     tab.projection = entry.projection

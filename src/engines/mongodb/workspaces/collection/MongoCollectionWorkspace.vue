@@ -15,6 +15,7 @@ import ResultsPanel from '../../../../components/results/ResultsPanel.vue'
 import QueryBrowserModal from '../../../../components/query/QueryBrowserModal.vue'
 import CollectionCrumbs from '../../../../components/base/CollectionCrumbs.vue'
 import { parseField, parsePipeline } from '../../../../utils/queryParser'
+import { setCollectionQueryMode } from '../../../../utils/queryMode'
 
 const props = defineProps({
   activeTab:        { type: Object, required: true },
@@ -139,11 +140,14 @@ function runAggregate() {
   if (props.resultTab === 'Explain') runExplain()
 }
 
-function runQuery(addToHistory = true) {
-  const tab = activeTab.value
+function runQuery(addToHistory = true, tab = activeTab.value) {
   if (!tab || tab.kind !== 'collection') return
   expandIdFilter(tab)
-  const parsed = parsedQuery.value
+  const parsed = {
+    filter: parseField(tab.filter),
+    projection: parseField(tab.projection),
+    sort: parseField(tab.sort),
+  }
   if (!parsed || !parsed.filter.ok || !parsed.projection.ok || !parsed.sort.ok) return
   emit('run-query', tab.id, {
     filter:        parsed.filter.ejson,
@@ -154,7 +158,7 @@ function runQuery(addToHistory = true) {
     addToHistory:  addToHistory,
   })
   // Keep the Explain plan in sync when it's the visible sub-tab.
-  if (props.resultTab === 'Explain') runExplain()
+  if (tab.id === activeTab.value?.id && props.resultTab === 'Explain') runExplain()
 }
 
 // Switch result sub-tab; the Explain plan is fetched lazily the first time it's
@@ -273,10 +277,10 @@ async function applyFromBrowser(entry) {
   const tab = activeTab.value
   if (!tab) return
   if (entry.mode === 'aggregate') {
-    tab.mode     = 'aggregate'
+    setCollectionQueryMode(tab, 'aggregate')
     tab.pipeline = entry.pipeline
   } else {
-    tab.mode       = 'find'
+    setCollectionQueryMode(tab, 'find')
     tab.filter     = entry.filter
     tab.sort       = entry.sort
     tab.projection = entry.projection

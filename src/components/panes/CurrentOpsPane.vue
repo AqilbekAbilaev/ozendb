@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { listDatabases } from '../../engines/mongodb/api/resources'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -71,7 +71,7 @@ const emptyLabel = computed(() =>
 
 // Namespace pickers. The database list is loaded once; an empty value is the "all" sentinel.
 const ALL = ''
-const databases = ref([])
+const databases = computed(() => props.activeTab._opsDatabases || [])
 const dbOptions = computed(() => [
   { value: ALL, label: 'All databases' },
   ...databases.value.map(d => ({ value: d.name, label: d.name })),
@@ -84,15 +84,17 @@ const collOptions = computed(() => {
   ]
 })
 // Reloaded when the pane moves to a tab on another server, for the same reason.
-watch(() => props.activeTab.connId, async (connId) => {
+watch(() => props.activeTab, async (tab) => {
   try {
-    databases.value = await listDatabases(connId)
+    tab._opsDatabases = await listDatabases(tab.connId)
   } catch (_) {
     // The pickers stay on "all" — a missing database list must not stop the ops view.
   }
 }, { immediate: true })
 // Switching database invalidates the chosen collection.
-watch(dbName, () => { collName.value = ALL })
+watch(() => [props.activeTab.id, props.activeTab.dbName], (current, previous) => {
+  if (previous && current[0] === previous[0]) collName.value = ALL
+})
 
 const selected = computed(() => visible.value.find(r => r.opid === selectedOpid.value) || null)
 // Killing is only meaningful for an operation that is actually running now.

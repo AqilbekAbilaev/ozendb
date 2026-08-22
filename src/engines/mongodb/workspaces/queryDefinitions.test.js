@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { queryDefinitions } from './queryDefinitions'
+import { setCollectionQueryMode } from '../../../utils/queryMode'
 import { isResourceRef } from '../../../utils/resourceRef'
 import { duplicateWorkspace, restoreWorkspace, disposeWorkspace } from '../../../workspaces/lifecycle'
 import { registerWorkspaceDefinitions } from '../../../workspaces/registerDefinitions'
@@ -167,11 +168,27 @@ const SOURCE = {
   connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
   mode: 'find', filter: '{ "a": 1 }', projection: '{ "a": 1 }', sort: '{ "a": -1 }',
   skip: 2, limit: 25, pipeline: '[{ "$match": {} }]', vqb: { rows: [1] }, colOrder: { a: 0 },
+  resultView: 'tree',
   results: [{ x: 1 }], hasRun: true, isRunning: true, runError: 'boom',
   selectedRow: 0, selectedRows: [0], elapsedMs: 12,
 }
 
 describe('lifecycle — duplicate', () => {
+  it('duplicates using the query mode selected after creation', () => {
+    const fromFind = { ...SOURCE }
+    setCollectionQueryMode(fromFind, 'aggregate')
+    const aggregate = duplicateWorkspace(fromFind)
+    expect(fromFind.type).toBe('mongodb.aggregate')
+    expect(aggregate.type).toBe('mongodb.aggregate')
+    expect(aggregate.mode).toBe('aggregate')
+
+    setCollectionQueryMode(aggregate, 'find')
+    const find = duplicateWorkspace(aggregate)
+    expect(aggregate.type).toBe('mongodb.find')
+    expect(find.type).toBe('mongodb.find')
+    expect(find.mode).toBe('find')
+  })
+
   it('preserves query text exactly and resets runtime', () => {
     const dup = duplicateWorkspace(SOURCE)
     expect(dup.filter).toBe('{ "a": 1 }')
@@ -180,6 +197,7 @@ describe('lifecycle — duplicate', () => {
     expect(dup.skip).toBe(2)
     expect(dup.limit).toBe(25)
     expect(dup.mode).toBe('find')
+    expect(dup.resultView).toBe('tree')
     expect(dup.results).toEqual([])
     expect(dup.hasRun).toBe(false)
     expect(dup.isRunning).toBe(false)
@@ -251,6 +269,7 @@ describe('lifecycle — restore', () => {
     connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     filter: '{ "a": 1 }', sort: '{ "a": -1 }', projection: '{ "a": 1 }',
     skip: 2, limit: 25, mode: 'find', pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 },
+    resultView: 'json',
   }
 
   it('find restores editor state with fresh runtime and the one-shot marker', () => {
@@ -259,6 +278,7 @@ describe('lifecycle — restore', () => {
     expect(tab.sort).toBe('{ "a": -1 }')
     expect(tab.skip).toBe(2)
     expect(tab.limit).toBe(25)
+    expect(tab.resultView).toBe('json')
     expect(tab._restored).toBe(true)
     expect(tab.results).toEqual([])
     expect(tab.hasRun).toBe(false)

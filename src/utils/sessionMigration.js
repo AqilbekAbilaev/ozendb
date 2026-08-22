@@ -85,7 +85,7 @@ function migrateLegacyRecord(record, connections, warnings) {
 // Validate a v2 session. Canonical by contract, so any record that is not: unknown
 // type fails the whole file (never partially restore), and a malformed record fails
 // it too (never let a broken file quietly lose the tabs after it).
-function validateV2(raw) {
+function validateV2(raw, connections, warnings) {
   const out = []
   for (const r of raw.tabs) {
     if (!isPlainObject(r) || !isValidId(r.id)) return null
@@ -93,6 +93,10 @@ function validateV2(raw) {
     const def = getWorkspaceDefinition(r.type)
     if (def.engine !== 'app' && !isValidTarget(r.target)) return null
     if (!isPlainObject(r.state)) return null
+    if (r.target && connections && !connections.has(r.target.connectionId)) {
+      warnings.push({ id: r.id, message: `connection no longer exists: ${r.target.connectionId}` })
+      continue
+    }
     out.push({
       id: r.id,
       type: r.type,
@@ -152,10 +156,11 @@ export function migrateSession(raw, { connections = null } = {}) {
       .filter(Boolean)
     return okResult(buildSession(records, raw.activeTabId), 1, true, warnings, raw)
   }
-  const validated = validateV2(raw)
+  const warnings = []
+  const validated = validateV2(raw, connections, warnings)
   if (validated === null) return { ok: false, reason: 'invalid-session', schemaVersion: 2 }
   if (validated.reason) return { ok: false, reason: validated.reason, schemaVersion: 2 }
-  return okResult(buildSession(validated.tabs, raw.activeTabId), 2, false, [], raw)
+  return okResult(buildSession(validated.tabs, raw.activeTabId), 2, false, warnings, raw)
 }
 
 // Per-type legacy key conventions for the restore bridge: collection/shell records

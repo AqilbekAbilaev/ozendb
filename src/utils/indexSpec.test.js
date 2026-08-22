@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { isProtectedIndex, indexKeyLabel, indexSpecJson, isIndexHidden, indexType, indexProperties } from './indexSpec'
+import {
+  isProtectedIndex, indexKeyLabel, indexSpecJson, isIndexHidden, indexType,
+  indexProperties, requestedIndexHidden,
+} from './indexSpec'
 
 describe('isProtectedIndex', () => {
   it('protects only the _id_ index', () => {
@@ -46,6 +49,15 @@ describe('isIndexHidden', () => {
     expect(isIndexHidden({ name: 'a', hidden: false })).toBe(false)
     expect(isIndexHidden({ name: 'a' })).toBe(false)
     expect(isIndexHidden(null)).toBe(false)
+  })
+})
+
+describe('requestedIndexHidden', () => {
+  it('honors an explicit menu state and toggles when none is supplied', () => {
+    expect(requestedIndexHidden({ hidden: true }, true)).toBe(true)
+    expect(requestedIndexHidden({ hidden: false }, false)).toBe(false)
+    expect(requestedIndexHidden({ hidden: true })).toBe(false)
+    expect(requestedIndexHidden({ hidden: false })).toBe(true)
   })
 })
 

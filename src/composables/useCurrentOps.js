@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { currentOps, killOp } from '../engines/mongodb/api/admin'
 import { errText, errCode } from '../utils/errors'
 import { normalizeOps, mergeRetained, filterOps } from '../utils/currentOps'
@@ -69,10 +69,10 @@ export function useCurrentOps(tab) {
     set: (value) => { tab()[key] = value },
   })
   const rows = setting('ops')
-  const error = ref(null)
-  const errorCode = ref(null)
-  const loading = ref(false)
-  const updatedAt = ref(null)
+  const error = setting('_opsError')
+  const errorCode = setting('_opsErrorCode')
+  const loading = setting('_opsLoading')
+  const updatedAt = setting('_opsUpdatedAt')
 
   const frequency = setting('frequency')
   const retention = setting('retention')
@@ -87,41 +87,61 @@ export function useCurrentOps(tab) {
   const collName = setting('collName')
   const view = setting('view')
 
-  // One request at a time: a server slower than the poll rate would otherwise stack up
-  // requests it can't answer.
-  let inFlight = false
-
-  async function load() {
-    if (inFlight) return
-    inFlight = true
-    loading.value = rows.value.length === 0
-    try {
-      const reply = await currentOps(tab().connId, { ownOnly: ownOnly.value, all: showSys.value })
-      rows.value = mergeRetained(rows.value, normalizeOps(reply), retention.value, Date.now())
-      updatedAt.value = Date.now()
-      error.value = null
-      errorCode.value = null
-    } catch (e) {
-      // Keep showing the last good list — a blink of blank table on one failed poll
-      // hides more than the error message tells.
-      error.value = errText(e)
-      errorCode.value = errCode(e)
-    } finally {
-      loading.value = false
-      inFlight = false
+  // Each workspace owns its request lock and response target. One pane instance is reused
+  // across tabs, so resolving through the active getter after an await can cross servers.
+  function load(targetTab = tab(), queue = false) {
+    if (targetTab._opsInFlight) {
+      if (queue) targetTab._opsReloadRequested = true
+      return targetTab._opsInFlight
     }
+    targetTab._opsLoading = targetTab.ops.length === 0
+    const ownOnlyAtRequest = targetTab.ownOnly
+    const showSysAtRequest = targetTab.showSys
+    const request = (async () => {
+      try {
+        const reply = await currentOps(targetTab.connId, {
+          ownOnly: ownOnlyAtRequest,
+          all: showSysAtRequest,
+        })
+        if (targetTab.ownOnly !== ownOnlyAtRequest || targetTab.showSys !== showSysAtRequest) return
+        targetTab.ops = mergeRetained(
+          targetTab.ops,
+          normalizeOps(reply),
+          targetTab.retention,
+          Date.now(),
+        )
+        targetTab._opsUpdatedAt = Date.now()
+        targetTab._opsError = null
+        targetTab._opsErrorCode = null
+      } catch (e) {
+        // Keep showing the last good list — a blink of blank table on one failed poll
+        // hides more than the error message tells.
+        targetTab._opsError = errText(e)
+        targetTab._opsErrorCode = errCode(e)
+      } finally {
+        const reload = targetTab._opsReloadRequested
+        targetTab._opsReloadRequested = false
+        targetTab._opsLoading = false
+        targetTab._opsInFlight = null
+        if (reload) load(targetTab)
+      }
+    })()
+    targetTab._opsInFlight = request
+    return request
   }
 
   // Kill one operation, then refresh so the table reflects it straight away rather than
   // at the next poll (which may be seconds away, or off).
   async function kill(opid) {
+    const targetTab = tab()
     try {
-      await killOp(tab().connId, opid)
-      await load()
+      await killOp(targetTab.connId, opid)
+      if (targetTab._opsInFlight) await targetTab._opsInFlight
+      await load(targetTab)
       return true
     } catch (e) {
-      error.value = errText(e)
-      errorCode.value = errCode(e)
+      targetTab._opsError = errText(e)
+      targetTab._opsErrorCode = errCode(e)
       return false
     }
   }
@@ -153,14 +173,22 @@ export function useCurrentOps(tab) {
 
   // Own/sys ops are server-side flags, so changing them needs a fresh reply rather than
   // a re-filter of what's already on screen.
-  watch([ownOnly, showSys], () => { rows.value = []; load() })
+  watch(
+    () => [tab().id, tab().ownOnly, tab().showSys],
+    (current, previous) => {
+      if (!previous || current[0] !== previous[0]) return
+      const targetTab = tab()
+      targetTab.ops = []
+      load(targetTab, true)
+    },
+  )
 
   const retainedCount = computed(() => visible.value.filter(row => row.expiredAt).length)
   const idleCount = computed(() => visible.value.filter(row => row.idle).length)
 
   const polling = computed(() => frequency.value > 0)
   const now = useTicker(polling, frequency)
-  watch(now, load)
+  watch(now, () => load())
 
   // Retention shrinking (or being switched off) should take effect on the spot rather
   // than at the next poll, which may be seconds away or never.

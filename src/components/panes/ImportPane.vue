@@ -4,6 +4,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
+import { useImportPaneLifecycle } from '../../composables/useImportPaneLifecycle'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -40,11 +41,12 @@ function changeTarget() {
 const t = computed(() => props.activeTab)
 const fmt = computed(() => (t.value.format || 'json').toUpperCase())
 const isJson = computed(() => t.value.format === 'json')
+const lifecycle = useImportPaneLifecycle()
 
-const running = ref(false)
-const error = ref(null)
-const errorCode = ref(null)
-const done = ref(null)   // { count } after a successful run
+const running = computed(() => !!t.value._importRunning)
+const error = computed(() => t.value._importError || null)
+const errorCode = computed(() => t.value._importErrorCode || null)
+const done = computed(() => t.value._importDone || null)
 
 // Output preview (for the selected source).
 const previewLoading = ref(false)
@@ -52,9 +54,17 @@ const previewError = ref(null)
 const previewCols = ref([])
 const previewRows = ref([])
 
-function setError(e) {
-  error.value = errText(e)
-  errorCode.value = errCode(e)
+watch(() => props.activeTab, (tab) => {
+  lifecycle.attach(tab)
+  previewLoading.value = false
+  previewError.value = null
+  previewCols.value = []
+  previewRows.value = []
+}, { immediate: true })
+
+function setError(e, tab = t.value) {
+  tab._importError = errText(e)
+  tab._importErrorCode = errCode(e)
 }
 
 function baseName(p) {
@@ -63,30 +73,31 @@ function baseName(p) {
 
 // ── sources ────────────────────────────────────────────────────
 async function addSource() {
-  error.value = null
+  const request = lifecycle.beginSource(t.value)
+  request.tab._importError = null
+  request.tab._importErrorCode = null
   let picked
   try {
     picked = await openDialog({
       multiple: true,
-      filters: [{ name: fmt.value, extensions: [t.value.format] }],
+      filters: [{ name: request.format.toUpperCase(), extensions: [request.format] }],
     })
   } catch (e) {
-    setError(e)
+    setError(e, request.tab)
     return
   }
   if (!picked) return
   const paths = Array.isArray(picked) ? picked : [picked]
   for (const p of paths) {
-    t.value.sources.push({
+    request.tab.sources.push({
       path: String(p),
       name: baseName(p),
-      targetDb: t.value.dbName,
-      targetColl: t.value.collName,
+      targetDb: request.targetDb,
+      targetColl: request.targetColl,
       mode: 'insert',
     })
   }
-  t.value.selectedSource = t.value.sources.length - 1
-  if (t.value.previewOpen) loadPreview()
+  request.tab.selectedSource = request.tab.sources.length - 1
 }
 
 function removeSource() {
@@ -94,55 +105,57 @@ function removeSource() {
   if (i < 0 || i >= t.value.sources.length) return
   t.value.sources.splice(i, 1)
   t.value.selectedSource = Math.min(i, t.value.sources.length - 1)
-  if (t.value.previewOpen) loadPreview()
 }
 
 function selectSource(i) {
+  if (t.value.selectedSource === i) {
+    if (t.value.previewOpen) loadPreview()
+    return
+  }
   t.value.selectedSource = i
-  if (t.value.previewOpen) loadPreview()
 }
 
 // Paste from clipboard: the text is staged as a temp file so it flows through the same
 // path-based preview/import as a picked file.
 async function pasteSource() {
-  error.value = null
+  const request = lifecycle.beginSource(t.value)
+  request.tab._importError = null
+  request.tab._importErrorCode = null
   let text = ''
   try {
     text = await navigator.clipboard.readText()
   } catch (e) {
-    setError(errText(e))
+    setError(e, request.tab)
     return
   }
   if (!text || !text.trim()) {
     showToast('Clipboard is empty')
     return
   }
-  await stageText(text)
+  await stageText(text, request)
 }
 
-async function stageText(text) {
+async function stageText(text, request) {
   let path
   try {
-    path = await stageImportText(text, t.value.format)
+    path = await stageImportText(text, request.format)
   } catch (e) {
-    setError(e)
+    setError(e, request.tab)
     return
   }
-  t.value.sources.push({
+  request.tab.sources.push({
     path: path,
-    name: `Clipboard.${t.value.format}`,
-    targetDb: t.value.dbName,
-    targetColl: t.value.collName,
+    name: `Clipboard.${request.format}`,
+    targetDb: request.targetDb,
+    targetColl: request.targetColl,
     mode: 'insert',
   })
-  t.value.selectedSource = t.value.sources.length - 1
-  if (t.value.previewOpen) loadPreview()
+  request.tab.selectedSource = request.tab.sources.length - 1
 }
 
 // ── output preview ─────────────────────────────────────────────
 function togglePreview() {
   t.value.previewOpen = !t.value.previewOpen
-  if (t.value.previewOpen) loadPreview()
 }
 
 async function loadPreview() {
@@ -150,16 +163,23 @@ async function loadPreview() {
   previewError.value = null
   previewCols.value = []
   previewRows.value = []
-  if (!src) return
+  if (!src) {
+    lifecycle.cancelPreview()
+    previewLoading.value = false
+    return
+  }
+  const request = lifecycle.beginPreview(t.value, src)
   previewLoading.value = true
   try {
-    const preview = await importPreview(src.path, t.value.format, PREVIEW_LIMIT)
+    const preview = await importPreview(request.path, request.format, PREVIEW_LIMIT)
+    if (!lifecycle.isCurrentPreview(request, props.activeTab)) return
     previewCols.value = preview.columns || []
     previewRows.value = preview.rows || []
   } catch (e) {
+    if (!lifecycle.isCurrentPreview(request, props.activeTab)) return
     previewError.value = errText(e)
   } finally {
-    previewLoading.value = false
+    if (lifecycle.isCurrentPreview(request, props.activeTab)) previewLoading.value = false
   }
 }
 
@@ -170,45 +190,52 @@ const canRun = computed(() =>
 )
 
 async function run() {
-  if (!canRun.value) return
-  running.value = true
-  error.value = null
+  if (!canRun.value || running.value) return
+  const runTab = t.value
+  const request = lifecycle.beginRun(runTab)
+  runTab._importRunning = true
+  runTab._importError = null
+  runTab._importErrorCode = null
+  runTab._importDone = null
   try {
     // Optional early validation: confirm each file parses before writing anything.
-    if (isJson.value && t.value.validate) {
-      for (const s of t.value.sources) {
-        await importPreview(s.path, t.value.format, 1)
+    if (request.format === 'json' && request.validate) {
+      for (const s of request.sources) {
+        await importPreview(s.path, request.format, 1)
       }
     }
     let total = 0
-    const conns = new Set()
-    for (const s of t.value.sources) {
+    for (const s of request.sources) {
       const count = await importCollectionMapped(
-        { connectionId: t.value.connId, database: String(s.targetDb).trim(), collection: String(s.targetColl).trim() },
+        { connectionId: request.connectionId, database: String(s.targetDb).trim(), collection: String(s.targetColl).trim() },
         s.path,
-        t.value.format,
+        request.format,
         [],
       )
       total += count
-      conns.add(t.value.connId)
     }
-    showToast(`Imported ${total} document${total === 1 ? '' : 's'} from ${t.value.sources.length} source${t.value.sources.length === 1 ? '' : 's'}`)
-    onImported(t.value.connId)
-    done.value = { count: total }
+    showToast(`Imported ${total} document${total === 1 ? '' : 's'} from ${request.sources.length} source${request.sources.length === 1 ? '' : 's'}`)
+    onImported(request.connectionId)
+    runTab._importDone = { count: total }
   } catch (e) {
-    setError(e)
+    setError(e, runTab)
+    if (!lifecycle.isCurrentRun(request, props.activeTab)) showToast(`Import failed: ${errText(e)}`)
   } finally {
-    running.value = false
+    runTab._importRunning = false
   }
 }
 
 function reset() {
-  done.value = null
-  error.value = null
+  t.value._importDone = null
+  t.value._importError = null
+  t.value._importErrorCode = null
 }
 
-// Keep the preview in sync when the selection changes while it's open.
-watch(() => t.value.selectedSource, () => { if (t.value.previewOpen) loadPreview() })
+// Include the path because removing a source can leave the selected index unchanged.
+watch(() => {
+  const source = t.value.sources[t.value.selectedSource]
+  return [t.value.id, t.value.previewOpen, t.value.selectedSource, source?.path]
+}, () => { if (t.value.previewOpen) loadPreview() })
 </script>
 
 <template>

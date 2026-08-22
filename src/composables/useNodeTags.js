@@ -9,6 +9,7 @@ import { getNodeTags, setConnectionTag, setNodeTag, clearNodeTagsUnder } from '.
 // by tree path.
 export function useNodeTags() {
   const tagOverrides = ref({})
+  let tagWrite = Promise.resolve()
 
   // Restore persisted colour tags so they survive a restart. Database/collection
   // tags come from the dedicated node-tag store; connection tags live on the
@@ -36,34 +37,45 @@ export function useNodeTags() {
   // Apply a colour to a node. `type` is 'connection' | 'database' | 'collection'; `nodeData`
   // is the sidebar shape ({ connId, connName, dbName, collName }). Colouring a parent resets
   // its descendants (drop their own tags so they inherit the parent's new colour).
-  async function applyColorTag({ type, nodeData, color }) {
+  function applyColorTag(request) {
+    const write = tagWrite.then(() => persistColorTag(request))
+    tagWrite = write.catch(() => {})
+    return write
+  }
+
+  async function persistColorTag({ type, nodeData, color }) {
     const nd = nodeData
     let clearPrefix = null
+    let key
     if (type === 'connection') {
-      // Connection tags live on the connection config (conn.tag). The override gives instant
-      // feedback; the command persists it for the next restart.
-      tagOverrides.value = { ...tagOverrides.value, [nd.connId]: color }
-      try { await setConnectionTag(nd.connId, color) } catch (_) {}
+      key = nd.connId
+      await setConnectionTag(nd.connId, color)
       clearPrefix = nd.connId + '/'
     } else {
       // Database/collection tags go in the dedicated node-tag store, keyed by the node's tree
       // path so a colour tags only that node, not the whole connection.
-      const key = type === 'database'
+      key = type === 'database'
         ? nd.connId + '/' + nd.dbName
         : nd.connId + '/' + nd.dbName + '/' + nd.collName
-      tagOverrides.value = { ...tagOverrides.value, [key]: color }
-      try { await setNodeTag(key, color) } catch (_) {}
+      await setNodeTag(key, color)
       if (type === 'database') clearPrefix = nd.connId + '/' + nd.dbName + '/'
     }
     if (clearPrefix) {
-      // Locally drop every descendant override so the tree/tabs re-inherit at once.
-      const pruned = {}
-      for (const k of Object.keys(tagOverrides.value)) {
-        if (!k.startsWith(clearPrefix)) pruned[k] = tagOverrides.value[k]
+      try {
+        await clearNodeTagsUnder(clearPrefix)
+      } catch (e) {
+        tagOverrides.value = { ...tagOverrides.value, [key]: color }
+        throw e
       }
-      tagOverrides.value = pruned
-      try { await clearNodeTagsUnder(clearPrefix) } catch (_) {}
     }
+
+    const updated = { ...tagOverrides.value, [key]: color }
+    if (clearPrefix) {
+      for (const existing of Object.keys(updated)) {
+        if (existing.startsWith(clearPrefix)) delete updated[existing]
+      }
+    }
+    tagOverrides.value = updated
   }
 
   return {

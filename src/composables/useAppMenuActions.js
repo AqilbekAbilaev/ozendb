@@ -80,7 +80,7 @@ export function useAppMenuActions({
         return
       }
       case 'file:search':       handleTool('search', menuTarget('database')); return
-      case 'coll:open_tab':     handleTool('collection'); return
+      case 'coll:open_tab':     handleTool('collection', menuTarget('collection')); return
       case 'coll:export':       handleTool('export', menuTarget('collection')); return
       case 'coll:import':       handleTool('import', menuTarget('collection')); return
 

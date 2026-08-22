@@ -43,6 +43,7 @@ function editorState(workspace) {
     sort: workspace.sort ?? '', skip: workspace.skip ?? 0, limit: workspace.limit ?? 50,
     pipeline: workspace.pipeline ?? '', vqb: workspace.vqb ?? null,
     colOrder: workspace.colOrder ?? null, readOnly: !!workspace.readOnly,
+    ...(workspace.resultView ? { resultView: workspace.resultView } : {}),
   }
 }
 

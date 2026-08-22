@@ -21,7 +21,7 @@ const { disconnect } = await import('../engines/mongodb/api/connections')
 // A minimal harness: useFeatures' dependencies are injected, so every other slice is
 // a stub and only the tab store is real. The tested surface is the disconnect paths:
 // which tabs survive, whether disposal runs, and the active-tab fallback.
-function makeFeatures(connectionRef) {
+function makeFeatures(connectionRef, overrides = {}) {
   return useFeatures({
     contextMenu: ref(null),
     connectionTreeRef: ref(connectionRef),
@@ -36,6 +36,7 @@ function makeFeatures(connectionRef) {
     openSqlTab: vi.fn(), openSchemaTab: vi.fn(), openSearchTab: vi.fn(),
     openCurrentOpsTab: vi.fn(), openExportSource: vi.fn(), openImportWizard: vi.fn(),
     exportDatabase: vi.fn(), importDatabase: vi.fn(),
+    ...overrides,
   })
 }
 
@@ -119,5 +120,52 @@ describe('disconnect paths close affected workspaces through the store', () => {
     expect(disconnect).toHaveBeenCalledWith('c2')
     expect(tabs.value.map(t => t.id)).toEqual(['q'])
     expect(activeTabId.value).toBe('q')
+  })
+})
+
+describe('global toolbar routing', () => {
+  it('routes a database tool through the active tab', () => {
+    const openShellTab = vi.fn()
+    seedStore([tab('f', 'c1', 'shop', 'orders')], 'f')
+    const features = makeFeatures({}, { openShellTab })
+
+    features.handleTool('shell')
+
+    expect(openShellTab).toHaveBeenCalledWith({
+      connectionId: 'c1',
+      connectionName: 'Sales',
+      dbName: 'shop',
+    })
+  })
+
+  it('opens the collection explicitly resolved by the native menu', () => {
+    const openCollectionTab = vi.fn()
+    const target = tab('target', 'c2', 'warehouse', 'stock')
+    const features = makeFeatures({ openSelectedCollection: vi.fn() }, { openCollectionTab })
+
+    features.handleTool('collection', target)
+
+    expect(openCollectionTab).toHaveBeenCalledWith({
+      connectionId: 'c2',
+      connectionName: 'Sales',
+      dbName: 'warehouse',
+      collectionName: 'stock',
+    })
+  })
+})
+
+describe('color tag persistence', () => {
+  it('shows a normalized error when saving a tag fails', async () => {
+    const contextMenu = ref({
+      type: 'collection',
+      nodeData: { connId: 'c1', dbName: 'db', collName: 'orders' },
+    })
+    const showToast = vi.fn()
+    const applyColorTag = vi.fn().mockRejectedValue({ code: 'command', message: 'disk full' })
+    const features = makeFeatures({}, { contextMenu, showToast, applyColorTag })
+
+    await features.handleContextAction('Choose Color:red')
+
+    expect(showToast).toHaveBeenCalledWith('Could not save color tag: disk full')
   })
 })

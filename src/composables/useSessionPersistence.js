@@ -101,7 +101,8 @@ export function useSessionPersistence({ runRestoredTab }) {
         // Activate the session's active tab only when it is among the restored set.
         // A requested id that is not a session tab (the always-present quickstart)
         // leaves the current active tab in charge.
-        const wanted = result.requestedActiveTabId ?? result.session.activeTabId
+        const requestedStillOpen = tabs.value.some((t) => t.id === result.requestedActiveTabId)
+        const wanted = requestedStillOpen ? result.requestedActiveTabId : result.session.activeTabId
         if (restored.some((t) => t.id === wanted)) {
           activeTabId.value = wanted
         }

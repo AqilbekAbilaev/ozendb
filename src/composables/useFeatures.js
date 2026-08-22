@@ -1,9 +1,10 @@
 import { disconnect } from '../engines/mongodb/api/connections'
 import { TOOLS } from '../constants/tools'
 import { MODALS } from '../constants/modalRegistry'
-import { closeWhere } from '../stores/tabs'
+import { activeTab, closeWhere } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
+import { errText } from '../utils/errors'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
@@ -233,7 +234,11 @@ export function useFeatures({
 
     // Choose Color carries the picked color as an ":<color>" suffix.
     if (action.startsWith('Choose Color:')) {
-      await applyColorTag({ type: saved.type, nodeData: saved.nodeData, color: action.split(':')[1] })
+      try {
+        await applyColorTag({ type: saved.type, nodeData: saved.nodeData, color: action.split(':')[1] })
+      } catch (e) {
+        showToast(`Could not save color tag: ${errText(e)}`)
+      }
       return
     }
 
@@ -248,6 +253,15 @@ export function useFeatures({
     if (name === 'connect') { modals.openModal('connectionManager'); return }
 
     if (name === 'collection') {
+      if (target && target.connectionId && target.dbName && target.collectionName) {
+        openCollectionTab({
+          connectionId: target.connectionId,
+          connectionName: target.connectionName,
+          dbName: target.dbName,
+          collectionName: target.collectionName,
+        })
+        return
+      }
       // Opens the collection currently highlighted in the sidebar, same as
       // double-clicking it. Guides the user when nothing is highlighted.
       if (!connectionTreeRef.value.openSelectedCollection()) {

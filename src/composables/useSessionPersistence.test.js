@@ -197,6 +197,21 @@ describe('initializeSession', () => {
     expect(ids).not.toContain('r3')
   })
 
+  it('activates the repaired survivor when the requested v2 tab was pruned', async () => {
+    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    getOpenTabs.mockResolvedValue({
+      schemaVersion: 2,
+      activeTabId: 'deleted',
+      tabs: [canonicalFind('deleted', 'c3'), canonicalFind('survivor', 'c1')],
+    })
+    const { initializeSession } = useSessionPersistence({ runRestoredTab })
+
+    await initializeSession({ restore: true })
+
+    expect(activeTabId.value).toBe('survivor')
+    expect(runRestoredTab.mock.calls[0][0].id).toBe('survivor')
+  })
+
   it('skips pruning when the connection list fails', async () => {
     seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
     listConnections.mockRejectedValue(new Error('offline'))

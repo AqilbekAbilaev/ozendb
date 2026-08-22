@@ -100,6 +100,16 @@ describe('closeTab — which tab becomes active', () => {
     expect(idsOf()).toEqual(['a', 'b'])
     expect(activeTabId.value).toBe('a')
   })
+
+  it('runs a restored tab when close fallback activates it', () => {
+    const restored = { id: 'r', kind: 'collection', _restored: true }
+    seed([restored, 'active'], 'active')
+
+    closeTab('active')
+
+    expect(activeTabId.value).toBe('r')
+    expect(runRestoredTab).toHaveBeenCalledWith(restored)
+  })
 })
 
 describe('closeTab — shell session teardown', () => {
@@ -161,6 +171,16 @@ describe('bulk close — iterating while the array reindexes', () => {
     seed(['a', 'b', 'c'], 'b')
     handleTabAction('Close All Tabs', 'b')
     expect(idsOf()).toEqual([])
+  })
+
+  it('does not run restored tabs that are also being closed', () => {
+    seed(['active', { id: 'r', kind: 'collection', _restored: true }, 'keep'], 'active')
+
+    handleTabAction('Close Other Tabs', 'keep')
+
+    expect(idsOf()).toEqual(['keep'])
+    expect(activeTabId.value).toBe('keep')
+    expect(runRestoredTab).not.toHaveBeenCalled()
   })
 
   it('ignores a side-close against an unknown tab id', () => {

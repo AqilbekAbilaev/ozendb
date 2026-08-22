@@ -4,6 +4,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { getKeybindings, getSettings, updateKeybindings, updateSettings } from './appApi/settings'
 import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
+import { setCollectionQueryMode } from './utils/queryMode'
 import { errText } from './utils/errors'
 import { mergeBindings, matchBinding } from './utils/keybindings'
 import { RELEASES_URL } from './constants/helpLinks'
@@ -24,7 +25,7 @@ import { useTabCreators } from './composables/useTabCreators'
 import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
   tabs, activeTabId, setRunRestoredTab,
-  activateTab, moveTab, handleTabAction,
+  activateTab, closeTab, moveTab, handleTabAction,
   renameTabTarget, renameTabValue, confirmRenameTab,
 } from './stores/tabs'
 import ConnectionTree from './components/connection/ConnectionTree.vue'
@@ -377,12 +378,11 @@ function onCopyQuery() {
   }
   showToast('Query copied.')
 }
-
 async function onPasteQuery() {
   const tab = tabs.value.find(t => t.id === activeTabId.value)
   if (!tab || !clipboardQuery.value) return
   const q = clipboardQuery.value
-  tab.mode       = q.mode
+  setCollectionQueryMode(tab, q.mode)
   tab.filter     = q.filter
   tab.sort       = q.sort
   tab.projection = q.projection
