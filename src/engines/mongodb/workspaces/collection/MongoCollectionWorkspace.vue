@@ -1,21 +1,22 @@
 <script setup>
 // The MongoDB collection workspace: find, aggregate, and SQL-to-MQL query behavior
 // and rendering, extracted whole from QueryWorkspace.vue (Work 3). It owns parsing,
-// validation, run dispatch, explain, and the saved-query browser for *collection*
+// validation, run dispatch, explain, and saved-query application for *collection*
 // tabs, and mutates the existing flat tab fields exactly as before. The host
-// (QueryWorkspace.vue) owns the tab bar, other pane kinds, and the result sub-tab
+// (WorkspaceArea.vue) owns the tab bar, other pane kinds, and the result sub-tab
 // compatibility ref this component reads/writes via v-model.
-import { ref, computed, nextTick, watch } from 'vue'
+import { computed, nextTick, watch } from 'vue'
 import { translateSqlToMql, explainFind, explainAggregate, loadExplainStorage } from '../../api/queries'
 import { errText } from '../../../../utils/errors'
 import QueryBar from '../../../../components/query/QueryBar.vue'
 import SqlQueryBar from '../../../../components/query/SqlQueryBar.vue'
 import PipelineEditor from '../../../../components/query/PipelineEditor.vue'
 import ResultsPanel from '../../../../components/results/ResultsPanel.vue'
-import QueryBrowserModal from '../../../../components/query/QueryBrowserModal.vue'
 import CollectionCrumbs from '../../../../components/base/CollectionCrumbs.vue'
 import { parseField, parsePipeline } from '../../../../utils/queryParser'
 import { setCollectionQueryMode } from '../../../../utils/queryMode'
+import { runTranslatedSql } from '../../../../utils/sqlWorkspace'
+import { beginWorkspaceRequest } from '../../../../utils/workspaceRequest'
 
 const props = defineProps({
   activeTab:        { type: Object, required: true },
@@ -26,16 +27,14 @@ const props = defineProps({
   clipboardQuery:   { type: Object, default: null },
   docMenuRequest:   { type: Object, default: null },
   historyRequest:   { type: Object, default: null },
-  browserRequest:   { type: Object, default: null },
+  savedQueryRequest: { type: Object, default: null },
   saveQueryRequest: { type: Object, default: null },
 })
 const emit = defineEmits([
   'update:result-tab', 'run-query', 'run-aggregate',
   'toggle-vqb', 'open-vqb', 'close-vqb', 'copy-query', 'paste-query',
-  'cancel-query', 'follow-reference',
+  'cancel-query', 'follow-reference', 'open-query-browser', 'saved-query-applied',
 ])
-
-const showQueryBrowser = ref(false)
 
 const activeTab = computed(() => props.activeTab)
 const isAggregate = computed(() => activeTab.value && activeTab.value.mode === 'aggregate')
@@ -88,13 +87,14 @@ const pipelineErrorText = computed(() => {
 })
 
 // The Run button (and the result toolbar's refresh) dispatch on the tab's mode.
-function run() {
-  if (isSql.value) {
-    runSql()
-  } else if (isAggregate.value) {
-    runAggregate()
+function run(tab = activeTab.value) {
+  if (!tab || tab.kind !== 'collection') return
+  if (tab.mode === 'sql') {
+    runSql(tab)
+  } else if (tab.mode === 'aggregate') {
+    runAggregate(tab)
   } else {
-    runQuery()
+    runQuery(true, tab)
   }
 }
 
@@ -103,41 +103,24 @@ function run() {
 // the shared result stack — paging, the Query Code preview, and Explain — all
 // operate on the same query. The collection is fixed by the tab; the collection
 // named in the SQL FROM clause is intentionally ignored.
-async function runSql() {
-  const tab = activeTab.value
+async function runSql(tab = activeTab.value) {
   if (!tab || tab.kind !== 'collection') return
-  tab.sqlError = null
-  let mql
-  try {
-    mql = await translateSqlToMql(tab.sql || '')
-  } catch (e) {
-    tab.sqlError = errText(e)
-    return
-  }
-  tab.filter     = mql.filter
-  tab.projection = mql.projection
-  tab.sort       = mql.sort
-  tab.skip       = mql.skip ?? 0
-  tab.limit      = mql.limit ?? (tab.limit || 50)
-  emit('run-query', tab.id, {
-    filter:        mql.filter,
-    projection:    mql.projection,
-    sort:          mql.sort,
-    skip:          tab.skip,
-    limit:         tab.limit,
-    addToHistory:  true,
+  await runTranslatedSql(tab, {
+    translate: translateSqlToMql,
+    runQuery: (workspace, query) => emit('run-query', workspace.id, query),
+    runExplain,
+    explainVisible: () => props.resultTab === 'Explain',
+    isCurrent: workspace => props.tabs.includes(workspace) && workspace.mode === 'sql',
   })
-  if (props.resultTab === 'Explain') runExplain()
 }
 
-function runAggregate() {
-  const tab = activeTab.value
+function runAggregate(tab = activeTab.value) {
   if (!tab || tab.kind !== 'collection') return
-  const parsed = parsedPipeline.value
+  const parsed = parsePipeline(tab.pipeline)
   if (!parsed || !parsed.ok) return  // inline error is already shown
   emit('run-aggregate', tab.id, { pipeline: parsed.ejson })
   // Keep the Explain plan in sync when it's the visible sub-tab.
-  if (props.resultTab === 'Explain') runExplain()
+  if (props.resultTab === 'Explain') runExplain(tab)
 }
 
 function runQuery(addToHistory = true, tab = activeTab.value) {
@@ -158,7 +141,7 @@ function runQuery(addToHistory = true, tab = activeTab.value) {
     addToHistory:  addToHistory,
   })
   // Keep the Explain plan in sync when it's the visible sub-tab.
-  if (tab.id === activeTab.value?.id && props.resultTab === 'Explain') runExplain()
+  if (tab.id === activeTab.value?.id && props.resultTab === 'Explain') runExplain(tab)
 }
 
 // Switch result sub-tab; the Explain plan is fetched lazily the first time it's
@@ -168,9 +151,10 @@ function selectRtab(t) {
   if (t === 'Explain') runExplain()
 }
 
-async function runExplain() {
-  const tab = activeTab.value
+async function runExplain(tab = activeTab.value) {
   if (!tab || tab.kind !== 'collection') return
+  const request = beginWorkspaceRequest(tab, 'explain')
+  const canApply = () => request.isCurrent() && props.tabs.includes(tab)
   // The chosen verbosity is stored on the tab so re-runs (pagination, refresh) reuse it.
   const verbosity = tab.explainVerbosity || 'executionStats'
   tab.explainVerbosity = verbosity
@@ -180,10 +164,11 @@ async function runExplain() {
   // Aggregate tabs explain their pipeline; find tabs explain the find query. Explaining
   // a find({}) on an aggregate tab (the old behavior) was silently misleading.
   if (tab.mode === 'aggregate') {
-    const parsed = parsedPipeline.value || parsePipeline(tab.pipeline)
+    const parsed = parsePipeline(tab.pipeline)
     if (!parsed || !parsed.ok) {
       tab.explainError = 'Fix the pipeline before running Explain.'
       tab.explainResult = null
+      tab.explainRunning = false
       return
     }
     tab.explainRunning = true
@@ -194,20 +179,27 @@ async function runExplain() {
         parsed.ejson,
         verbosity,
       )
-      tab.explainResult = result
+      if (canApply()) tab.explainResult = result
     } catch (e) {
-      tab.explainError = errText(e)
-      tab.explainResult = null
+      if (canApply()) {
+        tab.explainError = errText(e)
+        tab.explainResult = null
+      }
     } finally {
-      tab.explainRunning = false
+      if (canApply()) tab.explainRunning = false
     }
     return
   }
 
-  const parsed = parsedQuery.value
+  const parsed = {
+    filter: parseField(tab.filter),
+    projection: parseField(tab.projection),
+    sort: parseField(tab.sort),
+  }
   if (!parsed || !parsed.filter.ok || !parsed.projection.ok || !parsed.sort.ok) {
     tab.explainError = 'Fix the query before running Explain.'
     tab.explainResult = null
+    tab.explainRunning = false
     return
   }
   tab.explainRunning = true
@@ -224,23 +216,27 @@ async function runExplain() {
       },
       verbosity,
     )
+    if (!canApply()) return
     tab.explainResult = result
     // Best-effort: fetch on-disk sizes for the Collection/Index target nodes. A failure
     // here must never clear the explain or surface an error — just skip the size nodes.
     try {
-      tab.explainStorage = await loadExplainStorage({
+      const storage = await loadExplainStorage({
         connectionId: tab.connectionId,
         database:     tab.dbName,
         collection:   tab.collectionName,
       })
+      if (canApply()) tab.explainStorage = storage
     } catch (e) {
-      tab.explainStorage = null
+      if (canApply()) tab.explainStorage = null
     }
   } catch (e) {
-    tab.explainError = errText(e)
-    tab.explainResult = null
+    if (canApply()) {
+      tab.explainError = errText(e)
+      tab.explainResult = null
+    }
   } finally {
-    tab.explainRunning = false
+    if (canApply()) tab.explainRunning = false
   }
 }
 
@@ -249,7 +245,7 @@ function onExplainVerbosity(v) {
   const tab = activeTab.value
   if (!tab) return
   tab.explainVerbosity = v
-  runExplain()
+  runExplain(tab)
 }
 
 // When the whole Query value is a bare 24-hex ObjectId, build the _id filter so you
@@ -262,16 +258,6 @@ function expandIdFilter(tab) {
     tab.filter = `{ _id: ObjectId("${v}") }`
   }
 }
-
-function openQueryBrowser() {
-  showQueryBrowser.value = true
-}
-
-// File → Load: open the saved-query browser on request from the native menu.
-watch(() => props.browserRequest && props.browserRequest.nonce, (nonce) => {
-  if (nonce == null) return
-  openQueryBrowser()
-})
 
 async function applyFromBrowser(entry) {
   const tab = activeTab.value
@@ -288,8 +274,18 @@ async function applyFromBrowser(entry) {
     tab.limit      = Number(entry.limit)
   }
   await nextTick()
-  run()
+  run(tab)
 }
+
+watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
+  const request = props.savedQueryRequest
+  if (nonce == null || request.tabId !== activeTab.value?.id) return
+  try {
+    await applyFromBrowser(request.entry)
+  } finally {
+    emit('saved-query-applied', nonce)
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -320,7 +316,7 @@ async function applyFromBrowser(entry) {
       @copy-query="emit('copy-query')"
       @paste-query="emit('paste-query')"
       @toggle-vqb="emit('toggle-vqb')"
-      @open-browser="openQueryBrowser"
+      @open-browser="emit('open-query-browser')"
     />
 
     <!-- Aggregation pipeline editor -->
@@ -352,9 +348,4 @@ async function applyFromBrowser(entry) {
     @follow-reference="emit('follow-reference', $event)"
   />
 
-  <QueryBrowserModal
-    v-if="showQueryBrowser"
-    @close="showQueryBrowser = false"
-    @apply="applyFromBrowser"
-  />
 </template>

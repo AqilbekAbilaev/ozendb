@@ -4,9 +4,11 @@
 // chain in QueryWorkspace.vue while preserving the App-facing contract unchanged.
 // Props/listeners are built per resolved key so collection-only attributes never leak
 // onto ordinary panes' root DOM nodes.
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import TabBar from '../base/TabBar.vue'
+import QueryBrowserModal from '../query/QueryBrowserModal.vue'
 import { WORKSPACE_COMPONENTS, workspaceComponentFor } from '../../workspaces/registry'
+import { useSavedQueryBrowser } from '../../composables/useSavedQueryBrowser'
 
 const props = defineProps({
   tabs:           { type: Array,   required: true },
@@ -23,6 +25,16 @@ const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'tab-conte
 
 const activeTab = computed(() => props.tabs.find(t => t.id === props.activeTabId))
 const component = computed(() => workspaceComponentFor(activeTab.value))
+const savedQueryBrowser = useSavedQueryBrowser({
+  activate: (id) => emit('activate-tab', id),
+})
+
+watch(() => props.browserRequest?.nonce, (nonce) => {
+  if (nonce != null) savedQueryBrowser.open(activeTab.value)
+})
+watch(() => props.tabs.map(tab => tab.id), (ids) => {
+  savedQueryBrowser.retainTargets(new Set(ids))
+})
 
 // Which result sub-tab is active. Kept here (rather than in MongoCollectionWorkspace)
 // because the collection workspace unmounts when another pane kind activates: the
@@ -43,7 +55,7 @@ const bindings = computed(() => {
       clipboardQuery:   props.clipboardQuery,
       docMenuRequest:   props.docMenuRequest,
       historyRequest:   props.historyRequest,
-      browserRequest:   props.browserRequest,
+      savedQueryRequest: savedQueryBrowser.request.value,
       saveQueryRequest: props.saveQueryRequest,
     }
   }
@@ -61,6 +73,8 @@ const collectionListeners = {
   'paste-query': () => emit('paste-query'),
   'cancel-query': (id) => emit('cancel-query', id),
   'follow-reference': (e) => emit('follow-reference', e),
+  'open-query-browser': () => savedQueryBrowser.open(activeTab.value),
+  'saved-query-applied': (nonce) => savedQueryBrowser.acknowledge(nonce),
 }
 </script>
 
@@ -83,6 +97,11 @@ const collectionListeners = {
       v-if="component"
       v-bind="bindings"
       v-on="component === WORKSPACE_COMPONENTS.collection ? collectionListeners : {}"
+    />
+    <QueryBrowserModal
+      v-if="savedQueryBrowser.isOpen.value"
+      @close="savedQueryBrowser.close"
+      @apply="savedQueryBrowser.apply"
     />
   </div>
 </template>
