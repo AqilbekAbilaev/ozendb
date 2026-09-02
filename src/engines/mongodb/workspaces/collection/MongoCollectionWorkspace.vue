@@ -17,6 +17,7 @@ import { parseField, parsePipeline } from '../../../../utils/queryParser'
 import { setCollectionQueryMode } from '../../../../utils/queryMode'
 import { runTranslatedSql } from '../../../../utils/sqlWorkspace'
 import { beginWorkspaceRequest } from '../../../../utils/workspaceRequest'
+import { useInitialFindRun } from './useInitialFindRun'
 
 const props = defineProps({
   activeTab:        { type: Object, required: true },
@@ -39,6 +40,10 @@ const emit = defineEmits([
 const activeTab = computed(() => props.activeTab)
 const isAggregate = computed(() => activeTab.value && activeTab.value.mode === 'aggregate')
 const isSql = computed(() => activeTab.value && activeTab.value.mode === 'sql')
+
+useInitialFindRun(activeTab, {
+  runQuery: (workspace, query) => emit('run-query', workspace.id, query),
+})
 
 // ── query parsing & validation ─────────────────────────────
 // Shell syntax is parsed to canonical Extended JSON by utils/queryParser.js (MongoDB's

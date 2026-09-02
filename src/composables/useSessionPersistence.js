@@ -1,7 +1,7 @@
 import { watch } from 'vue'
 import { listConnections } from '../engines/mongodb/api/connections'
 import { getOpenTabs, setOpenTabs } from '../appApi/session'
-import { tabs, activeTabId, activeTab } from '../stores/tabs'
+import { tabs, activeTabId } from '../stores/tabs'
 import { restoreWorkspace } from '../workspaces/lifecycle'
 import { getWorkspaceDefinition } from '../workspaces/registry'
 import { migrateSession, toLegacyRecord } from '../utils/sessionMigration'
@@ -9,9 +9,8 @@ import { migrateSession, toLegacyRecord } from '../utils/sessionMigration'
 // Tab-session persistence (Work 7). On-disk sessions are canonical v2 records;
 // legacy unversioned files migrate in memory on load and are written back as v2.
 // Result sets and other runtime state are rebuilt on demand, so paging through
-// data never saves. The tab spine (`tabs`, `activeTabId`) comes from the store;
-// `runRestoredTab` re-runs a restored find tab's stored query in place.
-export function useSessionPersistence({ runRestoredTab }) {
+// data never saves. The tab spine (`tabs`, `activeTabId`) comes from the store.
+export function useSessionPersistence() {
   // Serialize a live tab into its canonical v2 record. Durable state is
   // definition-owned via the serialize hook; identity is the canonical target.
   // Tabs without a type predate the registry and cannot be serialized — skip them.
@@ -106,10 +105,6 @@ export function useSessionPersistence({ runRestoredTab }) {
         if (restored.some((t) => t.id === wanted)) {
           activeTabId.value = wanted
         }
-        // Lazily run the active restored tab (find mode re-runs its query; only
-        // find restores carry the one-shot marker).
-        const active = activeTab.value
-        if (active && active._restored) runRestoredTab(active)
       }
     }
     return { ok: true, sourceVersion: result.sourceVersion, migrated: result.migrated, warnings: result.warnings }

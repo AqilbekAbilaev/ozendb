@@ -55,21 +55,13 @@ export function pruneActiveTab() {
   }
 }
 
-// Re-running a restored tab's saved query belongs to the query runner, which is a
-// composable needing app-level deps (showToast) this module can't reach. App.vue
-// registers it once during setup, so the store depends on a function rather than on
-// useQueryRunner itself.
-let runRestoredTab = () => {}
-export function setRunRestoredTab(fn) { runRestoredTab = fn }
-
 // ── rename tab dialog ──
 export const renameTabTarget = ref(null)   // id of the tab being renamed
 export const renameTabValue = ref('')
 
 export function activateTab(id) {
+  if (!tabs.value.some(t => t.id === id)) return
   activeTabId.value = id
-  const tab = tabs.value.find(t => t.id === id)
-  if (tab && tab._restored) runRestoredTab(tab)
 }
 
 // Move the active-tab selection by `delta` (+1 next, -1 previous), wrapping around.
@@ -161,8 +153,6 @@ export function duplicateTab(tabId) {
   const dup = duplicateWorkspace(src)
   if (!dup) return   // unsupported duplicate (e.g. Quickstart) is a no-op
   tabs.value.push(dup)
-  // Activation drives the one-shot rerun marker: find duplicates carry _restored,
-  // so this re-runs their cloned query through the existing bridge exactly once.
   activateTab(dup.id)
 }
 

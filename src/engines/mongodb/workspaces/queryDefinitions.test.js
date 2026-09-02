@@ -207,9 +207,9 @@ describe('lifecycle — duplicate', () => {
     expect(dup.elapsedMs).toBe(null)
   })
 
-  it('receives the rerun marker so the bridge re-runs it once', () => {
+  it('receives the initial-run marker so its workspace runs it once', () => {
     const dup = duplicateWorkspace(SOURCE)
-    expect(dup._restored).toBe(true)
+    expect(dup.needsInitialRun).toBe(true)
   })
 
   it('detaches nested VQB and column-order state', () => {
@@ -224,12 +224,12 @@ describe('lifecycle — duplicate', () => {
 
   it('aggregate and sql duplicates do not carry the rerun marker', () => {
     const agg = duplicateWorkspace({ ...SOURCE, type: 'mongodb.aggregate', mode: 'aggregate' })
-    expect(agg._restored).toBeUndefined()
+    expect(agg.needsInitialRun).toBeUndefined()
     const sql = duplicateWorkspace({
       ...SOURCE, type: 'mongodb.sql_to_mql', mode: 'sql',
       sql: 'SELECT * FROM orders', sqlError: 'nope', filter: 'x', projection: 'y',
     })
-    expect(sql._restored).toBeUndefined()
+    expect(sql.needsInitialRun).toBeUndefined()
     expect(sql.sql).toBe('SELECT * FROM orders')
     expect(sql.sqlError).toBe(null)
     expect(sql.filter).toBe('')
@@ -279,7 +279,7 @@ describe('lifecycle — restore', () => {
     expect(tab.skip).toBe(2)
     expect(tab.limit).toBe(25)
     expect(tab.resultView).toBe('json')
-    expect(tab._restored).toBe(true)
+    expect(tab.needsInitialRun).toBe(true)
     expect(tab.results).toEqual([])
     expect(tab.hasRun).toBe(false)
     expect(tab.elapsedMs).toBe(null)
@@ -290,7 +290,7 @@ describe('lifecycle — restore', () => {
     const tab = restoreWorkspace({ ...savedFind, id: 'a', mode: 'aggregate', pipeline: '[{ "$match": {} }]' })
     expect(tab.mode).toBe('aggregate')
     expect(tab.pipeline).toBe('[{ "$match": {} }]')
-    expect(tab._restored).toBeUndefined()
+    expect(tab.needsInitialRun).toBeUndefined()
   })
 
   it('sql restores the SQL text but clears translated pieces and does not run', () => {
@@ -302,7 +302,7 @@ describe('lifecycle — restore', () => {
     expect(tab.projection).toBe('')
     expect(tab.pipeline).toBe('')
     expect(tab.readOnly).toBe(true)
-    expect(tab._restored).toBeUndefined()
+    expect(tab.needsInitialRun).toBeUndefined()
   })
 
   it('shell restore gets a fresh session id from the injected source', () => {

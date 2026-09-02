@@ -88,18 +88,18 @@ export const queryDefinitions = [
     },
     duplicate(workspace) {
       // Find is the only restored/duplicated query that re-runs automatically, so
-      // the marker rides along and the store's marker-driven activation handles it.
+      // the active Mongo collection workspace consumes this one-shot marker.
       return {
         title: workspace.title,
         target: resourceFromFeatureNode(collectionTarget(workspace)),
-        fields: { ...collectionFields({ target: collectionTarget(workspace), defaults: {} }), mode: 'find', ...editorState(workspace), _restored: true },
+        fields: { ...collectionFields({ target: collectionTarget(workspace), defaults: {} }), mode: 'find', ...editorState(workspace), needsInitialRun: true },
       }
     },
     restore(saved, ctx) {
       // Find is the only query that auto-runs on restore; the one-shot marker tells
-      // the store's bridge to re-run it exactly once on activation.
+      // its workspace to run it exactly once on activation.
       const base = restoreCollection(saved, ctx.defaults)
-      return { ...base, fields: { ...base.fields, _restored: true } }
+      return { ...base, fields: { ...base.fields, needsInitialRun: true } }
     },
   },
   {

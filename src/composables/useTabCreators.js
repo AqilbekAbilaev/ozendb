@@ -1,6 +1,6 @@
 import { getDefaultQuery } from '../engines/mongodb/api/queryLibrary'
 import { parseField } from '../utils/queryParser'
-import { tabs, activeTabId, activateTab, newTabId } from '../stores/tabs'
+import { tabs, activateTab, newTabId } from '../stores/tabs'
 import { createWorkspace } from '../workspaces/createWorkspace'
 
 // Every "open a tab" entry point in the app. The tab *shape* is owned by the
@@ -35,7 +35,7 @@ export function useTabCreators({
     })
     const id = tab.id
     tabs.value.push(tab)
-    activeTabId.value = id
+    activateTab(id)
 
     // Follow Reference (and any caller supplying a filter) runs that filter immediately,
     // bypassing the collection's saved default query. When the filter parses, its exact
@@ -94,13 +94,13 @@ export function useTabCreators({
     const existing = tabs.value.find(t =>
       t.kind === 'collection' && t.mode === 'sql' &&
       t.connectionId === connectionId && t.dbName === dbName && t.collectionName === collectionName)
-    if (existing) { activeTabId.value = existing.id; return }
+    if (existing) { activateTab(existing.id); return }
     const tab = newWorkspace('mongodb.sql_to_mql', {
       target: { connectionId, connectionName, dbName, collectionName },
       defaults: { queryLimit: defaultQueryLimit.value, resultView: defaultResultView.value },
     })
     tabs.value.push(tab)
-    activeTabId.value = tab.id
+    activateTab(tab.id)
   }
 
   // Open an IntelliShell tab scoped to a connection + database. Each shell tab has
@@ -110,7 +110,7 @@ export function useTabCreators({
       target: { connectionId, connectionName, dbName },
     })
     tabs.value.push(tab)
-    activeTabId.value = tab.id
+    activateTab(tab.id)
   }
 
   // Opens (or re-focuses) an Index Manager tab for a collection. The tab is a thin
@@ -118,10 +118,10 @@ export function useTabCreators({
   function openIndexManagerTab({ connId, connName, dbName, collName }) {
     const existing = tabs.value.find(t =>
       t.kind === 'indexes' && t.connId === connId && t.dbName === dbName && t.collName === collName)
-    if (existing) { activeTabId.value = existing.id; return }
+    if (existing) { activateTab(existing.id); return }
     const tab = newWorkspace('mongodb.indexes', { target: { connId, connName, dbName, collName } })
     tabs.value.push(tab)
-    activeTabId.value = tab.id
+    activateTab(tab.id)
   }
 
   // Open (or focus) a collection-scoped tool tab — Studio-3T renders Schema,
@@ -130,10 +130,10 @@ export function useTabCreators({
   function openSchemaTab({ connId, connName, dbName, collName }) {
     const existing = tabs.value.find(t =>
       t.kind === 'schema' && t.connId === connId && t.dbName === dbName && t.collName === collName)
-    if (existing) { activeTabId.value = existing.id; return }
+    if (existing) { activateTab(existing.id); return }
     const tab = newWorkspace('mongodb.schema', { target: { connId, connName, dbName, collName } })
     tabs.value.push(tab)
-    activeTabId.value = tab.id
+    activateTab(tab.id)
   }
 
   // Export starts with the source picker (Entire Collection / Current Query Result /
@@ -172,16 +172,16 @@ export function useTabCreators({
       options: { source: source || 'collection', format: 'json' },
     })
     tabs.value.push(tab)
-    activeTabId.value = tab.id
+    activateTab(tab.id)
   }
 
   // Search is database-scoped (it scans every collection in one db).
   function openSearchTab({ connId, connName, dbName }) {
     const existing = tabs.value.find(t => t.kind === 'search' && t.connId === connId && t.dbName === dbName)
-    if (existing) { activeTabId.value = existing.id; return }
+    if (existing) { activateTab(existing.id); return }
     const tab = newWorkspace('mongodb.search', { target: { connId, connName, dbName } })
     tabs.value.push(tab)
-    activeTabId.value = tab.id
+    activateTab(tab.id)
   }
 
   // Current Operations is connection-scoped, and every open makes its own tab (as opening
@@ -191,7 +191,7 @@ export function useTabCreators({
   function openCurrentOpsTab({ connId, connName }) {
     const tab = newWorkspace('mongodb.current_operations', { target: { connId, connName } })
     tabs.value.push(tab)
-    activeTabId.value = tab.id
+    activateTab(tab.id)
   }
 
   // Opens an Import tab for a collection with the format chosen in the picker. The
@@ -205,7 +205,7 @@ export function useTabCreators({
       options: { format: format },
     })
     tabs.value.push(tab)
-    activeTabId.value = tab.id
+    activateTab(tab.id)
   }
 
   // Help → Quickstart: focus the existing Quickstart tab, or open one if it was closed.

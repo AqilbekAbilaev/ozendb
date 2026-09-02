@@ -2,11 +2,10 @@ import { markRaw } from 'vue'
 import * as qapi from '../engines/mongodb/api/queries'
 import { pushQueryHistory } from '../engines/mongodb/api/queryLibrary'
 import { errText, errCode } from '../utils/errors'
-import { parseField } from '../utils/queryParser'
 import { tabs } from '../stores/tabs'
 
-// Query execution: running find/aggregate queries against a tab, cancelling an
-// in-flight query, and re-running a tab restored from a previous session.
+// Query execution: running find/aggregate queries against a tab and cancelling an
+// in-flight query.
 // Tabs come from the store, so this mutates the same tab objects every other consumer
 // sees; `showToast` is still injected to surface the same toasts as before.
 export function useQueryRunner({ showToast }) {
@@ -175,29 +174,9 @@ export function useQueryRunner({ showToast }) {
     }
   }
 
-  // A tab restored from a previous session carries its query text but no results.
-  // We run it lazily — the first time it becomes active — so a restart doesn't
-  // reconnect to every server at once. Find tabs re-run their stored query;
-  // aggregate tabs just keep their pipeline text and wait for a manual run.
-  function runRestoredTab(tab) {
-    tab._restored = false
-    if (tab.mode !== 'find') return
-    const pf = parseField(tab.filter     || '')
-    const ps = parseField(tab.sort       || '')
-    const pp = parseField(tab.projection || '')
-    runQuery(tab.id, {
-      filter:     pf.ok ? pf.ejson : '{}',
-      sort:       ps.ok ? ps.ejson : '{}',
-      projection: pp.ok ? pp.ejson : '{}',
-      skip:       Number(tab.skip),
-      limit:      Number(tab.limit),
-    })
-  }
-
   return {
     runQuery: runQuery,
     runAggregate: runAggregate,
     cancelQuery: cancelQuery,
-    runRestoredTab: runRestoredTab,
   }
 }

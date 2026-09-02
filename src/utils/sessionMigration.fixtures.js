@@ -164,7 +164,7 @@ export const sessions = {
     tabs: [{
       ...legacy.find,
       results: [{ x: 1 }], hasRun: true, isRunning: true, runError: 'boom',
-      selectedRow: 0, selectedRows: [0], elapsedMs: 12, _restored: true,
+      selectedRow: 0, selectedRows: [0], elapsedMs: 12,
     }],
   },
   duplicateIds: {

@@ -85,10 +85,10 @@ describe('restoreWorkspace', () => {
     expect(tab.title).toBe('orders')
   })
 
-  it('restores fresh runtime state and the one-shot restored marker', () => {
+  it('restores fresh runtime state and the one-shot initial-run marker', () => {
     const tab = restoreWorkspace(saved)
     expect(tab.filter).toBe('{ "a": 1 }')
-    expect(tab._restored).toBe(true)
+    expect(tab.needsInitialRun).toBe(true)
     expect(tab.results).toEqual([])
     expect(tab.hasRun).toBe(false)
     expect(tab.selectedRow).toBe(-1)

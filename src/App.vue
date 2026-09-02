@@ -5,6 +5,7 @@ import { getKeybindings, getSettings, updateKeybindings, updateSettings } from '
 import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
 import { setCollectionQueryMode } from './utils/queryMode'
+import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { errText } from './utils/errors'
 import { mergeBindings, matchBinding } from './utils/keybindings'
 import { RELEASES_URL } from './constants/helpLinks'
@@ -24,7 +25,7 @@ import { useZoom } from './composables/useZoom'
 import { useTabCreators } from './composables/useTabCreators'
 import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
-  tabs, activeTabId, setRunRestoredTab,
+  tabs, activeTabId,
   activateTab, closeTab, moveTab, handleTabAction,
   renameTabTarget, renameTabValue, confirmRenameTab,
 } from './stores/tabs'
@@ -51,20 +52,10 @@ onMounted(async () => {
   // custom bar used. (menu.rs emits the clicked item's id.)
   listen('menu-action', (e) => handleMenuAction(e.payload))
 
-  // The pop-out document editor emits this after a save. Re-run any open collection tab
-  // that shows the affected collection so the grid reflects the edit (find tabs only —
-  // runRestoredTab re-runs a tab's stored find query in place; aggregate tabs no-op).
+  // The pop-out editor emits this after a save. Refresh matching Find tabs explicitly;
+  // ordinary refresh is not part of restored-workspace lifecycle.
   listen('document-saved', (e) => {
-    const payload = e.payload || {}
-    for (const tab of tabs.value) {
-      if (tab.kind === 'collection' && tab.hasRun
-          && tab.connectionId === payload.connId
-          && tab.dbName === payload.db
-          && tab.collectionName === payload.coll) {
-        tab._restored = true
-        runRestoredTab(tab)
-      }
-    }
+    refreshFindWorkspacesAfterDocumentSave(tabs.value, e.payload, runQuery)
   })
 
   // On Linux the native menu carries no accelerators (they'd swallow editing keys
@@ -248,12 +239,7 @@ const {
   onHostKeyForget,
 } = sshApi
 
-const { runQuery, runAggregate, cancelQuery, runRestoredTab } = useQueryRunner({ showToast: showToast })
-
-// Tab operations live in stores/tabs.js (imported above) alongside the tab state.
-// Registering the re-runner is what lets the store re-run a restored tab without
-// reaching for the query runner.
-setRunRestoredTab(runRestoredTab)
+const { runQuery, runAggregate, cancelQuery } = useQueryRunner({ showToast: showToast })
 
 // The tab creators. They need the query runner and the settings-backed defaults, so
 // they're constructed here rather than being importable free functions.
@@ -287,9 +273,7 @@ function onTabContext({ id, x, y }) {
   contextMenu.value = { type: 'tab', x: x, y: y, nodeData: { tabId: id } }
 }
 
-const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence({
-  runRestoredTab: runRestoredTab,
-})
+const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence()
 
 // dbActionsApi is consumed whole by useFeatures (dialog seeders + pasteClipboard)
 // and AppModals (dialog state + confirm handlers, via provide/inject).

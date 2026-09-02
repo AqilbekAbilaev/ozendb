@@ -4,28 +4,25 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 // definitions must be registered before this module evaluates. Static imports run
 // before this file's body, hence the dynamic import below.
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
+import { registerWorkspaceDefinition } from '../workspaces/registry'
+
+const dispose = vi.fn(() => Promise.resolve())
 registerWorkspaceDefinitions()
+registerWorkspaceDefinition({
+  type: 'test.disposable',
+  engine: 'test',
+  dispose(workspace) { return dispose(workspace) },
+})
 
 const {
-  tabs, activeTabId, activeTab, pruneActiveTab, setRunRestoredTab,
+  tabs, activeTabId, activeTab, pruneActiveTab,
   activateTab, cycleTab, closeTab, closeWhere, duplicateTab, handleTabAction, newTabId,
   initializeTabs,
 } = await import('./tabs')
 
-// Closing a shell tab tears down its engine session; that call is the one side effect
-// in here worth asserting, so the driver is stubbed rather than the test avoiding it.
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn().mockResolvedValue(undefined),
-}))
-const { invoke } = await import('@tauri-apps/api/core')
-
 // Pins the tab-mutation behaviour most at risk from a refactor: which tab becomes active
 // after a close, and the bulk closers staying correct while closeTab splices the array
 // under them.
-//
-// App.vue registers the real re-runner during setup; here it's a spy.
-const runRestoredTab = vi.fn()
-setRunRestoredTab(runRestoredTab)
 
 // The store's refs are module-scope singletons, so each test seeds them explicitly.
 function seed(ids, activeId) {
@@ -60,6 +57,7 @@ describe('initializeTabs', () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  dispose.mockResolvedValue(undefined)
 })
 
 describe('closeTab — which tab becomes active', () => {
@@ -101,46 +99,43 @@ describe('closeTab — which tab becomes active', () => {
     expect(activeTabId.value).toBe('a')
   })
 
-  it('runs a restored tab when close fallback activates it', () => {
-    const restored = { id: 'r', kind: 'collection', _restored: true }
-    seed([restored, 'active'], 'active')
+  it('only updates active state when close fallback activates a marked tab', () => {
+    const marked = { id: 'r', kind: 'collection', needsInitialRun: true }
+    seed([marked, 'active'], 'active')
 
     closeTab('active')
 
     expect(activeTabId.value).toBe('r')
-    expect(runRestoredTab).toHaveBeenCalledWith(restored)
+    expect(marked.needsInitialRun).toBe(true)
   })
 })
 
-describe('closeTab — shell session teardown', () => {
-  it('closes the engine session behind a shell tab', () => {
-    seed([{ id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: 'sess-1' }, 'b'], 'b')
-    closeTab('s1')
-    expect(invoke).toHaveBeenCalledWith('close_shell_session', { sessionId: 'sess-1' })
+describe('closeTab — workspace disposal', () => {
+  it('delegates disposal once for the closed workspace', () => {
+    const workspace = { id: 'd1', type: 'test.disposable' }
+    seed([workspace, 'b'], 'b')
+    closeTab('d1')
+    expect(dispose).toHaveBeenCalledOnce()
+    expect(dispose).toHaveBeenCalledWith(workspace)
   })
 
-  it('does not call the driver for a shell tab that never opened a session', () => {
-    seed([{ id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: null }, 'b'], 'b')
-    closeTab('s1')
-    expect(invoke).not.toHaveBeenCalled()
-  })
-
-  it('does not call the driver for a collection tab', () => {
+  it('does not invoke an engine disposer for a workspace without one', () => {
     seed(['a', 'b'], 'a')
     closeTab('a')
-    expect(invoke).not.toHaveBeenCalled()
+    expect(dispose).not.toHaveBeenCalled()
   })
 
   it('keeps the removal synchronous while disposal runs in the background', () => {
-    seed([{ id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: 'sess-1' }, 'b'], 's1')
-    closeTab('s1')
+    dispose.mockReturnValueOnce(new Promise(() => {}))
+    seed([{ id: 'd1', type: 'test.disposable' }, 'b'], 'd1')
+    closeTab('d1')
     expect(idsOf()).toEqual(['b'])
   })
 
   it('does not block removal when disposal rejects', () => {
-    invoke.mockRejectedValueOnce(new Error('session gone'))
-    seed([{ id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: 'sess-1' }, 'b'], 's1')
-    expect(() => closeTab('s1')).not.toThrow()
+    dispose.mockRejectedValueOnce(new Error('disposal failed'))
+    seed([{ id: 'd1', type: 'test.disposable' }, 'b'], 'd1')
+    expect(() => closeTab('d1')).not.toThrow()
     expect(idsOf()).toEqual(['b'])
   })
 })
@@ -171,16 +166,6 @@ describe('bulk close — iterating while the array reindexes', () => {
     seed(['a', 'b', 'c'], 'b')
     handleTabAction('Close All Tabs', 'b')
     expect(idsOf()).toEqual([])
-  })
-
-  it('does not run restored tabs that are also being closed', () => {
-    seed(['active', { id: 'r', kind: 'collection', _restored: true }, 'keep'], 'active')
-
-    handleTabAction('Close Other Tabs', 'keep')
-
-    expect(idsOf()).toEqual(['keep'])
-    expect(activeTabId.value).toBe('keep')
-    expect(runRestoredTab).not.toHaveBeenCalled()
   })
 
   it('ignores a side-close against an unknown tab id', () => {
@@ -271,21 +256,25 @@ describe('activeTab', () => {
   })
 })
 
-// Re-activating a restored tab re-runs its saved query; that hand-off is why the store
-// takes a registered re-runner rather than importing the query runner.
 describe('activateTab', () => {
-  it('re-runs a restored tab when it is activated', () => {
-    const restored = { id: 'r', kind: 'collection', _restored: true }
-    seed([restored, 'b'], 'b')
+  it('changes only active state for a marked workspace', () => {
+    const marked = { id: 'r', kind: 'collection', needsInitialRun: true }
+    seed([marked, 'b'], 'b')
     activateTab('r')
     expect(activeTabId.value).toBe('r')
-    expect(runRestoredTab).toHaveBeenCalledWith(restored)
+    expect(marked.needsInitialRun).toBe(true)
   })
 
-  it('does not re-run a tab that was never restored', () => {
+  it('activates an ordinary workspace', () => {
     seed(['a', 'b'], 'b')
     activateTab('a')
-    expect(runRestoredTab).not.toHaveBeenCalled()
+    expect(activeTabId.value).toBe('a')
+  })
+
+  it('ignores an unknown workspace id', () => {
+    seed(['a', 'b'], 'b')
+    activateTab('missing')
+    expect(activeTabId.value).toBe('b')
   })
 })
 
@@ -310,21 +299,20 @@ describe('duplicateTab', () => {
     expect(tabs.value[2].results).toEqual([])
   })
 
-  it('re-runs a duplicated find through the existing bridge exactly once', () => {
+  it('marks a duplicated find for workspace-owned initial execution', () => {
     seed([FIND_TAB, 'b'], 'b')
     duplicateTab('f1')
-    expect(runRestoredTab).toHaveBeenCalledTimes(1)
-    expect(runRestoredTab).toHaveBeenCalledWith(tabs.value[2])
+    expect(tabs.value[2].needsInitialRun).toBe(true)
   })
 
-  it('does not re-run duplicated aggregate or sql tabs', () => {
+  it('does not mark duplicated aggregate or sql tabs for initial execution', () => {
     seed([{ ...FIND_TAB, id: 'a', type: 'mongodb.aggregate', mode: 'aggregate', pipeline: '[{}]' }, 'b'], 'b')
     duplicateTab('a')
-    expect(runRestoredTab).not.toHaveBeenCalled()
+    expect(tabs.value[2].needsInitialRun).toBeUndefined()
     expect(tabs.value[2].mode).toBe('aggregate')
     seed([{ ...FIND_TAB, id: 's', type: 'mongodb.sql_to_mql', mode: 'sql', sql: 'SELECT 1' }, 'b'], 'b')
     duplicateTab('s')
-    expect(runRestoredTab).not.toHaveBeenCalled()
+    expect(tabs.value[2].needsInitialRun).toBeUndefined()
     expect(tabs.value[2].sql).toBe('SELECT 1')
   })
 
@@ -367,26 +355,27 @@ describe('duplicateTab', () => {
 })
 
 describe('closeWhere', () => {
-  const shellTab = { id: 's1', kind: 'shell', type: 'mongodb.shell', sessionId: 'sess-1' }
+  const disposableTab = { id: 'd1', type: 'test.disposable' }
 
   it('closes every tab matching the predicate', () => {
-    seed([shellTab, 'b', 'c'], 'c')
-    closeWhere(t => t.kind === 'shell')
+    seed([disposableTab, 'b', 'c'], 'c')
+    closeWhere(t => t.type === 'test.disposable')
     expect(idsOf()).toEqual(['b', 'c'])
     expect(activeTabId.value).toBe('c')
   })
 
   it('disposes once per removed workspace', () => {
-    seed([shellTab, { ...shellTab, id: 's2', sessionId: 'sess-2' }, 'b'], 'b')
-    closeWhere(t => t.kind === 'shell')
-    expect(invoke).toHaveBeenCalledTimes(2)
-    expect(invoke).toHaveBeenCalledWith('close_shell_session', { sessionId: 'sess-1' })
-    expect(invoke).toHaveBeenCalledWith('close_shell_session', { sessionId: 'sess-2' })
+    const second = { ...disposableTab, id: 'd2' }
+    seed([disposableTab, second, 'b'], 'b')
+    closeWhere(t => t.type === 'test.disposable')
+    expect(dispose).toHaveBeenCalledTimes(2)
+    expect(dispose).toHaveBeenCalledWith(disposableTab)
+    expect(dispose).toHaveBeenCalledWith(second)
   })
 
   it('keeps every matching tab while splicing', () => {
-    seed(['a', shellTab, 'b', { ...shellTab, id: 's3', sessionId: 'sess-3' }, 'c'], 'c')
-    closeWhere(t => t.kind === 'shell')
+    seed(['a', disposableTab, 'b', { ...disposableTab, id: 'd3' }, 'c'], 'c')
+    closeWhere(t => t.type === 'test.disposable')
     expect(idsOf()).toEqual(['a', 'b', 'c'])
   })
 
