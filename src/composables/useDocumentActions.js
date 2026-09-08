@@ -2,7 +2,6 @@ import { ref, computed, watch } from 'vue'
 import {
   deleteDocument,
   deleteMany,
-  insertDocuments,
   replaceDocument,
   clearCollection,
   openDocumentWindow as openDocumentWindowApi,
@@ -11,6 +10,7 @@ import { errText } from '../utils/errors'
 import { canWriteTab, isWriteAction } from '../utils/writable'
 import { inspectField, setFieldValue, addFieldValue, removeField, renameField, getContainer } from '../utils/docEdit'
 import { valueToClipboard, valueToEjson, documentToClipboard, fieldPath } from '../utils/clipboardCopy'
+import { useDocumentPaste } from './useDocumentPaste'
 
 // Document CRUD + field-edit + native Document/Collection menu dispatch for the results
 // grid. UI-agnostic: `activeTab`/`docMenuRequest` are getters onto ResultsPanel's props,
@@ -170,8 +170,6 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   const showUpdateDialog = ref(false)
   const showDeleteDialog = ref(false)
   const showClearConfirm = ref(false)
-  const pasteConfirm     = ref(null)   // { text, id, database, collection } | null — pending paste
-  const pasteBusy        = ref(false)
   const clearConfirmText = ref('')
   const clearBusy        = ref(false)
   const clearError       = ref(null)
@@ -328,60 +326,11 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       .catch(() => showToast('Copy to clipboard failed'))
   }
 
-  // Edit → Paste Document(s) / Ctrl+V in the grid: read the clipboard and ask for
-  // confirmation before inserting — a paste writes to the collection, and the clipboard
-  // may hold something the user never meant to send. The target is captured here so a
-  // tab switch mid-dialog can't redirect the insert.
-  async function pasteDocuments() {
-    const tab = activeTab()
-    if (!tab || tab.kind !== 'collection' || !tab.collectionName) {
-      showToast('Open a collection first')
-      return
-    }
-    let text
-    try {
-      text = await navigator.clipboard.readText()
-    } catch (e) {
-      showToast('Cannot read from clipboard')
-      return
-    }
-    if (!text || !text.trim()) {
-      showToast('Clipboard is empty')
-      return
-    }
-    pasteConfirm.value = {
-      text: text,
-      workspace: tab,
-      connectionId: tab.connectionId,
-      database: tab.dbName,
-      collection: tab.collectionName,
-    }
-  }
-
-  // Confirmed paste: insert and refresh. Parse/insert errors surface as a toast (the
-  // backend validates the Extended JSON), so a bad paste never crashes.
-  async function onPasteConfirm() {
-    const target = pasteConfirm.value
-    if (!target || pasteBusy.value) return
-    // The dialog stays up, disabled, until the insert returns — closing it first would
-    // leave a large paste running with nothing on screen to say so.
-    pasteBusy.value = true
-    try {
-      const collectionTarget = {
-        connectionId: target.connectionId,
-        database: target.database,
-        collection: target.collection,
-      }
-      const count = await insertDocuments(collectionTarget, target.text)
-      showToast(`Pasted ${count} document${count !== 1 ? 's' : ''}`)
-      requery(true, target.workspace)
-    } catch (e) {
-      showToast(errText(e))
-    } finally {
-      pasteBusy.value = false
-      pasteConfirm.value = null
-    }
-  }
+  const { pasteConfirm, pasteBusy, pasteDocuments, onPasteConfirm } = useDocumentPaste({
+    activeTab,
+    showToast,
+    requery,
+  })
 
   // Persist a field-op mutation of the selected document via replace_document, then
   // refresh the page so the grid reflects it.
