@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { computed, ref } from 'vue'
 import { useModals } from './useModals'
 
 // The registry-driven modal API (openModal / closeModal / isModalOpen over a single
@@ -41,5 +42,47 @@ describe('useModals — registry-driven open-state', () => {
     modals.closeModal('stats')
     expect(modals.isModalOpen('stats')).toBe(false)
     expect(modals.isModalOpen('schema')).toBe(true)
+  })
+
+  it('stores per-open props and callbacks separately from the payload', () => {
+    const modals = useModals()
+    const onSave = () => {}
+    modals.openModal('stats', { connId: 'c1' }, { props: { title: 'Stats' }, on: { save: onSave } })
+
+    expect(modals.openModals.stats).toEqual({ connId: 'c1' })
+    expect(modals.modalOptions('stats')).toEqual({ props: { title: 'Stats' }, on: { save: onSave } })
+    expect(modals.modalOptions('stats').on.save).toBe(onSave)
+  })
+
+  it('clears session options when a modal closes', () => {
+    const modals = useModals()
+    modals.openModal('stats', {}, { props: { title: 'Stats' } })
+    modals.closeModal('stats')
+    expect(modals.modalOptions('stats')).toEqual({})
+  })
+
+  it('replaces payload and options when reopening the same modal', () => {
+    const modals = useModals()
+    modals.openModal('stats', { connId: 'old' }, { props: { title: 'Old' } })
+    modals.openModal('stats', { connId: 'new' }, { props: { title: 'New' } })
+    expect(modals.openModals.stats).toEqual({ connId: 'new' })
+    expect(modals.modalOptions('stats')).toEqual({ props: { title: 'New' } })
+  })
+
+  it('keeps options independent for different modal ids', () => {
+    const modals = useModals()
+    modals.openModal('stats', {}, { props: { title: 'Stats' } })
+    modals.openModal('schema', {}, { props: { title: 'Schema' } })
+    expect(modals.modalOptions('stats').props.title).toBe('Stats')
+    expect(modals.modalOptions('schema').props.title).toBe('Schema')
+  })
+
+  it('preserves reactive props supplied by an opener', () => {
+    const modals = useModals()
+    const count = ref(1)
+    const title = computed(() => `Count ${count.value}`)
+    modals.openModal('stats', {}, { props: { title } })
+    count.value = 2
+    expect(modals.modalOptions('stats').props.title.value).toBe('Count 2')
   })
 })

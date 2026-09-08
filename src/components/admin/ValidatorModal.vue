@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { getValidator, setValidator } from '../../engines/mongodb/api/admin'
 import { errText } from '../../utils/errors'
 import { parseField } from '../../utils/queryParser'
+import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -19,7 +20,8 @@ import BaseModalFoot from '../base/BaseModalFoot.vue'
 const props = defineProps({
   target: { type: Object, required: true },  // { connId, connName, dbName, collName }
 })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
+const { showToast } = useToast()
 
 const loading = ref(true)
 const saving = ref(false)
@@ -63,7 +65,7 @@ async function save() {
       level.value,
       action.value,
     )
-    emit('saved', props.target.collName)
+    showToast(`Validator saved for "${props.target.collName}"`)
     emit('close')
   } catch (e) {
     error.value = errText(e)

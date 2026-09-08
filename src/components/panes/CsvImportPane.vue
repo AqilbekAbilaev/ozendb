@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, watch, inject } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
 import { invalidateConnectionResources } from '../../stores/connectionData'
+import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
@@ -26,8 +27,7 @@ const props = defineProps({
   activeTab: { type: Object, required: true },
 })
 
-const bundle = inject('appModals')
-const showToast = bundle.handlers.showToast
+const { showToast } = useToast()
 
 const SUB_TABS = [
   { value: 'source', label: 'Source options' },

@@ -1,13 +1,12 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { getKeybindings, getSettings, updateKeybindings, updateSettings } from './appApi/settings'
 import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
 import { setCollectionQueryMode } from './utils/queryMode'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { errText } from './utils/errors'
-import { mergeBindings, matchBinding } from './utils/keybindings'
+import { matchBinding } from './utils/keybindings'
 import { RELEASES_URL } from './constants/helpLinks'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
@@ -29,6 +28,15 @@ import {
   activateTab, closeTab, moveTab, handleTabAction,
   renameTabTarget, renameTabValue, confirmRenameTab,
 } from './stores/tabs'
+import {
+  defaultQueryLimit,
+  defaultResultView,
+  editorTabWidth,
+  keyBindings,
+  loadSettings,
+  restoreSessionEnabled,
+  theme,
+} from './stores/settings'
 import ConnectionTree from './components/connection/ConnectionTree.vue'
 import WorkspaceArea from './components/workspace/WorkspaceArea.vue'
 import ContextMenu from './components/base/ContextMenu.vue'
@@ -65,23 +73,10 @@ onMounted(async () => {
     window.addEventListener('keydown', onGlobalKeydown)
   }
 
-  // Load persisted preferences so new tabs adopt the configured default limit.
+  // Settings must load before restoring tabs so new workspaces use the stored defaults.
   try {
-    const settings = await getSettings()
-    if (settings && Number(settings.default_query_limit)) {
-      defaultQueryLimit.value = Number(settings.default_query_limit)
-    }
-    if (settings && settings.theme) applyTheme(settings.theme)
-    if (settings && settings.default_result_view) defaultResultView.value = settings.default_result_view
-    if (settings && typeof settings.restore_session === 'boolean') restoreSessionEnabled.value = settings.restore_session
-    if (settings && Number(settings.editor_tab_width)) editorTabWidth.value = Number(settings.editor_tab_width)
+    const settings = await loadSettings()
     await loadZoom(settings && settings.ui_zoom)
-  } catch (_) {}
-
-  // Load custom keyboard shortcuts so the JS handler (Linux) honors rebinds.
-  try {
-    const overrides = await getKeybindings()
-    keyBindings.value = mergeBindings(overrides)
   } catch (_) {}
 
   // Restore persisted database/collection colour tags so they survive a restart.
@@ -131,37 +126,7 @@ const dbClipboard = ref(null)         // Copy/Paste: { kind: 'collection'|'datab
 const modalsApi = useModals()
 // Only the refs App.vue itself touches are destructured here; the rest are consumed
 // by useFeatures (via `modals: modalsApi`) and AppModals (via provide/inject).
-const defaultQueryLimit = ref(50)     // from settings; applied to newly opened collection tabs
-const theme = ref('dark')             // from settings; drives <html data-theme>
-const defaultResultView = ref('table')// from settings; the view a freshly opened collection tab shows
-const restoreSessionEnabled = ref(true) // from settings; whether to reopen last session's tabs on startup
-const editorTabWidth = ref(4)         // from settings; spaces per indent in the query/shell editors
-const preferencesInitialTab = ref('general') // which Preferences tab to open on (e.g. 'keyboard' from Help menu)
-// Effective keyboard shortcuts (defaults + user overrides). The JS key handler
-// reads these on Linux; the native menu reads the same persisted store at build.
-const keyBindings = ref(mergeBindings(null))
 
-// Apply a theme everywhere it needs to live: the ref (for the Preferences select),
-// the <html> attribute (which the CSS tokens key off), and the localStorage mirror
-// that lets both webviews pre-paint on next launch without a flash.
-function applyTheme(next) {
-  const value = next === 'light' ? 'light' : 'dark'
-  theme.value = value
-  document.documentElement.dataset.theme = value
-  localStorage.setItem('s4t-theme', value)
-}
-
-// Persist + apply a theme chosen outside the Preferences dialog (e.g. the Quickstart
-// tab's Quick Options). Mirrors what onPrefsSaved does, but saves the setting too so
-// the choice survives a restart.
-async function setTheme(next) {
-  try {
-    await updateSettings({ defaultQueryLimit: defaultQueryLimit.value, theme: next })
-  } catch (_) {}
-  applyTheme(next)
-}
-
-const expandConnectionId = ref(null)
 const vqbOpen        = ref(false)
 const clipboardQuery = ref(null)
 const contextMenu = ref(null)
@@ -203,15 +168,6 @@ provide('editorTabWidth', editorTabWidth)
 
 const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags()
 
-const {
-  openImportWizard,
-  exportDatabase,
-  importDatabase,
-} = useDbTransfer({
-  showToast: showToast,
-  openModal: modalsApi.openModal,
-})
-
 // Self-update. The launch check is silent; Help → Check for Updates… is the loud one.
 const updater = useUpdater({
   showToast: showToast,
@@ -248,7 +204,6 @@ const {
   openIndexManagerTab,
   openSchemaTab,
   openExportSource,
-  openExportTab,
   openSearchTab, openCurrentOpsTab,
   openImportTab,
   openQuickstart,
@@ -258,6 +213,17 @@ const {
   runQuery: runQuery,
   modalsApi: modalsApi,
   showToast: showToast,
+})
+
+const {
+  openImportWizard,
+  exportDatabase,
+  importDatabase,
+} = useDbTransfer({
+  showToast: showToast,
+  openModal: modalsApi.openModal,
+  closeModal: modalsApi.closeModal,
+  openImportTab: openImportTab,
 })
 
 // The workspace always keeps at least one tab open: closing the last tab reopens
@@ -303,7 +269,6 @@ const activeCollectionKey = computed(() => {
 
 const { handleMenuAction } = useAppMenuActions({
   modalsApi,
-  preferencesInitialTab,
   openQuickstart,
   updater,
   menuTarget,
@@ -335,15 +300,6 @@ function onGlobalKeydown(e) {
     e.preventDefault()
     handleMenuAction(id)
   }
-}
-
-function onManagerConnect(id) {
-  modalsApi.closeModal('connectionManager')
-  expandConnectionId.value = id
-}
-
-function onValidatorSaved(collName) {
-  showToast(`Validator saved for "${collName}"`)
 }
 
 function onCopyQuery() {
@@ -385,79 +341,12 @@ async function onPasteQuery() {
   })
 }
 
-function onPrefsSaved(payload) {
-  defaultQueryLimit.value = payload.defaultQueryLimit
-  applyTheme(payload.theme)
-  defaultResultView.value = payload.defaultResultView
-  restoreSessionEnabled.value = payload.restoreSession
-  editorTabWidth.value = payload.editorTabWidth
-}
-
-// Shortcuts editor saved: persist the new bindings and adopt them live. The JS
-// handler picks them up immediately; the native menu bar reflects them on next
-// launch (it's built once from the same store).
-async function onKeybindingsSaved(bindings) {
-  try {
-    const saved = await updateKeybindings(bindings)
-    keyBindings.value = mergeBindings(saved)
-  } catch (e) {
-    showToast(errText(e))
-  }
-}
-
-// Everything the extracted AppModals.vue needs, bundled behind one provide/inject.
-// Grouped by concern; AppModals destructures each group back to the same identifier
-// names the moved template already uses, so that template stays verbatim.
+// The remaining app-modal injection carries stable modal state that has not yet moved
+// into its own domain store.
 provide('appModals', {
   modals: modalsApi,
   indexes: indexesApi,
   ssh: sshApi,
-  handlers: {
-    setTheme: setTheme,
-    onManagerConnect: onManagerConnect,
-    onValidatorSaved: onValidatorSaved,
-    openImportTab: openImportTab,
-    onPrefsSaved: onPrefsSaved,
-    onKeybindingsSaved: onKeybindingsSaved,
-  },
-  // Extra domain events for registry-driven modals: modal id → { eventName: handler }.
-  // `close` is wired generically by AppModals; only the modal's other events go here.
-  modalEmits: {
-    validator: { saved: onValidatorSaved },
-    import: {
-      configure: (format) => {
-        openImportTab(modalsApi.openModals.import, format)
-        modalsApi.closeModal('import')
-      },
-    },
-    exportSource: {
-      choose: (source) => {
-        openExportTab(modalsApi.openModals.exportSource, source)
-        modalsApi.closeModal('exportSource')
-      },
-    },
-    connectionManager: { connect: onManagerConnect },
-    update: { install: updater.install, downloads: updater.openDownloads },
-    preferences: {
-      saved: onPrefsSaved,
-      'saved-keybindings': onKeybindingsSaved,
-    },
-  },
-  // Extra props for registry-driven modals that need app-level state beyond their target:
-  // modal id → () => props object, re-read on each render so reactive values stay current.
-  modalProps: {
-    update: () => updater.dialogProps.value,
-    preferences: () => ({
-      defaultQueryLimit: defaultQueryLimit.value,
-      theme: theme.value,
-      defaultResultView: defaultResultView.value,
-      restoreSession: restoreSessionEnabled.value,
-      editorTabWidth: editorTabWidth.value,
-      bindings: keyBindings.value,
-      initialTab: preferencesInitialTab.value,
-    }),
-  },
-  prefs: { defaultQueryLimit: defaultQueryLimit, theme: theme, keyBindings: keyBindings },
   tabRename: { renameTabTarget: renameTabTarget, renameTabValue: renameTabValue, confirmRenameTab: confirmRenameTab },
 })
 </script>
@@ -502,13 +391,11 @@ provide('appModals', {
         ref="connectionTreeRef"
         :width="sidebarWidth"
         :active-collection-key="activeCollectionKey"
-        :expand-id="expandConnectionId"
         :tag-overrides="tagOverrides"
         :context-active-node-key="contextActiveNodeKey"
         @select-collection="openCollectionTab"
         @select-node="treeSelection = $event"
         @connections-changed="treeConnectionCount = $event"
-        @expanded="expandConnectionId = null"
         @context-menu="contextMenu = $event"
       />
       <Resizer v-show="sidebarOpen" v-model="sidebarWidth" axis="x" :min="200" :max="560" />

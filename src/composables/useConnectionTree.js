@@ -8,6 +8,10 @@ import {
   connectionResourceLoading, connectionResourceErrors,
   ensureConnectionResources, refreshConnectionResources, clearConnectionResources,
 } from '../stores/connectionData'
+import {
+  connectionOpenRequest,
+  consumeConnectionOpenRequest,
+} from '../stores/connectionNavigation'
 
 export function useConnectionTree({ props, emit }) {
   const connections = ref([])
@@ -169,23 +173,28 @@ export function useConnectionTree({ props, emit }) {
     return `${connId}/${dbName}/${collName}`
   }
 
-  watch(() => props.expandId, async (id) => {
-    if (!id) return
-    let conn = connections.value.find(c => c.id === id)
+  async function openRequestedConnection(request) {
+    if (!request) return
+    const { connectionId } = request
+    let conn = connections.value.find(c => c.id === connectionId)
     if (!conn) {
       // Opening a connection that isn't in the sidebar yet: fetch just its config,
       // mark it open (persisted), and add only it — don't reload the whole list.
       const all = await listConnections()
-      conn = all.find(c => c.id === id)
+      conn = all.find(c => c.id === connectionId)
       if (conn) {
-        await setConnectionOpen(id, true)
+        await setConnectionOpen(connectionId, true)
         connections.value.push(conn)
       }
     }
-    if (conn && !expandedConns.value[id]) {
+    if (conn && !expandedConns.value[connectionId]) {
       toggleConnection(conn)
     }
-    emit('expanded')
+  }
+
+  watch(connectionOpenRequest, () => {
+    const pending = consumeConnectionOpenRequest()
+    if (pending) openRequestedConnection(pending)
   })
 
   // When a collection becomes the active one (e.g. switching tabs in the

@@ -12,6 +12,7 @@ import {
 import { errText, errMessage } from '../../utils/errors'
 import { fmtBytes } from '../../utils/format'
 import { useIndexPaneLifecycle } from '../../composables/useIndexPaneLifecycle'
+import { useToast } from '../../composables/useToast'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 
 // Each Index Manager tab manages its own index list, selection, and metrics
@@ -24,7 +25,7 @@ const props = defineProps({
 
 const bundle = inject('appModals')
 const idx = bundle.indexes
-const showToast = bundle.handlers.showToast
+const { showToast } = useToast()
 
 // Per-tab state (not shared across tabs)
 const localIndexesList     = ref([])

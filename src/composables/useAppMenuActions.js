@@ -6,7 +6,6 @@ import { tabs, activeTabId, closeTab, cycleTab } from '../stores/tabs'
 
 export function useAppMenuActions({
   modalsApi,
-  preferencesInitialTab,
   openQuickstart,
   updater,
   menuTarget,
@@ -46,8 +45,8 @@ export function useAppMenuActions({
       // --- direct modals / app ---
       case 'file:connect':     modalsApi.openModal('connectionManager'); return
       case 'file:exit':        appWindow.close(); return
-      case 'edit:preferences': preferencesInitialTab.value = 'general'; modalsApi.openModal('preferences'); return
-      case 'help:shortcuts':   preferencesInitialTab.value = 'keyboard'; modalsApi.openModal('preferences'); return
+      case 'edit:preferences': modalsApi.openModal('preferences', undefined, { props: { initialTab: 'general' } }); return
+      case 'help:shortcuts':   modalsApi.openModal('preferences', undefined, { props: { initialTab: 'keyboard' } }); return
       case 'help:quickstart':  openQuickstart(); return
       case 'help:updates':     updater.checkNow(); return
       case 'coll:vqb': {

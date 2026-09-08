@@ -1,7 +1,16 @@
 <script setup>
 import { ref } from 'vue'
 import { errText } from '../../utils/errors'
-import { updateSettings } from '../../appApi/settings'
+import {
+  defaultQueryLimit,
+  defaultResultView,
+  editorTabWidth,
+  keyBindings,
+  restoreSessionEnabled,
+  saveKeybindings,
+  savePreferences,
+  theme,
+} from '../../stores/settings'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -12,19 +21,12 @@ import HintText from '../base/HintText.vue'
 import ShortcutsPane from '../panes/ShortcutsPane.vue'
 import { PAGE_SIZES } from '../../constants/pageSizes'
 
-// App preferences. Persisted via update_settings (a partial merge on the backend);
-// on save the parent adopts the new values so open/newly opened views pick them up.
-// The Keyboard tab embeds the shortcut editor; its bindings ride along with Save.
+// App preferences are owned by the settings store. The form keeps local drafts until
+// Save succeeds, so cancelling or a rejected save never changes live settings.
 const props = defineProps({
-  defaultQueryLimit: { type: Number, default: 50 },
-  theme: { type: String, default: 'dark' },
-  defaultResultView: { type: String, default: 'table' },
-  restoreSession: { type: Boolean, default: true },
-  editorTabWidth: { type: Number, default: 4 },
-  bindings: { type: Object, default: () => ({}) },
   initialTab: { type: String, default: 'general' },
 })
-const emit = defineEmits(['close', 'saved', 'saved-keybindings'])
+const emit = defineEmits(['close'])
 
 const TABS = [
   { value: 'general', label: 'General' },
@@ -42,11 +44,11 @@ const TAB_WIDTHS = [2, 4, 8]
 const tabWidthOptions = TAB_WIDTHS.map((n) => ({ value: n, label: String(n) }))
 
 const activeTab = ref(props.initialTab)
-const limit = ref(props.defaultQueryLimit)
-const theme = ref(props.theme)
-const resultView = ref(props.defaultResultView)
-const restoreSession = ref(props.restoreSession)
-const tabWidth = ref(props.editorTabWidth)
+const limit = ref(defaultQueryLimit.value)
+const selectedTheme = ref(theme.value)
+const resultView = ref(defaultResultView.value)
+const restoreSession = ref(restoreSessionEnabled.value)
+const tabWidth = ref(editorTabWidth.value)
 const shortcutsPane = ref(null)
 const saving = ref(false)
 const error = ref(null)
@@ -55,24 +57,17 @@ async function save() {
   saving.value = true
   error.value = null
   try {
-    const settings = await updateSettings({
+    await savePreferences({
       defaultQueryLimit: Number(limit.value),
-      theme: theme.value,
+      theme: selectedTheme.value,
       defaultResultView: resultView.value,
       restoreSession: restoreSession.value,
       editorTabWidth: Number(tabWidth.value),
     })
     // Keyboard bindings save alongside settings under the single Save button.
     if (shortcutsPane.value) {
-      emit('saved-keybindings', shortcutsPane.value.collectBindings())
+      await saveKeybindings(shortcutsPane.value.collectBindings())
     }
-    emit('saved', {
-      defaultQueryLimit: Number(settings.default_query_limit),
-      theme: settings.theme,
-      defaultResultView: settings.default_result_view,
-      restoreSession: settings.restore_session,
-      editorTabWidth: Number(settings.editor_tab_width),
-    })
     emit('close')
   } catch (e) {
     error.value = errText(e)
@@ -122,7 +117,7 @@ async function save() {
             <div class="pf-label">Theme</div>
             <HintText class="pf-hint">Overall color scheme for the app.</HintText>
           </div>
-          <BaseSelect v-model="theme" class="pf-select" :options="THEME_OPTIONS" />
+          <BaseSelect v-model="selectedTheme" class="pf-select" :options="THEME_OPTIONS" />
         </div>
 
         <div class="pf-row">
@@ -136,7 +131,7 @@ async function save() {
 
       <!-- Keyboard: the shortcut editor, kept mounted so edits survive tab switches. -->
       <div v-show="activeTab === 'keyboard'" class="pf-panel">
-        <ShortcutsPane ref="shortcutsPane" :bindings="bindings" />
+        <ShortcutsPane ref="shortcutsPane" :bindings="keyBindings" />
       </div>
 
       <FieldError :text="error" />

@@ -35,7 +35,10 @@ export function useUpdater({ showToast, openModal, closeModal, openDownloadsPage
       }
       canInstall.value = await probeSelfUpdate()
       pending.value = update
-      openModal('update')
+      openModal('update', undefined, {
+        props: dialogProps,
+        on: { install, downloads: openDownloads },
+      })
     } catch (e) {
       if (!silent) showToast('Could not check for updates')
     } finally {
@@ -80,8 +83,7 @@ export function useUpdater({ showToast, openModal, closeModal, openDownloadsPage
     openDownloadsPage()
   }
 
-  // Everything UpdateModal renders, in one place — the dialog's prop shape belongs with
-  // the state that feeds it, not spread across App.vue's modalProps map.
+  // Everything UpdateModal renders stays with the state that feeds it.
   const dialogProps = computed(() => ({
     update: pending.value,
     canInstall: canInstall.value,

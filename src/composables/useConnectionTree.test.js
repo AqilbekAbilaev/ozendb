@@ -11,6 +11,7 @@ vi.mock('../appApi/connectionState', () => ({ setConnectionOpen: vi.fn() }))
 
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { connDatabases, clearConnectionResources, invalidateConnectionResources, refreshConnectionResources } from '../stores/connectionData'
+import { consumeConnectionOpenRequest, requestConnectionOpen } from '../stores/connectionNavigation'
 import { useConnectionTree } from './useConnectionTree'
 
 let scope
@@ -20,6 +21,7 @@ const conn = { id: 'a', name: 'Connection' }
 beforeEach(() => {
   vi.resetAllMocks()
   clearConnectionResources('a')
+  consumeConnectionOpenRequest()
   scope = effectScope()
   tree = scope.run(() => useConnectionTree({ props: {}, emit: vi.fn() }))
   tree.connections.value = [conn]
@@ -32,6 +34,13 @@ it('reuses an empty cached list on re-expansion', async () => {
   await tree.toggleConnection(conn)
   await tree.toggleConnection(conn)
   expect(listDatabases).toHaveBeenCalledOnce()
+})
+
+it('opens a requested connection through the navigation store', async () => {
+  listDatabases.mockResolvedValue([])
+  requestConnectionOpen('a')
+  await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
+  expect(listDatabases).toHaveBeenCalledWith('a')
 })
 
 it('refreshes a collapsed connection through the resource store', async () => {

@@ -23,7 +23,7 @@ function harness() {
   tabs.value = [{ id: 't0', kind: 'quickstart', title: 'Quickstart' }]
   activeTabId.value = 't0'
   const runQuery = vi.fn()
-  const modalsApi = { openModal: vi.fn() }
+  const modalsApi = { openModal: vi.fn(), closeModal: vi.fn() }
   const defaultQueryLimit = { value: 50 }
   const defaultResultView = { value: 'table' }
   const creators = useTabCreators({
@@ -282,7 +282,17 @@ describe('export source resolution', () => {
       ...NODE,
       query: '{"status":"open"}',
       selectedIds: ['a', 'b'],
-    })
+    }, expect.objectContaining({ on: expect.any(Object) }))
+  })
+
+  it('opens an export tab from the target captured when the picker opened', () => {
+    const c = harness()
+    c.openExportSource(NODE)
+    const [, target, options] = c.modalsApi.openModal.mock.calls[0]
+    options.on.choose('query')
+    expect(lastTab().source).toBe('query')
+    expect(lastTab().connId).toBe(target.connId)
+    expect(c.modalsApi.closeModal).toHaveBeenCalledWith('exportSource')
   })
 })
 

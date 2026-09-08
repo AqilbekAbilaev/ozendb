@@ -13,8 +13,8 @@ const lazy = (loader) => defineAsyncComponent(loader)
 
 export const MODALS = {
   // ── app-level singletons (no node target; level null) ──
-  // Opened by id alone (openModal('about')); any props/events they need are declared in
-  // App.vue's modalProps / modalEmits maps and bound generically by AppModals.
+  // Opened by id alone (openModal('about')); any session props/events are supplied by
+  // the owner when it opens the modal and bound generically by AppModals.
   connectionManager: { component: lazy(() => import('../components/connection/ConnectionManager.vue')), level: null },
   about:             { component: lazy(() => import('../components/app/AboutModal.vue')),                level: null },
   preferences:       { component: lazy(() => import('../components/app/PreferencesModal.vue')),          level: null },
@@ -45,9 +45,8 @@ export const MODALS = {
   addView:       { component: lazy(() => import('../components/admin/AddViewModal.vue')),       level: 'database' },
 
   // ── collection level ──
-  // A modal with extra domain events (e.g. validator's `saved`) keeps its component
-  // conforming — one `target`, emits `close` — and declares those events in App.vue's
-  // modalEmits map, which AppModals binds generically. The registry row stays pure data.
+  // Registry modals take one `target` prop and emit `close`; their owners may supply
+  // additional per-open listeners without adding routing to App.vue.
   stats:     { component: lazy(() => import('../components/admin/StatsModal.vue')),             level: 'collection' },
   history:   { component: lazy(() => import('../components/tools/CollectionHistoryModal.vue')), level: 'collection' },
   mapReduce: { component: lazy(() => import('../components/query/MapReduceModal.vue')),         level: 'collection' },

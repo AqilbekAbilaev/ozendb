@@ -1,20 +1,20 @@
 <script setup>
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, inject, onMounted } from 'vue'
 import { listConnections } from '../../engines/mongodb/api/connections'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { updateLastAccessed } from '../../appApi/connectionState'
+import { requestConnectionOpen } from '../../stores/connectionNavigation'
+import { setTheme as saveTheme, theme } from '../../stores/settings'
+import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import { formatNow } from '../../utils/format'
 
-// Actions/state come from App.vue's provided `appModals` (the same DI the modals
-// use), so the home screen can open the Connection Manager, connect to a
-// recent connection, and change the theme without threading props through
-// QueryWorkspace. Guarded so the component still renders if provided in isolation.
+// The home screen uses the modal API only to open Connection Manager. Settings and
+// navigation have dedicated stores, so they need no App-level callback routing.
 const app = inject('appModals', null)
 const modals   = app?.modals   || {}
-const handlers = app?.handlers || {}
-const theme = computed(() => app?.prefs?.theme?.value ?? 'dark')
+const { showToast } = useToast()
 
 // ── recent connections ─────────────────────────────────────
 const recent  = ref([])
@@ -53,14 +53,20 @@ async function openRecent(c) {
   try {
     await updateLastAccessed(c.id, formatNow())
   } catch (_) {}
-  handlers.onManagerConnect?.(c.id)
+  requestConnectionOpen(c.id)
 }
 
 // ── actions ────────────────────────────────────────────────
 function openConnectionManager() { if (modals.openModal) modals.openModal('connectionManager') }
 function createConnection()       { openConnectionManager() }  // new-connection form lives inside the manager
 
-function setTheme(value) { handlers.setTheme?.(value) }
+async function setTheme(value) {
+  try {
+    await saveTheme(value)
+  } catch (_) {
+    showToast('Could not save theme')
+  }
+}
 
 // ── help & learning ────────────────────────────────────────
 // REPO mirrors App.vue's HELP_REPO; wiki/issues/releases paths match its HELP_URLS.
@@ -73,7 +79,7 @@ const helpLinks = [
   ['Report an issue',      `${REPO}/issues`],
   ['Releases & changelog', `${REPO}/releases`],
 ]
-function openLink(url) { openUrl(url).catch(() => handlers.showToast?.('Could not open link')) }
+function openLink(url) { openUrl(url).catch(() => showToast('Could not open link')) }
 </script>
 
 <template>

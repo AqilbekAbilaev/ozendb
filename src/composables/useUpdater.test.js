@@ -18,7 +18,7 @@ function harness() {
   const calls = { toasts: [], opened: [], closed: [], downloads: 0 }
   const api = useUpdater({
     showToast: (m) => calls.toasts.push(m),
-    openModal: (id) => calls.opened.push(id),
+    openModal: (id, payload, options) => calls.opened.push({ id, payload, options }),
     closeModal: (id) => calls.closed.push(id),
     openDownloadsPage: () => { calls.downloads += 1 },
   })
@@ -86,7 +86,10 @@ describe('what an available update offers', () => {
     canSelfUpdate.mockResolvedValue(true)
     const { api, calls } = harness()
     await api.checkNow()
-    expect(calls.opened).toEqual(['update'])
+    expect(calls.opened[0].id).toBe('update')
+    expect(calls.opened[0].options.props).toBe(api.dialogProps)
+    expect(calls.opened[0].options.on.install).toBe(api.install)
+    expect(calls.opened[0].options.on.downloads).toBe(api.openDownloads)
     expect(api.canInstall.value).toBe(true)
     expect(api.pending.value.version).toBe('0.1.5')
   })
@@ -96,7 +99,7 @@ describe('what an available update offers', () => {
     canSelfUpdate.mockResolvedValue(false)
     const { api, calls } = harness()
     await api.checkNow()
-    expect(calls.opened).toEqual(['update'])
+    expect(calls.opened[0].id).toBe('update')
     expect(api.canInstall.value).toBe(false)
   })
 

@@ -1,5 +1,5 @@
 <script setup>
-import { inject } from 'vue'
+import { inject, unref } from 'vue'
 import { MODALS } from '../../constants/modalRegistry'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -12,18 +12,20 @@ import SshHostKeyModal from '../connection/SshHostKeyModal.vue'
 // registry-driven yet: the two index dialogs, the SSH host-key prompt and Rename Tab.
 const ctx = inject('appModals')
 
-const { openModals, closeModal } = ctx.modals
+const { openModals, closeModal, modalOptions } = ctx.modals
 
 // Registry-driven modals are bound generically: every modal gets `close`; node-targeted
-// modals (level set) also get their `target`; modals listed in App.vue's modalEmits/modalProps
-// get those extra events/props too. See constants/modalRegistry.js.
-const modalEmits = ctx.modalEmits
-const modalProps = ctx.modalProps
+// modals get their payload as `target`; the opener owns any session props and events.
 function modalListeners(id) {
-  return { close: () => closeModal(id), ...(modalEmits[id] || {}) }
+  const session = modalOptions(id)
+  return { ...(session.on || {}), close: () => closeModal(id) }
 }
 function modalBindings(id, payload) {
-  const extra = modalProps[id] ? modalProps[id]() : {}
+  const session = modalOptions(id)
+  const sessionProps = unref(session.props) || {}
+  const extra = {
+    ...Object.fromEntries(Object.entries(sessionProps).map(([key, value]) => [key, unref(value)])),
+  }
   return MODALS[id].level ? { target: payload, ...extra } : extra
 }
 // Keyed on the target, not just the id, so re-opening a dialog for a different node
@@ -60,10 +62,8 @@ const { renameTabTarget, renameTabValue, confirmRenameTab } = ctx.tabRename
 </script>
 
 <template>
-    <!-- Every registry-driven modal renders from this one block (constants/modalRegistry.js):
-         `close` is always wired; node-targeted modals also get their `target`, and any
-         extra props/events come from App.vue's modalProps/modalEmits. Adding a modal needs
-         no change here. -->
+    <!-- Every registry-driven modal renders from this one block. `close` is always wired;
+         node-targeted modals get their `target`, and openers provide extra session options. -->
     <component
       v-for="(payload, id) in openModals"
       :is="MODALS[id].component"

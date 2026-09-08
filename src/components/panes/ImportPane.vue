@@ -6,6 +6,7 @@ import { importPreview, importCollectionMapped } from '../../engines/mongodb/api
 import { errText, errCode } from '../../utils/errors'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { useImportPaneLifecycle } from '../../composables/useImportPaneLifecycle'
+import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -25,13 +26,13 @@ const props = defineProps({
   activeTab: { type: Object, required: true },
 })
 
-const bundle = inject('appModals')
-const showToast = bundle.handlers.showToast
+const modals = inject('appModals')?.modals
+const { showToast } = useToast()
 
 // "Change target" opens the Connection Manager (the app's single place to pick /
 // edit connections).
 function changeTarget() {
-  bundle.modals.openModal('connectionManager')
+  modals?.openModal('connectionManager')
 }
 
 // Insertion modes. Only plain insert is wired today; overwrite/merge/skip need a

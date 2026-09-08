@@ -11,12 +11,11 @@ import { useConnectionTree } from '../../composables/useConnectionTree.js'
 
 const props = defineProps({
   activeCollectionKey: String,
-  expandId: String,
   width: { type: Number, default: 320 },
   tagOverrides: { type: Object, default: () => ({}) },
   contextActiveNodeKey: { type: String, default: null },
 })
-const emit = defineEmits(['select-collection', 'expanded', 'context-menu', 'select-node', 'connections-changed'])
+const emit = defineEmits(['select-collection', 'context-menu', 'select-node', 'connections-changed'])
 
 const {
   connections, expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import * as connApi from '../../engines/mongodb/api/connections'
 import { updateLastAccessed } from '../../appApi/connectionState'
+import { requestConnectionOpen } from '../../stores/connectionNavigation'
 import { listen, emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
@@ -17,7 +18,7 @@ import NewConnection from './NewConnection.vue'
 import ContextMenu from '../base/ContextMenu.vue'
 import { formatNow } from '../../utils/format'
 
-const emit = defineEmits(['close', 'connect'])
+const emit = defineEmits(['close'])
 const { showToast } = useToast()
 
 const connections = ref([])
@@ -108,7 +109,8 @@ async function connectSelected() {
     const conn = connections.value.find(c => c.id === selectedId.value)
     if (conn) conn.last_accessed = now
   } catch {}
-  emit('connect', selectedId.value)
+  requestConnectionOpen(selectedId.value)
+  emit('close')
 }
 
 async function duplicateSelected() {

@@ -19,6 +19,21 @@ import { useDbActions } from './useDbActions'
 beforeEach(() => vi.resetAllMocks())
 const target = { connId: 'destination', dbName: 'db' }
 
+it('creates an import workspace from the picker target captured at open', () => {
+  const openModal = vi.fn()
+  const closeModal = vi.fn()
+  const openImportTab = vi.fn()
+  const transfer = useDbTransfer({ showToast: vi.fn(), openModal, closeModal, openImportTab })
+  const target = { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' }
+
+  transfer.openImportWizard(target)
+  const [, capturedTarget, options] = openModal.mock.calls[0]
+  options.on.configure('csv')
+
+  expect(openImportTab).toHaveBeenCalledWith(capturedTarget, 'csv')
+  expect(closeModal).toHaveBeenCalledWith('import')
+})
+
 it('invalidates a partially successful database import without a tree', async () => {
   open.mockResolvedValue(['/a.json', '/b.csv'])
   importCollection.mockResolvedValueOnce(1).mockRejectedValueOnce('Failed')

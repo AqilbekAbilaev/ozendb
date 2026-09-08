@@ -150,10 +150,18 @@ export function useTabCreators({
       .map(i => tab.results[i])
       .filter(doc => doc && doc._id !== undefined)
       .map(doc => doc._id)
-    modalsApi.openModal('exportSource', {
+    const target = {
       ...node,
       query: pf && pf.ok ? pf.ejson : null,
       selectedIds: selectedIds,
+    }
+    modalsApi.openModal('exportSource', target, {
+      on: {
+        choose: (source) => {
+          openExportTab(target, source)
+          modalsApi.closeModal('exportSource')
+        },
+      },
     })
   }
 
