@@ -280,7 +280,7 @@ const dbActionsApi = useDbActions({ showToast: showToast, dbClipboard: dbClipboa
 const { menuTarget } = useMenu({ treeSelection: treeSelection, treeConnectionCount: treeConnectionCount, selectedIndex: selectedIndex })
 
 // Node-action dispatch shared by right-click menus, the native menu, and the toolbar.
-const { handleContextAction, handleTool, menuNode } = useFeatures({
+const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
   contextMenu: contextMenu,
   connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard,
   modals: modalsApi, dbActions: dbActionsApi,
@@ -315,7 +315,7 @@ const { handleMenuAction } = useAppMenuActions({
   browserRequest,
   saveQueryRequest,
   historyRequest,
-  connectionTreeRef,
+  refreshAll,
   zoomIn,
   zoomOut,
   resetZoom,

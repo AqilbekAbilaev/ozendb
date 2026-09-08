@@ -5,6 +5,7 @@ import { activeTab, closeWhere } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
 import { errText } from '../utils/errors'
+import { refreshConnectionResources } from '../stores/connectionData'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
@@ -114,14 +115,25 @@ export function useFeatures({
     showToast('All connections closed')
   }
   async function refreshSelected(node) {
-    await connectionTreeRef.value.refreshConn(node.connId)
-    showToast('Refreshed')
+    try {
+      await refreshConnectionResources(node.connId)
+      showToast('Refreshed')
+    } catch (e) {
+      showToast('Refresh failed: ' + errText(e))
+    }
   }
   async function refreshAll() {
+    let done = 0
+    let failed = 0
     for (const conn of connectionTreeRef.value.getConnections()) {
-      await connectionTreeRef.value.refreshConn(conn.id)
+      try {
+        await refreshConnectionResources(conn.id)
+        done++
+      } catch {
+        failed++
+      }
     }
-    showToast('All connections refreshed')
+    showToast(failed ? `Refreshed ${done} connection${done === 1 ? '' : 's'}, ${failed} failed` : 'All connections refreshed')
   }
 
   function openServerInfo(node, kind, title) {
@@ -342,5 +354,6 @@ export function useFeatures({
     handleTool: handleTool,
     menuNode: menuNode,
     runFeature: runFeature,
+    refreshAll,
   }
 }

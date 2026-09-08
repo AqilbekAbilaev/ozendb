@@ -18,7 +18,7 @@ export function useAppMenuActions({
   browserRequest,
   saveQueryRequest,
   historyRequest,
-  connectionTreeRef,
+  refreshAll,
   zoomIn,
   zoomOut,
   resetZoom,
@@ -175,11 +175,7 @@ export function useAppMenuActions({
 
       // --- view ---
       case 'view:refresh':
-        for (const conn of connectionTreeRef.value.getConnections()) {
-          connectionTreeRef.value.refreshConn(conn.id)
-        }
-        showToast('Refreshed')
-        return
+        return refreshAll()
 
       // Tab navigation/closing. Close Tab and Close Tab (No Prompt) behave the same
       // today — there is no unsaved-changes prompt to differ on yet.

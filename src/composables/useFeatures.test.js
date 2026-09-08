@@ -17,6 +17,8 @@ vi.mock('../engines/mongodb/api/connections', () => ({
 }))
 
 const { disconnect } = await import('../engines/mongodb/api/connections')
+vi.mock('../stores/connectionData', () => ({ refreshConnectionResources: vi.fn() }))
+const { refreshConnectionResources } = await import('../stores/connectionData')
 
 // A minimal harness: useFeatures' dependencies are injected, so every other slice is
 // a stub and only the tab store is real. The tested surface is the disconnect paths:
@@ -64,6 +66,32 @@ function seedStore(arr, activeId) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  refreshConnectionResources.mockReset().mockResolvedValue([])
+})
+
+describe('resource refresh actions', () => {
+  it('refreshes the selected connection without a tree refresh method', async () => {
+    const showToast = vi.fn()
+    await makeFeatures({}, { showToast }).runFeature('Refresh', { connId: 'c1' })
+    expect(refreshConnectionResources).toHaveBeenCalledWith('c1')
+    expect(showToast).toHaveBeenCalledWith('Refreshed')
+  })
+
+  it('reports selected refresh failure without rejecting', async () => {
+    refreshConnectionResources.mockRejectedValue({ code: 'network', message: 'offline' })
+    const showToast = vi.fn()
+    await makeFeatures({}, { showToast }).runFeature('Refresh', { connId: 'c1' })
+    expect(showToast).toHaveBeenCalledWith("Refresh failed: Can't reach the server")
+  })
+
+  it('refreshes every open connection even if one fails', async () => {
+    refreshConnectionResources.mockRejectedValueOnce('offline')
+    const showToast = vi.fn()
+    const features = makeFeatures({ getConnections: () => [{ id: 'c1' }, { id: 'c2' }] }, { showToast })
+    await features.runFeature('Refresh All', {})
+    expect(refreshConnectionResources.mock.calls).toEqual([['c1'], ['c2']])
+    expect(showToast).toHaveBeenCalledWith('Refreshed 1 connection, 1 failed')
+  })
 })
 
 describe('disconnect paths close affected workspaces through the store', () => {
