@@ -4,6 +4,7 @@ import { MODALS } from '../constants/modalRegistry'
 import { activeTab, closeWhere } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
+import { resourceFromLegacyTab } from '../utils/legacyResourceRef'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 
@@ -68,6 +69,25 @@ export function useFeatures({
   function modalFeature(id) {
     const level = MODALS[id].level
     return { requires: level, run: (node) => modals.openModal(id, pick(node, LEVEL_FIELDS[level])) }
+  }
+
+  // A workspace's identity in the long alias spelling, read through its ResourceRef so
+  // the short-alias tool workspaces resolve the same as collection ones, and so a
+  // Current Operations tab's dbName/collName filters are not mistaken for its scope.
+  //
+  // ponytail: mirrors nodeFrom() in utils/menuContext.js. Two copies of one adapter is
+  // one too many — unify them into legacyResourceRef once this fix has landed on its
+  // own, rather than folding a refactor into a bug fix.
+  function workspaceTarget(workspace) {
+    const ref = resourceFromLegacyTab(workspace)
+    if (!ref) return null
+    const [database, collection] = ref.segments
+    return {
+      connectionId: ref.connectionId,
+      connectionName: workspace.connectionName ?? workspace.connName ?? null,
+      dbName: database ? database.name : null,
+      collectionName: collection ? collection.name : null,
+    }
   }
 
   // Normalize a tab (connectionId/collectionName keys) into a registry node.
@@ -283,8 +303,12 @@ export function useFeatures({
     }
 
     // The remaining actions operate on a specific node. From the toolbar that's the
-    // active tab; from the native menu the caller passes the sidebar selection.
-    const tab = target || activeTab.value
+    // active workspace; from the native menu the caller passes an already-resolved
+    // target. Only the former needs normalising — and it must be, because a tool
+    // workspace spells its fields connId/collName, so reading the long names straight
+    // off it yields undefined and the action degrades into a "select something first"
+    // toast while a perfectly good collection is on screen.
+    const tab = target || workspaceTarget(activeTab.value)
 
     if (name === 'shell') {
       if (tab && tab.connectionId && tab.dbName) {

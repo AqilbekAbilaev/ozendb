@@ -197,3 +197,54 @@ describe('color tag persistence', () => {
     expect(showToast).toHaveBeenCalledWith('Could not save color tag: disk full')
   })
 })
+
+// A real tool workspace carries ONLY the short aliases — see toolDefinitions'
+// shortTarget. The `tab` helper above sets both spellings, which hides the mismatch,
+// so these build the honest shape.
+const toolTab = (id, connId, db, coll, kind) => ({
+  id, kind, type: 'mongodb.' + kind,
+  connId, connName: 'Sales', dbName: db, collName: coll,
+  target: createResourceRef(connId, [
+    { kind: 'database', name: db }, { kind: 'collection', name: coll },
+  ]),
+})
+
+describe('handleTool falling back to the active workspace', () => {
+  beforeEach(() => {
+    tabs.value = [toolTab('s1', 'c1', 'shop', 'orders', 'schema')]
+    activeTabId.value = 's1'
+  })
+
+  // The toolbar passes no target, so the active workspace is it. Reading
+  // `tab.connectionId` off a short-alias tool tab yields undefined, and the action
+  // silently degrades into a "select something first" toast.
+  it('opens IntelliShell for the database a Schema tab is scoped to', () => {
+    const openShellTab = vi.fn()
+    const showToast = vi.fn()
+    makeFeatures({}, { openShellTab, showToast }).handleTool('shell')
+    expect(openShellTab).toHaveBeenCalledWith({
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
+    })
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  it('opens SQL for the collection a Schema tab is scoped to', () => {
+    const openSqlTab = vi.fn()
+    makeFeatures({}, { openSqlTab }).handleTool('sql')
+    expect(openSqlTab).toHaveBeenCalledWith({
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+    })
+  })
+
+  // Current Operations is connection-scoped: its dbName/collName are filters, so a
+  // database-scoped tool must not act on them.
+  it('does not treat Current Operations filters as a database', () => {
+    tabs.value = [toolTab('o1', 'c1', 'shop', 'orders', 'currentOps')]
+    activeTabId.value = 'o1'
+    const openShellTab = vi.fn()
+    const showToast = vi.fn()
+    makeFeatures({}, { openShellTab, showToast }).handleTool('shell')
+    expect(openShellTab).not.toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalled()
+  })
+})
