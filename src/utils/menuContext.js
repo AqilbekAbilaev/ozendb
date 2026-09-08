@@ -5,17 +5,40 @@
 // the sidebar/tree selection, so items enable when the user selects a
 // connection/database/collection in the tree — not only when a matching tab is
 // active (which at launch is always the context-less Quickstart tab).
+//
+// Identity is read through ResourceRef rather than off tab fields directly. Depth is
+// then counted once — segments — instead of re-derived per field per level, and a
+// tab's scope comes from its declared kind rather than from which fields happen to be
+// set. That is what keeps Current Operations, which carries dbName/collName as
+// *filters*, from enabling the Database menu.
+//
+// A workspace kind missing from legacyResourceRef's TAB_SCOPES resolves to no
+// resource and gates everything off. That fails closed — a menu action can never fire
+// against a target it could not identify — but it does mean a new workspace kind must
+// be registered there or its menus stay dark.
+import { resourceFromLegacyTab, resourceFromTreeSelection } from './legacyResourceRef'
+import { resourceKind } from './resourceRef'
+
+// How many segments each gated level needs.
+const DEPTH = { connection: 0, database: 1, collection: 2 }
+
+// -1 for "names no resource", so every comparison below is false for it.
+function depth(ref) {
+  return ref ? ref.segments.length : -1
+}
 
 // Which item groups should be enabled, given the active tab, the current sidebar
 // selection, and how many connections are open.
-//   activeTab      { connectionId, dbName, collectionName, kind } | null
+//   activeTab      a workspace (any kind) | null
 //   treeSelection  { connectionId, dbName, collectionName, kind } | null
 //   connectionCount  number of connections open in the tree
 //   indexSelected  whether an index row is selected in the open Indexes dialog
 export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false) {
   const tab = activeTab || null
-  const sel = treeSelection || null
-  const tabConnection = !!(tab && tab.connectionId)
+  const tabDepth = depth(resourceFromLegacyTab(tab))
+  const selDepth = depth(resourceFromTreeSelection(treeSelection || null))
+  const reaches = (level) => tabDepth >= DEPTH[level] || selDepth >= DEPTH[level]
+
   // Document/field selection is a property of the ACTIVE collection tab's results
   // view only — never the sidebar. The Document menu acts on the row/field the user
   // has selected in the grid, which only exists while a collection tab is active and
@@ -25,11 +48,11 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount
   const hasField = hasDocument && !!(tab && tab.selectedField)
   return {
-    hasConnection: tabConnection || !!(sel && sel.connectionId),
-    hasDatabase: !!(tab && tab.connectionId && tab.dbName) || !!(sel && sel.dbName),
-    hasCollection: !!(tab && tab.kind === 'collection' && tab.collectionName) || !!(sel && sel.collectionName),
+    hasConnection: reaches('connection'),
+    hasDatabase: reaches('database'),
+    hasCollection: reaches('collection'),
     // Refresh acts on every open connection, so it enables whenever one exists.
-    anyConnection: (connectionCount || 0) > 0 || tabConnection,
+    anyConnection: (connectionCount || 0) > 0 || tabDepth >= 0,
     hasDocument: hasDocument,
     hasField: hasField,
     // Index-menu actions operate on the index selected in the Indexes dialog, which
@@ -41,16 +64,21 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   }
 }
 
-// Does a tab-shaped target reach at least the given depth?
-//   'collection' → a collection, 'database' → a db or collection,
-//   'connection'/null → any connection.
-function satisfiesLevel(target, requiredLevel) {
-  if (!target || !target.connectionId) return false
-  if (requiredLevel === 'collection') {
-    return target.kind === 'collection' && !!target.collectionName
+// A resolved target, in the long alias spelling every handler already reads. Built
+// from the ResourceRef rather than copied off the source, so a tool tab (which spells
+// its fields connId/collName) resolves to the same shape as a collection tab — the
+// handlers downstream cannot tell them apart, and must not have to.
+function nodeFrom(source, ref) {
+  if (!ref) return null
+  const [database, collection] = ref.segments
+  return {
+    connectionId: ref.connectionId,
+    // A display name, not identity — so it is the one field still read off the source.
+    connectionName: source.connectionName ?? source.connName ?? null,
+    dbName: database ? database.name : null,
+    collectionName: collection ? collection.name : null,
+    kind: resourceKind(ref),
   }
-  if (requiredLevel === 'database') return !!target.dbName
-  return true
 }
 
 // The node a native menu action should act on. Because item enablement is the
@@ -59,19 +87,17 @@ function satisfiesLevel(target, requiredLevel) {
 // otherwise a shallow sidebar click could steal an item that only the deeper
 // active tab enabled. The sidebar selection wins when both qualify (that's what
 // the user just clicked); we fall back to the active tab when the selection is too
-// shallow. Returns a tab-shaped object so it drops straight into the existing
-// handlers. `requiredLevel` is 'connection' | 'database' | 'collection' | null.
+// shallow. `requiredLevel` is 'connection' | 'database' | 'collection' | null.
 export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null) {
   const sel = treeSelection || null
   const tab = activeTab || null
-  const selTarget = sel && sel.connectionId ? {
-    connectionId: sel.connectionId,
-    connectionName: sel.connectionName,
-    dbName: sel.dbName || null,
-    collectionName: sel.collectionName || null,
-    kind: sel.collectionName ? 'collection' : (sel.dbName ? 'database' : 'connection'),
-  } : null
-  if (satisfiesLevel(selTarget, requiredLevel)) return selTarget
-  if (satisfiesLevel(tab, requiredLevel)) return tab
-  return selTarget || tab
+  const selRef = resourceFromTreeSelection(sel)
+  const tabRef = resourceFromLegacyTab(tab)
+  const needed = DEPTH[requiredLevel] ?? DEPTH.connection
+
+  if (depth(selRef) >= needed) return nodeFrom(sel, selRef)
+  if (depth(tabRef) >= needed) return nodeFrom(tab, tabRef)
+  // Neither is deep enough: hand back the shallower of the two anyway, so the caller
+  // can name what is selected in its guide message.
+  return nodeFrom(sel, selRef) || nodeFrom(tab, tabRef)
 }

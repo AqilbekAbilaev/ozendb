@@ -107,6 +107,31 @@ describe('deriveMenuContext', () => {
     // The sidebar selection alone (Quickstart active) never locks anything.
     expect(deriveMenuContext(quickstart, collSel, 1).readOnly).toBe(false)
   })
+
+  // A Current Operations tab carries dbName/collName as *filters*, not identity. The
+  // old field-presence check read them as identity and lit the whole Database menu.
+  it('does not let Current Operations filters enable the database menu', () => {
+    const ops = { id: 't2', kind: 'currentOps', connId: 'c1', connName: 'Local', dbName: 'shop', collName: 'orders' }
+    const ctx = deriveMenuContext(ops, null, 1)
+    expect(ctx.hasConnection).toBe(true)
+    expect(ctx.hasDatabase).toBe(false)
+    expect(ctx.hasCollection).toBe(false)
+  })
+
+  // Schema/Indexes/Export/Import are collection-scoped workspaces, so collection
+  // actions apply to them just as they do to a find tab.
+  it('enables collection actions for collection-scoped tool tabs', () => {
+    const schema = { id: 't3', kind: 'schema', connId: 'c1', connName: 'Local', dbName: 'shop', collName: 'orders' }
+    const ctx = deriveMenuContext(schema, null, 1)
+    expect(ctx.hasDatabase).toBe(true)
+    expect(ctx.hasCollection).toBe(true)
+  })
+
+  it('gates everything off for a workspace kind that names no resource', () => {
+    const ctx = deriveMenuContext({ id: 't4', kind: 'not-a-registered-kind', connId: 'c1' }, null, 0)
+    expect(ctx.hasConnection).toBe(false)
+    expect(ctx.anyConnection).toBe(false)
+  })
 })
 
 describe('resolveMenuTarget', () => {
@@ -117,15 +142,23 @@ describe('resolveMenuTarget', () => {
     })
   })
 
-  it('derives kind from the deepest field present', () => {
-    const dbSel = { connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: null }
+  // The tree always emits an explicit kind (see useConnectionTree), and that is
+  // authoritative — the level is never guessed from which fields happen to be set.
+  it('takes the level from the selection kind, not from field presence', () => {
+    const dbSel = { connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: null, kind: 'database' }
     expect(resolveMenuTarget(null, dbSel).kind).toBe('database')
-    const connSel = { connectionId: 'c1', connectionName: 'Local', dbName: null, collectionName: null }
+    const connSel = { connectionId: 'c1', connectionName: 'Local', dbName: null, collectionName: null, kind: 'connection' }
     expect(resolveMenuTarget(null, connSel).kind).toBe('connection')
   })
 
+  it('names no resource for a kindless selection rather than guessing one', () => {
+    expect(resolveMenuTarget(null, { connectionId: 'c1', dbName: 'shop' })).toBe(null)
+  })
+
   it('falls back to the active tab when nothing is selected', () => {
-    expect(resolveMenuTarget(collectionTab, null)).toBe(collectionTab)
+    expect(resolveMenuTarget(collectionTab, null)).toEqual({
+      connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
+    })
   })
 
   it('returns null when neither a selection nor a tab is available', () => {
@@ -137,9 +170,11 @@ describe('resolveMenuTarget', () => {
     // scoped action must act on the tab (which its gate lit up), not the shallow
     // selection — otherwise the enabled item would only toast a guide message.
     const connSel = { connectionId: 'c2', connectionName: 'Prod', dbName: null, collectionName: null, kind: 'connection' }
-    expect(resolveMenuTarget(collectionTab, connSel, 'collection')).toBe(collectionTab)
+    expect(resolveMenuTarget(collectionTab, connSel, 'collection')).toEqual({
+      connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
+    })
     // A database-scoped action likewise falls through to the collection tab.
-    expect(resolveMenuTarget(collectionTab, connSel, 'database')).toBe(collectionTab)
+    expect(resolveMenuTarget(collectionTab, connSel, 'database').collectionName).toBe('orders')
     // A connection-scoped action is satisfied by the selection, so it wins.
     expect(resolveMenuTarget(collectionTab, connSel, 'connection').connectionId).toBe('c2')
   })
@@ -152,5 +187,15 @@ describe('resolveMenuTarget', () => {
   it('returns the shallow selection for the guide message when neither satisfies', () => {
     const connSel = { connectionId: 'c2', connectionName: 'Prod', dbName: null, collectionName: null, kind: 'connection' }
     expect(resolveMenuTarget(quickstart, connSel, 'collection').connectionId).toBe('c2')
+  })
+
+  // Tool tabs spell their fields connId/collName; handlers downstream read
+  // connectionId/collectionName. Resolving through ResourceRef normalises both to one
+  // shape, so an action fired from a Schema tab cannot land on undefined.
+  it('normalises a short-alias tool tab to the long spelling', () => {
+    const schema = { id: 't3', kind: 'schema', connId: 'c1', connName: 'Local', dbName: 'shop', collName: 'orders' }
+    expect(resolveMenuTarget(schema, null, 'collection')).toEqual({
+      connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
+    })
   })
 })
