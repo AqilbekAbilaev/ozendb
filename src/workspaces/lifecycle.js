@@ -3,7 +3,7 @@
 // must share — fresh IDs, deep detachment of durable state, common metadata, and
 // contained failure — so definitions never touch the workspace array directly.
 import { getWorkspaceDefinition, workspaceTypeForSaved } from './registry'
-import { sameResource, isResourceAncestor } from '../utils/resourceRef'
+import { createResourceRef, sameResource, isResourceAncestor } from '../utils/resourceRef'
 
 function defaultId() {
   return crypto.randomUUID ? crypto.randomUUID() : 'ws-' + Date.now() + '-' + Math.random().toString(36).slice(2)
@@ -95,4 +95,38 @@ export function disposeWorkspace(workspace) {
 // connection-scoped Current Operations tab survives a database drop.
 export function affectedByResource(drop) {
   return (tab) => !!tab.target && (sameResource(tab.target, drop) || isResourceAncestor(drop, tab.target))
+}
+
+// The mirror of affectedByResource: rewrite a workspace's target after its resource is
+// renamed, containment included — renaming a database also retargets every collection
+// workspace under it. Returns whether this workspace changed.
+//
+// Without this a rename moved the flat fields and left `target` on the old name, so
+// affectedByResource stopped matching the tab and a later drop never closed it.
+export function retargetResource(from, to) {
+  return (workspace) => {
+    const target = workspace.target
+    if (!target) return false
+    if (!sameResource(target, from) && !isResourceAncestor(from, target)) return false
+
+    const segments = [...to.segments, ...target.segments.slice(from.segments.length)]
+    workspace.target = createResourceRef(to.connectionId, segments)
+
+    // Both alias spellings are still live while the ResourceRef migration is
+    // unfinished, so the flat copies are pushed forward from the new target rather
+    // than left to drift out of step with it.
+    for (const segment of segments) {
+      if (segment.kind === 'database' && workspace.dbName !== undefined) workspace.dbName = segment.name
+      if (segment.kind !== 'collection') continue
+      if (workspace.collectionName !== undefined) workspace.collectionName = segment.name
+      if (workspace.collName !== undefined) workspace.collName = segment.name
+    }
+
+    // A tab the user renamed by hand keeps its title; only a default one follows.
+    const renamed = from.segments[from.segments.length - 1]
+    if (renamed && workspace.title === renamed.name) {
+      workspace.title = to.segments[to.segments.length - 1].name
+    }
+    return true
+  }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { duplicateWorkspace, restoreWorkspace, disposeWorkspace, deepClone, affectedByResource } from './lifecycle'
+import { duplicateWorkspace, restoreWorkspace, disposeWorkspace, deepClone, affectedByResource, retargetResource } from './lifecycle'
 import { registerWorkspaceDefinition } from './registry'
 import { registerWorkspaceDefinitions } from './registerDefinitions'
 import { createResourceRef } from '../utils/resourceRef'
@@ -191,5 +191,86 @@ describe('affectedByResource', () => {
     expect(by({ target: null })).toBe(false)
     expect(by({ kind: 'quickstart' })).toBe(false)
     expect(affectedByResource(conn)({ target: coll })).toBe(true)
+  })
+})
+
+describe('retargetResource', () => {
+  const conn = 'c1'
+  const orders = createResourceRef(conn, [
+    { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' },
+  ])
+  const sales = createResourceRef(conn, [
+    { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'sales' },
+  ])
+  const shop = createResourceRef(conn, [{ kind: 'database', name: 'shop' }])
+  const archive = createResourceRef(conn, [{ kind: 'database', name: 'archive' }])
+
+  function tab(extra) {
+    return { kind: 'collection', target: orders, title: 'orders', collectionName: 'orders', ...extra }
+  }
+
+  it('rewrites the target of the renamed resource itself', () => {
+    const t = tab()
+    expect(retargetResource(orders, sales)(t)).toBe(true)
+    expect(t.target).toEqual(sales)
+  })
+
+  // The regression this exists for: rename left `target` on the old name, so
+  // affectedByResource stopped matching and a later drop never closed the tab.
+  it('leaves the retargeted workspace findable by the new resource', () => {
+    const t = tab()
+    retargetResource(orders, sales)(t)
+    expect(affectedByResource(sales)(t)).toBe(true)
+    expect(affectedByResource(orders)(t)).toBe(false)
+  })
+
+  it('rewrites descendants when a parent is renamed', () => {
+    const t = tab()
+    retargetResource(shop, archive)(t)
+    expect(t.target).toEqual(createResourceRef(conn, [
+      { kind: 'database', name: 'archive' }, { kind: 'collection', name: 'orders' },
+    ]))
+  })
+
+  it('leaves unrelated workspaces untouched', () => {
+    const other = tab({ target: createResourceRef(conn, [
+      { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'invoices' },
+    ]) })
+    const before = other.target
+    expect(retargetResource(orders, sales)(other)).toBe(false)
+    expect(other.target).toBe(before)
+  })
+
+  it('ignores workspaces with no target', () => {
+    const home = { kind: 'quickstart', target: null }
+    expect(retargetResource(orders, sales)(home)).toBe(false)
+  })
+
+  // Both alias spellings exist while the ResourceRef migration is unfinished, so the
+  // flat copies are kept in step with the target rather than left to drift.
+  it('updates whichever flat alias the workspace kind uses', () => {
+    const long = tab({ collectionName: 'orders' })
+    const short = tab({ collName: 'orders', collectionName: undefined })
+    retargetResource(orders, sales)(long)
+    retargetResource(orders, sales)(short)
+    expect(long.collectionName).toBe('sales')
+    expect(short.collName).toBe('sales')
+  })
+
+  it('renames a database in the flat fields of the collections under it', () => {
+    const t = tab({ dbName: 'shop' })
+    retargetResource(shop, archive)(t)
+    expect(t.dbName).toBe('archive')
+    expect(t.collectionName).toBe('orders')
+  })
+
+  // A tab the user renamed by hand keeps its title; only the default one follows.
+  it('retitles only when the title still matches the old name', () => {
+    const untouched = tab({ title: 'orders' })
+    const custom = tab({ title: 'my working set' })
+    retargetResource(orders, sales)(untouched)
+    retargetResource(orders, sales)(custom)
+    expect(untouched.title).toBe('sales')
+    expect(custom.title).toBe('my working set')
   })
 })

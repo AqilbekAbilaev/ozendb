@@ -9,9 +9,11 @@ import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { tabs } from '../../stores/tabs'
+import { retargetResource } from '../../workspaces/lifecycle'
+import { createResourceRef } from '../../utils/resourceRef'
 
-// Collection → Rename Collection…: prefilled with the current name. An open tab on the
-// collection is retitled in place rather than closed, so the user keeps their query.
+// Collection → Rename Collection…: prefilled with the current name. Open workspaces on
+// the collection are retargeted in place rather than closed, so the user keeps their work.
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, connName, dbName, collName }
 })
@@ -39,14 +41,14 @@ async function confirm() {
       { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
       newName,
     )
-    const open = tabs.value.find(t => t.kind === 'collection'
-      && t.connectionId === props.target.connId
-      && t.dbName === props.target.dbName
-      && t.collectionName === props.target.collName)
-    if (open) {
-      open.collectionName = newName
-      open.title = newName
-    }
+    // Every workspace on the old collection follows the rename — not just the first
+    // find tab. Retargeting keeps `target` in step with the flat fields, so a later
+    // drop still recognises the tab (see workspaces/lifecycle).
+    const at = (name) => createResourceRef(props.target.connId, [
+      { kind: 'database', name: props.target.dbName },
+      { kind: 'collection', name: name },
+    ])
+    tabs.value.forEach(retargetResource(at(props.target.collName), at(newName)))
     showToast(`Collection renamed to "${newName}"`)
     invalidateConnectionResources(props.target.connId)
     emit('close')
