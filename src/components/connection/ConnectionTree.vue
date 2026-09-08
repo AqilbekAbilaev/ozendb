@@ -21,7 +21,7 @@ const emit = defineEmits(['select-collection', 'expanded', 'context-menu', 'sele
 const {
   connections, expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
-  toggleConnection, toggleDatabase, highlightCollection, openSelectedCollection,
+  retryConnection, toggleDatabase, highlightCollection, openSelectedCollection,
   openCollection, collectionKey, disconnectConn, refreshConn, getConnections,
 } = useConnectionTree({ props, emit })
 
@@ -145,7 +145,7 @@ defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollecti
             <summary>Details</summary>
             <div class="err-details-body">{{ connErrors[conn.id].message }}</div>
           </details>
-          <span class="err-retry" @click.stop="toggleConnection(conn)">Retry</span>
+          <span class="err-retry" @click.stop="retryConnection(conn)">Retry</span>
         </div>
 
         <!-- Databases -->

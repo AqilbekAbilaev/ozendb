@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { listDatabases } from '../engines/mongodb/api/resources'
 
 // The databases the sidebar has fetched for each connection, keyed by connection id.
 //
@@ -11,8 +12,85 @@ import { ref } from 'vue'
 // The pool can't answer that — it's evicted on every save and refilled by any
 // operation, so it goes cold while the tree carries on displaying what it already has.
 export const connDatabases = ref({})   // connId → DatabaseInfo[]
+export const connectionResourceLoading = ref({})
+export const connectionResourceErrors = ref({})
+
+const requestGenerations = new Map()
+const pendingRequests = new Map()
+const staleConnections = new Set()
+
+function hasOwn(record, id) {
+  return Object.prototype.hasOwnProperty.call(record, id)
+}
+
+function without(record, id) {
+  const next = { ...record }
+  delete next[id]
+  return next
+}
+
+function advanceGeneration(id) {
+  const generation = (requestGenerations.get(id) || 0) + 1
+  requestGenerations.set(id, generation)
+  return generation
+}
 
 /** Whether the sidebar currently holds databases fetched for this connection. */
 export function hasLoadedData(id) {
-  return !!connDatabases.value[id]
+  return hasOwn(connDatabases.value, id)
+}
+
+function loadConnectionResources(id) {
+  const generation = advanceGeneration(id)
+  connectionResourceLoading.value = { ...connectionResourceLoading.value, [id]: true }
+  connectionResourceErrors.value = without(connectionResourceErrors.value, id)
+
+  const request = (async () => {
+    try {
+      const databases = await listDatabases(id)
+      if (requestGenerations.get(id) === generation) {
+        connDatabases.value = { ...connDatabases.value, [id]: databases }
+        staleConnections.delete(id)
+      }
+      return databases
+    } catch (error) {
+      if (requestGenerations.get(id) === generation) {
+        connectionResourceErrors.value = { ...connectionResourceErrors.value, [id]: error }
+      }
+      throw error
+    } finally {
+      if (requestGenerations.get(id) === generation) {
+        connectionResourceLoading.value = { ...connectionResourceLoading.value, [id]: false }
+      }
+      if (pendingRequests.get(id) === request) pendingRequests.delete(id)
+    }
+  })()
+
+  pendingRequests.set(id, request)
+  return request
+}
+
+export function ensureConnectionResources(id) {
+  if (hasLoadedData(id) && !staleConnections.has(id)) return Promise.resolve(connDatabases.value[id])
+  return pendingRequests.get(id) || loadConnectionResources(id)
+}
+
+export function refreshConnectionResources(id) {
+  return loadConnectionResources(id)
+}
+
+export function invalidateConnectionResources(id) {
+  const shouldRefresh = hasLoadedData(id) || connectionResourceLoading.value[id] === true
+  if (shouldRefresh) staleConnections.add(id)
+  advanceGeneration(id)
+  if (shouldRefresh) refreshConnectionResources(id).catch(() => {})
+}
+
+export function clearConnectionResources(id) {
+  advanceGeneration(id)
+  pendingRequests.delete(id)
+  staleConnections.delete(id)
+  connDatabases.value = without(connDatabases.value, id)
+  connectionResourceLoading.value = without(connectionResourceLoading.value, id)
+  connectionResourceErrors.value = without(connectionResourceErrors.value, id)
 }

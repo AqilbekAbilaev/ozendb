@@ -1,17 +1,23 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { listConnections } from '../engines/mongodb/api/connections'
-import { listDatabases } from '../engines/mongodb/api/resources'
 import { listen } from '@tauri-apps/api/event'
 import { setConnectionOpen } from '../appApi/connectionState'
 import { errCode, errMessage } from '../utils/errors'
 import { applyConnectionUpdate } from '../utils/connectionList'
-import { connDatabases } from '../stores/connectionData'
+import {
+  connectionResourceLoading, connectionResourceErrors,
+  ensureConnectionResources, refreshConnectionResources, clearConnectionResources,
+} from '../stores/connectionData'
 
 export function useConnectionTree({ props, emit }) {
   const connections = ref([])
   const expandedConns = ref({})      // connId → boolean
-  const loadingConns = ref({})       // connId → boolean
-  const connErrors = ref({})         // connId → { message, code } (or null)
+  const loadingConns = connectionResourceLoading
+  const connErrors = computed(() => Object.fromEntries(
+    Object.entries(connectionResourceErrors.value).map(([id, error]) => [
+      id, { message: errMessage(error), code: errCode(error) },
+    ]),
+  ))
   const expandedDbs = ref({})        // "connId/dbName" → boolean
   const selectedKey = ref(null)      // collection row highlighted by a single click
   // The current single-click sidebar selection, at whatever level was clicked:
@@ -88,18 +94,18 @@ export function useConnectionTree({ props, emit }) {
     const wasOpen = expandedConns.value[id]
     expandedConns.value[id] = !wasOpen
 
-    if (!wasOpen && !connDatabases.value[id]) {
-      loadingConns.value[id] = true
-      connErrors.value[id] = null
+    if (!wasOpen) {
       try {
-        connDatabases.value[id] = await listDatabases(id)
-      } catch (e) {
-        connErrors.value[id] = { message: errMessage(e), code: errCode(e) }
-        expandedConns.value[id] = false
-      } finally {
-        loadingConns.value[id] = false
+        await ensureConnectionResources(id)
+      } catch {
+        if (connectionResourceErrors.value[id]) expandedConns.value[id] = false
       }
     }
+  }
+
+  async function retryConnection(conn) {
+    expandedConns.value[conn.id] = true
+    await refreshConn(conn.id)
   }
 
   function toggleDatabase(conn, dbName) {
@@ -216,9 +222,7 @@ export function useConnectionTree({ props, emit }) {
     }
     connections.value = connections.value.filter(c => c.id !== connId)
     delete expandedConns.value[connId]
-    delete loadingConns.value[connId]
-    delete connDatabases.value[connId]
-    delete connErrors.value[connId]
+    clearConnectionResources(connId)
     for (const key of Object.keys(expandedDbs.value)) {
       if (key.startsWith(connId + '/')) {
         delete expandedDbs.value[key]
@@ -232,17 +236,10 @@ export function useConnectionTree({ props, emit }) {
   }
 
   async function refreshConn(connId) {
-    if (!expandedConns.value[connId]) return
-    delete connDatabases.value[connId]
-    loadingConns.value[connId] = true
-    connErrors.value[connId] = null
     try {
-      connDatabases.value[connId] = await listDatabases(connId)
-    } catch (e) {
-      connErrors.value[connId] = { message: errMessage(e), code: errCode(e) }
-      expandedConns.value[connId] = false
-    } finally {
-      loadingConns.value[connId] = false
+      await refreshConnectionResources(connId)
+    } catch {
+      if (connectionResourceErrors.value[connId]) expandedConns.value[connId] = false
     }
   }
 
@@ -263,6 +260,7 @@ export function useConnectionTree({ props, emit }) {
     clearSelection,
     selectConnection,
     toggleConnection,
+    retryConnection,
     toggleDatabase,
     highlightCollection,
     openSelectedCollection,
