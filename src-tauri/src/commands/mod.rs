@@ -103,48 +103,6 @@ where
     result
 }
 
-/// Resolve the live MongoDB client for a saved connection: look up its config and
-/// hand off to the pool, which caches the client and reads credentials from the
-/// keychain only when it actually opens a new connection. Every command that
-/// operates on a connection goes through here, so the config-lookup + connect
-/// dance lives in exactly one place (and the keychain read stays off the hot path).
-pub(crate) async fn client_for(
-    pool: &ConnectionPool,
-    storage: &Storage,
-    id: &str,
-) -> Result<Client, AppError> {
-    let config = match storage.find(id) {
-        Some(val) => val,
-        None => return Err(AppError::UnknownConnection(id.to_string())),
-    };
-    pool.connect(&config).await
-}
-
-/// The write-gated sibling of `client_for`: every mutating command resolves its
-/// client through here instead, so a connection flagged `read_only` is refused at a
-/// single choke point before any write reaches the driver. Non-read-only
-/// connections fall straight through to `client_for`.
-///
-/// IntelliShell writes never reach this function — the shell talks to the driver
-/// directly — so they are gated separately by `shell::bridge::op_writes`, which
-/// refuses write methods, write `runCommand`s and `$out`/`$merge` pipelines. Both
-/// paths must stay in step: a new mutating command belongs here, a new shell
-/// operation belongs there.
-pub(crate) async fn client_for_write(
-    pool: &ConnectionPool,
-    storage: &Storage,
-    id: &str,
-) -> Result<Client, AppError> {
-    let config = match storage.find(id) {
-        Some(val) => val,
-        None => return Err(AppError::UnknownConnection(id.to_string())),
-    };
-    if config.read_only {
-        return Err(AppError::ReadOnly { name: config.name.clone() });
-    }
-    client_for(pool, storage, id).await
-}
-
 /// The two connection-facing managed states bundled behind one `State`: every
 /// command that touches a live MongoDB connection takes a single
 /// `ctx: State<'_, AppContext>` instead of the `pool` + `storage` pair, and
@@ -155,18 +113,38 @@ pub struct AppContext {
 }
 
 impl AppContext {
-    /// Resolve the live client for a saved connection — the method form of
-    /// `client_for`, which stays the single place the config-lookup + connect
-    /// dance lives.
+    /// Resolve the live client for a saved connection: look up its config and hand
+    /// off to the pool, which caches the client and reads credentials from the
+    /// keychain only when it actually opens a new connection. Every command that
+    /// operates on a connection goes through here, so the config-lookup + connect
+    /// dance lives in exactly one place (and the keychain read stays off the hot path).
     pub async fn client(&self, id: &str) -> Result<Client, AppError> {
-        client_for(&self.pool, &self.storage, id).await
+        let config = match self.storage.find(id) {
+            Some(val) => val,
+            None => return Err(AppError::UnknownConnection(id.to_string())),
+        };
+        self.pool.connect(&config).await
     }
 
-    /// The write-gated form of `client` — the method form of `client_for_write`.
-    /// Mutating commands resolve their client through here so a read-only
-    /// connection is refused before any write reaches the driver.
+    /// The write-gated sibling of `client`: every mutating command resolves through
+    /// here instead, so a connection flagged `read_only` is refused at a single choke
+    /// point before any write reaches the driver. It connects from the config it
+    /// already read, so the read-only check and the connect see one consistent view.
+    ///
+    /// IntelliShell writes never reach this function — the shell talks to the driver
+    /// directly — so they are gated separately by `shell::bridge::op_writes`, which
+    /// refuses write methods, write `runCommand`s and `$out`/`$merge` pipelines. Both
+    /// paths must stay in step: a new mutating command belongs here, a new shell
+    /// operation belongs there.
     pub async fn client_for_write(&self, id: &str) -> Result<Client, AppError> {
-        client_for_write(&self.pool, &self.storage, id).await
+        let config = match self.storage.find(id) {
+            Some(val) => val,
+            None => return Err(AppError::UnknownConnection(id.to_string())),
+        };
+        if config.read_only {
+            return Err(AppError::ReadOnly { name: config.name.clone() });
+        }
+        self.pool.connect(&config).await
     }
 
     /// Resolve straight to a collection handle for the common

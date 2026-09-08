@@ -60,7 +60,7 @@ Most app state and logic live in `src/composables/*` (`useModals`, `useQueryRunn
 
 | File | Responsibility |
 |---|---|
-| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds shared helpers — notably `client_for(pool, storage, id)`, the single entry point every command uses to resolve a connection to a live client, plus the EJSON/CSV parse helpers. |
+| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds `AppContext` — the pool + storage bundle every connection-touching command takes as its single `State`, whose `client` / `client_for_write` / `collection` / `collection_for_write` methods are the one place a connection resolves to a live client — plus the EJSON/CSV parse helpers. |
 | `pool.rs` | `ConnectionPool`: one `Client` per connection id behind a `tokio::Mutex` (and the live `SshTunnel` for tunnelled connections). `connect()` returns the cached client on a hit and only reads the keychain / builds the URI on a miss. |
 | `storage/mod.rs` | JSON persistence for `ConnectionConfig` (`connections.json`). Read-modify-write goes through the locked `update_with`; the raw `save` is private so writes can't bypass the lock. Most other JSON stores (`folders`, `history`, `saved_queries`, `default_queries`, `settings`, `shell_history`, `known_hosts`, `node_tags`, `collection_history`, `keybindings`, `export_watermarks`, `operations`) share the same shape via the generic `JsonStore<T>` in `json_store.rs`. `tabs.rs` and `storage/mod.rs` are deliberately bespoke — each carries a comment saying why. |
 | `persist.rs` | `atomic_write()` — write-to-temp-then-rename so a crash can't leave a truncated file. Shared by every JSON store. |
@@ -123,7 +123,8 @@ actually hold in your head.
   there is not supposed to be anything in a component worth testing.
 - **A composable owns one slice of state end to end.** If two composables both mutate the same
   thing, one of them is wrong — collapse them or move the state into `src/stores/`.
-- **Rust: `commands/*` are thin.** A `#[tauri::command]` resolves its client via `client_for`,
+- **Rust: `commands/*` are thin.** A `#[tauri::command]` resolves its client via `ctx.client()`
+  (or `ctx.client_for_write()` when it mutates),
   calls into real logic, and maps errors. Business logic that grows past a screenful moves to a
   sibling module so it can be unit-tested without a live MongoDB.
 
