@@ -129,18 +129,27 @@ actually hold in your head.
 
 ### File size
 
-**Hard limit: 600 lines** for any `.js`, `.vue` or `.rs` file. Enforced — `npm run check:size`,
-run in CI. Soft limit 400: not enforced, but past 400 expect to justify the file in review.
-Line count is a smell proxy, not the actual rule — a 500-line file of flat, obvious cases is fine,
-a 300-line file doing four jobs is not.
+**Hard limit: 500 lines. Soft limit: 400.** Both enforced by `npm run check:size`, run in CI:
+past 400 it warns and you justify the file in review, past 500 it fails. Line count is a smell
+proxy, not the actual rule — a 450-line file of flat, obvious cases is fine, a 300-line file
+doing four jobs is not.
 
-Ten files were already over 600 when the limit landed. `scripts/check-file-size.mjs` pins each at
-the length it had that day: they may shrink, never grow, and the check tells you to delete the pin
-once a file drops under the limit. So the list is the debt register — it is the one place those
-numbers live, don't copy them here. New files get no such grace.
+**Every line in the file counts** — a `.vue` template included. What you scroll through to follow
+the thing is the honest measure, and a template long enough to blow the limit is asking for
+subcomponents exactly as much as a long script is.
+
+**Tests are exempt** (`*.test.js`, `*.test.rs`, `tests.rs`, `*.fixtures.js`). A spec grows with the
+cases it covers; a limit that counts them buys shorter files by deleting coverage.
+
+The limit was 600 while the repo still had god files. They're gone, so it dropped to the 400 this
+document had already named as the soft limit — with 500 as the hard gate for now, on the way to
+400 once the over-limit files clear.
+
+**Eight files are over 500 today** and the check names them on every run — that listing is the debt
+register, so don't copy the numbers here. New files get no grace.
 
 **Splitting a god file is its own change.** Never bundle it with a feature or a fix (see Workflow).
-When you touch a pinned file for another reason, leave it no bigger than you found it.
+When you touch an over-limit file for another reason, leave it no bigger than you found it.
 
 ### Tests
 
