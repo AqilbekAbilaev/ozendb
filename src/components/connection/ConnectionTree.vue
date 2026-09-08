@@ -22,7 +22,7 @@ const {
   connections, expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
   retryConnection, toggleDatabase, highlightCollection, openSelectedCollection,
-  openCollection, collectionKey, disconnectConn, refreshConn, getConnections,
+  openCollection, collectionKey, disconnectConn, getConnections,
 } = useConnectionTree({ props, emit })
 
 // The colour name explicitly set on a node — its override (keyed by the node's
@@ -79,7 +79,7 @@ function onNodeContext(e, type, label, nodeData) {
 // pass their own target, so the card needs no per-kind handler here.
 const { tip, ...statsTip } = useStatsTip()
 
-defineExpose({ disconnectConn, refreshConn, getConnections, openSelectedCollection })
+defineExpose({ disconnectConn, getConnections, openSelectedCollection })
 </script>
 
 <template>

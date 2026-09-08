@@ -105,7 +105,11 @@ export function useConnectionTree({ props, emit }) {
 
   async function retryConnection(conn) {
     expandedConns.value[conn.id] = true
-    await refreshConn(conn.id)
+    try {
+      await refreshConnectionResources(conn.id)
+    } catch {
+      if (connectionResourceErrors.value[conn.id]) expandedConns.value[conn.id] = false
+    }
   }
 
   function toggleDatabase(conn, dbName) {
@@ -235,14 +239,6 @@ export function useConnectionTree({ props, emit }) {
     }
   }
 
-  async function refreshConn(connId) {
-    try {
-      await refreshConnectionResources(connId)
-    } catch {
-      if (connectionResourceErrors.value[connId]) expandedConns.value[connId] = false
-    }
-  }
-
   function getConnections() {
     return connections.value
   }
@@ -267,7 +263,6 @@ export function useConnectionTree({ props, emit }) {
     openCollection,
     collectionKey,
     disconnectConn,
-    refreshConn,
     getConnections,
   }
 }

@@ -10,7 +10,7 @@ vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases: vi.fn() }))
 vi.mock('../appApi/connectionState', () => ({ setConnectionOpen: vi.fn() }))
 
 import { listDatabases } from '../engines/mongodb/api/resources'
-import { connDatabases, clearConnectionResources, invalidateConnectionResources } from '../stores/connectionData'
+import { connDatabases, clearConnectionResources, invalidateConnectionResources, refreshConnectionResources } from '../stores/connectionData'
 import { useConnectionTree } from './useConnectionTree'
 
 let scope
@@ -34,11 +34,11 @@ it('reuses an empty cached list on re-expansion', async () => {
   expect(listDatabases).toHaveBeenCalledOnce()
 })
 
-it('refreshes a collapsed connection through the compatibility delegate', async () => {
+it('refreshes a collapsed connection through the resource store', async () => {
   listDatabases.mockResolvedValueOnce([]).mockResolvedValueOnce([{ name: 'new' }])
   await tree.toggleConnection(conn)
   await tree.toggleConnection(conn)
-  await tree.refreshConn('a')
+  await refreshConnectionResources('a')
   expect(connDatabases.value.a).toEqual([{ name: 'new' }])
   expect(tree.expandedConns.value.a).toBe(false)
 })
