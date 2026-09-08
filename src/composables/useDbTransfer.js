@@ -2,14 +2,15 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { exportCollection, importCollection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'
+import { invalidateConnectionResources } from '../stores/connectionData'
 
 // Import / export flows. Per-collection export is a workspace tab (see openExportTab in
 // App.vue); import opens a format picker first. The database-level Export/Import
 // Collections… run the plain per-collection commands in a loop over a chosen folder/files.
-// `showToast` and `connectionTreeRef` are injected; `openModal` is the registry opener
+// `showToast` is injected; `openModal` is the registry opener
 // from useModals, so the import format picker opens through the same path as every
 // other registry-driven modal.
-export function useDbTransfer({ showToast, connectionTreeRef, openModal }) {
+export function useDbTransfer({ showToast, openModal }) {
   // Import starts with the format picker; on Configure it opens the matching import tab.
   function openImportWizard(nodeData) {
     openModal('import', {
@@ -22,8 +23,8 @@ export function useDbTransfer({ showToast, connectionTreeRef, openModal }) {
 
   // After a wizard import, refresh the connection so a newly-populated collection shows
   // up in the sidebar.
-  async function onWizardImported(connId) {
-    await connectionTreeRef.value.refreshConn(connId)
+  function onWizardImported(connId) {
+    invalidateConnectionResources(connId)
   }
 
   // Database → Export Collections…: export every collection in the database to a chosen
@@ -95,7 +96,7 @@ export function useDbTransfer({ showToast, connectionTreeRef, openModal }) {
         failed++
       }
     }
-    await connectionTreeRef.value.refreshConn(nodeData.connId)
+    if (done > 0) invalidateConnectionResources(nodeData.connId)
     showToast(`Imported ${done} file${done !== 1 ? 's' : ''}${failed ? `, ${failed} failed` : ''}`)
   }
 

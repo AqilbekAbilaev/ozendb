@@ -1,13 +1,14 @@
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { copyCollection, copyCollectionToConnection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'
+import { invalidateConnectionResources } from '../stores/connectionData'
 
 // Clipboard paste for collections and databases, same-connection or cross-server. The
 // add/drop/rename/duplicate dialogs used to live here too; each is now a component that
 // owns its own form state (see constants/modalRegistry.js). `showToast` is injected so
-// this stays UI-agnostic; `connectionTreeRef` refreshes the sidebar after a change;
+// this stays UI-agnostic; the resource store refreshes after a change;
 // `dbClipboard` is read by pasteClipboard (App.vue still owns and sets it on copy).
-export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
+export function useDbActions({ showToast, dbClipboard }) {
   // Copy one collection from the clipboard's connection to the paste target. Same
   // connection uses the fast server-side `$out`; a different connection streams the
   // documents across via `copy_collection_to_connection`.
@@ -26,6 +27,7 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
         { database: target.dbName, collection: targetCollection },
       )
     }
+    invalidateConnectionResources(target.connId)
   }
 
   // Paste the app clipboard (a copied collection or database) into a target database,
@@ -50,7 +52,6 @@ export function useDbActions({ showToast, connectionTreeRef, dbClipboard }) {
         }
         showToast(`Pasted ${done} collection${done !== 1 ? 's' : ''} into ${target.dbName}${crossServer ? ' (cross-server)' : ''}`)
       }
-      await connectionTreeRef.value.refreshConn(target.connId)
     } catch (e) {
       showToast('Paste failed: ' + errText(e))
     }

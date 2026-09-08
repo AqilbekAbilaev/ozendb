@@ -210,7 +210,6 @@ const {
   importDatabase,
 } = useDbTransfer({
   showToast: showToast,
-  connectionTreeRef: connectionTreeRef,
   openModal: modalsApi.openModal,
 })
 
@@ -277,7 +276,7 @@ const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence
 
 // dbActionsApi is consumed whole by useFeatures (dialog seeders + pasteClipboard)
 // and AppModals (dialog state + confirm handlers, via provide/inject).
-const dbActionsApi = useDbActions({ showToast: showToast, connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard })
+const dbActionsApi = useDbActions({ showToast: showToast, dbClipboard: dbClipboard })
 
 const { menuTarget } = useMenu({ treeSelection: treeSelection, treeConnectionCount: treeConnectionCount, selectedIndex: selectedIndex })
 
