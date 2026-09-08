@@ -1,10 +1,14 @@
-// Pure adapters from every legacy frontend target shape to the canonical ResourceRef
-// (Work 2B). These are the migration contract: the tree, tabs, feature nodes and the
-// Mongo query API keep their current shapes, and conversion is lossless — or null
-// when the input cannot name a resource. Malformed inputs return null instead of
-// throwing, because they are shaped by user data and callers must not need try/catch.
+// Pure adapters between the canonical ResourceRef and every legacy frontend target
+// shape. These are the migration contract: the tree, tabs, feature nodes and the Mongo
+// query API keep their current shapes, and conversion is lossless — or null when the
+// input cannot name a resource. Malformed inputs return null instead of throwing,
+// because they are shaped by user data and callers must not need try/catch.
+//
+// Most of these read legacy → ResourceRef. The two that go the other way
+// (legacyNodeTagKey, legacyTargetFromResource) exist so a caller holding a ref can
+// hand a legacy consumer what it still expects, without re-deriving identity by hand.
 
-import { createResourceRef, isResourceRef } from './resourceRef'
+import { createResourceRef, isResourceRef, resourceKind } from './resourceRef'
 
 // Tool tabs and feature nodes use the short aliases (connId, collName); collection
 // and shell tabs use the long ones (connectionId, collectionName). Reading long
@@ -114,4 +118,23 @@ export function legacyNodeTagKey(resource) {
       : null
   }
   return null
+}
+
+// The inverse direction: a ResourceRef back into the long-alias target shape the
+// handlers, modals and tab creators all read. This is what lets a short-alias tool
+// workspace and a long-alias collection workspace resolve to one identical shape, so
+// nothing downstream has to know which spelling its caller happened to use.
+//
+// The display name is presentation, never identity (a ref does not carry one), so it
+// is passed in by whoever has it.
+export function legacyTargetFromResource(resource, connectionName = null) {
+  if (!isResourceRef(resource)) return null
+  const [database, collection] = resource.segments
+  return {
+    connectionId: resource.connectionId,
+    connectionName: connectionName ?? null,
+    dbName: database ? database.name : null,
+    collectionName: collection ? collection.name : null,
+    kind: resourceKind(resource),
+  }
 }

@@ -4,7 +4,7 @@ import { MODALS } from '../constants/modalRegistry'
 import { activeTab, closeWhere } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
-import { resourceFromLegacyTab } from '../utils/legacyResourceRef'
+import { resourceFromLegacyTab, legacyTargetFromResource } from '../utils/legacyResourceRef'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 
@@ -74,20 +74,12 @@ export function useFeatures({
   // A workspace's identity in the long alias spelling, read through its ResourceRef so
   // the short-alias tool workspaces resolve the same as collection ones, and so a
   // Current Operations tab's dbName/collName filters are not mistaken for its scope.
-  //
-  // ponytail: mirrors nodeFrom() in utils/menuContext.js. Two copies of one adapter is
-  // one too many — unify them into legacyResourceRef once this fix has landed on its
-  // own, rather than folding a refactor into a bug fix.
   function workspaceTarget(workspace) {
-    const ref = resourceFromLegacyTab(workspace)
-    if (!ref) return null
-    const [database, collection] = ref.segments
-    return {
-      connectionId: ref.connectionId,
-      connectionName: workspace.connectionName ?? workspace.connName ?? null,
-      dbName: database ? database.name : null,
-      collectionName: collection ? collection.name : null,
-    }
+    if (!workspace) return null
+    return legacyTargetFromResource(
+      resourceFromLegacyTab(workspace),
+      workspace.connectionName ?? workspace.connName ?? null,
+    )
   }
 
   // Normalize a tab (connectionId/collectionName keys) into a registry node.

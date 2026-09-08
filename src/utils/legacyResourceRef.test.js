@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  resourceFromTreeSelection, resourceFromFeatureNode,
+  resourceFromTreeSelection, resourceFromFeatureNode, legacyTargetFromResource,
   resourceFromMongoTarget, resourceFromLegacyTab, legacyNodeTagKey,
 } from './legacyResourceRef'
 import { createResourceRef, sameResource } from './resourceRef'
@@ -144,5 +144,45 @@ describe('legacyNodeTagKey', () => {
     ]))).toBe(null)
     expect(legacyNodeTagKey(createResourceRef('c1', [{ kind: 'schema', name: 'public' }]))).toBe(null)
     expect(legacyNodeTagKey(null)).toBe(null)
+  })
+})
+describe('legacyTargetFromResource', () => {
+  it('spreads segments back into the long alias fields', () => {
+    expect(legacyTargetFromResource(COLL_REF, 'Sales')).toEqual({
+      connectionId: 'c1', connectionName: 'Sales',
+      dbName: 'shop', collectionName: 'orders', kind: 'collection',
+    })
+  })
+
+  it('leaves the levels a shallower resource does not reach as null', () => {
+    expect(legacyTargetFromResource(DB_REF, 'Sales')).toEqual({
+      connectionId: 'c1', connectionName: 'Sales',
+      dbName: 'shop', collectionName: null, kind: 'database',
+    })
+    expect(legacyTargetFromResource(CONN_REF, 'Sales')).toEqual({
+      connectionId: 'c1', connectionName: 'Sales',
+      dbName: null, collectionName: null, kind: 'connection',
+    })
+  })
+
+  // The display name is presentation, not identity, so it is passed in rather than
+  // read back out of the ref — which never carried it.
+  it('defaults the display name to null when none is given', () => {
+    expect(legacyTargetFromResource(CONN_REF).connectionName).toBe(null)
+  })
+
+  it('returns null for anything that is not a resource', () => {
+    expect(legacyTargetFromResource(null)).toBe(null)
+    expect(legacyTargetFromResource({ connectionId: 'c1' })).toBe(null)
+  })
+
+  // Round-tripping is what lets a short-alias tool workspace and a long-alias
+  // collection workspace resolve to one shape (see useFeatures, menuContext).
+  it('round-trips a short-alias feature node into the long spelling', () => {
+    const ref = resourceFromFeatureNode({ connId: 'c1', dbName: 'shop', collName: 'orders' })
+    expect(legacyTargetFromResource(ref, 'Sales')).toEqual({
+      connectionId: 'c1', connectionName: 'Sales',
+      dbName: 'shop', collectionName: 'orders', kind: 'collection',
+    })
   })
 })

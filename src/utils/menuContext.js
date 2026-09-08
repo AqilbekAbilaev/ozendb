@@ -17,8 +17,7 @@
 // resource and gates everything off. That fails closed — a menu action can never fire
 // against a target it could not identify — but it does mean a new workspace kind must
 // be registered there or its menus stay dark.
-import { resourceFromLegacyTab } from './legacyResourceRef'
-import { resourceKind } from './resourceRef'
+import { resourceFromLegacyTab, legacyTargetFromResource } from './legacyResourceRef'
 
 // How many segments each gated level needs.
 const DEPTH = { connection: 0, database: 1, collection: 2 }
@@ -65,21 +64,10 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   }
 }
 
-// A resolved target, in the long alias spelling every handler already reads. Built
-// from the ResourceRef rather than copied off the source, so a tool tab (which spells
-// its fields connId/collName) resolves to the same shape as a collection tab — the
-// handlers downstream cannot tell them apart, and must not have to.
+// A resolved target, in the long alias spelling every handler already reads. The name
+// is the one piece of presentation the ref cannot carry, so it is read off the source.
 function nodeFrom(source, ref) {
-  if (!ref) return null
-  const [database, collection] = ref.segments
-  return {
-    connectionId: ref.connectionId,
-    // A display name, not identity — so it is the one field still read off the source.
-    connectionName: source.connectionName ?? source.connName ?? null,
-    dbName: database ? database.name : null,
-    collectionName: collection ? collection.name : null,
-    kind: resourceKind(ref),
-  }
+  return legacyTargetFromResource(ref, source?.connectionName ?? source?.connName ?? null)
 }
 
 // The node a native menu action should act on. Because item enablement is the
