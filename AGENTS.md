@@ -19,10 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run the full app (Vite dev server + Tauri shell)
 npm run tauri dev
 
-# Verify Rust compiles after any backend change
-cd src-tauri && cargo build
-
-# Run Rust unit tests
+# Verify any backend change: compiles the test tree too, which `cargo build` does not
 cd src-tauri && cargo test
 
 # Frontend-only Vite dev server (no Tauri; invoke() calls won't work)
@@ -191,6 +188,9 @@ This project is human-delivered, AI-developed. The human must stay in full contr
 - **One logical change per session.** Never bundle unrelated changes into a single response. If a task touches more than ~3 files, split it into steps and confirm with the user between each step.
 - **Explain before committing.** Always describe what changed and why in plain language before reporting the work as done. No code jargon — write as if explaining to someone who will review the diff.
 - **Never mix refactoring with bug fixes.** Each commit must have a single concern. If a bug fix requires a refactor, do them in separate steps.
-- **Always verify the build compiles** after any Rust change before reporting done. Run `cargo build` inside `src-tauri/` and confirm it succeeds.
+- **Always verify the tests compile and pass** after any Rust change before reporting done. Run
+  `cargo test` inside `src-tauri/` — not `cargo build`. Test modules are `#[cfg(test)]`, so a build
+  can pass while the test tree is broken; that is exactly how a split once landed on main with an
+  orphaned test importing a function it had just made private.
 - **Let the user commit.** Do not create git commits unless explicitly asked. Explain the change, then wait.
 - **Never write long and verbose, detailed git commit messages, just include high-level overview of what has been done
