@@ -6,17 +6,18 @@
 // connection/database/collection in the tree — not only when a matching tab is
 // active (which at launch is always the context-less Quickstart tab).
 //
-// Identity is read through ResourceRef rather than off tab fields directly. Depth is
-// then counted once — segments — instead of re-derived per field per level, and a
-// tab's scope comes from its declared kind rather than from which fields happen to be
-// set. That is what keeps Current Operations, which carries dbName/collName as
-// *filters*, from enabling the Database menu.
+// Identity is a ResourceRef, never a set of tab fields. The tree hands its selection's
+// ref straight over (see useConnectionTree); a tab's comes from its declared kind. So
+// depth is counted once — segments — rather than re-derived per field per level, and a
+// tab's scope is what it says it is rather than whichever fields happen to be set.
+// That is what keeps Current Operations, which carries dbName/collName as *filters*,
+// from enabling the Database menu.
 //
 // A workspace kind missing from legacyResourceRef's TAB_SCOPES resolves to no
 // resource and gates everything off. That fails closed — a menu action can never fire
 // against a target it could not identify — but it does mean a new workspace kind must
 // be registered there or its menus stay dark.
-import { resourceFromLegacyTab, resourceFromTreeSelection } from './legacyResourceRef'
+import { resourceFromLegacyTab } from './legacyResourceRef'
 import { resourceKind } from './resourceRef'
 
 // How many segments each gated level needs.
@@ -30,13 +31,13 @@ function depth(ref) {
 // Which item groups should be enabled, given the active tab, the current sidebar
 // selection, and how many connections are open.
 //   activeTab      a workspace (any kind) | null
-//   treeSelection  { connectionId, dbName, collectionName, kind } | null
+//   treeSelection  the tree's selection payload, carrying `resource` | null
 //   connectionCount  number of connections open in the tree
 //   indexSelected  whether an index row is selected in the open Indexes dialog
 export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false) {
   const tab = activeTab || null
   const tabDepth = depth(resourceFromLegacyTab(tab))
-  const selDepth = depth(resourceFromTreeSelection(treeSelection || null))
+  const selDepth = depth(treeSelection?.resource)
   const reaches = (level) => tabDepth >= DEPTH[level] || selDepth >= DEPTH[level]
 
   // Document/field selection is a property of the ACTIVE collection tab's results
@@ -91,7 +92,7 @@ function nodeFrom(source, ref) {
 export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null) {
   const sel = treeSelection || null
   const tab = activeTab || null
-  const selRef = resourceFromTreeSelection(sel)
+  const selRef = sel?.resource ?? null
   const tabRef = resourceFromLegacyTab(tab)
   const needed = DEPTH[requiredLevel] ?? DEPTH.connection
 

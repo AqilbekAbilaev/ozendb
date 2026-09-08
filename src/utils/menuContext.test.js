@@ -5,6 +5,15 @@ import { deriveMenuContext, resolveMenuTarget } from './menuContext'
 // active tab and the sidebar/tree selection, so selecting a node in the tree
 // enables the matching items even while the context-less Quickstart tab is active.
 
+import { resourceFromTreeSelection } from './legacyResourceRef'
+
+// Selections are built exactly the way useConnectionTree builds them, so these
+// fixtures cannot drift from the payload the menu actually receives at runtime.
+function selection(connectionId, connectionName, dbName, collectionName, kind) {
+  const sel = { connectionId, connectionName, dbName, collectionName, kind }
+  return { ...sel, resource: resourceFromTreeSelection(sel) }
+}
+
 const quickstart = { id: 't0', kind: 'quickstart', title: 'Quickstart' }
 const collectionTab = {
   id: 't1', kind: 'collection',
@@ -27,7 +36,7 @@ describe('deriveMenuContext', () => {
   })
 
   it('a collection selected in the sidebar enables all three, even on Quickstart', () => {
-    const sel = { connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection' }
+    const sel = selection('c1', 'Local', 'shop', 'orders', 'collection')
     const ctx = deriveMenuContext(quickstart, sel, 1)
     expect(ctx.hasConnection).toBe(true)
     expect(ctx.hasDatabase).toBe(true)
@@ -35,7 +44,7 @@ describe('deriveMenuContext', () => {
   })
 
   it('a database selected in the sidebar enables connection + database only', () => {
-    const sel = { connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: null, kind: 'database' }
+    const sel = selection('c1', 'Local', 'shop', null, 'database')
     const ctx = deriveMenuContext(quickstart, sel, 1)
     expect(ctx.hasConnection).toBe(true)
     expect(ctx.hasDatabase).toBe(true)
@@ -43,7 +52,7 @@ describe('deriveMenuContext', () => {
   })
 
   it('a connection selected in the sidebar enables connection only', () => {
-    const sel = { connectionId: 'c1', connectionName: 'Local', dbName: null, collectionName: null, kind: 'connection' }
+    const sel = selection('c1', 'Local', null, null, 'connection')
     const ctx = deriveMenuContext(quickstart, sel, 1)
     expect(ctx.hasConnection).toBe(true)
     expect(ctx.hasDatabase).toBe(false)
@@ -67,7 +76,7 @@ describe('deriveMenuContext', () => {
   it('document/field context comes from the active collection tab, never the sidebar', () => {
     // A collection selected in the sidebar enables collection items but NOT the
     // Document menu — there is no results grid / selection there.
-    const collSel = { connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection' }
+    const collSel = selection('c1', 'Local', 'shop', 'orders', 'collection')
     const fromSidebar = deriveMenuContext(quickstart, collSel, 1)
     expect(fromSidebar.hasCollection).toBe(true)
     expect(fromSidebar.hasDocument).toBe(false)
@@ -99,7 +108,7 @@ describe('deriveMenuContext', () => {
   })
 
   it('readOnly comes from the active tab, never the sidebar', () => {
-    const collSel = { connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection' }
+    const collSel = selection('c1', 'Local', 'shop', 'orders', 'collection')
     // A locked tab locks the context even with no sidebar selection.
     expect(deriveMenuContext({ ...collectionTab, readOnly: true }, null, 1).readOnly).toBe(true)
     // An unlocked tab stays unlocked even when a sidebar node is selected.
@@ -136,7 +145,7 @@ describe('deriveMenuContext', () => {
 
 describe('resolveMenuTarget', () => {
   it('prefers the sidebar selection over the active tab', () => {
-    const sel = { connectionId: 'c2', connectionName: 'Prod', dbName: 'analytics', collectionName: 'events', kind: 'collection' }
+    const sel = selection('c2', 'Prod', 'analytics', 'events', 'collection')
     expect(resolveMenuTarget(collectionTab, sel)).toEqual({
       connectionId: 'c2', connectionName: 'Prod', dbName: 'analytics', collectionName: 'events', kind: 'collection',
     })
@@ -145,9 +154,9 @@ describe('resolveMenuTarget', () => {
   // The tree always emits an explicit kind (see useConnectionTree), and that is
   // authoritative — the level is never guessed from which fields happen to be set.
   it('takes the level from the selection kind, not from field presence', () => {
-    const dbSel = { connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: null, kind: 'database' }
+    const dbSel = selection('c1', 'Local', 'shop', null, 'database')
     expect(resolveMenuTarget(null, dbSel).kind).toBe('database')
-    const connSel = { connectionId: 'c1', connectionName: 'Local', dbName: null, collectionName: null, kind: 'connection' }
+    const connSel = selection('c1', 'Local', null, null, 'connection')
     expect(resolveMenuTarget(null, connSel).kind).toBe('connection')
   })
 
@@ -169,7 +178,7 @@ describe('resolveMenuTarget', () => {
     // Collection tab active, but a bare connection is highlighted. A collection-
     // scoped action must act on the tab (which its gate lit up), not the shallow
     // selection — otherwise the enabled item would only toast a guide message.
-    const connSel = { connectionId: 'c2', connectionName: 'Prod', dbName: null, collectionName: null, kind: 'connection' }
+    const connSel = selection('c2', 'Prod', null, null, 'connection')
     expect(resolveMenuTarget(collectionTab, connSel, 'collection')).toEqual({
       connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
     })
@@ -180,12 +189,12 @@ describe('resolveMenuTarget', () => {
   })
 
   it('prefers the sidebar selection when it satisfies the required level', () => {
-    const collSel = { connectionId: 'c2', connectionName: 'Prod', dbName: 'analytics', collectionName: 'events', kind: 'collection' }
+    const collSel = selection('c2', 'Prod', 'analytics', 'events', 'collection')
     expect(resolveMenuTarget(collectionTab, collSel, 'collection').connectionId).toBe('c2')
   })
 
   it('returns the shallow selection for the guide message when neither satisfies', () => {
-    const connSel = { connectionId: 'c2', connectionName: 'Prod', dbName: null, collectionName: null, kind: 'connection' }
+    const connSel = selection('c2', 'Prod', null, null, 'connection')
     expect(resolveMenuTarget(quickstart, connSel, 'collection').connectionId).toBe('c2')
   })
 
