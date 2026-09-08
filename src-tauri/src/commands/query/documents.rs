@@ -195,3 +195,6 @@ pub async fn clear_collection(
     Ok(result.deleted_count as i64)
 }
 
+#[cfg(test)]
+#[path = "documents.test.rs"]
+mod tests;
