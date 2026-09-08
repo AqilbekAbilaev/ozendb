@@ -4,6 +4,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 import { useImportPaneLifecycle } from '../../composables/useImportPaneLifecycle'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -26,7 +27,6 @@ const props = defineProps({
 
 const bundle = inject('appModals')
 const showToast = bundle.handlers.showToast
-const onImported = bundle.handlers.onWizardImported   // refresh the connection tree
 
 // "Change target" opens the Connection Manager (the app's single place to pick /
 // edit connections).
@@ -212,10 +212,10 @@ async function run() {
         request.format,
         [],
       )
+      invalidateConnectionResources(request.connectionId)
       total += count
     }
     showToast(`Imported ${total} document${total === 1 ? '' : 's'} from ${request.sources.length} source${request.sources.length === 1 ? '' : 's'}`)
-    onImported(request.connectionId)
     runTab._importDone = { count: total }
   } catch (e) {
     setError(e, runTab)

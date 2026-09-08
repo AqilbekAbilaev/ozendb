@@ -4,6 +4,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
@@ -27,7 +28,6 @@ const props = defineProps({
 
 const bundle = inject('appModals')
 const showToast = bundle.handlers.showToast
-const onImported = bundle.handlers.onWizardImported
 
 const SUB_TABS = [
   { value: 'source', label: 'Source options' },
@@ -175,18 +175,19 @@ function mappingPayload() {
 
 async function run() {
   if (!canRun.value) return
+  const connectionId = t.value.connId
   running.value = true
   error.value = null
   try {
     const count = await importCollectionMapped(
-      { connectionId: t.value.connId, database: String(t.value.targetDb).trim(), collection: String(t.value.targetColl).trim() },
+      { connectionId, database: String(t.value.targetDb).trim(), collection: String(t.value.targetColl).trim() },
       t.value.filePath,
       'csv',
       mappingPayload(),
       csvPayload(),
     )
     showToast(`Imported ${count} document${count === 1 ? '' : 's'}`)
-    onImported(t.value.connId)
+    invalidateConnectionResources(connectionId)
     done.value = { count: count }
   } catch (e) {
     setError(e)

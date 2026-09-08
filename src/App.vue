@@ -205,7 +205,6 @@ const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags()
 
 const {
   openImportWizard,
-  onWizardImported,
   exportDatabase,
   importDatabase,
 } = useDbTransfer({
@@ -417,7 +416,6 @@ provide('appModals', {
     setTheme: setTheme,
     onManagerConnect: onManagerConnect,
     onValidatorSaved: onValidatorSaved,
-    onWizardImported: onWizardImported,
     openImportTab: openImportTab,
     onPrefsSaved: onPrefsSaved,
     onKeybindingsSaved: onKeybindingsSaved,

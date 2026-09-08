@@ -56,8 +56,3 @@ it('invalidates successful database copies even when later collections fail', as
   expect(invalidateConnectionResources).toHaveBeenCalledWith('destination')
   expect(showToast).toHaveBeenLastCalledWith('Pasted 1 collection into db (cross-server)')
 })
-
-it('keeps the wizard callback independent of the tree', async () => {
-  await useDbTransfer({ showToast: vi.fn() }).onWizardImported('destination')
-  expect(invalidateConnectionResources).toHaveBeenCalledWith('destination')
-})

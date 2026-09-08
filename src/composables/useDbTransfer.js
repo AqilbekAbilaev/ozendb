@@ -21,12 +21,6 @@ export function useDbTransfer({ showToast, openModal }) {
     })
   }
 
-  // After a wizard import, refresh the connection so a newly-populated collection shows
-  // up in the sidebar.
-  function onWizardImported(connId) {
-    invalidateConnectionResources(connId)
-  }
-
   // Database → Export Collections…: export every collection in the database to a chosen
   // folder, one JSON file per collection. Reuses the per-collection command.
   async function exportDatabase(nodeData) {
@@ -102,7 +96,6 @@ export function useDbTransfer({ showToast, openModal }) {
 
   return {
     openImportWizard: openImportWizard,
-    onWizardImported: onWizardImported,
     exportDatabase: exportDatabase,
     importDatabase: importDatabase,
   }
