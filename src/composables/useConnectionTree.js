@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event'
 import { setConnectionOpen } from '../appApi/connectionState'
 import { errCode, errMessage } from '../utils/errors'
 import { applyConnectionUpdate } from '../utils/connectionList'
+import { resourceFromTreeSelection } from '../utils/legacyResourceRef'
 import {
   connectionResourceLoading, connectionResourceErrors,
   ensureConnectionResources, refreshConnectionResources, clearConnectionResources,
@@ -25,7 +26,7 @@ export function useConnectionTree({ props, emit }) {
   const expandedDbs = ref({})        // "connId/dbName" → boolean
   const selectedKey = ref(null)      // collection row highlighted by a single click
   // The current single-click sidebar selection, at whatever level was clicked:
-  //   { connectionId, connectionName, dbName, collectionName, kind } | null
+  //   { connectionId, connectionName, dbName, collectionName, kind, resource } | null
   // This is what the native menu gates on (a selected connection/database/
   // collection enables the matching items), so it's emitted to App.vue.
   const selection = ref(null)
@@ -34,11 +35,15 @@ export function useConnectionTree({ props, emit }) {
   // Records the selection at any tree level and tells App.vue, which folds it into
   // the menu context. Also drives the collection-row highlight (selectedKey).
   function setSelection(sel) {
-    selection.value = sel
+    // Dual-carry: the canonical ResourceRef rides alongside the flat fields so
+    // consumers can move onto it before those are dropped. Derived here, where the
+    // clicked level is known for certain, instead of being re-inferred downstream
+    // from which fields happen to be set.
+    selection.value = sel && { ...sel, resource: resourceFromTreeSelection(sel) }
     selectedKey.value = sel && sel.kind === 'collection'
       ? collectionKey(sel.connectionId, sel.dbName, sel.collectionName)
       : null
-    emit('select-node', sel)
+    emit('select-node', selection.value)
   }
 
   function clearSelection() {
