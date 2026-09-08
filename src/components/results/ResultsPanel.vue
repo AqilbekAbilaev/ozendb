@@ -1,8 +1,5 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
-import { countDocuments } from '../../engines/mongodb/api/queries'
-import { errText } from '../../utils/errors'
-import { parseField } from '../../utils/queryParser'
 import BaseIcon from '../base/BaseIcon.vue'
 import FieldEditModal from './FieldEditModal.vue'
 import UpdateDocumentsModal from './UpdateDocumentsModal.vue'
@@ -24,6 +21,7 @@ import FieldError from '../base/FieldError.vue'
 import { useDocumentActions } from '../../composables/useDocumentActions'
 import { useToast } from '../../composables/useToast'
 import { useTicker } from '../../composables/useTicker'
+import { useResultsPagination } from '../../composables/useResultsPagination'
 import { PAGE_SIZES } from '../../constants/pageSizes'
 
 const props = defineProps({
@@ -57,7 +55,6 @@ const viewMode = computed({
   },
 })
 const viewMenu     = ref(false)
-const pageSizeMenu = ref(false)
 
 // Drag-to-VQB signals originate in the grid (ResultTable) and are forwarded to
 // VisualQueryBuilder, which sits beside the grid here. ResultTable owns the gesture;
@@ -72,88 +69,15 @@ const vqbDrop         = ref(null)
 const vqbWidth = ref(360)
 
 
-// ── pagination ─────────────────────────────────────────
-
-function goFirst() {
-  const tab = props.activeTab
-  if (!tab) return
-  tab.skip = 0
-  emit('requery', false)
-}
-
-function goPrev() {
-  const tab = props.activeTab
-  if (!tab) return
-  tab.skip = Math.max(0, (tab.skip || 0) - (tab.limit || 50))
-  emit('requery', false)
-}
-
-function goNext() {
-  const tab = props.activeTab
-  if (!tab) return
-  tab.skip = (tab.skip || 0) + (tab.limit || 50)
-  emit('requery', false)
-}
-
-// Count the documents matching the tab's current filter. The result is cached on
-// the tab together with the filter it was counted for, so the "of N" total is
-// only shown while it still matches the active filter (see rangeText).
-async function fetchCount(tab) {
-  // Convert the tab's shell-syntax filter to canonical Extended JSON before sending,
-  // exactly as the run-query path does — the backend's parser is strict and rejects
-  // shell conveniences like unquoted keys.
-  const parsed = parseField(tab.filter || '')
-  if (!parsed.ok) throw new Error(parsed.error)
-  const filter = parsed.ejson
-  const total = await countDocuments(
-    { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
-    filter,
-  )
-  tab.total = total
-  tab.totalFilter = filter
-  return total
-}
-
-async function goLast() {
-  const tab = props.activeTab
-  if (!tab) return
-  try {
-    const total = await fetchCount(tab)
-    const limit = tab.limit || 50
-    // Land on the page whose first row is the last full page boundary.
-    tab.skip = total === 0 ? 0 : Math.floor((total - 1) / limit) * limit
-    emit('requery', false)
-  } catch (e) {
-    showToast('Count failed: ' + errText(e))
-  }
-}
-
-async function runCount() {
-  const tab = props.activeTab
-  // Ignore clicks while a count is already in flight: on a large collection each
-  // count is a heavy server op, so this stops rapid clicks from stacking counts
-  // (and sidesteps out-of-order results — only one runs at a time).
-  if (!tab || isCountDisabled.value || tab.isCounting) return
-  tab.isCounting = true
-  try {
-    await fetchCount(tab)
-    // Show the total on the button itself (see countText); it stays until the
-    // next run clears the flag or the filter changes.
-    tab.countShown = true
-  } catch (e) {
-    showToast('Count failed: ' + errText(e))
-  } finally {
-    tab.isCounting = false
-  }
-}
-
-function setPageSize(size) {
-  const tab = props.activeTab
-  if (!tab) return
-  tab.limit = size
-  pageSizeMenu.value = false
-  emit('requery', true)
-}
+const {
+  pageSizeMenu, countMenu, isCountDisabled, rangeText, countText,
+  goFirst, goPrev, goNext, goLast, runCount, setPageSize, onCountContext, copyCountValue,
+} = useResultsPagination({
+  activeTab: () => props.activeTab,
+  isAggregate: () => props.isAggregate,
+  requery: history => emit('requery', history),
+  showToast,
+})
 
 // ── document CRUD + field edits + Document/Collection menu dispatch ──
 // The whole cluster (insert/edit/delete, field-level edits, drill navigation, the
@@ -185,21 +109,6 @@ const pasteHidden  = computed(() => Math.max(0, (pasteConfirm.value?.text?.lengt
 // ── paging range / count ──────────────────────────────
 // "<from> to <to>" of the current page, skip-aware; appends "of <N>" only when a
 // count has been taken for the still-current filter.
-const rangeText = computed(() => {
-  const tab = props.activeTab
-  const len = tab?.results?.length ?? 0
-  if (!len) return '-- to --'
-  const skip = tab.skip || 0
-  const base = `${skip + 1} to ${skip + len}`
-  // Compare in canonical Extended JSON so the stored count (see fetchCount) matches
-  // the active filter regardless of shell-syntax/whitespace differences.
-  const parsed = parseField(tab.filter || '')
-  const curFilter = parsed.ok ? parsed.ejson : null
-  if (tab.total != null && curFilter != null && tab.totalFilter === curFilter) {
-    return `${base} of ${tab.total.toLocaleString()}`
-  }
-  return base
-})
 
 // Live counter in the footer while a query is in flight, replaced by the server's
 // own timing once the results land.
@@ -208,46 +117,14 @@ const now = useTicker(isRunning)
 const runningMs = computed(() => Math.max(0, now.value - (props.activeTab?.startedAt ?? now.value)))
 
 // Count applies to a find filter; aggregate pipelines have no single filter.
-const isCountDisabled = computed(() =>
-  props.isAggregate || !props.activeTab || props.activeTab.kind !== 'collection'
-)
 
 // The counted total shown inline on the "Count Documents" button — only while it
 // belongs to the current run (countShown, cleared by the runner on every new run)
 // and still matches the active filter (same validity check as rangeText). Null
 // otherwise, so the label reverts to a plain "Count Documents".
-const countText = computed(() => {
-  const tab = props.activeTab
-  if (!tab || isCountDisabled.value || tab.total == null || !tab.countShown) return null
-  const parsed = parseField(tab.filter || '')
-  const curFilter = parsed.ok ? parsed.ejson : null
-  if (curFilter != null && tab.totalFilter === curFilter) {
-    return tab.total.toLocaleString()
-  }
-  return null
-})
 
 // Right-clicking the shown count offers "Copy value to clipboard" (Studio-3T style).
 // Only armed when there's a count to copy — otherwise the native menu is left alone.
-const countMenu = ref(null)
-function onCountContext(e) {
-  if (countText.value == null) return
-  e.preventDefault()
-  countMenu.value = {
-    x: e.clientX,
-    y: e.clientY,
-    items: [{ label: 'Copy value to clipboard', icon: 'copy' }],
-  }
-}
-function copyCountValue() {
-  const tab = props.activeTab
-  countMenu.value = null
-  // Copy the raw number (no thousands separators) so it pastes cleanly into
-  // spreadsheets or reports.
-  if (tab && tab.total != null) {
-    navigator.clipboard.writeText(String(tab.total)).catch(() => {})
-  }
-}
 
 // Bulk Update / Delete dialogs target a whole collection by query, so they're only
 // meaningful on a collection tab (not aggregate output, not IntelliShell results).
