@@ -1,14 +1,14 @@
 use crate::error::AppError;
-use crate::known_hosts::KnownHostsStore;
 use crate::node_tags::NodeTagStorage;
-use crate::ssh::HostKeyPrompts;
-use crate::storage::{ConnectionConfig, HostEntry, SshAuthMethod};
+use crate::storage::{ConnectionConfig, HostEntry};
 use super::AppContext;
 use crate::uri;
 use mongodb::Client;
-use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
+
+mod ssh;
+pub use ssh::{forget_ssh_host, respond_ssh_host_key, test_ssh_connection};
 
 /// The connection editor's form, exactly as the frontend sends it. `save_connection`
 /// and `update_connection` take the same payload; the fields the editor doesn't own
@@ -120,114 +120,6 @@ pub async fn test_connection(id: Option<String>, fields: ConnectionFields) -> Re
     Ok(())
 }
 
-/// Test a connection that goes through an SSH tunnel: open a temporary tunnel,
-/// connect to the forwarded local port, ping, then tear the tunnel down (it
-/// drops at the end of this function). TLS-over-SSH is not exercised here.
-#[tauri::command]
-pub async fn test_ssh_connection(
-    app: tauri::AppHandle,
-    known_hosts: State<'_, Arc<KnownHostsStore>>,
-    prompts: State<'_, Arc<HostKeyPrompts>>,
-    ssh_host: String,
-    ssh_port: u16,
-    ssh_user: String,
-    ssh_auth: String,
-    ssh_password: Option<String>,
-    ssh_key_file: Option<String>,
-    ssh_passphrase: Option<String>,
-    mongo_host: String,
-    mongo_port: u16,
-    username: Option<String>,
-    password: Option<String>,
-    auth_db: Option<String>,
-    auth_mechanism: Option<String>,
-) -> Result<(), AppError> {
-    let auth = match SshAuthMethod::from_opt(Some(ssh_auth.as_str())) {
-        SshAuthMethod::Key => crate::ssh::SshAuth::Key {
-            path: ssh_key_file.unwrap_or_default(),
-            passphrase: ssh_passphrase,
-        },
-        SshAuthMethod::Password => crate::ssh::SshAuth::Password(ssh_password.unwrap_or_default()),
-    };
-    let params = crate::ssh::SshParams {
-        ssh_host: ssh_host,
-        ssh_port: ssh_port,
-        ssh_user: ssh_user,
-        auth: auth,
-        mongo_host: mongo_host.clone(),
-        mongo_port: mongo_port,
-    };
-    let tunnel = match crate::ssh::establish(
-        params,
-        Arc::clone(known_hosts.inner()),
-        Arc::clone(prompts.inner()),
-        app,
-    )
-    .await
-    {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-
-    // Minimal config carrying just the Mongo auth fields, pointed at the tunnel.
-    let cfg = ConnectionConfig {
-        id: String::new(),
-        name: String::new(),
-        hosts: vec![HostEntry { host: mongo_host, port: mongo_port }],
-        connection_type: String::from("standalone"),
-        replica_set_name: None,
-        username: username,
-        auth_db: auth_db,
-        auth_mechanism: auth_mechanism,
-        options: std::collections::BTreeMap::new(),
-        tls: false,
-        tls_ca_file: None,
-        tls_cert_key_file: None,
-        tls_allow_invalid_certificates: false,
-        ssh_enabled: false,
-        ssh_host: None,
-        ssh_port: 22,
-        ssh_user: None,
-        ssh_auth: None,
-        ssh_key_file: None,
-        tag: None,
-        read_only: false,
-        folder_id: None,
-        last_accessed: None,
-        open: false,
-    };
-    let local_port = tunnel.local_addr.port();
-    let uri = uri::with_timeout(&uri::build_uri_to(
-        &cfg,
-        password.as_deref(),
-        "127.0.0.1",
-        local_port,
-    ));
-    let client = Client::with_uri_str(&uri).await?;
-    match client.list_database_names().await {
-        Ok(_) => {}
-        Err(e) => return Err(AppError::Mongo(e)),
-    };
-    Ok(())
-}
-
-/// The frontend's answer to a first-contact SSH host-key prompt: deliver the
-/// user's trust decision to the SSH handshake that is waiting on it.
-#[tauri::command]
-pub fn respond_ssh_host_key(prompts: State<'_, Arc<HostKeyPrompts>>, request_id: u64, trust: bool) {
-    prompts.resolve(request_id, trust);
-}
-
-/// Forget a host's trusted SSH key so the next connection re-prompts as a fresh
-/// first contact. The recovery path after a legitimate server key rotation.
-#[tauri::command]
-pub fn forget_ssh_host(
-    known_hosts: State<'_, Arc<KnownHostsStore>>,
-    host: String,
-    port: u16,
-) -> Result<(), AppError> {
-    known_hosts.remove(&host, port)
-}
 
 /// Which stored secrets an updated config can still use. A `false` means the
 /// setting that justified the secret is gone — no username (or auth turned off),
