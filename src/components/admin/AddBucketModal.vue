@@ -7,17 +7,14 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 
 // Database → Add GridFS Bucket…: a bucket is the pair of `<name>.files` and
 // `<name>.chunks` collections; create both so it appears in the GridFS view.
-//
-// Owns its form state (name / error / saving) rather than borrowing refs from a
-// composable — the dialog is the only thing that reads them. `saved` asks the caller to
-// refresh the connection's tree, which is App.vue's to do.
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, connName, dbName }
 })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
@@ -36,9 +33,10 @@ async function confirm() {
         { connectionId: props.target.connId, database: props.target.dbName },
         `${bucket}.${suffix}`,
       )
+      // The first collection may succeed even if creating the second fails.
+      invalidateConnectionResources(props.target.connId)
     }
     showToast(`GridFS bucket "${bucket}" created`)
-    emit('saved', props.target.connId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

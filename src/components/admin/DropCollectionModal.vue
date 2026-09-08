@@ -6,6 +6,7 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 import { closeWhere } from '../../stores/tabs'
 import { affectedByResource } from '../../workspaces/lifecycle'
 import { createResourceRef } from '../../utils/resourceRef'
@@ -15,7 +16,7 @@ import { createResourceRef } from '../../utils/resourceRef'
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, connName, dbName, collName }
 })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
@@ -32,6 +33,7 @@ async function confirm() {
       database:     props.target.dbName,
       collection:   props.target.collName,
     })
+    invalidateConnectionResources(props.target.connId)
     // Containment closes every tab scoped into the dropped collection (find/aggregate/
     // SQL/import/export/indexes/schema), and only those. closeTab runs disposal.
     closeWhere(affectedByResource(createResourceRef(props.target.connId, [
@@ -39,7 +41,6 @@ async function confirm() {
       { kind: 'collection', name: props.target.collName },
     ])))
     showToast(`Collection "${props.target.collName}" dropped`)
-    emit('saved', props.target.connId)
     emit('close')
   } catch (e) {
     error.value = errText(e)
