@@ -3,7 +3,9 @@ use mongodb::options::IndexOptions;
 use mongodb::{Client, Collection, IndexModel};
 use tokio::runtime::Handle;
 
-use super::{op_writes, DEFAULT_FIND_LIMIT, MAX_DOCS, MAX_QUERY_TIME};
+use super::op_writes;
+
+mod read;
 
 pub(super) fn run_op(
     client: &Client,
@@ -49,8 +51,8 @@ pub(super) fn run_op(
         let collection = database.collection::<bson::Document>(collection_name);
 
         match method {
-            "find" => exec_find(&collection, args).await,
-            "findOne" => exec_find_one(&collection, args).await,
+            "find" => read::exec_find(&collection, args).await,
+            "findOne" => read::exec_find_one(&collection, args).await,
             "insertOne" => exec_insert_one(&collection, args).await,
             "insertMany" => exec_insert_many(&collection, args).await,
             "updateOne" => exec_update(&collection, args, false).await,
@@ -58,10 +60,10 @@ pub(super) fn run_op(
             "replaceOne" => exec_replace_one(&collection, args).await,
             "deleteOne" => exec_delete(&collection, args, false).await,
             "deleteMany" => exec_delete(&collection, args, true).await,
-            "countDocuments" => exec_count(&collection, args).await,
-            "estimatedDocumentCount" => exec_estimated_count(&collection).await,
-            "distinct" => exec_distinct(&collection, args).await,
-            "aggregate" => exec_aggregate(&collection, args).await,
+            "countDocuments" => read::exec_count(&collection, args).await,
+            "estimatedDocumentCount" => read::exec_estimated_count(&collection).await,
+            "distinct" => read::exec_distinct(&collection, args).await,
+            "aggregate" => read::exec_aggregate(&collection, args).await,
             "drop" => exec_drop(&collection).await,
             "createIndex" => exec_create_index(&collection, args).await,
             "dropIndex" => exec_drop_index(&collection, args).await,
@@ -96,102 +98,11 @@ pub(super) fn arg_doc(args: &[serde_json::Value], index: usize) -> Result<bson::
 }
 
 /// BSON → EJSON-preserving JSON (same conversion the find/aggregate commands use).
-fn bson_doc_to_json(doc: bson::Document) -> serde_json::Value {
+pub(super) fn bson_doc_to_json(doc: bson::Document) -> serde_json::Value {
     serde_json::Value::from(bson::Bson::Document(doc))
 }
 
 // ── per-method executors ──────────────────────────────────────────────────
-
-async fn exec_find(
-    collection: &Collection<bson::Document>,
-    args: &[serde_json::Value],
-) -> Result<serde_json::Value, String> {
-    let filter = match arg_doc(args, 0) {
-        Ok(doc) => doc,
-        Err(e) => return Err(e),
-    };
-    let mut query = collection.find(filter);
-
-    // Positional args from the cursor: [filter, projection, sort, skip, limit].
-    let projection = match arg_doc(args, 1) {
-        Ok(doc) => doc,
-        Err(e) => return Err(e),
-    };
-    if !projection.is_empty() {
-        query = query.projection(projection);
-    }
-    let sort = match arg_doc(args, 2) {
-        Ok(doc) => doc,
-        Err(e) => return Err(e),
-    };
-    if !sort.is_empty() {
-        query = query.sort(sort);
-    }
-    // JS numbers may decode as floats, so read through f64 then cast.
-    if let Some(skip) = args.get(3).and_then(|value| value.as_f64()) {
-        if skip > 0.0 {
-            query = query.skip(skip as u64);
-        }
-    }
-    // Default to a small batch when no limit is set; never fetch beyond MAX_DOCS.
-    let requested = args
-        .get(4)
-        .and_then(|value| value.as_f64())
-        .map(|value| value as i64)
-        .unwrap_or(0);
-    let effective_limit = if requested <= 0 {
-        DEFAULT_FIND_LIMIT
-    } else {
-        requested.min(MAX_DOCS as i64)
-    };
-    query = query.limit(effective_limit).max_time(MAX_QUERY_TIME);
-
-    let mut cursor = match query.await {
-        Ok(value) => value,
-        Err(e) => return Err(e.to_string()),
-    };
-    let mut docs = Vec::new();
-    loop {
-        let has_next = match cursor.advance().await {
-            Ok(value) => value,
-            Err(e) => return Err(e.to_string()),
-        };
-        if !has_next {
-            break;
-        }
-        let doc: bson::Document = match cursor.deserialize_current() {
-            Ok(value) => value,
-            Err(e) => return Err(e.to_string()),
-        };
-        docs.push(bson_doc_to_json(doc));
-    }
-    Ok(serde_json::Value::Array(docs))
-}
-
-async fn exec_find_one(
-    collection: &Collection<bson::Document>,
-    args: &[serde_json::Value],
-) -> Result<serde_json::Value, String> {
-    let filter = match arg_doc(args, 0) {
-        Ok(doc) => doc,
-        Err(e) => return Err(e),
-    };
-    let mut query = collection.find_one(filter);
-    if args.len() > 1 {
-        let projection = match arg_doc(args, 1) {
-            Ok(doc) => doc,
-            Err(e) => return Err(e),
-        };
-        if !projection.is_empty() {
-            query = query.projection(projection);
-        }
-    }
-    match query.await {
-        Ok(Some(doc)) => Ok(bson_doc_to_json(doc)),
-        Ok(None) => Ok(serde_json::Value::Null),
-        Err(e) => Err(e.to_string()),
-    }
-}
 
 async fn exec_insert_one(
     collection: &Collection<bson::Document>,
@@ -317,61 +228,6 @@ async fn exec_delete(
     }
 }
 
-async fn exec_count(
-    collection: &Collection<bson::Document>,
-    args: &[serde_json::Value],
-) -> Result<serde_json::Value, String> {
-    let filter = match arg_doc(args, 0) {
-        Ok(value) => value,
-        Err(e) => return Err(e),
-    };
-    match collection.count_documents(filter).max_time(MAX_QUERY_TIME).await {
-        Ok(value) => Ok(serde_json::Value::from(value)),
-        Err(e) => Err(e.to_string()),
-    }
-}
-
-async fn exec_aggregate(
-    collection: &Collection<bson::Document>,
-    args: &[serde_json::Value],
-) -> Result<serde_json::Value, String> {
-    let array = match args.first().and_then(|value| value.as_array()) {
-        Some(value) => value,
-        None => return Err(String::from("aggregate expects a pipeline array")),
-    };
-    let mut stages = Vec::new();
-    for item in array {
-        match to_document(item) {
-            Ok(doc) => stages.push(doc),
-            Err(e) => return Err(e),
-        }
-    }
-    let mut cursor = match collection.aggregate(stages).max_time(MAX_QUERY_TIME).await {
-        Ok(value) => value,
-        Err(e) => return Err(e.to_string()),
-    };
-    let mut docs = Vec::new();
-    loop {
-        // Safety ceiling so a huge pipeline result can't exhaust memory.
-        if docs.len() >= MAX_DOCS {
-            break;
-        }
-        let has_next = match cursor.advance().await {
-            Ok(value) => value,
-            Err(e) => return Err(e.to_string()),
-        };
-        if !has_next {
-            break;
-        }
-        let doc: bson::Document = match cursor.deserialize_current() {
-            Ok(value) => value,
-            Err(e) => return Err(e.to_string()),
-        };
-        docs.push(bson_doc_to_json(doc));
-    }
-    Ok(serde_json::Value::Array(docs))
-}
-
 fn update_result_to_json(result: mongodb::results::UpdateResult) -> serde_json::Value {
     let mut out = serde_json::Map::new();
     out.insert(String::from("acknowledged"), serde_json::Value::Bool(true));
@@ -390,39 +246,6 @@ fn update_result_to_json(result: mongodb::results::UpdateResult) -> serde_json::
         None => {}
     }
     serde_json::Value::Object(out)
-}
-
-async fn exec_estimated_count(
-    collection: &Collection<bson::Document>,
-) -> Result<serde_json::Value, String> {
-    match collection.estimated_document_count().await {
-        Ok(value) => Ok(serde_json::Value::from(value)),
-        Err(e) => Err(e.to_string()),
-    }
-}
-
-async fn exec_distinct(
-    collection: &Collection<bson::Document>,
-    args: &[serde_json::Value],
-) -> Result<serde_json::Value, String> {
-    let field = match args.first().and_then(|value| value.as_str()) {
-        Some(value) => value.to_string(),
-        None => return Err(String::from("distinct expects a field name")),
-    };
-    let filter = match arg_doc(args, 1) {
-        Ok(doc) => doc,
-        Err(e) => return Err(e),
-    };
-    match collection.distinct(field, filter).await {
-        Ok(values) => {
-            let array = values
-                .into_iter()
-                .map(serde_json::Value::from)
-                .collect::<Vec<serde_json::Value>>();
-            Ok(serde_json::Value::Array(array))
-        }
-        Err(e) => Err(e.to_string()),
-    }
 }
 
 async fn exec_drop(
