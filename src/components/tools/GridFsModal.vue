@@ -15,6 +15,7 @@ import {
 import { errText, errCode } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import { useToast } from '../../composables/useToast'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 import { parseField } from '../../utils/queryParser'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
@@ -147,14 +148,16 @@ async function doSetMeta() {
 async function doCopyBucket() {
   const name = copyBucketName.value.trim()
   if (!name) return
+  const connectionId = props.target.connId
   busy.value = true
   subError.value = null
   try {
     await gridfsCopyBucket(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId, database: props.target.dbName },
       selectedBucket.value,
       name,
     )
+    invalidateConnectionResources(connectionId)
     showToast(`Bucket copied to "${name}"`)
     copyBucketOpen.value = false
     await loadBuckets()
@@ -171,12 +174,14 @@ async function dropBucket() {
   const bucket = selectedBucket.value
   const ok = window.confirm(`Drop GridFS bucket "${bucket}" and all its files? This cannot be undone.`)
   if (!ok) return
+  const connectionId = props.target.connId
   busy.value = true
   try {
     await gridfsDropBucket(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId, database: props.target.dbName },
       bucket,
     )
+    invalidateConnectionResources(connectionId)
     showToast(`Dropped bucket "${bucket}"`)
     selectedBucket.value = 'fs'
     await loadBuckets()
@@ -250,13 +255,15 @@ async function upload() {
     path = await openDialog({ multiple: false })
   } catch (_) { return }
   if (!path) return
+  const connectionId = props.target.connId
   busy.value = true
   try {
     await gridfsUpload(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId, database: props.target.dbName },
       selectedBucket.value,
       path,
     )
+    invalidateConnectionResources(connectionId)
     showToast('File uploaded')
     await loadBuckets()
     await loadFiles()

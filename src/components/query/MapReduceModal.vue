@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { mapReduce } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
@@ -28,19 +29,22 @@ const error = ref(null)
 const result = ref(null)
 
 async function run() {
+  const connectionId = props.target.connId
+  const output = outCollection.value
   running.value = true
   error.value = null
   result.value = null
   try {
     result.value = await mapReduce(
-      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId, database: props.target.dbName, collection: props.target.collName },
       {
         map:          map.value,
         reduce:       reduce.value,
         finalize:     finalize.value,
-        outCollection: outCollection.value,
+        outCollection: output,
       },
     )
+    if (output.trim()) invalidateConnectionResources(connectionId)
   } catch (e) {
     error.value = errText(e)
   } finally {
