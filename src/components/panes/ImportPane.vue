@@ -1,11 +1,12 @@
 <script setup>
-import { ref, computed, watch, inject } from 'vue'
+import { computed, watch, inject } from 'vue'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { useImportPaneLifecycle } from '../../composables/useImportPaneLifecycle'
+import { useImportPreview } from '../../composables/useImportPreview'
 import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -14,7 +15,7 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
 import { cellText } from '../../utils/format'
-import { INSERT_MODES, PREVIEW_LIMIT } from '../../constants/dataTools'
+import { INSERT_MODES } from '../../constants/dataTools'
 
 // Import surface for a collection, rendered as a workspace tab (kind 'import').
 // The format was chosen in the ImportFormatModal picker and lives on the tab.
@@ -49,18 +50,23 @@ const error = computed(() => t.value._importError || null)
 const errorCode = computed(() => t.value._importErrorCode || null)
 const done = computed(() => t.value._importDone || null)
 
-// Output preview (for the selected source).
-const previewLoading = ref(false)
-const previewError = ref(null)
-const previewCols = ref([])
-const previewRows = ref([])
+const {
+  loading: previewLoading,
+  error: previewError,
+  columns: previewCols,
+  rows: previewRows,
+  reset: resetPreview,
+  toggle: togglePreview,
+  loadPreview,
+} = useImportPreview({
+  tab: t,
+  activeTab: () => props.activeTab,
+  lifecycle,
+})
 
 watch(() => props.activeTab, (tab) => {
   lifecycle.attach(tab)
-  previewLoading.value = false
-  previewError.value = null
-  previewCols.value = []
-  previewRows.value = []
+  resetPreview()
 }, { immediate: true })
 
 function setError(e, tab = t.value) {
@@ -152,36 +158,6 @@ async function stageText(text, request) {
     mode: 'insert',
   })
   request.tab.selectedSource = request.tab.sources.length - 1
-}
-
-// ── output preview ─────────────────────────────────────────────
-function togglePreview() {
-  t.value.previewOpen = !t.value.previewOpen
-}
-
-async function loadPreview() {
-  const src = t.value.sources[t.value.selectedSource]
-  previewError.value = null
-  previewCols.value = []
-  previewRows.value = []
-  if (!src) {
-    lifecycle.cancelPreview()
-    previewLoading.value = false
-    return
-  }
-  const request = lifecycle.beginPreview(t.value, src)
-  previewLoading.value = true
-  try {
-    const preview = await importPreview(request.path, request.format, PREVIEW_LIMIT)
-    if (!lifecycle.isCurrentPreview(request, props.activeTab)) return
-    previewCols.value = preview.columns || []
-    previewRows.value = preview.rows || []
-  } catch (e) {
-    if (!lifecycle.isCurrentPreview(request, props.activeTab)) return
-    previewError.value = errText(e)
-  } finally {
-    if (lifecycle.isCurrentPreview(request, props.activeTab)) previewLoading.value = false
-  }
 }
 
 // ── run ────────────────────────────────────────────────────────
