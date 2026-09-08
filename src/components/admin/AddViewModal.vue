@@ -9,13 +9,14 @@ import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { parsePipeline } from '../../utils/queryParser'
 import { useToast } from '../../composables/useToast'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 
 // Add View… (from a database node) opens with no source; Add View Here… (from a
 // collection node) prefills that collection — the caller seeds `target.source`.
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, connName, dbName, source }
 })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
@@ -43,7 +44,7 @@ async function confirm() {
       pp.ejson,
     )
     showToast(`View "${viewName}" created`)
-    emit('saved', props.target.connId)
+    invalidateConnectionResources(props.target.connId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

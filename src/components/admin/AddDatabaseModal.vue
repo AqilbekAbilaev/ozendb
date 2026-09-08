@@ -7,13 +7,14 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 
 // Connection → Add Database…: MongoDB only materialises a database once it holds a
 // collection, so the first collection name is required rather than optional.
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, connName }
 })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
@@ -35,7 +36,7 @@ async function confirm() {
       collName.value.trim(),
     )
     showToast(`Database "${database}" created`)
-    emit('saved', props.target.connId)
+    invalidateConnectionResources(props.target.connId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

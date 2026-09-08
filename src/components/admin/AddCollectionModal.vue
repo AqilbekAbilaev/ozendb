@@ -9,6 +9,7 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 import { buildCollectionOptions, emptyCollectionOptions } from '../../utils/collectionOptions'
 
 // Database → Add Collection…: name plus the collection type and that type's options
@@ -17,7 +18,7 @@ import { buildCollectionOptions, emptyCollectionOptions } from '../../utils/coll
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, connName, dbName }
 })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
@@ -50,7 +51,7 @@ async function confirm() {
       built.options,
     )
     showToast(`Collection "${collection}" created`)
-    emit('saved', props.target.connId)
+    invalidateConnectionResources(props.target.connId)
     emit('close')
   } catch (e) {
     error.value = errText(e)
