@@ -7,6 +7,7 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 import { tabs } from '../../stores/tabs'
 
 // Collection → Rename Collection…: prefilled with the current name. An open tab on the
@@ -14,7 +15,7 @@ import { tabs } from '../../stores/tabs'
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, connName, dbName, collName }
 })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
@@ -47,7 +48,7 @@ async function confirm() {
       open.title = newName
     }
     showToast(`Collection renamed to "${newName}"`)
-    emit('saved', props.target.connId)
+    invalidateConnectionResources(props.target.connId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

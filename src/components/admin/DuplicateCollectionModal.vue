@@ -7,13 +7,14 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
+import { invalidateConnectionResources } from '../../stores/connectionData'
 
 // Collection → Duplicate Collection…: copies every document into a new collection in the
 // same database, prefilled with a "_copy" suffix. The backend returns the copied count.
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, connName, dbName, collName }
 })
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
@@ -38,7 +39,7 @@ async function confirm() {
       targetName,
     )
     showToast(`Copied ${count} document${count === 1 ? '' : 's'} to "${targetName}"`)
-    emit('saved', props.target.connId)
+    invalidateConnectionResources(props.target.connId)
     emit('close')
   } catch (e) {
     error.value = errText(e)
