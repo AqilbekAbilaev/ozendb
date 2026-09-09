@@ -1,21 +1,24 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { listConnections } from '../engines/mongodb/api/connections'
 import { listen } from '@tauri-apps/api/event'
-import { setConnectionOpen } from '../appApi/connectionState'
 import { errCode, errMessage } from '../utils/errors'
-import { applyConnectionUpdate } from '../utils/connectionList'
 import { resourceFromTreeSelection } from '../utils/legacyResourceRef'
 import {
   connectionResourceLoading, connectionResourceErrors,
-  ensureConnectionResources, refreshConnectionResources, clearConnectionResources,
+  ensureConnectionResources, refreshConnectionResources,
 } from '../stores/connectionData'
+import {
+  openConnections, loadOpenConnections, addOpenConnection,
+  updateOpenConnection, closeConnection, openConnectionById,
+} from '../stores/openConnections'
 import {
   connectionOpenRequest,
   consumeConnectionOpenRequest,
 } from '../stores/connectionNavigation'
 
 export function useConnectionTree({ props, emit }) {
-  const connections = ref([])
+  // The open-connection registry lives in the store; the tree renders it and owns
+  // only its own view state (expansion, selection, search).
+  const connections = openConnections
   const expandedConns = ref({})      // connId → boolean
   const loadingConns = connectionResourceLoading
   const connErrors = computed(() => Object.fromEntries(
@@ -64,16 +67,9 @@ export function useConnectionTree({ props, emit }) {
     // The sidebar shows only the connections that are open; the full saved list
     // lives in the Connection Manager. A connection's `open` flag is persisted, so
     // only the ones that were open before a restart come back.
-    const all = await listConnections()
-    connections.value = all.filter(c => c.open)
-    await listen('connection-saved', (e) => {
-      if (!connections.value.some(c => c.id === e.payload.id)) {
-        connections.value.push(e.payload)
-      }
-    })
-    await listen('connection-updated', (e) => {
-      connections.value = applyConnectionUpdate(connections.value, e.payload)
-    })
+    await loadOpenConnections()
+    await listen('connection-saved', (e) => addOpenConnection(e.payload))
+    await listen('connection-updated', (e) => updateOpenConnection(e.payload))
     await listen('connection-deleted', (e) => {
       disconnectConn(e.payload.id, { persist: false })
     })
@@ -181,17 +177,7 @@ export function useConnectionTree({ props, emit }) {
   async function openRequestedConnection(request) {
     if (!request) return
     const { connectionId } = request
-    let conn = connections.value.find(c => c.id === connectionId)
-    if (!conn) {
-      // Opening a connection that isn't in the sidebar yet: fetch just its config,
-      // mark it open (persisted), and add only it — don't reload the whole list.
-      const all = await listConnections()
-      conn = all.find(c => c.id === connectionId)
-      if (conn) {
-        await setConnectionOpen(connectionId, true)
-        connections.value.push(conn)
-      }
-    }
+    const conn = await openConnectionById(connectionId)
     if (conn && !expandedConns.value[connectionId]) {
       toggleConnection(conn)
     }
@@ -238,18 +224,15 @@ export function useConnectionTree({ props, emit }) {
     if (selection.value && selection.value.connectionId === connId) {
       setSelection(null)
     }
-    connections.value = connections.value.filter(c => c.id !== connId)
+    // Registry side — dropping it from the list, releasing its databases, and
+    // persisting the closed state — belongs to the store.
+    closeConnection(connId, { persist: persist })
+    // View side stays here: collapse whatever this connection had expanded.
     delete expandedConns.value[connId]
-    clearConnectionResources(connId)
     for (const key of Object.keys(expandedDbs.value)) {
       if (key.startsWith(connId + '/')) {
         delete expandedDbs.value[key]
       }
-    }
-    // Persist the closed state so it doesn't re-open after restart. Skipped when the
-    // connection was deleted (the record is already gone from storage).
-    if (persist) {
-      setConnectionOpen(connId, false)
     }
   }
 
