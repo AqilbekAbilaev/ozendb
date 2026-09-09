@@ -38,20 +38,90 @@ npm test
 ### Data flow
 
 ```
-App.vue  (composes the panes; owns split-pane sizing and handleContextAction)
-  ├── app/Toolbar.vue            (global toolbar actions)
-  ├── connection/ConnectionTree.vue  (sidebar; list_connections, list_databases on mount/expand)
-  ├── query/QueryWorkspace.vue   (tabs + query UI; emits run-query → App.vue calls find_documents)
-  ├── app/OperationsPane.vue     (surface for long-running operations)
-  ├── app/AppModals.vue          (renders every top-level modal, incl. ConnectionManager → NewConnection)
-  └── base/ContextMenu.vue       (handled entirely in App.vue's handleContextAction)
+main.js  (registers workspace definitions, seeds the first tab, then mounts — in that order)
+└── App.vue  (composition root: wires the composables, owns split-pane sizing)
+    ├── app/Toolbar.vue                (global toolbar actions → handleTool)
+    ├── connection/ConnectionTree.vue  (sidebar; emits select-node / select-collection)
+    ├── workspace/WorkspaceArea.vue    (the tab strip and whichever workspace is active)
+    ├── panes/OperationsPane.vue       (bottom dock for long-running operations)
+    ├── app/AppModals.vue              (every top-level modal, incl. ConnectionManager → NewConnection)
+    └── base/ContextMenu.vue           (routed through useFeatures' handleContextAction)
 ```
 
-Components are grouped by area under `src/components/`: `admin/`, `app/`, `base/`, `connection/`, `panes/` (the tab-area panes), `query/`, `results/`, `tools/`.
+### The layers
 
-Most app state and logic live in `src/composables/*` (`useModals`, `useQueryRunner`, `useDbActions`, `useMenu`, `useOperations`, `useSessionPersistence`, …) — `useModals` owns the open-state for every modal. App.vue composes these and passes props/handlers down; treat the composable as the source of truth for its slice.
+Four rings, outermost first. A ring may import inwards, never outwards.
 
-**Tab state** lives in `src/stores/tabs.js` — module-scope `tabs` / `activeTabId` refs plus every tab mutation (activate/close/cycle/duplicate/reorder/rename), shared by every importer. Tabs are plain objects and children mutate their properties directly (e.g. `tab.filter`, `tab.skip`), which works because Vue 3 makes array items reactive. The tab *creators* — what a newly opened tab of each kind contains — live in `src/composables/useTabCreators.js`, which App.vue constructs with the query runner and the settings-backed defaults they need. Note: module-scope refs do not survive Vite HMR cleanly — restart the dev server before blaming the code for stale tab state.
+| Layer | What lives there |
+|---|---|
+| `src/components/` | Rendering and event wiring only. Grouped by area: `admin/`, `app/`, `base/`, `connection/`, `panes/`, `query/`, `results/`, `tools/`, `workspace/`. |
+| `src/composables/` | Stateful, reusable slices (`useModals`, `useQueryRunner`, `useFeatures`, `useMenu`, …). One composable owns one slice end to end. |
+| `src/stores/` | Module-scope state shared by every importer: `tabs.js` (the tab spine), `connectionData.js` (databases per connection), `connectionNavigation.js`, `settings.js`. |
+| `src/utils/` | Pure functions. No Vue, no I/O. |
+
+### The Tauri boundary
+
+Nothing outside two roots may call `invoke`. **This is enforced, not a convention** —
+`src/appApi/apiBoundary.test.js` lists every engine-neutral command and fails the suite
+if one is invoked elsewhere, or if any production file outside the roots imports
+`@tauri-apps/api/core` at all.
+
+- **`src/appApi/`** — engine-neutral commands: `settings`, `session`, `menu`, `folders`,
+  `tags`, `operations`, `errorLog`, `files`, `sshTrust`, `updater`, `connectionState`.
+  Nothing here knows what a collection is.
+- **`src/engines/mongodb/api/`** — everything MongoDB-shaped: `queries`, `documents`,
+  `admin`, `indexes`, `schema`, `resources`, `gridfs`, `shell`, `transfer`,
+  `connections`, `queryLibrary`. Each takes a target `{ connectionId, database,
+  collection }` and turns it into a command payload via `payload.js`. **The only place
+  that knows command names and wire shapes** — the rest of the frontend talks targets.
+
+Adding a backend command means adding it to whichever root owns it, and to the list in
+`apiBoundary.test.js` if it is engine-neutral.
+
+### Workspaces (what a tab is)
+
+A tab is a *workspace*: a plain object with a canonical envelope (`id`, `type`,
+`engine`, `title`, `color`, `target`) plus whatever fields its type needs.
+
+- **`src/workspaces/`** is the engine-neutral machinery. `registry.js` maps types to
+  components; `createWorkspace.js` is the single factory and owns the envelope no
+  definition may override; `lifecycle.js` dispatches duplicate / restore / dispose and
+  holds the resource predicates (`affectedByResource`, `retargetResource`);
+  `registerDefinitions.js` is the one explicit, ordered registration call.
+- **`src/engines/mongodb/workspaces/`** holds the MongoDB definitions —
+  `queryDefinitions.js` (find, aggregate, SQL, shell) and `toolDefinitions.js`
+  (indexes, schema, search, import, export, current ops) — plus the collection
+  workspace component itself.
+
+**Startup order is load-bearing.** `main.js` calls `registerWorkspaceDefinitions()`,
+then `initializeTabs()`, then mounts. Every static import evaluates before that body
+runs, so a `createWorkspace` at module scope would hit an empty registry. Nothing may
+create a workspace during module evaluation.
+
+**Tab state** lives in `src/stores/tabs.js` — module-scope `tabs` / `activeTabId` refs
+plus every mutation (activate/close/cycle/duplicate/reorder/rename), shared by every
+importer. Tabs are plain objects and children mutate their properties directly (e.g.
+`tab.filter`, `tab.skip`), which works because Vue 3 makes array items reactive. The tab
+*creators* live in `src/composables/useTabCreators.js`, which App.vue constructs with
+the query runner and settings-backed defaults. Note: module-scope refs do not survive
+Vite HMR cleanly — restart the dev server before blaming the code for stale tab state.
+
+### Resource identity
+
+A connection/database/collection is named by a **ResourceRef** — `{ connectionId,
+segments: [{ kind, name }] }` — in `src/utils/resourceRef.js`. Ordered segments rather
+than fixed Mongo fields, so a deeper hierarchy (PostgreSQL `database/schema/table`)
+fits without a redesign. Names are opaque and never parsed by `/` or `.`; display names
+are presentation, not identity.
+
+Every workspace carries one as `target`, and containment questions are asked of it —
+"does dropping this close that tab?" is `affectedByResource`, not string comparison.
+
+`src/utils/legacyResourceRef.js` converts in both directions between a ResourceRef and
+the older flat shapes. **Those flat shapes are still live** — `{ connId, connName,
+dbName, collName }` in tool tabs and modal props, `{ connectionId, connectionName,
+dbName, collectionName }` in collection and shell tabs — and retiring them is unfinished
+work, not a pattern to copy. New code takes a ResourceRef.
 
 ### Rust backend (`src-tauri/src/`)
 
@@ -121,9 +191,9 @@ actually hold in your head.
 - **A composable owns one slice of state end to end.** If two composables both mutate the same
   thing, one of them is wrong — collapse them or move the state into `src/stores/`.
 - **Rust: `commands/*` are thin.** A `#[tauri::command]` resolves its client via `ctx.client()`
-  (or `ctx.client_for_write()` when it mutates),
-  calls into real logic, and maps errors. Business logic that grows past a screenful moves to a
-  sibling module so it can be unit-tested without a live MongoDB.
+  (or `ctx.client_for_write()` when it mutates), calls into real logic, and maps errors. Business
+  logic that grows past a screenful moves to a sibling module so it can be unit-tested without a
+  live MongoDB.
 
 ### File size
 
