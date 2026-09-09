@@ -7,6 +7,7 @@ import { createResourceRef } from '../utils/resourceRef'
 import { resourceFromLegacyTab, legacyTargetFromResource } from '../utils/legacyResourceRef'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
+import { openConnections, closeConnection } from '../stores/openConnections'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
@@ -96,7 +97,7 @@ export function useFeatures({
 
   async function disconnectOne(node, ctx) {
     try { await disconnect(node.connId) } catch (_) {}
-    connectionTreeRef.value.disconnectConn(node.connId)
+    await closeConnection(node.connId)
     // Every tab scoped into this connection is stale once it's gone — including tool
     // tabs, whose short alias keys the old filter could never see. Containment runs
     // disposal (shell teardown) through closeTab for each affected workspace.
@@ -104,10 +105,11 @@ export function useFeatures({
     showToast('Disconnected from ' + ctx.label)
   }
   async function disconnectOthers(node) {
-    const others = connectionTreeRef.value.getConnections().filter(c => c.id !== node.connId)
+    // Snapshot first: closing mutates the list the loop is reading.
+    const others = openConnections.value.filter(c => c.id !== node.connId)
     for (const conn of others) {
       try { await disconnect(conn.id) } catch (_) {}
-      connectionTreeRef.value.disconnectConn(conn.id)
+      await closeConnection(conn.id)
     }
     // Keep every tab scoped under the surviving connection; close all other
     // resource-scoped tabs. The old filter closed every non-collection tab — it
@@ -117,9 +119,9 @@ export function useFeatures({
     showToast('Disconnected all other connections')
   }
   async function disconnectAll() {
-    for (const conn of connectionTreeRef.value.getConnections()) {
+    for (const conn of [...openConnections.value]) {
       try { await disconnect(conn.id) } catch (_) {}
-      connectionTreeRef.value.disconnectConn(conn.id)
+      await closeConnection(conn.id)
     }
     // Every resource-scoped tab belongs to a now-disconnected connection; only
     // resource-less workspaces (Quickstart) survive.
@@ -137,7 +139,7 @@ export function useFeatures({
   async function refreshAll() {
     let done = 0
     let failed = 0
-    for (const conn of connectionTreeRef.value.getConnections()) {
+    for (const conn of openConnections.value) {
       try {
         await refreshConnectionResources(conn.id)
         done++

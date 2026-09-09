@@ -21,7 +21,7 @@ const {
   connections, expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
   retryConnection, toggleDatabase, highlightCollection, openSelectedCollection,
-  openCollection, collectionKey, disconnectConn, getConnections,
+  openCollection, collectionKey,
 } = useConnectionTree({ props, emit })
 
 // The colour name explicitly set on a node — its override (keyed by the node's
@@ -78,7 +78,9 @@ function onNodeContext(e, type, label, nodeData) {
 // pass their own target, so the card needs no per-kind handler here.
 const { tip, ...statsTip } = useStatsTip()
 
-defineExpose({ disconnectConn, getConnections, openSelectedCollection })
+// The registry moved to stores/openConnections, so the only thing left worth exposing
+// is the one genuinely visual question: open whatever row the user has highlighted.
+defineExpose({ openSelectedCollection })
 </script>
 
 <template>

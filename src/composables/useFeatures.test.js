@@ -17,8 +17,14 @@ vi.mock('../engines/mongodb/api/connections', () => ({
 }))
 
 const { disconnect } = await import('../engines/mongodb/api/connections')
-vi.mock('../stores/connectionData', () => ({ refreshConnectionResources: vi.fn() }))
+vi.mock('../stores/connectionData', () => ({
+  refreshConnectionResources: vi.fn(), clearConnectionResources: vi.fn(),
+}))
 const { refreshConnectionResources } = await import('../stores/connectionData')
+vi.mock('../appApi/connectionState', () => ({ setConnectionOpen: vi.fn() }))
+const {
+  openConnections, addOpenConnection, resetOpenConnections,
+} = await import('../stores/openConnections')
 
 // A minimal harness: useFeatures' dependencies are injected, so every other slice is
 // a stub and only the tab store is real. The tested surface is the disconnect paths:
@@ -87,10 +93,44 @@ describe('resource refresh actions', () => {
   it('refreshes every open connection even if one fails', async () => {
     refreshConnectionResources.mockRejectedValueOnce('offline')
     const showToast = vi.fn()
-    const features = makeFeatures({ getConnections: () => [{ id: 'c1' }, { id: 'c2' }] }, { showToast })
+    resetOpenConnections()
+    addOpenConnection({ id: 'c1' })
+    addOpenConnection({ id: 'c2' })
+    const features = makeFeatures({}, { showToast })
     await features.runFeature('Refresh All', {})
     expect(refreshConnectionResources.mock.calls).toEqual([['c1'], ['c2']])
     expect(showToast).toHaveBeenCalledWith('Refreshed 1 connection, 1 failed')
+  })
+})
+
+// The registry lives in the store, so these paths take no sidebar component at all —
+// makeFeatures({}) passes an empty stub and they must still work.
+describe('disconnect paths read the registry from the store', () => {
+  beforeEach(() => {
+    resetOpenConnections()
+  })
+
+  it('disconnects one connection without touching the sidebar component', async () => {
+    addOpenConnection({ id: 'c1', name: 'One' })
+    addOpenConnection({ id: 'c2', name: 'Two' })
+    await makeFeatures({}).runFeature('Disconnect', { connId: 'c1' }, { label: 'One' })
+    expect(disconnect).toHaveBeenCalledWith('c1')
+    expect(openConnections.value.map(c => c.id)).toEqual(['c2'])
+  })
+
+  it('disconnects every other connection, keeping the named one', async () => {
+    addOpenConnection({ id: 'c1', name: 'One' })
+    addOpenConnection({ id: 'c2', name: 'Two' })
+    addOpenConnection({ id: 'c3', name: 'Three' })
+    await makeFeatures({}).runFeature('Disconnect Others', { connId: 'c1' })
+    expect(openConnections.value.map(c => c.id)).toEqual(['c1'])
+  })
+
+  it('disconnects all of them', async () => {
+    addOpenConnection({ id: 'c1', name: 'One' })
+    addOpenConnection({ id: 'c2', name: 'Two' })
+    await makeFeatures({}).runFeature('Disconnect All', {})
+    expect(openConnections.value).toEqual([])
   })
 })
 
@@ -103,7 +143,9 @@ describe('disconnect paths close affected workspaces through the store', () => {
       tab('ix', 'c1', 'shop', 'orders', 'indexes'),
       tab('f2', 'c2', 'other', 'items'),
     ], 'f')
-    const features = makeFeatures({ disconnectConn: vi.fn(), getConnections: vi.fn(() => [{ id: 'c1' }]) })
+    resetOpenConnections()
+    addOpenConnection({ id: 'c1' })
+    const features = makeFeatures({})
     await features.runFeature('Disconnect', { connId: 'c1', connName: 'Sales' }, { label: 'Sales' })
     expect(disconnect).toHaveBeenCalledWith('c1')
     const ids = tabs.value.map(t => t.id)
@@ -121,10 +163,10 @@ describe('disconnect paths close affected workspaces through the store', () => {
       tab('f2', 'c2', 'other', 'items'),
       tab('ix', 'c2', 'other', 'items', 'indexes'),
     ], 'sh')
-    const features = makeFeatures({
-      disconnectConn: vi.fn(),
-      getConnections: vi.fn(() => [{ id: 'c1' }, { id: 'c2' }]),
-    })
+    resetOpenConnections()
+    addOpenConnection({ id: 'c1' })
+    addOpenConnection({ id: 'c2' })
+    const features = makeFeatures({})
     await features.runFeature('Disconnect Others', { connId: 'c1', connName: 'Sales' })
     expect(disconnect).toHaveBeenCalledWith('c2')
     const ids = tabs.value.map(t => t.id)
@@ -139,10 +181,10 @@ describe('disconnect paths close affected workspaces through the store', () => {
       tab('sh', 'c1', 'shop', null, 'shell'),
       tab('f2', 'c2', 'other', 'items'),
     ], 'f')
-    const features = makeFeatures({
-      disconnectConn: vi.fn(),
-      getConnections: vi.fn(() => [{ id: 'c1' }, { id: 'c2' }]),
-    })
+    resetOpenConnections()
+    addOpenConnection({ id: 'c1' })
+    addOpenConnection({ id: 'c2' })
+    const features = makeFeatures({})
     await features.runFeature('Disconnect All', {})
     expect(disconnect).toHaveBeenCalledWith('c1')
     expect(disconnect).toHaveBeenCalledWith('c2')

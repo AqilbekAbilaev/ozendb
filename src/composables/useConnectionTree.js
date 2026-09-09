@@ -63,6 +63,27 @@ export function useConnectionTree({ props, emit }) {
     }
   }
 
+  // The store is the source of truth for which connections are open, so the tree
+  // prunes its own view state when one leaves — whoever closed it. Doing this in each
+  // caller instead meant the action dispatcher had to reach into the sidebar component
+  // just to keep its expansion state honest.
+  watch(openConnections, (list) => {
+    const live = new Set(list.map(c => c.id))
+    if (selection.value && !live.has(selection.value.connectionId)) setSelection(null)
+    for (const id of Object.keys(expandedConns.value)) {
+      if (!live.has(id)) delete expandedConns.value[id]
+    }
+    for (const key of Object.keys(expandedDbs.value)) {
+      // Keys are `connId/dbName` and connection ids are UUIDs, so the first segment
+      // is the id — a database name can never contain a slash.
+      if (!live.has(key.slice(0, key.indexOf('/')))) delete expandedDbs.value[key]
+    }
+    // Synchronous on purpose: an async flush leaves a tick where the selection still
+    // names a connection that is gone, and the native menu derives its enabled items
+    // from that selection. The body only prunes local refs, so it is cheap and safe
+    // to run inline.
+  }, { flush: 'sync' })
+
   onMounted(async () => {
     // The sidebar shows only the connections that are open; the full saved list
     // lives in the Connection Manager. A connection's `open` flag is persisted, so
@@ -220,25 +241,11 @@ export function useConnectionTree({ props, emit }) {
   })
 
   function disconnectConn(connId, { persist = true } = {}) {
-    // Drop a stale selection pointing at the connection that's going away.
-    if (selection.value && selection.value.connectionId === connId) {
-      setSelection(null)
-    }
-    // Registry side — dropping it from the list, releasing its databases, and
-    // persisting the closed state — belongs to the store.
+    // Purely a delegation now. The view cleanup that used to live here runs off the
+    // watcher below, so it happens however a connection leaves the list.
     closeConnection(connId, { persist: persist })
-    // View side stays here: collapse whatever this connection had expanded.
-    delete expandedConns.value[connId]
-    for (const key of Object.keys(expandedDbs.value)) {
-      if (key.startsWith(connId + '/')) {
-        delete expandedDbs.value[key]
-      }
-    }
   }
 
-  function getConnections() {
-    return connections.value
-  }
   return {
     connections,
     expandedConns,
@@ -260,6 +267,5 @@ export function useConnectionTree({ props, emit }) {
     openCollection,
     collectionKey,
     disconnectConn,
-    getConnections,
   }
 }
