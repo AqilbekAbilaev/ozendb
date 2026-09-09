@@ -33,7 +33,7 @@ export function shouldFling(samples, vx, vy) {
 }
 
 // Wire momentum onto one scroll container. Returns a detach function.
-export function attachMomentum(el) {
+function attachMomentum(el) {
   let vx = 0, vy = 0, samples = 0, lastAt = 0, frameAt = 0
   let raf = null, endTimer = null
 

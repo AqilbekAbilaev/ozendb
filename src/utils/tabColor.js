@@ -3,7 +3,7 @@
 // colour can never drift between where it's chosen and where it's shown. Each preset
 // points at an existing theme token (never a raw hex), so the tags stay theme-aware
 // and in step with the rest of the UI — blue is literally the app accent.
-export const TAG_COLORS = {
+const TAG_COLORS = {
   blue:   'var(--accent)',
   green:  'var(--green)',
   purple: 'var(--purple)',
@@ -23,7 +23,7 @@ export const TAG_PRESETS = [
 
 // True when a stored tag value is a raw hex colour (a custom colour) rather than one
 // of the preset names above. Custom colours persist as their own '#rrggbb' string.
-export function isHexColor(value) {
+function isHexColor(value) {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
 }
 

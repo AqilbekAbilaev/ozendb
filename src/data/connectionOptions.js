@@ -103,7 +103,7 @@ export const TABS = [
 
 // `available: false` modes are shown disabled and badged "soon" rather than hidden,
 // so the list reads as the full set of what MongoDB supports.
-export const AUTH_MODES = [
+const AUTH_MODES = [
   { value: 'none',          label: 'None',                            available: true  },
   { value: 'SCRAM-SHA-256', label: 'Basic (SCRAM-SHA-256)',           available: true  },
   { value: 'SCRAM-SHA-1',   label: 'Legacy (SCRAM-SHA-1)',            available: true  },
