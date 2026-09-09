@@ -30,23 +30,13 @@ function opsTarget(node) {
 // Indexes/Schema/Search tabs are identity-only: the pane reloads its data on mount,
 // so a duplicate is just the same target with a fresh id. Work 7 makes Schema and
 // Search persist (identity only, like Indexes) — the restore hook is shared too.
-function identityTool(kind, titlePrefix) {
-  return {
-    duplicate(workspace) {
-      return {
-        title: workspace.title || titlePrefix + ' ' + (workspace.collName || workspace.dbName),
-        target: resourceFromFeatureNode(shortTarget(workspace)),
-        fields: { kind, ...shortTarget(workspace) },
-      }
-    },
-    restore(saved) {
-      return {
-        title: saved.title || titlePrefix + ' ' + saved.collName,
-        target: resourceFromFeatureNode(shortTarget(saved)),
-        fields: { kind, ...shortTarget(saved) },
-      }
-    },
-  }
+function identityTool(kind, titlePrefix, anchor = (source) => source.collName || source.dbName) {
+  const rebuild = (source) => ({
+    title: source.title || titlePrefix + ' ' + anchor(source),
+    target: resourceFromFeatureNode(shortTarget(source)),
+    fields: { kind, ...shortTarget(source) },
+  })
+  return { duplicate: rebuild, restore: rebuild }
 }
 
 export const toolDefinitions = [
@@ -76,8 +66,7 @@ export const toolDefinitions = [
       }
     },
     serialize: () => ({}),
-    duplicate: identityTool('schema', 'Schema:').duplicate,
-    restore: identityTool('schema', 'Schema:').restore,
+    ...identityTool('schema', 'Schema:'),
   },
   {
     type: 'mongodb.search',
@@ -96,14 +85,9 @@ export const toolDefinitions = [
       }
     },
     serialize: () => ({}),
-    duplicate: identityTool('search', 'Search:').duplicate,
-    restore(saved) {
-      // Search has no collection, so the shared title fallback must not reach for
-      // collName; dbName is the anchor.
-      const tool = identityTool('search', 'Search:').restore(saved)
-      if (!saved.title) tool.title = 'Search: ' + saved.dbName
-      return tool
-    },
+    // Search is database-scoped, so its title falls back to dbName rather than the
+    // collName the shared helper reaches for.
+    ...identityTool('search', 'Search:', (saved) => saved.dbName),
   },
   {
     type: 'mongodb.import',

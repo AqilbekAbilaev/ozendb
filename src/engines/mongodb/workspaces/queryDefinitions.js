@@ -34,6 +34,39 @@ function collectionTarget(target) {
   }
 }
 
+// Identity for a collection-scoped workspace, from whichever object carries the flat
+// fields — a creation context's target, a live workspace, or a saved record.
+const collectionRef = (source) => resourceFromFeatureNode(collectionTarget(source))
+
+// A fresh tab in the given mode. Every collection query starts from the same spine
+// and differs only in `mode` and a few mode-specific fields.
+function createCollection(ctx, mode, extra = {}) {
+  return {
+    title: ctx.target.collectionName,
+    target: collectionRef(ctx.target),
+    fields: { ...collectionFields(ctx), mode: mode, pipeline: '', ...extra },
+  }
+}
+
+// A duplicate replays durable state onto a *fresh* runtime spine — results,
+// selection, errors and timings all start empty. Writing that per mode is how two
+// tabs end up sharing one set of results, so it happens here instead.
+function duplicateCollection(workspace, mode, durable) {
+  return {
+    title: workspace.title,
+    target: collectionRef(workspace),
+    fields: {
+      ...collectionFields({ target: workspace, defaults: {} }),
+      mode: mode,
+      // Same base as createCollection: `pipeline` is not part of collectionFields, so
+      // a mode whose durable state omits it still gets an empty one rather than
+      // undefined. Find and aggregate overwrite it from editorState.
+      pipeline: '',
+      ...durable,
+    },
+  }
+}
+
 // The editor fields that survive a duplicate, replayed onto a fresh runtime spine.
 // VQB/column-order arrive here as references; the generic helper deep-clones the
 // whole fields object so no two tabs ever share them.
@@ -69,17 +102,53 @@ function restoreCollection(saved, defaults = {}) {
   }
 }
 
+// A shell workspace is database-scoped, so its identity is the connection plus the
+// database — never the collection a sibling tab happens to be on.
+function shellTarget(source) {
+  return {
+    connectionId: source.connectionId,
+    connectionName: source.connectionName,
+    dbName: source.dbName,
+  }
+}
+
+// The full shape of a shell tab. Create, duplicate and restore all produce exactly
+// this — they differ only in the editor text they carry over — so the runtime spine
+// is written once. Getting it wrong in one of three copies is how a duplicated tab
+// ends up sharing its predecessor's results.
+//
+// `sessionId` is always freshly minted: each shell tab owns its own backend JS
+// session so variables persist across runs within a tab and never leak between them.
+function shellFields(source, sessionId, durable = {}) {
+  return {
+    kind: 'shell',
+    ...shellTarget(source),
+    sessionId: sessionId,
+    code: durable.code ?? '',
+    scriptPath: durable.scriptPath ?? null,
+    history: [], isRunning: false,
+    results: [], resultView: 'table', resultTab: 'Console',
+    runError: null, elapsedMs: null, drillPath: [], hasRun: false,
+    selectedRow: -1, selectedRows: [],
+    logs: [], scalar: undefined, hasScalar: false,
+  }
+}
+
+function shellWorkspace(source, ctx, durable) {
+  return {
+    title: source.title || 'mongosh: ' + source.dbName,
+    target: resourceFromFeatureNode(shellTarget(source)),
+    fields: shellFields(source, ctx.ids.session(), durable),
+  }
+}
+
 export const queryDefinitions = [
   {
     type: 'mongodb.find',
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.collection,
     create(ctx) {
-      return {
-        title: ctx.target.collectionName,
-        target: resourceFromFeatureNode(collectionTarget(ctx.target)),
-        fields: { ...collectionFields(ctx), mode: 'find', pipeline: '' },
-      }
+      return createCollection(ctx, 'find')
     },
     // Work 7: the durable editor state, projected from either a legacy record or a
     // live tab. Runtime fields (results, selection, errors) are never serialized.
@@ -89,11 +158,7 @@ export const queryDefinitions = [
     duplicate(workspace) {
       // Find is the only restored/duplicated query that re-runs automatically, so
       // the active Mongo collection workspace consumes this one-shot marker.
-      return {
-        title: workspace.title,
-        target: resourceFromFeatureNode(collectionTarget(workspace)),
-        fields: { ...collectionFields({ target: collectionTarget(workspace), defaults: {} }), mode: 'find', ...editorState(workspace), needsInitialRun: true },
-      }
+      return duplicateCollection(workspace, 'find', { ...editorState(workspace), needsInitialRun: true })
     },
     restore(saved, ctx) {
       // Find is the only query that auto-runs on restore; the one-shot marker tells
@@ -107,20 +172,12 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.collection,
     create(ctx) {
-      return {
-        title: ctx.target.collectionName,
-        target: resourceFromFeatureNode(collectionTarget(ctx.target)),
-        fields: { ...collectionFields(ctx), mode: 'aggregate', pipeline: '' },
-      }
+      return createCollection(ctx, 'aggregate')
     },
     serialize: editorState,
     duplicate(workspace) {
       // Clone the pipeline and editor state, reset runtime, and do not run.
-      return {
-        title: workspace.title,
-        target: resourceFromFeatureNode(collectionTarget(workspace)),
-        fields: { ...collectionFields({ target: collectionTarget(workspace), defaults: {} }), mode: 'aggregate', ...editorState(workspace) },
-      }
+      return duplicateCollection(workspace, 'aggregate', editorState(workspace))
     },
     restore(saved, ctx) {
       return restoreCollection(saved, ctx.defaults)
@@ -131,16 +188,11 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.collection,
     create(ctx) {
-      return {
-        title: 'SQL: ' + ctx.target.collectionName,
-        target: resourceFromFeatureNode(collectionTarget(ctx.target)),
-        fields: {
-          ...collectionFields(ctx),
-          mode: 'sql', pipeline: '',
-          sql: 'SELECT *\nFROM ' + ctx.target.collectionName,
-          sqlError: null,
-        },
-      }
+      const base = createCollection(ctx, 'sql', {
+        sql: 'SELECT *\nFROM ' + ctx.target.collectionName,
+        sqlError: null,
+      })
+      return { ...base, title: 'SQL: ' + ctx.target.collectionName }
     },
     serialize(workspace) {
       // SQL's translated find pieces are derived state, never stored; only the text
@@ -153,16 +205,10 @@ export const queryDefinitions = [
     duplicate(workspace) {
       // Clone the SQL text and settings but clear the translated find pieces — a
       // duplicated SQL tab must never run with a stale translation.
-      return {
-        title: workspace.title,
-        target: resourceFromFeatureNode(collectionTarget(workspace)),
-        fields: {
-          ...collectionFields({ target: collectionTarget(workspace), defaults: {} }),
-          mode: 'sql', pipeline: '',
-          sql: workspace.sql ?? '', sqlError: null,
-          readOnly: !!workspace.readOnly, colOrder: workspace.colOrder ?? null,
-        },
-      }
+      return duplicateCollection(workspace, 'sql', {
+        sql: workspace.sql ?? '', sqlError: null,
+        readOnly: !!workspace.readOnly, colOrder: workspace.colOrder ?? null,
+      })
     },
     restore(saved, ctx) {
       // The translated find pieces are re-derived on the next Run, so they restore
@@ -183,80 +229,17 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.shell,
     create(ctx) {
-      return {
-        title: 'mongosh: ' + ctx.target.dbName,
-        target: resourceFromFeatureNode({
-          connectionId: ctx.target.connectionId,
-          connectionName: ctx.target.connectionName,
-          dbName: ctx.target.dbName,
-        }),
-        fields: {
-          kind: 'shell',
-          connectionId: ctx.target.connectionId,
-          connectionName: ctx.target.connectionName,
-          dbName: ctx.target.dbName,
-          // Each shell tab gets its own backend JS session so variables persist
-          // across runs; the injected source keeps tests deterministic.
-          sessionId: ctx.ids.session(),
-          code: '', history: [], isRunning: false,
-          results: [], resultView: 'table', resultTab: 'Console',
-          runError: null, elapsedMs: null, drillPath: [], hasRun: false,
-          selectedRow: -1, selectedRows: [],
-          logs: [], scalar: undefined, hasScalar: false,
-        },
-      }
+      return shellWorkspace(ctx.target, ctx)
     },
     serialize(workspace) {
       // The session is backend state keyed by id; only the editor text is durable.
       return { code: workspace.code ?? '', scriptPath: workspace.scriptPath ?? null }
     },
     duplicate(workspace, ctx) {
-      // Each shell tab owns its backend JS session, so a duplicate opens a fresh one;
-      // the injected session source keeps tests deterministic.
-      return {
-        title: workspace.title,
-        target: resourceFromFeatureNode({
-          connectionId: workspace.connectionId,
-          connectionName: workspace.connectionName,
-          dbName: workspace.dbName,
-        }),
-        fields: {
-          kind: 'shell',
-          connectionId: workspace.connectionId,
-          connectionName: workspace.connectionName,
-          dbName: workspace.dbName,
-          sessionId: ctx.ids.session(),
-          code: workspace.code || '', scriptPath: workspace.scriptPath || null,
-          history: [], isRunning: false,
-          results: [], resultView: 'table', resultTab: 'Console',
-          runError: null, elapsedMs: null, drillPath: [], hasRun: false,
-          selectedRow: -1, selectedRows: [],
-          logs: [], scalar: undefined, hasScalar: false,
-        },
-      }
+      return shellWorkspace(workspace, ctx, workspace)
     },
     restore(saved, ctx) {
-      return {
-        title: saved.title || 'mongosh: ' + saved.dbName,
-        target: resourceFromFeatureNode({
-          connectionId: saved.connectionId,
-          connectionName: saved.connectionName,
-          dbName: saved.dbName,
-        }),
-        fields: {
-          kind: 'shell',
-          connectionId: saved.connectionId,
-          connectionName: saved.connectionName,
-          dbName: saved.dbName,
-          sessionId: ctx.ids.session(),
-          code: saved.code || '', scriptPath: saved.scriptPath || null,
-          history: [], isRunning: false,
-          results: [], resultView: 'table', resultTab: 'Console',
-          runError: null, elapsedMs: null, drillPath: [], hasRun: false,
-          selectedRow: -1, selectedRows: [],
-          logs: [], scalar: undefined, hasScalar: false,
-        },
-      }
+      return shellWorkspace(saved, ctx, saved)
     },
     dispose(workspace) {
       // Best-effort: closeShellSession resolves/rejects by itself, and the generic
