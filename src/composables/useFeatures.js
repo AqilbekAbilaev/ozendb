@@ -77,16 +77,16 @@ export function useFeatures({
   // the registry modal with the node fields that level needs.
   const LEVEL_FIELDS = { connection: CONN, database: DB, collection: COLL }
 
-  // A modal's target, carrying both alias spellings while the modals move onto the
-  // long names one batch at a time (audit §8). Either spelling reads the same value,
-  // so a not-yet-converted modal keeps working. The short pair comes out once no
-  // component reads it — contextMenus/useFeatures specs pin the rest.
+  // A modal's target. Modals read the long alias spelling — the same one the tab
+  // creators, the Mongo API and the menu target resolution use — so the short
+  // connId/collName pair stops here and never reaches a component. The FEATURES nodes
+  // upstream are still short; converting those is the rest of audit §8.
   function modalTarget(node, level) {
     const short = pick(node, LEVEL_FIELDS[level])
     return {
-      ...short,
       connectionId: short.connId,
       connectionName: short.connName,
+      ...(short.dbName !== undefined ? { dbName: short.dbName } : {}),
       ...(short.collName !== undefined ? { collectionName: short.collName } : {}),
     }
   }

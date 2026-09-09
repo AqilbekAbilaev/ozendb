@@ -14,7 +14,7 @@ import { invalidateConnectionResources } from '../../stores/connectionData'
 // Add View… (from a database node) opens with no source; Add View Here… (from a
 // collection node) prefills that collection — the caller seeds `target.source`.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName, dbName, source }
+  target: { type: Object, required: true },   // { connectionId, connectionName, dbName, source }
 })
 const emit = defineEmits(['close'])
 
@@ -38,13 +38,13 @@ async function confirm() {
   error.value = null
   try {
     await createView(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       viewName,
       source.value.trim(),
       pp.ejson,
     )
     showToast(`View "${viewName}" created`)
-    invalidateConnectionResources(props.target.connId)
+    invalidateConnectionResources(props.target.connectionId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

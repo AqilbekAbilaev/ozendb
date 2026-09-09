@@ -13,7 +13,7 @@ import { fmtBytes, fmtNum } from '../../utils/format'
 // and surfaces the headline numbers plus a per-index size breakdown, the way
 // Studio-3T's Collection Stats view does.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName, collName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, collectionName }
 })
 defineEmits(['close'])
 
@@ -26,7 +26,7 @@ const showRaw = ref(false)
 onMounted(async () => {
   try {
     stats.value = await collectionStats(
-      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
     )
   } catch (e) {
     error.value = errText(e)
@@ -57,7 +57,7 @@ const rawJson = computed(() => (stats.value ? JSON.stringify(stats.value.raw, nu
 <template>
   <BaseModal width="620px" max-width="92vw" @close="$emit('close')">
       <template #title>
-        Collection Stats — {{ target.dbName }}.{{ target.collName }}
+        Collection Stats — {{ target.dbName }}.{{ target.collectionName }}
         <span v-if="stats && stats.capped" class="ss-tag">capped</span>
       </template>
 

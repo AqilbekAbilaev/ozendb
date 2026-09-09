@@ -11,7 +11,7 @@ import BaseModalBody from '../base/BaseModalBody.vue'
 // Live server metrics: polls serverStatus on an interval and draws simple SVG
 // sparklines. Reuses the existing server_status command (no new backend).
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName }
+  target: { type: Object, required: true },  // { connectionId, connectionName }
 })
 defineEmits(['close'])
 
@@ -37,7 +37,7 @@ function push(key, value) {
 
 async function sample() {
   try {
-    const s = await serverStatus(props.target.connId)
+    const s = await serverStatus(props.target.connectionId)
     error.value = null
     const conn = s.connections || {}
     const net = s.network || {}
@@ -87,7 +87,7 @@ const charts = computed(() => [
 </script>
 
 <template>
-  <BaseModal :title="`Server Status Charts — ${target.connName}`" width="620px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Server Status Charts — ${target.connectionName}`" width="620px" max-width="92vw" @close="$emit('close')">
       <BaseModalBody>
         <StateMessage v-if="loading" mode="loading" label="Sampling server status…" />
         <StateMessage v-else-if="error" mode="error" :message="error" />

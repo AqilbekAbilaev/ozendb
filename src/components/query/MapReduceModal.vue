@@ -16,7 +16,7 @@ import FormField from '../base/FormField.vue'
 // Open Map-Reduce for a collection: enter map / reduce / (optional) finalize JS and
 // an output collection (blank = inline), run mapReduce, and show the raw result.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName, collName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, collectionName }
 })
 defineEmits(['close'])
 
@@ -29,14 +29,14 @@ const error = ref(null)
 const result = ref(null)
 
 async function run() {
-  const connectionId = props.target.connId
+  const connectionId = props.target.connectionId
   const output = outCollection.value
   running.value = true
   error.value = null
   result.value = null
   try {
     result.value = await mapReduce(
-      { connectionId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId, database: props.target.dbName, collection: props.target.collectionName },
       {
         map:          map.value,
         reduce:       reduce.value,
@@ -56,7 +56,7 @@ const resultJson = () => (result.value ? JSON.stringify(result.value, null, 2) :
 </script>
 
 <template>
-  <BaseModal :title="`Map-Reduce — ${target.collName}`" width="640px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Map-Reduce — ${target.collectionName}`" width="640px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <div class="mr-body">

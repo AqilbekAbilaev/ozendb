@@ -14,7 +14,7 @@ import BaseModalBody from '../base/BaseModalBody.vue'
 
 // Add / Edit Stored Functions for a database (its system.js documents).
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
 })
 defineEmits(['close'])
 
@@ -32,7 +32,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    functions.value = await listFunctions({ connectionId: props.target.connId, database: props.target.dbName })
+    functions.value = await listFunctions({ connectionId: props.target.connectionId, database: props.target.dbName })
   } catch (e) {
     error.value = errText(e)
   } finally {
@@ -59,7 +59,7 @@ async function onSaveFunction() {
   editError.value = null
   try {
     await saveFunction(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       name,
       editing.value.body,
     )
@@ -76,7 +76,7 @@ async function onDropFunction(fn) {
   if (!confirmDelete(fn.name)) return
   busy.value = true
   try {
-    await dropFunction({ connectionId: props.target.connId, database: props.target.dbName }, fn.name)
+    await dropFunction({ connectionId: props.target.connectionId, database: props.target.dbName }, fn.name)
     await load()
   } catch (e) {
     error.value = errText(e)

@@ -12,7 +12,7 @@ import { invalidateConnectionResources } from '../../stores/connectionData'
 // Connection → Add Database…: MongoDB only materialises a database once it holds a
 // collection, so the first collection name is required rather than optional.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName }
+  target: { type: Object, required: true },   // { connectionId, connectionName }
 })
 const emit = defineEmits(['close'])
 
@@ -32,11 +32,11 @@ async function confirm() {
   error.value = null
   try {
     await createDatabase(
-      { connectionId: props.target.connId, database: database },
+      { connectionId: props.target.connectionId, database: database },
       collName.value.trim(),
     )
     showToast(`Database "${database}" created`)
-    invalidateConnectionResources(props.target.connId)
+    invalidateConnectionResources(props.target.connectionId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

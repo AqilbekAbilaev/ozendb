@@ -18,7 +18,7 @@ import FormField from '../base/FormField.vue'
 // Manage Users for a database: list, create, and drop users (via usersInfo /
 // createUser / dropUser).
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
 })
 defineEmits(['close'])
 
@@ -38,7 +38,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    users.value = await listUsers({ connectionId: props.target.connId, database: props.target.dbName })
+    users.value = await listUsers({ connectionId: props.target.connectionId, database: props.target.dbName })
   } catch (e) {
     error.value = errText(e)
   } finally {
@@ -56,7 +56,7 @@ async function onCreateUser() {
   createError.value = null
   try {
     await createUser(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       name,
       newPassword.value,
       roles,
@@ -77,7 +77,7 @@ async function onDropUser(user) {
   if (!confirmDelete(user.user)) return
   busy.value = true
   try {
-    await dropUser({ connectionId: props.target.connId, database: props.target.dbName }, user.user)
+    await dropUser({ connectionId: props.target.connectionId, database: props.target.dbName }, user.user)
     await load()
   } catch (e) {
     error.value = errText(e)
@@ -106,7 +106,7 @@ async function openCopyPanel() {
   copyTargetDb.value = props.target.dbName
   try {
     connections.value = await listConnections()
-    copyTargetConn.value = props.target.connId
+    copyTargetConn.value = props.target.connectionId
   } catch (e) {
     copyError.value = errText(e)
   }
@@ -120,7 +120,7 @@ async function runCopyUsers() {
   copyResults.value = null
   try {
     copyResults.value = await copyUsersToConnection(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       copyTargetConn.value,
       targetDb,
     )

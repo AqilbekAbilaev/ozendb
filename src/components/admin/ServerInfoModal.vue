@@ -11,7 +11,7 @@ import BaseModal from '../base/BaseModal.vue'
 // Reused for the extra Server Info menu entries (Build Info / Host Info / Replica
 // Set Status). Shows the flat scalar fields as cards and the full document raw.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, kind, title }
+  target: { type: Object, required: true },  // { connectionId, connectionName, kind, title }
 })
 defineEmits(['close'])
 
@@ -23,7 +23,7 @@ const showRaw = ref(false)
 
 onMounted(async () => {
   try {
-    data.value = await serverInfo(props.target.connId, props.target.kind)
+    data.value = await serverInfo(props.target.connectionId, props.target.kind)
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)
@@ -52,7 +52,7 @@ const rawJson = computed(() => (data.value ? JSON.stringify(data.value, null, 2)
 </script>
 
 <template>
-  <BaseModal :title="`${target.title} — ${target.connName}`" width="640px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`${target.title} — ${target.connectionName}`" width="640px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <StateMessage v-if="loading" mode="loading" :label="`Fetching ${target.title.toLowerCase()}…`" />

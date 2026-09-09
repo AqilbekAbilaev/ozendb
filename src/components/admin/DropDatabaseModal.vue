@@ -14,7 +14,7 @@ import { createResourceRef } from '../../utils/resourceRef'
 // Database → Drop Database…: destructive, so it confirms first. Dropping also closes every
 // open tab pointing into that database — those tabs can no longer resolve anything.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName, dbName }
+  target: { type: Object, required: true },   // { connectionId, connectionName, dbName }
 })
 const emit = defineEmits(['close'])
 
@@ -28,12 +28,12 @@ async function confirm() {
   deleting.value = true
   error.value = null
   try {
-    await dropDatabase({ connectionId: props.target.connId, database: props.target.dbName })
-    invalidateConnectionResources(props.target.connId)
+    await dropDatabase({ connectionId: props.target.connectionId, database: props.target.dbName })
+    invalidateConnectionResources(props.target.connectionId)
     // Containment closes every tab scoped into the dropped database (collections,
     // shells, tools), and only those; connection-scoped tabs like Current Operations
     // survive. closeTab runs disposal for each removed workspace.
-    closeWhere(affectedByResource(createResourceRef(props.target.connId, [{ kind: 'database', name: props.target.dbName }])))
+    closeWhere(affectedByResource(createResourceRef(props.target.connectionId, [{ kind: 'database', name: props.target.dbName }])))
     showToast(`Database "${props.target.dbName}" dropped`)
     emit('close')
   } catch (e) {

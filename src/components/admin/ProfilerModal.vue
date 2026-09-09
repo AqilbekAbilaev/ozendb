@@ -14,7 +14,7 @@ import BaseModalBody from '../base/BaseModalBody.vue'
 // lists the slow ops captured in `system.profile`, and lets the user change the
 // profiling level / slow-op threshold. Profiling is per-database in MongoDB.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
 })
 defineEmits(['close'])
 
@@ -48,7 +48,7 @@ const currentLevelLabel = computed(() =>
 
 async function fetchStatus() {
   status.value = await getProfilingStatus(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
     )
   // Seed the control bar from the live status the first time we learn it.
   if (status.value && typeof status.value.was === 'number') {
@@ -61,7 +61,7 @@ async function fetchStatus() {
 
 async function fetchList() {
   entries.value = await listProfile(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       50,
       slowerThan.value != null && slowerThan.value !== '' ? Number(slowerThan.value) : null,
     )
@@ -85,7 +85,7 @@ async function applyLevel() {
   errorCode.value = null
   try {
     await setProfilingLevel(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       Number(level.value),
       Number(slowms.value),
     )

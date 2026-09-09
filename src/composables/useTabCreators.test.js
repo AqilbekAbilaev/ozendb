@@ -280,6 +280,10 @@ describe('export source resolution', () => {
     c.openExportSource(NODE)
     expect(c.modalsApi.openModal).toHaveBeenCalledWith('exportSource', {
       ...NODE,
+      // Both spellings: the modal reads the long one, openExportTab the short one.
+      connectionId: NODE.connId,
+      connectionName: NODE.connName,
+      collectionName: NODE.collName,
       query: '{"status":"open"}',
       selectedIds: ['a', 'b'],
     }, expect.objectContaining({ on: expect.any(Object) }))

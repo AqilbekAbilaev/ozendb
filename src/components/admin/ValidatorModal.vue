@@ -18,7 +18,7 @@ import BaseModalFoot from '../base/BaseModalFoot.vue'
 // Add / Edit Validator for a collection. Fetches the current validator on open so an
 // existing rule is never silently overwritten, then writes changes via collMod.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName, collName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, collectionName }
 })
 const emit = defineEmits(['close'])
 const { showToast } = useToast()
@@ -35,7 +35,7 @@ const ACTION_OPTIONS = ['error', 'warn'].map((v) => ({ value: v, label: v }))
 onMounted(async () => {
   try {
     const info = await getValidator(
-      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
     )
     validatorText.value = info.validator || ''
     if (info.validation_level) level.value = info.validation_level
@@ -60,12 +60,12 @@ async function save() {
   error.value = null
   try {
     await setValidator(
-      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
       ejson,
       level.value,
       action.value,
     )
-    showToast(`Validator saved for "${props.target.collName}"`)
+    showToast(`Validator saved for "${props.target.collectionName}"`)
     emit('close')
   } catch (e) {
     error.value = errText(e)
@@ -76,7 +76,7 @@ async function save() {
 </script>
 
 <template>
-  <BaseModal :title="`Validator — ${target.collName}`" width="620px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Validator — ${target.collectionName}`" width="620px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <StateMessage v-if="loading" mode="loading" label="Loading validator…" />

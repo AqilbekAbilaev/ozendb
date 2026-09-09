@@ -12,7 +12,7 @@ import BaseRadio from '../base/BaseRadio.vue'
 // Two of the sources depend on there being a matching open collection tab, so they
 // enable only when the caller supplies one (see `target.query` / `target.selected`).
 const props = defineProps({
-  // { connId, connName, dbName, collName, query, selectedIds } — `query` is the tab's
+  // { connectionId, connectionName, dbName, collectionName, query, selectedIds } — `query` is the tab’s
   // current filter as EJSON (null when Export was opened from the sidebar), and
   // `selectedIds` the EJSON _id values of the rows selected in its grid.
   target: { type: Object, required: true },
@@ -69,7 +69,7 @@ function next() {
       <div class="ifm-title">Export source</div>
       <div class="ifm-sub">
         Please choose an export source —
-        {{ target.dbName }}.{{ target.collName }}
+        {{ target.dbName }}.{{ target.collectionName }}
       </div>
     </div>
 

@@ -12,20 +12,20 @@ import { invalidateConnectionResources } from '../../stores/connectionData'
 // Collection → Duplicate Collection…: copies every document into a new collection in the
 // same database, prefilled with a "_copy" suffix. The backend returns the copied count.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName, dbName, collName }
+  target: { type: Object, required: true },   // { connectionId, connectionName, dbName, collectionName }
 })
 const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
-const name = ref(props.target.collName + '_copy')
+const name = ref(props.target.collectionName + '_copy')
 const error = ref(null)
 const saving = ref(false)
 
 // Duplicating onto itself would fail server-side, so the button waits for a new name.
 const valid = computed(() => {
   const next = name.value.trim()
-  return !!next && next !== props.target.collName
+  return !!next && next !== props.target.collectionName
 })
 
 async function confirm() {
@@ -35,11 +35,11 @@ async function confirm() {
   error.value = null
   try {
     const count = await duplicateCollection(
-      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
       targetName,
     )
     showToast(`Copied ${count} document${count === 1 ? '' : 's'} to "${targetName}"`)
-    invalidateConnectionResources(props.target.connId)
+    invalidateConnectionResources(props.target.connectionId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

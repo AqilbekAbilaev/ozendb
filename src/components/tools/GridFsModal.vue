@@ -32,7 +32,7 @@ import { fmtBytes } from '../../utils/format'
 // Top-bar / tree GridFS browser for a database: list buckets, list files, and
 // upload / download / delete / rename / edit-metadata files, plus bucket copy/drop.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName, menuRequest? }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, menuRequest? }
 })
 const emit = defineEmits(['close'])
 const { showToast } = useToast()
@@ -100,7 +100,7 @@ async function doRename() {
   subError.value = null
   try {
     await gridfsRename(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       selectedBucket.value,
       file.id,
       name,
@@ -130,7 +130,7 @@ async function doSetMeta() {
   subError.value = null
   try {
     await gridfsSetMetadata(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       selectedBucket.value,
       file.id,
       ejson,
@@ -148,7 +148,7 @@ async function doSetMeta() {
 async function doCopyBucket() {
   const name = copyBucketName.value.trim()
   if (!name) return
-  const connectionId = props.target.connId
+  const connectionId = props.target.connectionId
   busy.value = true
   subError.value = null
   try {
@@ -174,7 +174,7 @@ async function dropBucket() {
   const bucket = selectedBucket.value
   const ok = window.confirm(`Drop GridFS bucket "${bucket}" and all its files? This cannot be undone.`)
   if (!ok) return
-  const connectionId = props.target.connId
+  const connectionId = props.target.connectionId
   busy.value = true
   try {
     await gridfsDropBucket(
@@ -211,7 +211,7 @@ function onBucket(bucket) {
 async function loadBuckets() {
   try {
     buckets.value = await listGridfsBuckets(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
     )
     if (buckets.value.length && !buckets.value.includes(selectedBucket.value)) {
       selectedBucket.value = buckets.value[0]
@@ -228,7 +228,7 @@ async function loadFiles() {
   resetDelete()
   try {
     files.value = await listGridfsFiles(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       selectedBucket.value,
     )
   } catch (e) {
@@ -255,7 +255,7 @@ async function upload() {
     path = await openDialog({ multiple: false })
   } catch (_) { return }
   if (!path) return
-  const connectionId = props.target.connId
+  const connectionId = props.target.connectionId
   busy.value = true
   try {
     await gridfsUpload(
@@ -284,7 +284,7 @@ async function download(file) {
   busy.value = true
   try {
     await gridfsDownload(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       selectedBucket.value,
       file.id,
       dest,
@@ -303,7 +303,7 @@ async function confirmDelete(file) {
   busy.value = true
   try {
     await gridfsDelete(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
       selectedBucket.value,
       file.id,
     )

@@ -15,20 +15,20 @@ import { createResourceRef } from '../../utils/resourceRef'
 // Collection → Rename Collection…: prefilled with the current name. Open workspaces on
 // the collection are retargeted in place rather than closed, so the user keeps their work.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName, dbName, collName }
+  target: { type: Object, required: true },   // { connectionId, connectionName, dbName, collectionName }
 })
 const emit = defineEmits(['close'])
 
 const { showToast } = useToast()
 
-const name = ref(props.target.collName)
+const name = ref(props.target.collectionName)
 const error = ref(null)
 const saving = ref(false)
 
 // Renaming to the same name is a no-op, so the button stays disabled until it differs.
 const valid = computed(() => {
   const next = name.value.trim()
-  return !!next && next !== props.target.collName
+  return !!next && next !== props.target.collectionName
 })
 
 async function confirm() {
@@ -38,19 +38,19 @@ async function confirm() {
   error.value = null
   try {
     await renameCollection(
-      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
       newName,
     )
     // Every workspace on the old collection follows the rename — not just the first
     // find tab. Retargeting keeps `target` in step with the flat fields, so a later
     // drop still recognises the tab (see workspaces/lifecycle).
-    const at = (name) => createResourceRef(props.target.connId, [
+    const at = (name) => createResourceRef(props.target.connectionId, [
       { kind: 'database', name: props.target.dbName },
       { kind: 'collection', name: name },
     ])
-    tabs.value.forEach(retargetResource(at(props.target.collName), at(newName)))
+    tabs.value.forEach(retargetResource(at(props.target.collectionName), at(newName)))
     showToast(`Collection renamed to "${newName}"`)
-    invalidateConnectionResources(props.target.connId)
+    invalidateConnectionResources(props.target.connectionId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

@@ -14,7 +14,7 @@ import { createResourceRef } from '../../utils/resourceRef'
 // Collection → Drop Collection…: destructive, so it confirms first. Dropping also closes
 // any open tab on that collection, which would otherwise query something gone.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName, dbName, collName }
+  target: { type: Object, required: true },   // { connectionId, connectionName, dbName, collectionName }
 })
 const emit = defineEmits(['close'])
 
@@ -29,18 +29,18 @@ async function confirm() {
   error.value = null
   try {
     await dropCollection({
-      connectionId: props.target.connId,
+      connectionId: props.target.connectionId,
       database:     props.target.dbName,
-      collection:   props.target.collName,
+      collection:   props.target.collectionName,
     })
-    invalidateConnectionResources(props.target.connId)
+    invalidateConnectionResources(props.target.connectionId)
     // Containment closes every tab scoped into the dropped collection (find/aggregate/
     // SQL/import/export/indexes/schema), and only those. closeTab runs disposal.
-    closeWhere(affectedByResource(createResourceRef(props.target.connId, [
+    closeWhere(affectedByResource(createResourceRef(props.target.connectionId, [
       { kind: 'database', name: props.target.dbName },
-      { kind: 'collection', name: props.target.collName },
+      { kind: 'collection', name: props.target.collectionName },
     ])))
-    showToast(`Collection "${props.target.collName}" dropped`)
+    showToast(`Collection "${props.target.collectionName}" dropped`)
     emit('close')
   } catch (e) {
     error.value = errText(e)
@@ -53,7 +53,7 @@ async function confirm() {
 <template>
   <BaseModal title="Drop Collection" @close="emit('close')">
     <div class="del-body">
-      <p>Are you sure you want to drop "<strong>{{ target.collName }}</strong>"? This deletes all of its documents and cannot be undone.</p>
+      <p>Are you sure you want to drop "<strong>{{ target.collectionName }}</strong>"? This deletes all of its documents and cannot be undone.</p>
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">

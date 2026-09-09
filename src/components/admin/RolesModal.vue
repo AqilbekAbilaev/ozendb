@@ -9,7 +9,7 @@ import BaseModalBody from '../base/BaseModalBody.vue'
 
 // Manage Roles for a database: read-only listing of the custom (non-built-in) roles.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
 })
 defineEmits(['close'])
 
@@ -19,7 +19,7 @@ const roles = ref([])
 
 onMounted(async () => {
   try {
-    roles.value = await listRoles({ connectionId: props.target.connId, database: props.target.dbName })
+    roles.value = await listRoles({ connectionId: props.target.connectionId, database: props.target.dbName })
   } catch (e) {
     error.value = errText(e)
   } finally {

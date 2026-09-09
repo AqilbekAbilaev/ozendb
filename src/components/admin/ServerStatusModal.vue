@@ -11,7 +11,7 @@ import BaseModal from '../base/BaseModal.vue'
 // Opened from App.vue for a connection node. Fetches admin `serverStatus` once
 // and surfaces the headline fields; the full document is available raw below.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName }
+  target: { type: Object, required: true },  // { connectionId, connectionName }
 })
 defineEmits(['close'])
 
@@ -23,7 +23,7 @@ const showRaw = ref(false)
 
 onMounted(async () => {
   try {
-    status.value = await serverStatus(props.target.connId)
+    status.value = await serverStatus(props.target.connectionId)
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)
@@ -78,7 +78,7 @@ const rawJson = computed(() =>
 </script>
 
 <template>
-  <BaseModal :title="`Server Status — ${target.connName}`" width="640px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Server Status — ${target.connectionName}`" width="640px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <StateMessage v-if="loading" mode="loading" label="Fetching server status…" />

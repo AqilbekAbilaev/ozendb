@@ -13,7 +13,7 @@ import BaseModalBody from '../base/BaseModalBody.vue'
 // delete) made to this collection, newest-first, each restorable — Studio-3T's
 // undo-your-edits safety net. Opened from App.vue for a collection node.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName, collName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, collectionName }
 })
 defineEmits(['close'])
 
@@ -30,7 +30,7 @@ async function load() {
   errorCode.value = null
   try {
     entries.value = await listCollectionHistory(
-      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
     )
   } catch (e) {
     error.value = errText(e)
@@ -80,7 +80,7 @@ async function restore(entry) {
 async function clearAll() {
   try {
     await clearCollectionHistory(
-      { connectionId: props.target.connId, database: props.target.dbName, collection: props.target.collName },
+      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
     )
     entries.value = []
     notice.value = 'History cleared'
@@ -91,7 +91,7 @@ async function clearAll() {
 </script>
 
 <template>
-  <BaseModal :title="`Collection History — ${target.dbName}.${target.collName}`" width="640px" max-width="calc(100vw - 40px)" height="calc(100vh - 80px)" max-height="calc(100vh - 80px)" @close="$emit('close')">
+  <BaseModal :title="`Collection History — ${target.dbName}.${target.collectionName}`" width="640px" max-width="calc(100vw - 40px)" height="calc(100vh - 80px)" max-height="calc(100vh - 80px)" @close="$emit('close')">
 
       <BaseModalBody>
         <div class="ch-controls">

@@ -12,7 +12,7 @@ import { invalidateConnectionResources } from '../../stores/connectionData'
 // Database → Add GridFS Bucket…: a bucket is the pair of `<name>.files` and
 // `<name>.chunks` collections; create both so it appears in the GridFS view.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName, dbName }
+  target: { type: Object, required: true },   // { connectionId, connectionName, dbName }
 })
 const emit = defineEmits(['close'])
 
@@ -30,11 +30,11 @@ async function confirm() {
   try {
     for (const suffix of ['files', 'chunks']) {
       await createCollection(
-        { connectionId: props.target.connId, database: props.target.dbName },
+        { connectionId: props.target.connectionId, database: props.target.dbName },
         `${bucket}.${suffix}`,
       )
       // The first collection may succeed even if creating the second fails.
-      invalidateConnectionResources(props.target.connId)
+      invalidateConnectionResources(props.target.connectionId)
     }
     showToast(`GridFS bucket "${bucket}" created`)
     emit('close')

@@ -12,7 +12,7 @@ import { fmtBytes, fmtNum } from '../../utils/format'
 // Opened from App.vue for a database node. Fetches `dbStats` once and surfaces the
 // headline fields; the full document is available raw below.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, connName, dbName }
+  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
 })
 defineEmits(['close'])
 
@@ -25,7 +25,7 @@ const showRaw = ref(false)
 onMounted(async () => {
   try {
     stats.value = await databaseStats(
-      { connectionId: props.target.connId, database: props.target.dbName },
+      { connectionId: props.target.connectionId, database: props.target.dbName },
     )
   } catch (e) {
     error.value = errText(e)

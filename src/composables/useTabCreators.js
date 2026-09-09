@@ -152,6 +152,12 @@ export function useTabCreators({
       .map(doc => doc._id)
     const target = {
       ...node,
+      // The modal reads the long spelling; openExportTab still builds a tool
+      // workspace from the short one, so this object carries both until the node
+      // path is migrated too (audit §8).
+      connectionId: node.connId,
+      connectionName: node.connName,
+      collectionName: node.collName,
       query: pf && pf.ok ? pf.ejson : null,
       selectedIds: selectedIds,
     }

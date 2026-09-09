@@ -272,12 +272,12 @@ export function useAppMenuActions({
     }
     const open = modalsApi.openModals.gridfs
     const sameOpen = open
-      && open.connId === target.connectionId
+      && open.connectionId === target.connectionId
       && open.dbName === target.dbName
     if (!sameOpen) {
       modalsApi.openModal('gridfs', {
-        connId: target.connectionId,
-        connName: target.connectionName,
+        connectionId: target.connectionId,
+        connectionName: target.connectionName,
         dbName: target.dbName,
       })
     }
