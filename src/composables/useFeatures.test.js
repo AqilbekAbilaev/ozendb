@@ -10,7 +10,8 @@ import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 registerWorkspaceDefinitions()
 
 const { tabs, activeTabId } = await import('../stores/tabs')
-const { useFeatures } = await import('./useFeatures')
+const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
+const { MENUS } = await import('../constants/contextMenus')
 
 vi.mock('../engines/mongodb/api/connections', () => ({
   disconnect: vi.fn(() => Promise.resolve()),
@@ -288,5 +289,59 @@ describe('handleTool falling back to the active workspace', () => {
     makeFeatures({}, { openShellTab, showToast }).handleTool('shell')
     expect(openShellTab).not.toHaveBeenCalled()
     expect(showToast).toHaveBeenCalled()
+  })
+})
+
+// The dispatcher is keyed on each menu item's own display label, so a renamed or
+// mistyped one stops matching and the user is told the feature is "coming soon".
+// These lock the coupling until actions move onto the stable ids the native menu
+// already emits (audit §2): every action a menu offers must be dispatchable, and
+// every one that is not must be an acknowledged placeholder.
+describe('context menu coverage', () => {
+  // A `sub` item only opens a flyout; its `subItems` are the real actions. The tab
+  // menu is excluded because handleContextAction routes it to the tab store before
+  // runFeature ever sees it.
+  function actionsIn(items) {
+    const out = []
+    for (const item of items) {
+      if (item.sep) continue
+      if (item.subItems) out.push(...item.subItems)
+      if (item.sub) continue
+      if (item.label) out.push(item.label)
+    }
+    return out
+  }
+  const offered = [...new Set(
+    Object.entries(MENUS).filter(([type]) => type !== 'tab').flatMap(([, items]) => actionsIn(items)),
+  )]
+
+  it('scrapes a plausible number of actions, so a silently-empty check cannot pass', () => {
+    expect(offered.length).toBeGreaterThan(30)
+  })
+
+  it('can dispatch every action the menus offer', () => {
+    const { knownActions } = makeFeatures({})
+    const orphans = offered.filter(a => !knownActions.has(a) && !UNBUILT_ACTIONS.has(a))
+    expect(orphans).toEqual([])
+  })
+
+  it('keeps no placeholder for an action that is in fact implemented', () => {
+    const { knownActions } = makeFeatures({})
+    expect([...UNBUILT_ACTIONS].filter(a => knownActions.has(a))).toEqual([])
+  })
+
+  it('reports an unknown action as a fault instead of an unbuilt feature', () => {
+    const showToast = vi.fn()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    makeFeatures({}, { showToast }).runFeature('Definitely Not A Feature', { connId: 'c1' })
+    expect(showToast).toHaveBeenCalledWith('Could not run "Definitely Not A Feature"')
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+  })
+
+  it('still says "coming soon" for the acknowledged placeholders', () => {
+    const showToast = vi.fn()
+    makeFeatures({}, { showToast }).runFeature('Export URI…', { connId: 'c1' })
+    expect(showToast).toHaveBeenCalledWith('Export URI… — coming to OzenDB')
   })
 })

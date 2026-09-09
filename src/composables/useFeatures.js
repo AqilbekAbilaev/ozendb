@@ -18,6 +18,15 @@ import { openConnections, closeConnection } from '../stores/openConnections'
 // Dependencies are injected so this stays UI-agnostic and testable: `modals`/
 // `dbActions` are the sibling composable APIs; the rest are shared refs and the
 // tab creators, which remain in App.vue. Tab state comes from the store.
+// Context-menu entries that are deliberately offered but not implemented yet. Naming
+// them is what lets an *unrecognised* action be treated as the bug it is: while
+// "absent from FEATURES" meant "coming soon", a renamed or mistyped label was
+// indistinguishable from a placeholder and quietly lied to the user.
+export const UNBUILT_ACTIONS = new Set([
+  'Duplicate Database…',
+  'Export URI…',
+])
+
 export function useFeatures({
   // shared reactive state
   contextMenu, connectionTreeRef, dbClipboard,
@@ -243,7 +252,14 @@ export function useFeatures({
   // may want (e.g. the clicked node's display label).
   function runFeature(action, node, ctx = {}) {
     const feat = FEATURES[action]
-    if (!feat) { showToast(action + ' — coming to OzenDB'); return }
+    if (!feat) {
+      if (UNBUILT_ACTIONS.has(action)) { showToast(action + ' — coming to OzenDB'); return }
+      // Offered by a menu but unknown here: a wiring bug, not a placeholder. Say so
+      // loudly rather than telling the user their feature was never built.
+      console.error(`useFeatures: no handler registered for action "${action}"`)
+      showToast(`Could not run "${action}"`)
+      return
+    }
     if (feat.requires && !hasLevel(node, feat.requires)) { showToast(levelHint(feat.requires)); return }
     return feat.run(node, ctx)
   }
@@ -336,8 +352,11 @@ export function useFeatures({
       runFeature(action, tabNode(tab))
       return
     }
+    // Every entry in TOOLS is handled above or via TOOL_ALIASES, so reaching here
+    // means the toolbar grew a button nobody wired up.
     const label = TOOLS.find(t => t.name === name)?.label || name
-    showToast(`${label} — coming to OzenDB`)
+    console.error(`useFeatures: no handler registered for tool "${name}"`)
+    showToast(`Could not run "${label}"`)
   }
 
   // Bridges a native-menu item into the feature registry by synthesizing the
@@ -368,6 +387,9 @@ export function useFeatures({
   }
 
   return {
+    // Exposed so contextMenus can be checked against what is actually dispatchable
+    // (see the coverage spec); FEATURES itself closes over injected dependencies.
+    knownActions: new Set(Object.keys(FEATURES)),
     handleContextAction: handleContextAction,
     handleTool: handleTool,
     menuNode: menuNode,
