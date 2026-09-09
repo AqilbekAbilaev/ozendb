@@ -117,7 +117,7 @@ export function useTabCreators({
   // shell around the shared useIndexes state; IndexManagerPane loads it on mount.
   function openIndexManagerTab({ connId, connName, dbName, collName }) {
     const existing = tabs.value.find(t =>
-      t.kind === 'indexes' && t.connId === connId && t.dbName === dbName && t.collName === collName)
+      t.kind === 'indexes' && t.connectionId === connId && t.dbName === dbName && t.collectionName === collName)
     if (existing) { activateTab(existing.id); return }
     const tab = newWorkspace('mongodb.indexes', { target: { connId, connName, dbName, collName } })
     tabs.value.push(tab)
@@ -129,7 +129,7 @@ export function useTabCreators({
   // collection focuses the existing tab.
   function openSchemaTab({ connId, connName, dbName, collName }) {
     const existing = tabs.value.find(t =>
-      t.kind === 'schema' && t.connId === connId && t.dbName === dbName && t.collName === collName)
+      t.kind === 'schema' && t.connectionId === connId && t.dbName === dbName && t.collectionName === collName)
     if (existing) { activateTab(existing.id); return }
     const tab = newWorkspace('mongodb.schema', { target: { connId, connName, dbName, collName } })
     tabs.value.push(tab)
@@ -191,7 +191,7 @@ export function useTabCreators({
 
   // Search is database-scoped (it scans every collection in one db).
   function openSearchTab({ connId, connName, dbName }) {
-    const existing = tabs.value.find(t => t.kind === 'search' && t.connId === connId && t.dbName === dbName)
+    const existing = tabs.value.find(t => t.kind === 'search' && t.connectionId === connId && t.dbName === dbName)
     if (existing) { activateTab(existing.id); return }
     const tab = newWorkspace('mongodb.search', { target: { connId, connName, dbName } })
     tabs.value.push(tab)

@@ -231,9 +231,9 @@ watch(() => props.activeTab, (tab) => {
   closeIndexForm()
   idx.selectedIndex.value = null
   idx.indexesTarget.value = {
-    connId: tab.connId,
+    connectionId: tab.connectionId,
     dbName: tab.dbName,
-    collName: tab.collName,
+    collectionName: tab.collectionName,
   }
   loadIndexes(tab)
 }, { immediate: true })
@@ -279,7 +279,7 @@ function usageOf(index)  { const u = localIndexUsage.value[index.name]; return u
 <template>
   <div class="idxm">
     <!-- Breadcrumb -->
-    <CollectionCrumbs :conn="activeTab.connName" :db="activeTab.dbName" :coll="activeTab.collName" icon="anchor" label="Indexes" />
+    <CollectionCrumbs :conn="activeTab.connectionName" :db="activeTab.dbName" :coll="activeTab.collectionName" icon="anchor" label="Indexes" />
 
     <!-- Toolbar -->
     <div class="idx-toolbar">

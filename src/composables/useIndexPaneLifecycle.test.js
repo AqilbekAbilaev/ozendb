@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { useIndexPaneLifecycle } from './useIndexPaneLifecycle'
 
 const tab = (id, connId = 'c1', dbName = 'db', collName = 'coll') => ({
-  id, connId, dbName, collName,
+  id, connectionId: connId, dbName, collectionName: collName,
 })
 
 describe('index pane menu ownership', () => {
@@ -33,7 +33,7 @@ describe('index form target', () => {
 
     lifecycle.attachMenuApi(first, api)
     const captured = lifecycle.captureFormTarget(first)
-    first.collName = 'renamed-after-open'
+    first.collectionName = 'renamed-after-open'
 
     expect(captured).toEqual({ connectionId: 'c1', database: 'db', collection: 'coll' })
     expect(lifecycle.formTarget.value).toEqual(captured)

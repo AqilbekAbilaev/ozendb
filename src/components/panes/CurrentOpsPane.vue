@@ -86,7 +86,7 @@ const collOptions = computed(() => {
 // Reloaded when the pane moves to a tab on another server, for the same reason.
 watch(() => props.activeTab, async (tab) => {
   try {
-    tab._opsDatabases = await listDatabases(tab.connId)
+    tab._opsDatabases = await listDatabases(tab.connectionId)
   } catch (_) {
     // The pickers stay on "all" — a missing database list must not stop the ops view.
   }
@@ -133,7 +133,7 @@ const updatedText = computed(() =>
     <!-- Breadcrumb -->
     <div class="crumbs">
       <BaseIcon name="connect" :size="15" class="c-ic" />
-      <span class="crumb">{{ activeTab.connName }}</span>
+      <span class="crumb">{{ activeTab.connectionName }}</span>
       <BaseIcon name="caret" :size="11" class="sep" />
       <BaseIcon name="dbSmall" :size="15" class="c-ic" />
       <BaseSelect v-model="dbName" class="cr-select" size="sm" :options="dbOptions" />

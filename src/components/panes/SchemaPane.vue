@@ -40,7 +40,7 @@ async function analyze() {
   errorCode.value = null
   try {
     report.value = await analyzeSchema(
-      { connectionId: props.activeTab.connId, database: props.activeTab.dbName, collection: props.activeTab.collName },
+      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
       sampleSize.value,
     )
   } catch (e) {
@@ -54,7 +54,7 @@ async function analyze() {
 
 onMounted(analyze)
 // Re-analyze if this tab is retargeted at a different collection.
-watch(() => props.activeTab.connId + ':' + props.activeTab.dbName + ':' + props.activeTab.collName, () => {
+watch(() => props.activeTab.connectionId + ':' + props.activeTab.dbName + ':' + props.activeTab.collectionName, () => {
   analyze()
 })
 
@@ -70,7 +70,7 @@ async function runSchemaExport() {
   let path
   try {
     path = await saveDialog({
-      defaultPath: `${props.activeTab.collName}-schema.${ext}`,
+      defaultPath: `${props.activeTab.collectionName}-schema.${ext}`,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     })
   } catch (e) {
@@ -82,7 +82,7 @@ async function runSchemaExport() {
   exportMsg.value = null
   try {
     const count = await exportSchema(
-      { connectionId: props.activeTab.connId, database: props.activeTab.dbName, collection: props.activeTab.collName },
+      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
       sampleSize.value,
       String(path),
       format,
@@ -137,7 +137,7 @@ const fields = computed(() => (report.value ? report.value.fields : []))
 <template>
   <div class="schema-pane">
     <!-- Breadcrumb (mirrors the collection tab) -->
-    <CollectionCrumbs :conn="activeTab.connName" :db="activeTab.dbName" :coll="activeTab.collName" icon="schema" label="Schema" />
+    <CollectionCrumbs :conn="activeTab.connectionName" :db="activeTab.dbName" :coll="activeTab.collectionName" icon="schema" label="Schema" />
 
     <!-- Controls -->
     <div class="sc-controls">

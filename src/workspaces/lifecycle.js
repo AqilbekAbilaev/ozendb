@@ -112,14 +112,17 @@ export function retargetResource(from, to) {
     const segments = [...to.segments, ...target.segments.slice(from.segments.length)]
     workspace.target = createResourceRef(to.connectionId, segments)
 
-    // Both alias spellings are still live while the ResourceRef migration is
-    // unfinished, so the flat copies are pushed forward from the new target rather
-    // than left to drift out of step with it.
+    // Every workspace kind spells its identity the same way now, so the flat copies
+    // are pushed forward from the new target rather than left to drift out of step.
+    //
+    // Deliberately does NOT touch `collName`: that key survives only on Current
+    // Operations, where it is the user's collection *filter*, not identity — and a
+    // connection-scoped tab is never matched by this predicate anyway.
     for (const segment of segments) {
       if (segment.kind === 'database' && workspace.dbName !== undefined) workspace.dbName = segment.name
-      if (segment.kind !== 'collection') continue
-      if (workspace.collectionName !== undefined) workspace.collectionName = segment.name
-      if (workspace.collName !== undefined) workspace.collName = segment.name
+      if (segment.kind === 'collection' && workspace.collectionName !== undefined) {
+        workspace.collectionName = segment.name
+      }
     }
 
     // A tab the user renamed by hand keeps its title; only a default one follows.

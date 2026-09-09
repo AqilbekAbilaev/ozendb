@@ -21,7 +21,7 @@ export function useImportPaneLifecycle() {
       tabId: tab.id,
       format: tab.format,
       targetDb: tab.dbName,
-      targetColl: tab.collName,
+      targetColl: tab.collectionName,
     }
   }
 
@@ -29,7 +29,7 @@ export function useImportPaneLifecycle() {
     return {
       version: ++runVersion,
       tabId: tab.id,
-      connectionId: tab.connId,
+      connectionId: tab.connectionId,
       format: tab.format,
       validate: !!tab.validate,
       sources: tab.sources.map(snapshotSource),

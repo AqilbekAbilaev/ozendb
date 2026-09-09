@@ -45,7 +45,7 @@ const collOptions = computed(() => [
 async function loadDatabases() {
   initErr.value = null
   try {
-    databases.value = await listDatabases(props.activeTab.connId)
+    databases.value = await listDatabases(props.activeTab.connectionId)
   } catch (e) {
     initErr.value = errText(e)
   }
@@ -77,7 +77,7 @@ async function search() {
   result.value = null
   try {
     const res = await searchCollections(
-      { connectionId: props.activeTab.connId, database: selectedDb.value },
+      { connectionId: props.activeTab.connectionId, database: selectedDb.value },
       t,
       {
         collection: selectedColl.value || null,
@@ -139,7 +139,7 @@ function segments(text) {
     <!-- Breadcrumb with database + collection pickers -->
     <div class="crumbs">
       <BaseIcon name="connect" :size="15" class="c-ic" />
-      <span class="crumb">{{ activeTab.connName }}</span>
+      <span class="crumb">{{ activeTab.connectionName }}</span>
       <BaseIcon name="caret" :size="11" class="sep" />
       <BaseIcon name="dbSmall" :size="15" class="c-ic" />
       <BaseSelect v-model="selectedDb" class="cr-select" size="sm" :options="dbOptions" />

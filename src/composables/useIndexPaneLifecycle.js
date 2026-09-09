@@ -2,9 +2,9 @@ import { ref } from 'vue'
 
 function targetOf(tab) {
   return {
-    connectionId: tab.connId,
+    connectionId: tab.connectionId,
     database: tab.dbName,
-    collection: tab.collName,
+    collection: tab.collectionName,
   }
 }
 

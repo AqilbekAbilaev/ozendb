@@ -343,14 +343,17 @@ describe('duplicateTab', () => {
   it('a tool workspace can never become a collection workspace', () => {
     seed([{
       id: 'i', kind: 'indexes', type: 'mongodb.indexes', engine: 'mongodb',
-      title: 'Index Manager: orders', connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
+      title: 'Index Manager: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     }, 'b'], 'b')
     duplicateTab('i')
     const dup = tabs.value[2]
     expect(dup.kind).toBe('indexes')
     expect(dup.type).toBe('mongodb.indexes')
     expect(dup.mode).toBeUndefined()
-    expect(dup.connectionId).toBeUndefined()
+    // Identity is shared by every workspace kind now; what must not leak across is
+    // the collection workspace's editor/result spine.
+    expect(dup.filter).toBeUndefined()
+    expect(dup.results).toBeUndefined()
   })
 })
 

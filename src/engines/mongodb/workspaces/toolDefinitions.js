@@ -7,12 +7,19 @@ import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
 
-function shortTarget(node) {
+// A tool workspace's identity fields, in the same long spelling collection and shell
+// workspaces use — so a pane reading `activeTab.collectionName` does not have to know
+// which kind of tab it is looking at.
+//
+// Reads either spelling because its callers differ: `create` is handed a feature node
+// (still short — see audit §8), while `duplicate` and `restore` are handed a workspace
+// or saved record, which are long.
+function toolTarget(source) {
   return {
-    connId: node.connId,
-    connName: node.connName,
-    dbName: node.dbName,
-    collName: node.collName,
+    connectionId: source.connectionId ?? source.connId ?? null,
+    connectionName: source.connectionName ?? source.connName ?? null,
+    dbName: source.dbName ?? null,
+    collectionName: source.collectionName ?? source.collName ?? null,
   }
 }
 
@@ -20,7 +27,17 @@ function shortTarget(node) {
 // not identity, so duplicate/restore must not read them into the target (a
 // collection-scoped target would also close the tab when its database drops).
 function connectionScope(node) {
-  return { connId: node.connId, connName: node.connName }
+  return { connId: node.connId ?? node.connectionId, connName: node.connName ?? node.connectionName }
+}
+
+// Identity for a connection-scoped tool. Deliberately not toolTarget: Current
+// Operations carries dbName/collName as *filters*, and spreading collection-level
+// identity over them would overwrite what the user is filtering on.
+function toolConnectionTarget(source) {
+  return {
+    connectionId: source.connectionId ?? source.connId ?? null,
+    connectionName: source.connectionName ?? source.connName ?? null,
+  }
 }
 
 function opsTarget(node) {
@@ -30,11 +47,11 @@ function opsTarget(node) {
 // Indexes/Schema/Search tabs are identity-only: the pane reloads its data on mount,
 // so a duplicate is just the same target with a fresh id. Work 7 makes Schema and
 // Search persist (identity only, like Indexes) — the restore hook is shared too.
-function identityTool(kind, titlePrefix, anchor = (source) => source.collName || source.dbName) {
+function identityTool(kind, titlePrefix, anchor = (source) => source.collectionName || source.dbName) {
   const rebuild = (source) => ({
     title: source.title || titlePrefix + ' ' + anchor(source),
-    target: resourceFromFeatureNode(shortTarget(source)),
-    fields: { kind, ...shortTarget(source) },
+    target: resourceFromFeatureNode(toolTarget(source)),
+    fields: { kind, ...toolTarget(source) },
   })
   return { duplicate: rebuild, restore: rebuild }
 }
@@ -47,8 +64,8 @@ export const toolDefinitions = [
     create(ctx) {
       return {
         title: 'Index Manager: ' + ctx.target.collName,
-        target: resourceFromFeatureNode(shortTarget(ctx.target)),
-        fields: { kind: 'indexes', ...shortTarget(ctx.target) },
+        target: resourceFromFeatureNode(toolTarget(ctx.target)),
+        fields: { kind: 'indexes', ...toolTarget(ctx.target) },
       }
     },
     serialize: () => ({}),
@@ -61,8 +78,8 @@ export const toolDefinitions = [
     create(ctx) {
       return {
         title: 'Schema: ' + ctx.target.collName,
-        target: resourceFromFeatureNode(shortTarget(ctx.target)),
-        fields: { kind: 'schema', ...shortTarget(ctx.target) },
+        target: resourceFromFeatureNode(toolTarget(ctx.target)),
+        fields: { kind: 'schema', ...toolTarget(ctx.target) },
       }
     },
     serialize: () => ({}),
@@ -75,11 +92,10 @@ export const toolDefinitions = [
     create(ctx) {
       return {
         title: 'Search: ' + ctx.target.dbName,
-        target: resourceFromFeatureNode(shortTarget(ctx.target)),
+        target: resourceFromFeatureNode(toolTarget(ctx.target)),
         fields: {
           kind: 'search',
-          connId: ctx.target.connId,
-          connName: ctx.target.connName,
+          ...toolConnectionTarget(ctx.target),
           dbName: ctx.target.dbName,
         },
       }
@@ -94,7 +110,7 @@ export const toolDefinitions = [
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.import,
     create(ctx) {
-      const target = shortTarget(ctx.target)
+      const target = toolTarget(ctx.target)
       const format = ctx.options.format || 'json'
       const base = { kind: 'import', ...target, format }
       // CSV is single-source with Source/Target sub-tabs and per-file options; JSON
@@ -151,9 +167,9 @@ export const toolDefinitions = [
       if (workspace.format === 'csv') {
         return {
           title: workspace.title,
-          target: resourceFromFeatureNode(shortTarget(workspace)),
+          target: resourceFromFeatureNode(toolTarget(workspace)),
           fields: {
-            kind: 'import', ...shortTarget(workspace), format: 'csv',
+            kind: 'import', ...toolTarget(workspace), format: 'csv',
             subTab: 'source', sourceType: workspace.sourceType || 'file',
             filePath: workspace.filePath || '',
             csv: {
@@ -171,9 +187,9 @@ export const toolDefinitions = [
       }
       return {
         title: workspace.title,
-        target: resourceFromFeatureNode(shortTarget(workspace)),
+        target: resourceFromFeatureNode(toolTarget(workspace)),
         fields: {
-          kind: 'import', ...shortTarget(workspace), format: 'json',
+          kind: 'import', ...toolTarget(workspace), format: 'json',
           validate: !!workspace.validate,
           sources: (workspace.sources || []).map(s => ({
             path: s.path, name: s.name,
@@ -190,9 +206,9 @@ export const toolDefinitions = [
       if (saved.format === 'csv') {
         return {
           title: saved.title,
-          target: resourceFromFeatureNode(shortTarget(saved)),
+          target: resourceFromFeatureNode(toolTarget(saved)),
           fields: {
-            kind: 'import', ...shortTarget(saved), format: 'csv',
+            kind: 'import', ...toolTarget(saved), format: 'csv',
             subTab: 'source',
             sourceType: saved.sourceType || 'file', filePath: saved.filePath || '',
             csv: {
@@ -213,9 +229,9 @@ export const toolDefinitions = [
       }))
       return {
         title: saved.title,
-        target: resourceFromFeatureNode(shortTarget(saved)),
+        target: resourceFromFeatureNode(toolTarget(saved)),
         fields: {
-          kind: 'import', ...shortTarget(saved), format: 'json',
+          kind: 'import', ...toolTarget(saved), format: 'json',
           validate: !!saved.validate,
           sources,
           selectedSource: sources.length ? 0 : -1,
@@ -229,7 +245,7 @@ export const toolDefinitions = [
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.export,
     create(ctx) {
-      const target = shortTarget(ctx.target)
+      const target = toolTarget(ctx.target)
       const source = ctx.options.source || 'collection'
       // The source fixes what gets exported and is frozen onto the tab at open time:
       // a later re-run re-reads the collection, but through the query as it was when
@@ -277,9 +293,9 @@ export const toolDefinitions = [
       // survive; the result banner is runtime state and starts clear.
       return {
         title: workspace.title,
-        target: resourceFromFeatureNode(shortTarget(workspace)),
+        target: resourceFromFeatureNode(toolTarget(workspace)),
         fields: {
-          kind: 'export', ...shortTarget(workspace),
+          kind: 'export', ...toolTarget(workspace),
           step: workspace.step || 0, format: workspace.format || 'json',
           incremental: !!workspace.incremental,
           source: workspace.source || 'collection',
@@ -295,9 +311,9 @@ export const toolDefinitions = [
     restore(saved) {
       return {
         title: saved.title,
-        target: resourceFromFeatureNode(shortTarget(saved)),
+        target: resourceFromFeatureNode(toolTarget(saved)),
         fields: {
-          kind: 'export', ...shortTarget(saved),
+          kind: 'export', ...toolTarget(saved),
           step: saved.step || 0, format: saved.format || 'json',
           incremental: !!saved.incremental,
           source: saved.source || 'collection',
@@ -318,11 +334,10 @@ export const toolDefinitions = [
     create(ctx) {
       return {
         title: 'Current Operations: ' + ctx.target.connName,
-        target: resourceFromFeatureNode(shortTarget(ctx.target)),
+        target: resourceFromFeatureNode(toolTarget(ctx.target)),
         fields: {
           kind: 'currentOps',
-          connId: ctx.target.connId,
-          connName: ctx.target.connName,
+          ...toolConnectionTarget(ctx.target),
           // Toolbar settings and grid state live on the tab so they survive tab
           // switches (the pane unmounts while another tab is active). opsDefaults is
           // a factory: the arrays and column order are per-tab, never shared.
@@ -349,7 +364,7 @@ export const toolDefinitions = [
         title: workspace.title,
         target: opsTarget(workspace),
         fields: {
-          kind: 'currentOps', ...shortTarget(workspace),
+          kind: 'currentOps', ...toolConnectionTarget(workspace),
           ...opsDefaults(),
           frequency: workspace.frequency ?? 2000,
           retention: workspace.retention ?? 10_000,
@@ -368,7 +383,7 @@ export const toolDefinitions = [
         title: saved.title,
         target: opsTarget(saved),
         fields: {
-          kind: 'currentOps', ...shortTarget(saved),
+          kind: 'currentOps', ...toolConnectionTarget(saved),
           ...opsDefaults(),
           frequency: saved.frequency ?? 2000,
           retention: saved.retention ?? 10_000,

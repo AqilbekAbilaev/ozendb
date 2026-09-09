@@ -295,7 +295,7 @@ describe('export source resolution', () => {
     const [, target, options] = c.modalsApi.openModal.mock.calls[0]
     options.on.choose('query')
     expect(lastTab().source).toBe('query')
-    expect(lastTab().connId).toBe(target.connId)
+    expect(lastTab().connectionId).toBe(target.connId)
     expect(c.modalsApi.closeModal).toHaveBeenCalledWith('exportSource')
   })
 })

@@ -167,16 +167,16 @@ export function migrateSession(raw, { connections = null } = {}) {
 // carry the long keys, tool records the short aliases, and the connection scope of
 // a current-ops record is empty even when its filters are populated.
 const LEGACY_KEYS = {
-  'mongodb.find':           { kind: 'collection', long: true, extra: { mode: 'find' } },
-  'mongodb.aggregate':      { kind: 'collection', long: true, extra: { mode: 'aggregate' } },
-  'mongodb.sql_to_mql':     { kind: 'collection', long: true, extra: { mode: 'sql' } },
-  'mongodb.shell':          { kind: 'shell', long: true },
-  'mongodb.indexes':        { kind: 'indexes', short: true },
-  'mongodb.schema':         { kind: 'schema', short: true },
-  'mongodb.search':         { kind: 'search', short: true },
-  'mongodb.import':         { kind: 'import', short: true },
-  'mongodb.export':         { kind: 'export', short: true },
-  'mongodb.current_operations': { kind: 'currentOps', short: true },
+  'mongodb.find':           { kind: 'collection', extra: { mode: 'find' } },
+  'mongodb.aggregate':      { kind: 'collection', extra: { mode: 'aggregate' } },
+  'mongodb.sql_to_mql':     { kind: 'collection', extra: { mode: 'sql' } },
+  'mongodb.shell':          { kind: 'shell' },
+  'mongodb.indexes':        { kind: 'indexes' },
+  'mongodb.schema':         { kind: 'schema' },
+  'mongodb.search':         { kind: 'search' },
+  'mongodb.import':         { kind: 'import' },
+  'mongodb.export':         { kind: 'export' },
+  'mongodb.current_operations': { kind: 'currentOps' },
 }
 
 // The v2 → legacy bridge. Restore hooks (Work 6) consume the flat legacy shape and
@@ -188,19 +188,14 @@ export function toLegacyRecord(v2, connectionName = null) {
   if (!conf || !isValidTarget(v2.target)) return null
   const [db] = v2.target.segments
   const coll = v2.target.segments[1]
-  const identity = conf.long
-    ? {
-        connectionId: v2.target.connectionId,
-        connectionName: connectionName,
-        dbName: db ? db.name : null,
-        collectionName: coll ? coll.name : null,
-      }
-    : {
-        connId: v2.target.connectionId,
-        connName: connectionName,
-        dbName: db ? db.name : null,
-        collName: coll ? coll.name : null,
-      }
+  // Every workspace kind now takes the long spelling, so there is one projection
+  // rather than a per-type flag choosing between two (audit §8).
+  const identity = {
+    connectionId: v2.target.connectionId,
+    connectionName: connectionName,
+    dbName: db ? db.name : null,
+    collectionName: coll ? coll.name : null,
+  }
   return {
     id: v2.id,
     kind: conf.kind,

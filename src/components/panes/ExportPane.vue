@@ -59,7 +59,7 @@ async function loadCollectionSample() {
   error.value = null
   try {
     const { documents: docs } = await runFind(
-      { connectionId: t.value.connId, database: t.value.dbName, collection: t.value.collName },
+      { connectionId: t.value.connectionId, database: t.value.dbName, collection: t.value.collectionName },
       { filter: t.value.filter || '{}', projection: '{}', sort: '{}', skip: 0, limit: PREVIEW_LIMIT },
     )
     sampleRows.value = docs || []
@@ -132,7 +132,7 @@ async function run() {
   let path
   try {
     path = await saveDialog({
-      defaultPath: `${t.value.collName}.${t.value.format}`,
+      defaultPath: `${t.value.collectionName}.${t.value.format}`,
       filters: [{ name: t.value.format.toUpperCase(), extensions: [t.value.format] }],
     })
   } catch (e) {
@@ -144,7 +144,7 @@ async function run() {
   error.value = null
   try {
     const count = await exportCollectionFields(
-      { connectionId: t.value.connId, database: t.value.dbName, collection: t.value.collName },
+      { connectionId: t.value.connectionId, database: t.value.dbName, collection: t.value.collectionName },
       String(path),
       t.value.format,
       mappingPayload(),
@@ -182,7 +182,7 @@ const sourceLabel = computed(() => {
 <template>
   <div class="export-pane">
     <CollectionCrumbs
-      :conn="activeTab.connName" :db="activeTab.dbName" :coll="activeTab.collName"
+      :conn="activeTab.connectionName" :db="activeTab.dbName" :coll="activeTab.collectionName"
       icon="export" label="Export"
     />
 

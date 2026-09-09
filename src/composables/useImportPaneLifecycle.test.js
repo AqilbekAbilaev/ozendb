@@ -3,11 +3,11 @@ import { useImportPaneLifecycle } from './useImportPaneLifecycle'
 
 const tab = (id, connId, sources = []) => ({
   id,
-  connId,
+  connectionId: connId,
   format: 'json',
   validate: true,
   dbName: 'db',
-  collName: 'orders',
+  collectionName: 'orders',
   sources,
 })
 
@@ -19,7 +19,7 @@ describe('import source acquisition', () => {
     const source = lifecycle.beginSource(first)
     first.format = 'csv'
     first.dbName = 'other'
-    first.collName = 'changed'
+    first.collectionName = 'changed'
 
     expect(source).toEqual({
       tab: first,
@@ -41,7 +41,7 @@ describe('import pane run identity', () => {
 
     lifecycle.attach(first)
     const run = lifecycle.beginRun(first)
-    first.connId = 'changed'
+    first.connectionId = 'changed'
     first.format = 'csv'
     first.sources[1].targetColl = 'changed'
 

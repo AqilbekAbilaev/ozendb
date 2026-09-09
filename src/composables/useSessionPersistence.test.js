@@ -282,8 +282,8 @@ describe('initializeSession', () => {
     getOpenTabs.mockResolvedValue({
       activeTabId: 's',
       tabs: [
-        { id: 's', kind: 'schema', title: 'Schema: orders', color: null, connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' },
-        { id: 'q', kind: 'search', title: 'Search: shop', color: null, connId: 'c1', connName: 'Sales', dbName: 'shop' },
+        { id: 's', kind: 'schema', title: 'Schema: orders', color: null, connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' },
+        { id: 'q', kind: 'search', title: 'Search: shop', color: null, connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' },
       ],
     })
     const { initializeSession } = useSessionPersistence()
@@ -291,7 +291,7 @@ describe('initializeSession', () => {
     const schema = tabs.value.find(t => t.id === 's')
     const search = tabs.value.find(t => t.id === 'q')
     expect(schema.type).toBe('mongodb.schema')
-    expect(schema.connName).toBe('Sales')
+    expect(schema.connectionName).toBe('Sales')
     expect(search.type).toBe('mongodb.search')
     expect(search.dbName).toBe('shop')
   })

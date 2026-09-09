@@ -246,15 +246,22 @@ describe('retargetResource', () => {
     expect(retargetResource(orders, sales)(home)).toBe(false)
   })
 
-  // Both alias spellings exist while the ResourceRef migration is unfinished, so the
-  // flat copies are kept in step with the target rather than left to drift.
-  it('updates whichever flat alias the workspace kind uses', () => {
-    const long = tab({ collectionName: 'orders' })
-    const short = tab({ collName: 'orders', collectionName: undefined })
-    retargetResource(orders, sales)(long)
-    retargetResource(orders, sales)(short)
-    expect(long.collectionName).toBe('sales')
-    expect(short.collName).toBe('sales')
+  // Every workspace kind spells identity the same way now, so the flat copy is kept
+  // in step with the target rather than left to drift.
+  it('updates the flat identity copy alongside the target', () => {
+    const t = tab({ collectionName: 'orders' })
+    retargetResource(orders, sales)(t)
+    expect(t.collectionName).toBe('sales')
+  })
+
+  // `collName` survives only on Current Operations, where it is the user's collection
+  // *filter*. Retargeting must never rewrite it — that would silently change what the
+  // user is watching.
+  it('never touches a collName filter', () => {
+    const t = tab({ collectionName: 'orders', collName: 'a-filter' })
+    retargetResource(orders, sales)(t)
+    expect(t.collectionName).toBe('sales')
+    expect(t.collName).toBe('a-filter')
   })
 
   it('renames a database in the flat fields of the collections under it', () => {
