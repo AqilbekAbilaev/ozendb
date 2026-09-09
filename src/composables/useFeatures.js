@@ -64,7 +64,7 @@ export function useFeatures({
   // it carries the source collection to prefill (empty from a database node, the clicked
   // collection from "Add View Here…"), so it opens directly instead of via modalFeature.
   function openAddView(node, source) {
-    modals.openModal('addView', { ...pick(node, DB), source: source })
+    modals.openModal('addView', { ...modalTarget(node, 'database'), source: source })
   }
 
   // A feature that simply opens a modal by copying node fields into its target ref.
@@ -76,9 +76,24 @@ export function useFeatures({
   // component are declared once in MODALS, so the feature is named by id alone and opens
   // the registry modal with the node fields that level needs.
   const LEVEL_FIELDS = { connection: CONN, database: DB, collection: COLL }
+
+  // A modal's target, carrying both alias spellings while the modals move onto the
+  // long names one batch at a time (audit §8). Either spelling reads the same value,
+  // so a not-yet-converted modal keeps working. The short pair comes out once no
+  // component reads it — contextMenus/useFeatures specs pin the rest.
+  function modalTarget(node, level) {
+    const short = pick(node, LEVEL_FIELDS[level])
+    return {
+      ...short,
+      connectionId: short.connId,
+      connectionName: short.connName,
+      ...(short.collName !== undefined ? { collectionName: short.collName } : {}),
+    }
+  }
+
   function modalFeature(id) {
     const level = MODALS[id].level
-    return { requires: level, run: (node) => modals.openModal(id, pick(node, LEVEL_FIELDS[level])) }
+    return { requires: level, run: (node) => modals.openModal(id, modalTarget(node, level)) }
   }
 
   // A workspace's identity in the long alias spelling, read through its ResourceRef so
@@ -160,7 +175,9 @@ export function useFeatures({
   }
 
   function openServerInfo(node, kind, title) {
-    modals.openModal('serverInfo', { connId: node.connId, connName: node.connName, kind: kind, title: title })
+    modals.openModal('serverInfo', {
+      ...modalTarget(node, 'connection'), kind: kind, title: title,
+    })
   }
   function copyToClipboard(node, kind) {
     if (kind === 'collection') {
