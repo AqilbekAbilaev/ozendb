@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BaseIcon from './BaseIcon.vue'
+import { MENUS } from '../../constants/contextMenus'
 import { TAG_PRESETS } from '../../utils/tabColor.js'
 
 const props = defineProps({
@@ -20,87 +21,6 @@ const pos = ref({ x: props.menu.x, y: props.menu.y })
 // bottom, so we flip it to grow upward (bottom-anchored) instead.
 const subFlipUp = ref(false)
 
-const MENUS = {
-  connection: [
-    { label: 'Server Info',       sub: 'list', subItems: ['Build Info', 'Host Info', 'Server Status', 'Replica Set Status'] },
-    { label: 'Current Operations' },
-    { sep: true },
-    { label: 'Open IntelliShell', icon: 'shell',  shortcut: '⌘L' },
-    { label: 'Search in…',        icon: 'search' },
-    { sep: true },
-    { label: 'Add Database…' },
-    { sep: true },
-    { label: 'Copy Name',  shortcut: '⌥⌘C' },
-    { label: 'Export URI…' },
-    { sep: true },
-    { label: 'Import…' },
-    { label: 'Export…' },
-    { sep: true },
-    { label: 'Refresh Selected Item', shortcut: '⇧⌘R' },
-    { label: 'Refresh All',           shortcut: '⌘R' },
-    { label: 'Choose Color', icon: 'brush', sub: 'color' },
-    { sep: true },
-    { label: 'Disconnect',       shortcut: '⌃⌥D' },
-    { label: 'Disconnect Others' },
-    { label: 'Disconnect All' },
-  ],
-  database: [
-    { label: 'Open IntelliShell', icon: 'shell',  shortcut: '⌘L' },
-    { label: 'Search in…',        icon: 'search' },
-    { label: 'GridFS…',           icon: 'folder' },
-    { sep: true },
-    { label: 'Add Collection…' },
-    { label: 'Add View…' },
-    { sep: true },
-    { label: 'Copy Name', shortcut: '⌥⌘C' },
-    { label: 'Duplicate Database…' },
-    { sep: true },
-    { label: 'Query Profiler' },
-    { sep: true },
-    { label: 'Import…' },
-    { label: 'Export…' },
-    { sep: true },
-    { label: 'Refresh', shortcut: '⌘R' },
-    { label: 'Choose Color', icon: 'brush', sub: 'color' },
-    { sep: true },
-    { label: 'Drop Database…', danger: true },
-  ],
-  collection: [
-    { label: 'Open Collection',        icon: 'collection', shortcut: '↵' },
-    { label: 'Open IntelliShell',      icon: 'shell' },
-    { label: 'Open Aggregation Editor',icon: 'aggregate' },
-    { sep: true },
-    { label: 'View Schema',    icon: 'schema' },
-    { label: 'Collection History', icon: 'history' },
-    { label: 'Indexes…' },
-    { label: 'Collection Stats' },
-    { sep: true },
-    { label: 'Copy Name', shortcut: '⌥⌘C' },
-    { label: 'Rename Collection…' },
-    { label: 'Duplicate Collection…' },
-    { sep: true },
-    { label: 'Import…' },
-    { label: 'Export…' },
-    { sep: true },
-    { label: 'Refresh', shortcut: '⌘R' },
-    { label: 'Choose Color', icon: 'brush', sub: 'color' },
-    { sep: true },
-    { label: 'Drop Collection…', danger: true },
-  ],
-  tab: [
-    { label: 'Close Tab' },
-    { label: 'Close Other Tabs' },
-    { label: 'Close Tabs to the Left' },
-    { label: 'Close Tabs to the Right' },
-    { label: 'Close All Tabs' },
-    { sep: true },
-    { label: 'Duplicate Tab', icon: 'copy' },
-    { label: 'Move Tab to the Front' },
-    { label: 'Rename Tab…', icon: 'edit' },
-    { sep: true },
-    { label: 'Choose Color', icon: 'brush', sub: 'color' },
-  ],
-}
 
 onMounted(() => {
   if (menuEl.value) {
