@@ -4,8 +4,6 @@ import { runTranslatedSql } from './sqlWorkspace'
 describe('runTranslatedSql', () => {
   it('runs and explains the workspace that started a delayed translation', async () => {
     const first = { id: 'first', mode: 'sql', sql: 'SELECT * FROM orders', limit: 25 }
-    const second = { id: 'second' }
-    let active = first
     let finishTranslation
     const translate = vi.fn(() => new Promise(resolve => { finishTranslation = resolve }))
     const runQuery = vi.fn()
@@ -18,11 +16,9 @@ describe('runTranslatedSql', () => {
       explainVisible: () => true,
       isCurrent: tab => tab.mode === 'sql',
     })
-    active = second
     finishTranslation({ filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 10 })
     await running
 
-    expect(active).toBe(second)
     expect(runQuery).toHaveBeenCalledWith(first, expect.objectContaining({ limit: 10 }))
     expect(runExplain).toHaveBeenCalledWith(first)
   })

@@ -155,14 +155,14 @@ function buildOptions() {
   }
   if (optPartial.value.trim()) {
     try { options.partialFilterExpression = JSON.parse(optPartial.value) }
-    catch (e) { throw new Error('Partial filter expression is not valid JSON') }
+    catch (e) { throw new Error('Partial filter expression is not valid JSON', { cause: e }) }
   }
   // Text options
   if (txtDefaultLang.value.trim()) options.default_language = txtDefaultLang.value.trim()
   if (txtLangOverride.value.trim()) options.language_override = txtLangOverride.value.trim()
   if (txtWeights.value.trim()) {
     try { options.weights = JSON.parse(txtWeights.value) }
-    catch (e) { throw new Error('Text weights must be valid JSON') }
+    catch (e) { throw new Error('Text weights must be valid JSON', { cause: e }) }
   }
   // Geo options
   if (geoSphereVersion.value !== '') options['2dsphereIndexVersion'] = numOrThrow(geoSphereVersion.value, '2dsphere index version')

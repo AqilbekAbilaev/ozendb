@@ -287,7 +287,7 @@ const padBottom = computed(() => {
   const rows = virtualRows.value
   return rows.length ? totalSize.value - rows[rows.length - 1].end : 0
 })
-useResultKeyboard({ activeTab: () => props.activeTab, gridDocs, gridColumns, inlineEdit, cellCtx, selectedCol, anchorRow, copySelection, setSingleRow, selectRangeTo, emit, rowVirtualizer, tableRef, gridWrapRef })
+useResultKeyboard({ activeTab: () => props.activeTab, gridDocs, gridColumns, inlineEdit, cellCtx, selectedCol, anchorRow, copySelection, setSingleRow, selectRangeTo, emit, rowVirtualizer, tableRef, gridWrapRef, measureRowH })
 
 // Return to the top when the underlying document set changes (new page, drill in/out,
 // tab switch). An inline edit splices `results` in place — same array reference — so it

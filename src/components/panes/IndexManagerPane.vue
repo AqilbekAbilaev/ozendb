@@ -255,7 +255,7 @@ watch(() => idx.indexesRevision.value, () => {
 
 // Paste: create an index from a JSON spec on the clipboard
 async function pasteIndex() {
-  let text = ''
+  let text
   try { text = await navigator.clipboard.readText() } catch (e) { text = '' }
   if (!text.trim()) { showToast('Clipboard is empty'); return }
   let spec

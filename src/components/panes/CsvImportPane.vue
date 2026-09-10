@@ -97,7 +97,7 @@ async function selectFile() {
 
 async function pasteFromClipboard() {
   error.value = null
-  let text = ''
+  let text
   try {
     text = await navigator.clipboard.readText()
   } catch (e) {

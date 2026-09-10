@@ -128,7 +128,7 @@ async function pasteSource() {
   const request = lifecycle.beginSource(t.value)
   request.tab._importError = null
   request.tab._importErrorCode = null
-  let text = ''
+  let text
   try {
     text = await navigator.clipboard.readText()
   } catch (e) {

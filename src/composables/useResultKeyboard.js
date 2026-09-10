@@ -1,6 +1,6 @@
 import { nextTick, onMounted, onUnmounted } from 'vue'
 
-export function useResultKeyboard({ activeTab, gridDocs, gridColumns, inlineEdit, cellCtx, selectedCol, anchorRow, copySelection, setSingleRow, selectRangeTo, emit, rowVirtualizer, tableRef, gridWrapRef }) {
+export function useResultKeyboard({ activeTab, gridDocs, gridColumns, inlineEdit, cellCtx, selectedCol, anchorRow, copySelection, setSingleRow, selectRangeTo, emit, rowVirtualizer, tableRef, gridWrapRef, measureRowH }) {
   function handleKeydown(e) {
     // Don't hijack keys while the user is typing in a field (query bar, modals,
     // inline cell editor) — otherwise arrow keys / Ctrl+C drive grid navigation
@@ -110,4 +110,3 @@ export function useResultKeyboard({ activeTab, gridDocs, gridColumns, inlineEdit
   onMounted(()  => window.addEventListener('focus', repaintGridOnFocus))
   onUnmounted(() => window.removeEventListener('focus', repaintGridOnFocus))
 }
-

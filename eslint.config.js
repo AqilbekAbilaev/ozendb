@@ -1,10 +1,24 @@
+import js from '@eslint/js'
+import globals from 'globals'
 import pluginVue from 'eslint-plugin-vue'
 
-// Only two rules are on: unused code, and Vue's own parse-level essentials. The point
-// is dead code that survives a refactor (a destructure whose template moved away), not
+// ESLint's recommended rules catch general JavaScript mistakes; Vue's essentials
+// cover template correctness. Project-specific rules stay focused on dead code, not
 // style — there is still no formatter here, deliberately.
 export default [
+  js.configs.recommended,
   ...pluginVue.configs['flat/essential'],
+  {
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
+  {
+    files: ['src/**/*.test.js'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+  },
   {
     rules: {
       // Single-word component names are the convention throughout src/components.
@@ -18,6 +32,8 @@ export default [
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
       }],
+      // Best-effort persistence and optional platform APIs intentionally ignore failures.
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
 ]

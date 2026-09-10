@@ -72,7 +72,7 @@ export function syntaxHighlight(json) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(
-      /(\/(?:\\.|[^/\\\n])+\/[a-z]*|(?:ObjectId|ISODate|NumberDecimal|NumberLong|Timestamp|BinData|MinKey|MaxKey)\([^()]*\)|"(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      /(\/(?:\\.|[^/\\\n])+\/[a-z]*|(?:ObjectId|ISODate|NumberDecimal|NumberLong|Timestamp|BinData|MinKey|MaxKey)\([^()]*\)|"(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
       (match) => {
         if (match[0] === '/' || /^[A-Za-z]+\(/.test(match)) return `<span class="joid">${match}</span>`
         if (match[0] === '"') {

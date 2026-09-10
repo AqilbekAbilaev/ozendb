@@ -416,14 +416,11 @@ export function annotateSeverity(root) {
 export function buildExplainTree(explainDoc, storage) {
   if (!explainDoc || typeof explainDoc !== 'object') return null
 
-  let root = null
-  if (explainDoc.shards || explainDoc.splitPipeline) {
-    root = buildShardedNotice()
-  } else if (Array.isArray(explainDoc.stages)) {
-    root = buildAggregateTree(explainDoc)
-  } else {
-    root = buildFindTree(explainDoc, storage || null)
-  }
+  const root = explainDoc.shards || explainDoc.splitPipeline
+    ? buildShardedNotice()
+    : Array.isArray(explainDoc.stages)
+      ? buildAggregateTree(explainDoc)
+      : buildFindTree(explainDoc, storage || null)
   if (!root) return null
 
   return annotateSeverity(root)

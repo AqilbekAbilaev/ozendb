@@ -41,7 +41,7 @@ export function useDbTransfer({ showToast, openModal, closeModal, openImportTab 
       return
     }
     if (!dir) return  // user cancelled
-    let collections = []
+    let collections
     try {
       const dbs = await listDatabases(nodeData.connId)
       collections = (dbs.find(d => d.name === nodeData.dbName)?.collections) || []

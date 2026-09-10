@@ -59,7 +59,7 @@ const tab = (id, connId, db, coll, kind = 'collection') => {
   return {
     id, kind, type: 'mongodb.' + (kind === 'shell' ? 'shell' : kind === 'indexes' ? 'indexes' : 'find'),
     connectionId: connId, connectionName: 'Sales', dbName: db, collectionName: coll,
-    connId, connName: 'Sales', dbName: db, collName: coll,
+    connId, connName: 'Sales', collName: coll,
     target: createResourceRef(connId, segments),
   }
 }
