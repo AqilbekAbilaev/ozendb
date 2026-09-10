@@ -55,6 +55,21 @@ npm test                      # Frontend unit tests (Vitest)
 5. **Describe what changed and why** in the PR, in plain language, and include the CLA agreement
    line above.
 
+## Commit messages
+
+One concern per commit — don't bundle a refactor into a fix. Subject line:
+
+```
+type: short summary in the imperative
+```
+
+`type` is one of **feat**, **fix**, **refactor**, **perf**, **docs**, **test** or **chore**, with an
+optional scope (`refactor(app): move modal routing out of app`). Lowercase, no trailing period, and
+reach for `feat:`/`refactor:` rather than vaguer verbs like `add:` or `change:`.
+
+Add a body only when the *why* isn't clear from the diff. None of this is enforced by a hook or a
+CI check — it's review convention, so that `git log --oneline` stays readable.
+
 ## Reporting bugs
 
 Open a [GitHub issue](https://github.com/AqilbekAbilaev/ozendb/issues) with:

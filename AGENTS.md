@@ -264,3 +264,10 @@ This project is human-delivered, AI-developed. The human must stay in full contr
   orphaned test importing a function it had just made private.
 - **Let the user commit.** Do not create git commits unless explicitly asked. Explain the change, then wait.
 - **Never write long and verbose, detailed git commit messages, just include high-level overview of what has been done
+- **Commit message format** is the one in [`CONTRIBUTING.md`](CONTRIBUTING.md#commit-messages):
+  `type: short summary`, one concern per commit. It lives there rather than here so contributors and
+  agents can't drift apart.
+- **Stage explicit paths.** Never `git add -A` or `git add .` — hand-maintained files (CHANGELOG,
+  local notes, scratch plans) must not ride along on someone else's commit.
+- **No trailers.** No `Co-Authored-By`, no "generated with" line. The commit says what changed; who
+  typed it is not part of the record.
