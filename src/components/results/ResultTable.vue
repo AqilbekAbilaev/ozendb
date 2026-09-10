@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { guessType, TYPE_CLASS, formatCell, columns, getAtPath } from '../../utils/resultGrid'
 import { useResultSearch } from '../../composables/useResultSearch'
@@ -106,7 +106,7 @@ const {
 const {
   cellCtx, inlineEdit, cellRef, copySelection, openCellCtx, cellCtxPick,
   followReference, startInlineEdit, commitInlineEdit, cancelInlineEdit,
-  onCellClick, selectRow, selectCell, openCellDrill, goToDrillLevel,
+  onCellClick, selectRow, openCellDrill, goToDrillLevel,
 } = useGridCellActions({
   activeTab:  () => props.activeTab,
   drillPath:  () => props.drillPath,

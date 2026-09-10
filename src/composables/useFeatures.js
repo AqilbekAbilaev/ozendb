@@ -67,11 +67,6 @@ export function useFeatures({
     modals.openModal('addView', { ...modalTarget(node, 'database'), source: source })
   }
 
-  // A feature that simply opens a modal by copying node fields into its target ref.
-  function modal(target, requires, fields) {
-    return { requires: requires, run: (node) => { target.value = pick(node, fields) } }
-  }
-
   // A registry-driven modal feature (see constants/modalRegistry.js): its level and
   // component are declared once in MODALS, so the feature is named by id alone and opens
   // the registry modal with the node fields that level needs.

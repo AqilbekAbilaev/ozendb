@@ -2,7 +2,6 @@
 import { ref, onMounted, computed } from 'vue'
 import { getProfilingStatus, setProfilingLevel, listProfile } from '../../engines/mongodb/api/admin'
 import { errText, errCode } from '../../utils/errors'
-import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModal from '../base/BaseModal.vue'

@@ -34,7 +34,7 @@ import { fmtBytes } from '../../utils/format'
 const props = defineProps({
   target: { type: Object, required: true },  // { connectionId, connectionName, dbName, menuRequest? }
 })
-const emit = defineEmits(['close'])
+defineEmits(['close'])
 const { showToast } = useToast()
 
 const buckets = ref([])

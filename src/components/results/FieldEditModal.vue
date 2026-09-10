@@ -7,7 +7,6 @@
 // locally; the parent performs the actual document mutation + save and can feed a
 // backend error back in via `saveError` (the dialog stays open on error).
 import { ref, computed, watch } from 'vue'
-import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'

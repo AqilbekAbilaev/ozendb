@@ -117,7 +117,7 @@ const RENDERERS = {
     },
     arr: (it) => `Arrays.asList(${it.join(', ')})`,
     objectId: (h) => `new ObjectId(${q(h)})`,
-    date: (ms, iso) => `new java.util.Date(${ms}L)`,
+    date: (ms) => `new java.util.Date(${ms}L)`,
     int: (s) => s, long: (s) => `${s}L`, double: (s) => s,
     decimal: (s) => `Decimal128.parse(${q(s)})`,
     regex: (p, o) => `new BsonRegularExpression(${q(p)}, ${q(o)})`,
@@ -266,7 +266,7 @@ const GENERATORS = {
       if (limit) s += `.limit(${limit})`
       return s
     },
-    aggregate: (coll, stages, R) =>
+    aggregate: (coll, stages) =>
       `collection.aggregate(Arrays.asList(${stages.join(', ')}))`,
   },
   csharp: {
@@ -278,7 +278,7 @@ const GENERATORS = {
       if (limit) s += `.Limit(${limit})`
       return s
     },
-    aggregate: (coll, stages, R) =>
+    aggregate: (coll, stages) =>
       `collection.Aggregate<BsonDocument>(new BsonDocument[] { ${stages.join(', ')} })`,
   },
   php: {
@@ -316,7 +316,7 @@ const GENERATORS = {
       const optExpr = opts.length ? `, options.Find().${opts.join('.')}` : ''
       return `collection.Find(ctx, ${renderValue(filter, R)}${optExpr})`
     },
-    aggregate: (coll, stages, R) =>
+    aggregate: (coll, stages) =>
       `collection.Aggregate(ctx, mongo.Pipeline{${stages.join(', ')}})`,
   },
 }

@@ -18,7 +18,7 @@ const props = defineProps({
 const emit = defineEmits(['select-collection', 'context-menu', 'select-node', 'connections-changed'])
 
 const {
-  connections, expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
+  expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
   retryConnection, toggleDatabase, highlightCollection, openSelectedCollection,
   openCollection, collectionKey,

@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import { listRoles } from '../../engines/mongodb/api/admin'
 import { errText } from '../../utils/errors'
-import BaseIcon from '../base/BaseIcon.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'

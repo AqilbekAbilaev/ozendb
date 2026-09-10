@@ -7,11 +7,11 @@ import HintText from '../base/HintText.vue'
 // Driven entirely by App.vue: `prompt` is set for a first-contact trust request,
 // `changed` for a refused connection whose host key no longer matches. At most
 // one is non-null at a time; `prompt` wins if both somehow are.
-const props = defineProps({
+defineProps({
   prompt:  { type: Object, default: null },  // { requestId, host, port, fingerprint }
   changed: { type: Object, default: null },  // { host, port, storedFingerprint, presentedFingerprint }
 })
-const emit = defineEmits(['trust', 'cancel', 'forget', 'dismiss'])
+defineEmits(['trust', 'cancel', 'forget', 'dismiss'])
 </script>
 
 <template>

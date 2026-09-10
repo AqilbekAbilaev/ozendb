@@ -2,7 +2,7 @@
 // A theme-tinted checkbox — just the control, meant to sit inside a call-site
 // <label> that supplies the text (and any icons). Single root, so `class`,
 // `disabled`, `title` fall through. v-model is the boolean checked state.
-const props = defineProps({
+defineProps({
   modelValue: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { errMessage, errCode, errTitle, errText } from './errors'
+import { errMessage, errCode, errText } from './errors'
 
 describe('errMessage', () => {
   it('returns the string as-is', () => {

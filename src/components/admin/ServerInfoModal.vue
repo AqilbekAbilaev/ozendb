@@ -2,7 +2,6 @@
 import { ref, onMounted, computed } from 'vue'
 import { serverInfo } from '../../engines/mongodb/api/admin'
 import { errText, errCode } from '../../utils/errors'
-import BaseIcon from '../base/BaseIcon.vue'
 import RawToggle from '../base/RawToggle.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'

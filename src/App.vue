@@ -5,7 +5,6 @@ import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
 import { setCollectionQueryMode } from './utils/queryMode'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
-import { errText } from './utils/errors'
 import { matchBinding } from './utils/keybindings'
 import { RELEASES_URL } from './constants/helpLinks'
 import { useIndexes } from './composables/useIndexes'
@@ -35,7 +34,6 @@ import {
   keyBindings,
   loadSettings,
   restoreSessionEnabled,
-  theme,
 } from './stores/settings'
 import ConnectionTree from './components/connection/ConnectionTree.vue'
 import WorkspaceArea from './components/workspace/WorkspaceArea.vue'
@@ -205,7 +203,6 @@ const {
   defaultResultView: defaultResultView,
   runQuery: runQuery,
   modalsApi: modalsApi,
-  showToast: showToast,
 })
 
 const {

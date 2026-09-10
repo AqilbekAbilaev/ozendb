@@ -18,7 +18,6 @@ export function useTabCreators({
   defaultResultView,
   runQuery,
   modalsApi,
-  showToast,
 }) {
   const newWorkspace = (type, context) => createWorkspace(type, {
     ...context,

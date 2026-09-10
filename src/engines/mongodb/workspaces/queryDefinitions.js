@@ -4,7 +4,7 @@
 // Work 6 adds the lifecycle hooks (duplicate, restore, dispose) that generic helpers
 // dispatch through.
 import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
-import { resourceFromFeatureNode, resourceFromLegacyTab } from '../../../utils/legacyResourceRef'
+import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { closeShellSession } from '../api/shell'
 
 // The editor+result spine shared by every collection-scoped query mode. Scalar

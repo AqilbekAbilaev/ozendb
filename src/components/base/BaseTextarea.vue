@@ -4,7 +4,7 @@
 // so `class`, `rows`, `placeholder`, `disabled`, `spellcheck` fall through; a call
 // site that needs a taller/shorter box keeps its class (min-height wins over the
 // default). Not a code editor — CodeEditor.vue is the syntax-highlighted one.
-const props = defineProps({
+defineProps({
   modelValue: { type: String, default: '' },
 })
 const emit = defineEmits(['update:modelValue', 'blur', 'focus'])

@@ -5,8 +5,6 @@
 //
 // Lives here rather than inside ContextMenu.vue so it can be imported and checked
 // without mounting anything.
-import { TAG_PRESETS } from '../utils/tabColor.js'
-
 export const MENUS = {
   connection: [
     { label: 'Server Info',       sub: 'list', subItems: ['Build Info', 'Host Info', 'Server Status', 'Replica Set Status'] },

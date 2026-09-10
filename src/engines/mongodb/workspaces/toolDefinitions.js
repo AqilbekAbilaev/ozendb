@@ -200,7 +200,7 @@ export const toolDefinitions = [
         },
       }
     },
-    restore(saved, ctx) {
+    restore(saved) {
       // Restore re-derives preview state exactly like the current session service:
       // the CSV options come back with safe defaults, the JSON sources verbatim.
       if (saved.format === 'csv') {
