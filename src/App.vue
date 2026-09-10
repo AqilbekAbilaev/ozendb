@@ -185,13 +185,6 @@ const {
 } = indexesApi
 
 const sshApi = useSshHostKey()
-const {
-  sshHostKeyPrompt,
-  sshHostKeyChanged,
-  onHostKeyTrust,
-  onHostKeyCancel,
-  onHostKeyForget,
-} = sshApi
 
 const { runQuery, runAggregate, cancelQuery } = useQueryRunner({ showToast: showToast })
 
