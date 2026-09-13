@@ -1,10 +1,8 @@
 import { createApp } from "vue";
 import "./assets/theme.css";
 import "./assets/dialogs.css";
-// Startup order is explicit: every static import (including App.vue's whole tree)
-// evaluates before this body runs, so any createWorkspace at module scope would hit
-// an empty registry. Definitions are registered first, the initial tab is created
-// second, and only then does Vue mount.
+// Order is load-bearing: every static import below evaluates before this body runs,
+// so a createWorkspace at module scope would hit an empty registry.
 import { registerWorkspaceDefinitions } from "./workspaces/registerDefinitions";
 import { initializeTabs } from "./stores/tabs";
 import App from "./App.vue";
