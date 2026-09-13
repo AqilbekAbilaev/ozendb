@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { installInputUndo } from './utils/inputUndo'
 import { parseField } from './utils/queryParser'
 import { setCollectionQueryMode } from './utils/queryMode'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
@@ -51,9 +50,6 @@ import { listen } from '@tauri-apps/api/event';
 const NATIVE_MENU_OWNS_SHORTCUTS = !/Linux/i.test(navigator.userAgent);
 
 onMounted(async () => {
-  // WebKitGTK has no native undo/redo for text fields — install our own so Ctrl+Z works.
-  installInputUndo()
-
   // Native menu clicks arrive here; route them through the same handlers the
   // custom bar used. (menu.rs emits the clicked item's id.)
   listen('menu-action', (e) => handleMenuAction(e.payload))

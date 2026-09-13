@@ -8,8 +8,13 @@ import { initializeTabs } from "./stores/tabs";
 import App from "./App.vue";
 import { installErrorReporting, describeError } from "./utils/errorReport";
 import { prePaintTheme } from "./utils/themeMirror";
+import { installInputUndo } from "./utils/inputUndo";
 
 prePaintTheme();
+
+// WebKitGTK has no native undo/redo for text fields. Installed here rather than in a
+// component so HMR can't stack duplicate listeners on the shared document.
+installInputUndo();
 
 // Installed before mount so an exception thrown during setup is still recorded.
 const report = installErrorReporting();
