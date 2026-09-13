@@ -2,10 +2,11 @@ import { createApp } from "vue";
 import "../assets/theme.css";
 import DocumentEditorPage from "../components/results/DocumentEditorPage.vue";
 import { installInputUndo } from "../utils/inputUndo";
+import { prePaintTheme } from "../utils/themeMirror";
 
 // This editor is a separate webview, so it loads its own stylesheet and pre-paints
-// the theme from the shared localStorage mirror the main window keeps in sync.
-document.documentElement.dataset.theme = localStorage.getItem("s4t-theme") || "dark";
+// from the shared mirror the main window keeps in sync.
+prePaintTheme();
 
 createApp(DocumentEditorPage).mount("#doc-editor-app");
 

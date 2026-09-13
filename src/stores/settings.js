@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { getKeybindings, getSettings, updateKeybindings, updateSettings } from '../appApi/settings'
 import { mergeBindings } from '../utils/keybindings'
+import { normalizedTheme, writeThemeMirror } from '../utils/themeMirror'
 
 const DEFAULTS = {
   defaultQueryLimit: 50,
@@ -22,15 +23,8 @@ function positiveNumber(value, fallback) {
   return Number.isFinite(number) && number > 0 ? number : fallback
 }
 
-function normalizedTheme(value) {
-  return value === 'light' ? 'light' : 'dark'
-}
-
 function adoptTheme(value) {
-  const next = normalizedTheme(value)
-  theme.value = next
-  if (typeof document !== 'undefined') document.documentElement.dataset.theme = next
-  if (typeof localStorage !== 'undefined') localStorage.setItem('s4t-theme', next)
+  theme.value = writeThemeMirror(value)
 }
 
 function adoptSettings(settings) {

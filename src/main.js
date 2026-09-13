@@ -9,11 +9,9 @@ import { registerWorkspaceDefinitions } from "./workspaces/registerDefinitions";
 import { initializeTabs } from "./stores/tabs";
 import App from "./App.vue";
 import { installErrorReporting, describeError } from "./utils/errorReport";
+import { prePaintTheme } from "./utils/themeMirror";
 
-// Pre-paint the theme from the localStorage mirror before mount so light-theme
-// users don't see a dark flash. App.vue loads the authoritative value from
-// settings and keeps this mirror in sync.
-document.documentElement.dataset.theme = localStorage.getItem("s4t-theme") || "dark";
+prePaintTheme();
 
 // Installed before mount so an exception thrown during setup is still recorded.
 const report = installErrorReporting();
