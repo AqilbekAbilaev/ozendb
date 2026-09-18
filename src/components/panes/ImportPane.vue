@@ -1,10 +1,11 @@
 <script setup>
-import { computed, watch, inject } from 'vue'
+import { computed, watch } from 'vue'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
 import { invalidateConnectionResources } from '../../stores/connectionData'
+import { openModal } from '../../stores/modals'
 import { useImportPaneLifecycle } from '../../composables/useImportPaneLifecycle'
 import { useImportPreview } from '../../composables/useImportPreview'
 import { useToast } from '../../composables/useToast'
@@ -27,13 +28,12 @@ const props = defineProps({
   activeTab: { type: Object, required: true },
 })
 
-const modals = inject('appModals')?.modals
 const { showToast } = useToast()
 
 // "Change target" opens the Connection Manager (the app's single place to pick /
 // edit connections).
 function changeTarget() {
-  modals?.openModal('connectionManager')
+  openModal('connectionManager')
 }
 
 // Insertion modes. Only plain insert is wired today; overwrite/merge/skip need a

@@ -5,8 +5,8 @@ import { defineAsyncComponent } from 'vue'
 //   level     — node depth the modal needs; drives feature gating/seeding (see useFeatures)
 //
 // A conforming modal takes a single `target` prop (its context object) and emits `close`.
-// AppModals.vue renders whatever useModals reports open via one v-for, so adding a modal
-// is this one row plus the component itself — no edits to useModals/useFeatures/AppModals.
+// AppModals.vue renders whatever stores/modals.js reports open via one v-for, so adding a
+// modal is this one row plus the component itself — no edits to useFeatures/AppModals.
 // (Modals that emit extra events or carry no context still live as explicit blocks in
 // AppModals until the registry grows an adapter for them.)
 const lazy = (loader) => defineAsyncComponent(loader)

@@ -11,7 +11,6 @@ import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
 import { useDbActions } from './composables/useDbActions'
 import { useMenu } from './composables/useMenu'
-import { useModals } from './composables/useModals'
 import { useUpdater } from './composables/useUpdater'
 import { useOperations } from './composables/useOperations'
 import { useNodeTags } from './composables/useNodeTags'
@@ -24,7 +23,6 @@ import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
   tabs, activeTabId,
   activateTab, closeTab, moveTab, handleTabAction,
-  renameTabTarget, renameTabValue, confirmRenameTab,
 } from './stores/tabs'
 import {
   defaultQueryLimit,
@@ -99,9 +97,6 @@ const browserRequest = ref(null)      // File → Load: { nonce } signal to open
 const saveQueryRequest = ref(null)    // File → Save: { nonce } signal to open the save-query form
 const dbClipboard = ref(null)         // Copy/Paste: { kind: 'collection'|'database', connId, connName, dbName, collName? }
 
-// Kept as an api object (not fully destructured) so it can be provided whole to AppModals.
-const modalsApi = useModals()
-
 const vqbOpen        = ref(false)
 const clipboardQuery = ref(null)
 const contextMenu = ref(null)
@@ -140,8 +135,6 @@ const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags()
 // The launch check below is silent; Help → Check for Updates… is the loud one.
 const updater = useUpdater({
   showToast: showToast,
-  openModal: modalsApi.openModal,
-  closeModal: modalsApi.closeModal,
   openDownloadsPage: () => openUrl(RELEASES_URL).catch(() => showToast('Could not open link')),
 })
 
@@ -170,7 +163,6 @@ const {
   defaultQueryLimit: defaultQueryLimit,
   defaultResultView: defaultResultView,
   runQuery: runQuery,
-  modalsApi: modalsApi,
 })
 
 const {
@@ -179,8 +171,6 @@ const {
   importDatabase,
 } = useDbTransfer({
   showToast: showToast,
-  openModal: modalsApi.openModal,
-  closeModal: modalsApi.closeModal,
   openImportTab: openImportTab,
 })
 
@@ -202,7 +192,7 @@ const { menuTarget } = useMenu({ treeSelection: treeSelection, treeConnectionCou
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
   contextMenu: contextMenu,
   connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard,
-  modals: modalsApi, dbActions: dbActionsApi,
+  dbActions: dbActionsApi,
   showToast: showToast, applyColorTag: applyColorTag, menuTarget: menuTarget,
   handleTabAction: handleTabAction, openCollectionTab: openCollectionTab,
   openShellTab: openShellTab, openIndexManagerTab: openIndexManagerTab, openSqlTab: openSqlTab,
@@ -220,7 +210,6 @@ const activeCollectionKey = computed(() => {
 })
 
 const { handleMenuAction } = useAppMenuActions({
-  modalsApi,
   openQuickstart,
   updater,
   menuTarget,
@@ -291,12 +280,13 @@ async function onPasteQuery() {
   })
 }
 
-// Stable modal state that hasn't moved into its own domain store yet.
+// indexesApi/sshApi can't move to a store as-is: useIndexes needs App.vue's showToast
+// (only reachable via inject, which needs a component context), and useSshHostKey
+// registers its Tauri listeners inside onMounted. Everyone else reads stores/modals.js
+// and stores/tabs.js directly instead of going through this bundle.
 provide('appModals', {
-  modals: modalsApi,
   indexes: indexesApi,
   ssh: sshApi,
-  tabRename: { renameTabTarget: renameTabTarget, renameTabValue: renameTabValue, confirmRenameTab: confirmRenameTab },
 })
 </script>
 

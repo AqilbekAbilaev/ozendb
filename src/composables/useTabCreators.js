@@ -2,6 +2,7 @@ import { getDefaultQuery } from '../engines/mongodb/api/queryLibrary'
 import { parseField } from '../utils/queryParser'
 import { tabs, activateTab, newTabId } from '../stores/tabs'
 import { createWorkspace } from '../workspaces/createWorkspace'
+import { openModal, closeModal } from '../stores/modals'
 
 // Every "open a tab" entry point in the app. The tab *shape* is owned by the
 // workspace definitions (Work 5); this file is the orchestration layer — which
@@ -9,15 +10,13 @@ import { createWorkspace } from '../workspaces/createWorkspace'
 // a modal, and which append a fresh tab. The tab state and its mutations live in
 // stores/tabs.js.
 //
-// Takes the handful of App.vue bindings they genuinely need rather than reading a
-// global: the two settings-backed defaults a new tab adopts, the query runner
-// (opening a collection runs its first query), the modal API (export and import
-// both start in a modal), and the toast for the one reachable failure.
+// Takes the handful of App.vue bindings it genuinely needs rather than reading a
+// global: the two settings-backed defaults a new tab adopts and the query runner
+// (opening a collection runs its first query).
 export function useTabCreators({
   defaultQueryLimit,
   defaultResultView,
   runQuery,
-  modalsApi,
 }) {
   const newWorkspace = (type, context) => createWorkspace(type, {
     ...context,
@@ -160,11 +159,11 @@ export function useTabCreators({
       query: pf && pf.ok ? pf.ejson : null,
       selectedIds: selectedIds,
     }
-    modalsApi.openModal('exportSource', target, {
+    openModal('exportSource', target, {
       on: {
         choose: (source) => {
           openExportTab(target, source)
-          modalsApi.closeModal('exportSource')
+          closeModal('exportSource')
         },
       },
     })

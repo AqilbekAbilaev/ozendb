@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { canSelfUpdate } from '../appApi/updater'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { openModal, closeModal } from '../stores/modals'
 
 // Self-update, end to end: the check, the pending update, download progress, the install
 // and the fallback for installs that can't replace themselves.
@@ -16,7 +17,7 @@ import { relaunch } from '@tauri-apps/plugin-process'
 // install time, after the user has already agreed. So we ask first, and fail towards the
 // downloads page — a Mac user sent to a working download page is a smaller failure than
 // anyone promised an install that can't happen.
-export function useUpdater({ showToast, openModal, closeModal, openDownloadsPage }) {
+export function useUpdater({ showToast, openDownloadsPage }) {
   const pending    = ref(null)   // the plugin's Update object, or null
   const canInstall = ref(false)
   const checking   = ref(false)

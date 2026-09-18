@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
 vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
 vi.mock('../appApi/updater', () => ({ canSelfUpdate: vi.fn() }))
+vi.mock('../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
 
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { canSelfUpdate } from '../appApi/updater'
+import { openModal, closeModal } from '../stores/modals'
 import { useUpdater } from './useUpdater'
 
 // The updater has two audiences that must not be confused: installs that can replace
@@ -16,10 +18,10 @@ import { useUpdater } from './useUpdater'
 
 function harness() {
   const calls = { toasts: [], opened: [], closed: [], downloads: 0 }
+  openModal.mockImplementation((id, payload, options) => calls.opened.push({ id, payload, options }))
+  closeModal.mockImplementation((id) => calls.closed.push(id))
   const api = useUpdater({
     showToast: (m) => calls.toasts.push(m),
-    openModal: (id, payload, options) => calls.opened.push({ id, payload, options }),
-    closeModal: (id) => calls.closed.push(id),
     openDownloadsPage: () => { calls.downloads += 1 },
   })
   return { api, calls }

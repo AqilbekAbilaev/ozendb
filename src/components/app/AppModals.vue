@@ -7,12 +7,12 @@ import BaseInput from '../base/BaseInput.vue'
 import FieldError from '../base/FieldError.vue'
 import { indexSpecJson } from '../../utils/indexSpec'
 import SshHostKeyModal from '../connection/SshHostKeyModal.vue'
+import { openModals, closeModal, modalOptions } from '../../stores/modals'
+import { renameTabTarget, renameTabValue, confirmRenameTab } from '../../stores/tabs'
 
-// Single provide/inject from App.vue. What's left here are the modals that aren't
-// registry-driven yet: the two index dialogs, the SSH host-key prompt and Rename Tab.
+// indexes/ssh still come through App.vue's appModals provide — see the comment there
+// for why useIndexes/useSshHostKey can't be module-scope stores yet.
 const ctx = inject('appModals')
-
-const { openModals, closeModal, modalOptions } = ctx.modals
 
 // Registry-driven modals are bound generically: every modal gets `close`; node-targeted
 // modals get their payload as `target`; the opener owns any session props and events.
@@ -57,8 +57,6 @@ const {
   onHostKeyCancel,
   onHostKeyForget,
 } = ctx.ssh
-
-const { renameTabTarget, renameTabValue, confirmRenameTab } = ctx.tabRename
 </script>
 
 <template>

@@ -3,9 +3,9 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
 import { tabs, activeTabId, closeTab, cycleTab } from '../stores/tabs'
+import { openModal, openModals } from '../stores/modals'
 
 export function useAppMenuActions({
-  modalsApi,
   openQuickstart,
   updater,
   menuTarget,
@@ -40,13 +40,13 @@ export function useAppMenuActions({
       openUrl(HELP_URLS[id]).catch(() => showToast('Could not open link'))
       return
     }
-    if (HELP_MODALS[id]) { modalsApi.openModal(HELP_MODALS[id]); return }
+    if (HELP_MODALS[id]) { openModal(HELP_MODALS[id]); return }
     switch (id) {
       // --- direct modals / app ---
-      case 'file:connect':     modalsApi.openModal('connectionManager'); return
+      case 'file:connect':     openModal('connectionManager'); return
       case 'file:exit':        appWindow.close(); return
-      case 'edit:preferences': modalsApi.openModal('preferences', undefined, { props: { initialTab: 'general' } }); return
-      case 'help:shortcuts':   modalsApi.openModal('preferences', undefined, { props: { initialTab: 'keyboard' } }); return
+      case 'edit:preferences': openModal('preferences', undefined, { props: { initialTab: 'general' } }); return
+      case 'help:shortcuts':   openModal('preferences', undefined, { props: { initialTab: 'keyboard' } }); return
       case 'help:quickstart':  openQuickstart(); return
       case 'help:updates':     updater.checkNow(); return
       case 'coll:vqb': {
@@ -270,19 +270,19 @@ export function useAppMenuActions({
       showToast('Open a database first')
       return
     }
-    const open = modalsApi.openModals.gridfs
+    const open = openModals.gridfs
     const sameOpen = open
       && open.connectionId === target.connectionId
       && open.dbName === target.dbName
     if (!sameOpen) {
-      modalsApi.openModal('gridfs', {
+      openModal('gridfs', {
         connectionId: target.connectionId,
         connectionName: target.connectionName,
         dbName: target.dbName,
       })
     }
     await nextTick()
-    modalsApi.openModals.gridfs.menuRequest = { action: action, nonce: Date.now() }
+    openModals.gridfs.menuRequest = { action: action, nonce: Date.now() }
   }
   return { handleMenuAction }
 }

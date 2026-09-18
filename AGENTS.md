@@ -240,7 +240,7 @@ inverse also holds: don't hand-roll what an already-installed library does (the 
 Comments say **why**, never what. The existing ones explain history and constraints — why
 `tabs.rs` is bespoke instead of a `JsonStore<T>`, why accelerators are skipped on Linux, why CI is
 Linux-only. If a comment restates the code, delete it; if the code needs a comment to be followed
-at all, the code is the thing to fix.
+at all, the code is the thing to fix. Keep comments as small as possible.
 
 ### Errors
 

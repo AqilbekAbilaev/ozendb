@@ -8,6 +8,7 @@ import { resourceFromLegacyTab, legacyTargetFromResource } from '../utils/legacy
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
+import { openModal } from '../stores/modals'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
@@ -15,9 +16,9 @@ import { openConnections, closeConnection } from '../stores/openConnections'
 // described once in FEATURES: the node level it needs and what it does. A "node"
 // here is the normalized shape { connId, connName, dbName, collName }.
 //
-// Dependencies are injected so this stays UI-agnostic and testable: `modals`/
-// `dbActions` are the sibling composable APIs; the rest are shared refs and the
-// tab creators, which remain in App.vue. Tab state comes from the store.
+// Dependencies are injected so this stays UI-agnostic and testable: `dbActions` is the
+// sibling composable API; the rest are shared refs and the tab creators, which remain in
+// App.vue. Tab state comes from the store; modals open through stores/modals.js directly.
 // Context-menu entries that are deliberately offered but not implemented yet. Naming
 // them is what lets an *unrecognised* action be treated as the bug it is: while
 // "absent from FEATURES" meant "coming soon", a renamed or mistyped label was
@@ -30,8 +31,8 @@ export const UNBUILT_ACTIONS = new Set([
 export function useFeatures({
   // shared reactive state
   contextMenu, connectionTreeRef, dbClipboard,
-  // sibling composable APIs
-  modals, dbActions,
+  // sibling composable API
+  dbActions,
   // injected functions
   showToast, applyColorTag, menuTarget,
   handleTabAction, openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab,
@@ -64,7 +65,7 @@ export function useFeatures({
   // it carries the source collection to prefill (empty from a database node, the clicked
   // collection from "Add View Here…"), so it opens directly instead of via modalFeature.
   function openAddView(node, source) {
-    modals.openModal('addView', { ...modalTarget(node, 'database'), source: source })
+    openModal('addView', { ...modalTarget(node, 'database'), source: source })
   }
 
   // A registry-driven modal feature (see constants/modalRegistry.js): its level and
@@ -88,7 +89,7 @@ export function useFeatures({
 
   function modalFeature(id) {
     const level = MODALS[id].level
-    return { requires: level, run: (node) => modals.openModal(id, modalTarget(node, level)) }
+    return { requires: level, run: (node) => openModal(id, modalTarget(node, level)) }
   }
 
   // A workspace's identity in the long alias spelling, read through its ResourceRef so
@@ -170,7 +171,7 @@ export function useFeatures({
   }
 
   function openServerInfo(node, kind, title) {
-    modals.openModal('serverInfo', {
+    openModal('serverInfo', {
       ...modalTarget(node, 'connection'), kind: kind, title: title,
     })
   }
@@ -304,7 +305,7 @@ export function useFeatures({
   // other tool resolves the operating node (the passed sidebar selection, else the
   // active tab) and routes through the shared feature registry.
   function handleTool(name, target = null) {
-    if (name === 'connect') { modals.openModal('connectionManager'); return }
+    if (name === 'connect') { openModal('connectionManager'); return }
 
     if (name === 'collection') {
       if (target && target.connectionId && target.dbName && target.collectionName) {

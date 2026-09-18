@@ -8,11 +8,13 @@ vi.mock('../engines/mongodb/api/transfer', () => ({
   copyCollection: vi.fn(), copyCollectionToConnection: vi.fn(),
 }))
 vi.mock('../stores/connectionData', () => ({ invalidateConnectionResources: vi.fn() }))
+vi.mock('../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
 
 import { open } from '@tauri-apps/plugin-dialog'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { importCollection, copyCollection, copyCollectionToConnection } from '../engines/mongodb/api/transfer'
 import { invalidateConnectionResources } from '../stores/connectionData'
+import { openModal, closeModal } from '../stores/modals'
 import { useDbTransfer } from './useDbTransfer'
 import { useDbActions } from './useDbActions'
 
@@ -20,10 +22,8 @@ beforeEach(() => vi.resetAllMocks())
 const target = { connId: 'destination', dbName: 'db' }
 
 it('creates an import workspace from the picker target captured at open', () => {
-  const openModal = vi.fn()
-  const closeModal = vi.fn()
   const openImportTab = vi.fn()
-  const transfer = useDbTransfer({ showToast: vi.fn(), openModal, closeModal, openImportTab })
+  const transfer = useDbTransfer({ showToast: vi.fn(), openImportTab })
   const target = { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' }
 
   transfer.openImportWizard(target)

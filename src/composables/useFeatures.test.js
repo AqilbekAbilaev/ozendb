@@ -35,7 +35,6 @@ function makeFeatures(connectionRef, overrides = {}) {
     contextMenu: ref(null),
     connectionTreeRef: ref(connectionRef),
     dbClipboard: ref(null),
-    modals: { openModal: vi.fn() },
     dbActions: { pasteClipboard: vi.fn() },
     showToast: vi.fn(),
     applyColorTag: vi.fn(),

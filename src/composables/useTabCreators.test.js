@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
+vi.mock('../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
 
 // Definitions must be registered before the tab store can build its Quickstart tab
 // (stores/tabs.js creates it through createWorkspace, see initializeTabs). Static
@@ -11,29 +12,27 @@ registerWorkspaceDefinitions()
 
 const { useTabCreators } = await import('./useTabCreators')
 const { tabs, activeTabId } = await import('../stores/tabs')
+const { openModal, closeModal } = await import('../stores/modals')
 const { getDefaultQuery } = await import('../engines/mongodb/api/queryLibrary')
 
 vi.mock('../engines/mongodb/api/queryLibrary', () => ({
   getDefaultQuery: vi.fn(),
 }))
 
-// Each test seeds a clean tab strip; the creators append to it. The query runner and
-// the modal API are fakes so no Tauri call can leak into the assertions.
+// Each test seeds a clean tab strip; the creators append to it. The query runner is a
+// fake so no Tauri call can leak into the assertions; the modal store is mocked above.
 function harness() {
   tabs.value = [{ id: 't0', kind: 'quickstart', title: 'Quickstart' }]
   activeTabId.value = 't0'
   const runQuery = vi.fn()
-  const modalsApi = { openModal: vi.fn(), closeModal: vi.fn() }
   const defaultQueryLimit = { value: 50 }
   const defaultResultView = { value: 'table' }
   const creators = useTabCreators({
     defaultQueryLimit,
     defaultResultView,
     runQuery,
-    modalsApi,
-    showToast: vi.fn(),
   })
-  return { ...creators, runQuery, modalsApi, defaultQueryLimit, defaultResultView }
+  return { ...creators, runQuery, defaultQueryLimit, defaultResultView }
 }
 
 const COLLECTION = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' }
@@ -278,7 +277,7 @@ describe('export source resolution', () => {
       selectedRows: [0, 1, 2],
     }]
     c.openExportSource(NODE)
-    expect(c.modalsApi.openModal).toHaveBeenCalledWith('exportSource', {
+    expect(openModal).toHaveBeenCalledWith('exportSource', {
       ...NODE,
       // Both spellings: the modal reads the long one, openExportTab the short one.
       connectionId: NODE.connId,
@@ -292,11 +291,11 @@ describe('export source resolution', () => {
   it('opens an export tab from the target captured when the picker opened', () => {
     const c = harness()
     c.openExportSource(NODE)
-    const [, target, options] = c.modalsApi.openModal.mock.calls[0]
+    const [, target, options] = openModal.mock.calls[0]
     options.on.choose('query')
     expect(lastTab().source).toBe('query')
     expect(lastTab().connectionId).toBe(target.connId)
-    expect(c.modalsApi.closeModal).toHaveBeenCalledWith('exportSource')
+    expect(closeModal).toHaveBeenCalledWith('exportSource')
   })
 })
 

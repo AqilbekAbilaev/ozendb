@@ -1,19 +1,16 @@
 <script setup>
-import { ref, inject, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { listConnections } from '../../engines/mongodb/api/connections'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { updateLastAccessed } from '../../appApi/connectionState'
 import { requestConnectionOpen } from '../../stores/connectionNavigation'
 import { setTheme as saveTheme, theme } from '../../stores/settings'
+import { openModal } from '../../stores/modals'
 import { useToast } from '../../composables/useToast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import { formatNow } from '../../utils/format'
 
-// The home screen uses the modal API only to open Connection Manager. Settings and
-// navigation have dedicated stores, so they need no App-level callback routing.
-const app = inject('appModals', null)
-const modals   = app?.modals   || {}
 const { showToast } = useToast()
 
 // ── recent connections ─────────────────────────────────────
@@ -57,7 +54,7 @@ async function openRecent(c) {
 }
 
 // ── actions ────────────────────────────────────────────────
-function openConnectionManager() { if (modals.openModal) modals.openModal('connectionManager') }
+function openConnectionManager() { openModal('connectionManager') }
 function createConnection()       { openConnectionManager() }  // new-connection form lives inside the manager
 
 async function setTheme(value) {

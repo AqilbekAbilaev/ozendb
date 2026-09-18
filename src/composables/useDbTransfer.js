@@ -3,15 +3,12 @@ import { listDatabases } from '../engines/mongodb/api/resources'
 import { exportCollection, importCollection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'
 import { invalidateConnectionResources } from '../stores/connectionData'
+import { openModal, closeModal } from '../stores/modals'
 
 // Import / export flows. Per-collection export is a workspace tab (see openExportTab in
 // App.vue); import opens a format picker first. The database-level Export/Import
 // Collections… run the plain per-collection commands in a loop over a chosen folder/files.
-// `showToast` is injected; modal and workspace helpers let this owner move a picker
-// into its matching workspace without routing the decision through App.vue.
-// from useModals, so the import format picker opens through the same path as every
-// other registry-driven modal.
-export function useDbTransfer({ showToast, openModal, closeModal, openImportTab }) {
+export function useDbTransfer({ showToast, openImportTab }) {
   // Import starts with the format picker; on Configure it opens the matching import tab.
   function openImportWizard(nodeData) {
     const target = {
