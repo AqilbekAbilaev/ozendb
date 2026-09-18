@@ -44,25 +44,20 @@ import OperationsPane from './components/panes/OperationsPane.vue'
 
 import { listen } from '@tauri-apps/api/event';
 
-// On macOS/Windows the native menu registers the keyboard accelerators. On Linux
-// it doesn't (WebKitGTK would swallow editing keys), so the webview keeps its own
-// shortcut handling there. Detected from the webview's platform string.
+// Linux's WebKitGTK swallows the accelerators the native menu would otherwise own,
+// so the webview keeps its own shortcut handling there instead.
 const NATIVE_MENU_OWNS_SHORTCUTS = !/Linux/i.test(navigator.userAgent);
 
 onMounted(async () => {
-  // Native menu clicks arrive here; route them through the same handlers the
-  // custom bar used. (menu.rs emits the clicked item's id.)
+  // menu.rs emits the clicked item's id here.
   listen('menu-action', (e) => handleMenuAction(e.payload))
 
-  // The pop-out editor emits this after a save. Refresh matching Find tabs explicitly;
-  // ordinary refresh is not part of restored-workspace lifecycle.
+  // The pop-out editor emits this after a save; refresh matching Find tabs explicitly,
+  // since that isn't part of the restored-workspace lifecycle.
   listen('document-saved', (e) => {
     refreshFindWorkspacesAfterDocumentSave(tabs.value, e.payload, runQuery)
   })
 
-  // On Linux the native menu carries no accelerators (they'd swallow editing keys
-  // on WebKitGTK — see menu.rs), so we keep our own keyboard shortcuts there. On
-  // macOS/Windows the native menu owns the accelerators, so we don't double-bind.
   if (NATIVE_MENU_OWNS_SHORTCUTS === false) {
     window.addEventListener('keydown', onGlobalKeydown)
   }
@@ -73,14 +68,11 @@ onMounted(async () => {
     await loadZoom(settings && settings.ui_zoom)
   } catch (_) {}
 
-  // Restore persisted database/collection colour tags so they survive a restart.
   await loadNodeTags()
 
-  // Load the saved session (always, so a legacy file is migrated and validated)
-  // and restore tabs only when the user opted in; wired before the save watcher.
+  // Session load always runs (migrates/validates a legacy file); tab restore is opt-in.
   await initializeSession({ restore: restoreSessionEnabled.value })
 
-  // Save on any change to the open tabs or the active tab.
   startAutoSave()
 
   // Not awaited: a slow or failed check must never hold up startup.
@@ -92,22 +84,14 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
 });
 
-// ── app state ──────────────────────────────────────────────
-// `tabs`/`activeTabId` come from stores/tabs.js and the creators from
-// composables/useTabCreators.js (both imported above); the watch that keeps one tab
-// open is registered below, once the creators exist.
 const toast = ref(null)
 let toastTimer = null
 const connectionTreeRef = ref(null)
-// The sidebar's current single-click selection and how many connections are open.
-// Both feed `menuContext`, so the native menu enables items based on what's
-// selected/open in the tree, not only on the active tab.
+// Feeds menuContext, so the native menu reflects tree selection, not just the active tab.
 const treeSelection = ref(null)       // { connectionId, connectionName, dbName, collectionName, kind } | null
 const treeConnectionCount = ref(0)
-// A one-shot request routed from the native menu down to the active collection's
-// ResultsPanel (which owns the editors and results view). Used for Document/Collection
-// editing as well as the View menu's view-mode toggles and Refresh Document. Bumping
-// `nonce` re-fires the panel's watcher; `action` is the menu item id.
+// One-shot request from the native menu to the active collection's ResultsPanel; bumping
+// `nonce` re-fires its watcher, `action` is the menu item id.
 const docMenuRequest = ref(null)      // { action, nonce } | null
 const toolbarHidden = ref(false)      // View → Hide Global Toolbar toggle
 const historyRequest = ref(null)      // View → History Manager: { nonce } signal to the QueryBar
@@ -115,11 +99,8 @@ const browserRequest = ref(null)      // File → Load: { nonce } signal to open
 const saveQueryRequest = ref(null)    // File → Save: { nonce } signal to open the save-query form
 const dbClipboard = ref(null)         // Copy/Paste: { kind: 'collection'|'database', connId, connName, dbName, collName? }
 
-// Open-state for every top-level modal (see useModals). Kept as an api object so it
-// can be provided to AppModals.vue; destructured here for the dispatchers that set it.
+// Kept as an api object (not fully destructured) so it can be provided whole to AppModals.
 const modalsApi = useModals()
-// Only the refs App.vue itself touches are destructured here; the rest are consumed
-// by useFeatures (via `modals: modalsApi`) and AppModals (via provide/inject).
 
 const vqbOpen        = ref(false)
 const clipboardQuery = ref(null)
@@ -135,8 +116,6 @@ const contextActiveNodeKey = computed(() => {
 const sidebarWidth = ref(320)
 const sidebarOpen = ref(true)   // the "Open connections" rail entry toggles the tree
 
-// ── Operations pane (bottom dock) ──
-// Backed by the backend registry; the rail "Operations" label toggles it.
 const { operations, runningCount, clearFinished } = useOperations()
 const { zoomIn, zoomOut, resetZoom, loadZoom } = useZoom({ showToast: showToast })
 const operationsPaneOpen = ref(false)
@@ -151,18 +130,14 @@ function showToast(msg) {
   toast.value = msg
   toastTimer = setTimeout(() => { toast.value = null }, 2200)
 }
-// Toast is an app-wide concern, so it's provided once here and injected by any
-// component that needs it (see useToast) rather than bubbled up as a `toast` event.
+// Provided once here (rather than bubbled as an event) since toast is an app-wide concern.
 provide('showToast', showToast)
-// The default result view (Preferences → General) is injected by ResultsPanel as the
-// fallback for a tab that has no view of its own yet.
 provide('defaultResultView', defaultResultView)
-// Editor indent width (Preferences → Appearance) is injected by every CodeEditor.
 provide('editorTabWidth', editorTabWidth)
 
 const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags()
 
-// Self-update. The launch check is silent; Help → Check for Updates… is the loud one.
+// The launch check below is silent; Help → Check for Updates… is the loud one.
 const updater = useUpdater({
   showToast: showToast,
   openModal: modalsApi.openModal,
@@ -171,9 +146,7 @@ const updater = useUpdater({
 })
 
 const indexesApi = useIndexes({ showToast: showToast })
-// App.vue only needs the bindings for the native Index menu / menuContext
-// (selectedIndex). The full indexesApi is provided app-wide (see provide below);
-// the Index Manager tab (IndexManagerPane) consumes the rest via inject.
+// Only the Index-menu binding is needed here; IndexManagerPane consumes the rest via inject.
 const {
   selectedIndex,
 } = indexesApi
@@ -182,8 +155,7 @@ const sshApi = useSshHostKey()
 
 const { runQuery, runAggregate, cancelQuery } = useQueryRunner({ showToast: showToast })
 
-// The tab creators. They need the query runner and the settings-backed defaults, so
-// they're constructed here rather than being importable free functions.
+// Constructed here, not as free functions, since they need the query runner and settings defaults.
 const {
   openCollectionTab,
   openSqlTab,
@@ -212,26 +184,21 @@ const {
   openImportTab: openImportTab,
 })
 
-// The workspace always keeps at least one tab open: closing the last tab reopens
-// the Quickstart tab (the home screen) instead of leaving an empty, tab-less pane.
+// Closing the last tab reopens Quickstart instead of leaving an empty, tab-less pane.
 watch(() => tabs.value.length, (count) => {
   if (count === 0) openQuickstart()
 })
 
-// Tab right-click: the context menu itself is App.vue state, so this stays out of the store.
 function onTabContext({ id, x, y }) {
   contextMenu.value = { type: 'tab', x: x, y: y, nodeData: { tabId: id } }
 }
 
 const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence()
 
-// dbActionsApi is consumed whole by useFeatures (dialog seeders + pasteClipboard)
-// and AppModals (dialog state + confirm handlers, via provide/inject).
 const dbActionsApi = useDbActions({ showToast: showToast, dbClipboard: dbClipboard })
 
 const { menuTarget } = useMenu({ treeSelection: treeSelection, treeConnectionCount: treeConnectionCount, selectedIndex: selectedIndex })
 
-// Node-action dispatch shared by right-click menus, the native menu, and the toolbar.
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
   contextMenu: contextMenu,
   connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard,
@@ -245,7 +212,6 @@ const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
   exportDatabase: exportDatabase, importDatabase: importDatabase,
 })
 
-// ── active collection tracking (for tree highlight) ────────
 const activeCollectionKey = computed(() => {
   const t = tabs.value.find(x => x.id === activeTabId.value)
   return t?.kind === 'collection'
@@ -273,14 +239,12 @@ const { handleMenuAction } = useAppMenuActions({
   docMenuRequest,
   toolbarHidden,
 })
-// The menu bar's keyboard shortcuts, used on Linux only. Skip text fields and code
-// editors so the webview keeps its native editing keys (the WebKitGTK swallow trap).
+// Linux only; skip text fields/editors so the webview keeps its native editing keys.
 function onGlobalKeydown(e) {
   const t = e.target
   if (t && t.closest && t.closest('input, textarea, [contenteditable], .cm-editor, .monaco-editor')) {
     return
   }
-  // Match the event against the current (possibly customized) bindings.
   const id = matchBinding(e, keyBindings.value)
   if (id) {
     e.preventDefault()
@@ -327,8 +291,7 @@ async function onPasteQuery() {
   })
 }
 
-// The remaining app-modal injection carries stable modal state that has not yet moved
-// into its own domain store.
+// Stable modal state that hasn't moved into its own domain store yet.
 provide('appModals', {
   modals: modalsApi,
   indexes: indexesApi,
