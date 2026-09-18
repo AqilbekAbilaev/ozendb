@@ -35,7 +35,6 @@ impl CollectionHistoryStore {
         })
     }
 
-    // Every entry for one collection, newest-first.
     pub fn list_for(&self, conn_id: &str, database: &str, collection: &str) -> Vec<HistoryEntry> {
         self.load()
             .into_iter()
@@ -47,14 +46,12 @@ impl CollectionHistoryStore {
             .collect()
     }
 
-    // A single entry by id (for restore).
     pub fn get(&self, entry_id: &str) -> Option<HistoryEntry> {
         self.load()
             .into_iter()
             .find(|entry| entry.id == entry_id)
     }
 
-    // Drop every entry for one collection.
     pub fn clear_for(&self, conn_id: &str, database: &str, collection: &str) -> Result<(), AppError> {
         self.inner.update(|entries| {
             entries.retain(|entry| {
