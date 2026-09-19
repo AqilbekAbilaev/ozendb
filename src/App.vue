@@ -5,6 +5,9 @@ import { parseField } from './utils/queryParser'
 import { setCollectionQueryMode } from './utils/queryMode'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { matchBinding } from './utils/keybindings'
+import { errText } from './utils/errors'
+import { describeError } from './utils/errorReport'
+import { recordFrontendError } from './appApi/errorLog'
 import { RELEASES_URL } from './constants/helpLinks'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
@@ -21,7 +24,7 @@ import { useZoom } from './composables/useZoom'
 import { useTabCreators } from './composables/useTabCreators'
 import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
-  tabs, activeTabId,
+  tabs, activeTabId, activeTab,
   activateTab, closeTab, moveTab, handleTabAction,
 } from './stores/tabs'
 import {
@@ -62,9 +65,13 @@ onMounted(async () => {
 
   // Settings must load before restoring tabs so new workspaces use the stored defaults.
   try {
-    const settings = await loadSettings()
-    await loadZoom(settings && settings.ui_zoom)
-  } catch (_) {}
+    await loadSettings()
+  } catch (e) {
+    // Defaults keep the app usable, so the only symptom is preferences appearing to be
+    // ignored — say so rather than letting the user think they never saved.
+    showToast(`Could not load settings — using defaults. ${errText(e)}`)
+    recordFrontendError(`loadSettings: ${describeError(e)}`).catch(() => {})
+  }
 
   await loadNodeTags()
 
@@ -112,7 +119,7 @@ const sidebarWidth = ref(320)
 const sidebarOpen = ref(true)   // the "Open connections" rail entry toggles the tree
 
 const { operations, runningCount, clearFinished } = useOperations()
-const { zoomIn, zoomOut, resetZoom, loadZoom } = useZoom({ showToast: showToast })
+const { zoomIn, zoomOut, resetZoom } = useZoom({ showToast: showToast })
 const operationsPaneOpen = ref(false)
 const operationsPaneHeight = ref(200)
 
@@ -203,7 +210,7 @@ const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
 })
 
 const activeCollectionKey = computed(() => {
-  const t = tabs.value.find(x => x.id === activeTabId.value)
+  const t = activeTab.value
   return t?.kind === 'collection'
     ? `${t.connectionId}/${t.dbName}/${t.collectionName}`
     : null
@@ -242,7 +249,7 @@ function onGlobalKeydown(e) {
 }
 
 function onCopyQuery() {
-  const tab = tabs.value.find(t => t.id === activeTabId.value)
+  const tab = activeTab.value
   if (!tab) return
   clipboardQuery.value = {
     mode:       tab.mode       || 'find',
@@ -256,7 +263,7 @@ function onCopyQuery() {
   showToast('Query copied.')
 }
 async function onPasteQuery() {
-  const tab = tabs.value.find(t => t.id === activeTabId.value)
+  const tab = activeTab.value
   if (!tab || !clipboardQuery.value) return
   const q = clipboardQuery.value
   setCollectionQueryMode(tab, q.mode)

@@ -1,7 +1,6 @@
-import { ref } from 'vue'
-import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { updateSettings } from '../appApi/settings'
-import { ZOOM_LEVELS, DEFAULT_ZOOM, nearestZoom, stepZoom } from '../utils/zoom'
+import { applyZoom, zoom } from '../stores/settings'
+import { DEFAULT_ZOOM, stepZoom } from '../utils/zoom'
 
 // UI zoom for the main window.
 //
@@ -10,29 +9,12 @@ import { ZOOM_LEVELS, DEFAULT_ZOOM, nearestZoom, stepZoom } from '../utils/zoom'
 // pipeline box), and a scaled coordinate space would put those measurements out of step
 // with what the user sees. Webview zoom scales layout itself, so the measurements stay true.
 //
-// The ladder and clamping live in utils/zoom.js so they stay unit tested; this only
-// applies the result and persists it.
+// The ladder and clamping live in utils/zoom.js; the value and its application live in
+// stores/settings.js alongside the other persisted preferences. This is only the stepping.
 export function useZoom({ showToast }) {
-  const zoom = ref(DEFAULT_ZOOM)
-
-  async function apply(factor, { persist = true } = {}) {
-    zoom.value = factor
-    try {
-      await getCurrentWebview().setZoom(factor)
-    } catch (_) {
-      // A webview that refuses the zoom shouldn't take the action down with it; the
-      // stored value still applies on the next launch.
-    }
-    if (persist) {
-      try { await updateSettings({ uiZoom: factor }) } catch (_) {}
-    }
-  }
-
-  // Restore the persisted level at startup. Snapped through the ladder so a hand-edited
-  // settings.json can't leave the UI at an unusable size. Applied even at 100%, since a
-  // webview can retain a zoom across reloads. Not persisted — nothing changed yet.
-  async function loadZoom(saved) {
-    await apply(nearestZoom(saved), { persist: false })
+  async function apply(factor) {
+    await applyZoom(factor)
+    try { await updateSettings({ uiZoom: factor }) } catch (_) {}
   }
 
   function announce(factor) {
@@ -57,12 +39,5 @@ export function useZoom({ showToast }) {
     announce(DEFAULT_ZOOM)
   }
 
-  return {
-    zoom: zoom,
-    zoomIn: zoomIn,
-    zoomOut: zoomOut,
-    resetZoom: resetZoom,
-    loadZoom: loadZoom,
-    ZOOM_LEVELS: ZOOM_LEVELS,
-  }
+  return { zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom }
 }

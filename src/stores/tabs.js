@@ -2,30 +2,12 @@ import { ref, computed } from 'vue'
 import { createWorkspace } from '../workspaces/createWorkspace'
 import { duplicateWorkspace, disposeWorkspace } from '../workspaces/lifecycle'
 
-// The tab spine: the open workspace tabs, which one is active, and every mutation of
-// them (activate/close/cycle/duplicate/reorder/rename).
-//
-// Module-scope refs, so every importer shares one instance — that's the point. These
-// used to live in App.vue and be passed into six composables, which meant tracing a tab
-// mutation required reading all seven files.
-//
-// Exported as refs (not a reactive object) so consumers still awaiting migration can be
-// handed them as the `{ tabs, activeTabId }` params they already expect.
-//
-// No createWorkspace call happens at module scope: a cold import must not depend on
-// the workspace registry being populated, because main.js registers definitions in
-// its body — which runs only after every static import has evaluated. The initial
-// tab is instead created by initializeTabs(), called from main.js once registration
-// is done (see that function for the ordering contract). The workspace always keeps
-// at least one tab open; App.vue watches the length and reopens Quickstart at zero.
+// These used to live in App.vue, threaded through six composables. Nothing here may call
+// createWorkspace at module scope — a cold import beats main.js to populating the registry.
 export const tabs = ref([])
 export const activeTabId = ref(null)
 
-// Establishes the initial Quickstart tab through its definition (Work 5), with the
-// stable 't0' id supplied through the factory's injected id source. Idempotent; main.js
-// calls it once, after registerWorkspaceDefinitions() — that explicit order is what
-// makes the createWorkspace here safe. Test files that import this store must register
-// first (see their preambles) and may call initializeTabs for the seeded tab.
+// Safe only after registerWorkspaceDefinitions(); tests importing this store register first.
 let tabsInitialized = false
 export function initializeTabs() {
   if (tabsInitialized) return
@@ -35,28 +17,22 @@ export function initializeTabs() {
   activeTabId.value = tab.id
 }
 
-// Every tab id comes from here. It used to be `'t' + Date.now()` at each creation site,
-// which collides whenever two tabs are created within the same millisecond — and a
-// duplicate id silently breaks closeTab/activateTab, which both act on the first match.
+// Was `'t' + Date.now()` per call site, which collides within a millisecond — and a
+// duplicate id silently breaks closeTab/activateTab, which act on the first match.
 export function newTabId() {
   return crypto.randomUUID()
 }
 
-// `tabs.value.find(t => t.id === activeTabId.value)` was written out at ~a dozen call
-// sites across App.vue and three composables. Undefined when no tab is open.
 export const activeTab = computed(() => tabs.value.find(t => t.id === activeTabId.value))
 
-// Several callers delete tabs in bulk (dropping a database or collection closes every
-// tab pointing at it) and then need the active id to still refer to something. Falls
-// back to the last remaining tab, or none.
+// Bulk deletes (dropping a database closes every tab under it) can strand the active id.
 export function pruneActiveTab() {
   if (activeTabId.value && !tabs.value.find(t => t.id === activeTabId.value)) {
     activeTabId.value = tabs.value.length ? tabs.value[tabs.value.length - 1].id : null
   }
 }
 
-// ── rename tab dialog ──
-export const renameTabTarget = ref(null)   // id of the tab being renamed
+export const renameTabTarget = ref(null)
 export const renameTabValue = ref('')
 
 export function activateTab(id) {
@@ -64,8 +40,6 @@ export function activateTab(id) {
   activeTabId.value = id
 }
 
-// Move the active-tab selection by `delta` (+1 next, -1 previous), wrapping around.
-// No-ops when fewer than two tabs are open.
 export function cycleTab(delta) {
   if (tabs.value.length < 2) return
   const idx = tabs.value.findIndex(t => t.id === activeTabId.value)
@@ -85,8 +59,6 @@ export function closeTab(id, activateFallback = true) {
   // and the splice below never waits on it — visual closure stays synchronous.
   disposeWorkspace(closing)
   tabs.value.splice(idx, 1)
-  // If we closed the active tab, move to an adjacent one (the nearest preceding
-  // tab, else the new first tab).
   if (activateFallback && activeTabId.value === id) {
     const next = tabs.value[idx - 1] || tabs.value[0]
     if (next) activateTab(next.id)
@@ -109,15 +81,11 @@ function closeTabs(ids) {
   else activeTabId.value = null
 }
 
-// Close every tab matching the predicate (disconnect/drop paths). The filtered
-// snapshot hands back ids, so closeTab's splicing can't shift the iteration out
-// from under the caller's live array.
+// These all map to ids first: closeTab splices, so iterating the live array would skip.
 export function closeWhere(predicate) {
   closeTabs(tabs.value.filter(t => predicate(t)).map(t => t.id))
 }
 
-// filter/slice below hand back a fresh array, so closeTab's splicing can't shift the
-// iteration out from under these.
 export function closeTabsExcept(tabId) {
   closeTabs(tabs.value.filter(t => t.id !== tabId).map(t => t.id))
 }
@@ -136,8 +104,7 @@ export function moveTabToFront(tabId) {
   const [tab] = tabs.value.splice(idx, 1)
   tabs.value.unshift(tab)
 }
-// Reorder: move `id` to sit before `beforeId` (null = to the end). Driven by the tab-strip
-// drag. The new order is the tab array itself, so session persistence saves it for free.
+// Order is the array itself, so session persistence saves the drag for free.
 export function moveTab(id, beforeId) {
   if (id === beforeId) return
   const from = tabs.value.findIndex(t => t.id === id)
