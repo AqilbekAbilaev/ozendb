@@ -6,9 +6,12 @@ vi.mock('vue', async importOriginal => ({
   onMounted: vi.fn(),
   onUnmounted: vi.fn(),
 }))
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }))
 vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases: vi.fn() }))
 vi.mock('../appApi/connectionState', () => ({ setConnectionOpen: vi.fn() }))
 
+import { onMounted, onUnmounted } from 'vue'
+import { listen } from '@tauri-apps/api/event'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { connDatabases, clearConnectionResources, invalidateConnectionResources, refreshConnectionResources } from '../stores/connectionData'
 import { consumeConnectionOpenRequest, requestConnectionOpen } from '../stores/connectionNavigation'
@@ -151,4 +154,19 @@ it('clears the resource ref along with the selection', () => {
   t.disconnectConn('a', { persist: false })
   expect(emit).toHaveBeenLastCalledWith('select-node', null)
   s.stop()
+})
+
+// A dropped handle leaves one live listener per mount, each firing against a dead tree.
+it('unlistens from every backend event on unmount', async () => {
+  vi.stubGlobal('document', { addEventListener: vi.fn(), removeEventListener: vi.fn() })
+  const offs = [vi.fn(), vi.fn(), vi.fn()]
+  let call = 0
+  listen.mockImplementation(() => Promise.resolve(offs[call++]))
+
+  await onMounted.mock.calls.at(-1)[0]()
+  expect(listen).toHaveBeenCalledTimes(3)
+
+  onUnmounted.mock.calls.at(-1)[0]()
+  await new Promise(r => setTimeout(r, 0))
+  for (const off of offs) expect(off).toHaveBeenCalledTimes(1)
 })

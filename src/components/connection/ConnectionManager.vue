@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as connApi from '../../engines/mongodb/api/connections'
 import { updateLastAccessed } from '../../appApi/connectionState'
 import { requestConnectionOpen } from '../../stores/connectionNavigation'
@@ -28,14 +28,20 @@ const showOnStartup     = ref(false)
 const showNewConnection = ref(false)
 const showEditConnection = ref(false)
 
+// The dialog is destroyed on close, so the listener must go with it. Kept as the promise:
+// unlistening through .then() is correct whether or not listen() has resolved yet.
+let unlisten
+
 onMounted(async () => {
-  connections.value = await connApi.listConnections()
-  await loadFolders()
-  listen('connection-saved', (e) => {
+  unlisten = listen('connection-saved', (e) => {
     if (!connections.value.find(c => c.id === e.payload.id))
       connections.value.push(e.payload)
   })
+  connections.value = await connApi.listConnections()
+  await loadFolders()
 })
+
+onUnmounted(() => unlisten.then(off => off()))
 
 const filtered = computed(() => {
   const q = filterText.value.toLowerCase()

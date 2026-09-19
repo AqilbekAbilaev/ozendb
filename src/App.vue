@@ -49,15 +49,18 @@ import { listen } from '@tauri-apps/api/event';
 // so the webview keeps its own shortcut handling there instead.
 const NATIVE_MENU_OWNS_SHORTCUTS = !/Linux/i.test(navigator.userAgent);
 
-onMounted(async () => {
-  // menu.rs emits the clicked item's id here.
-  listen('menu-action', (e) => handleMenuAction(e.payload))
+let unlisten = []
 
-  // The pop-out editor emits this after a save; refresh matching Find tabs explicitly,
-  // since that isn't part of the restored-workspace lifecycle.
-  listen('document-saved', (e) => {
-    refreshFindWorkspacesAfterDocumentSave(tabs.value, e.payload, runQuery)
-  })
+onMounted(async () => {
+  unlisten = [
+    // menu.rs emits the clicked item's id here.
+    listen('menu-action', (e) => handleMenuAction(e.payload)),
+    // The pop-out editor emits this after a save; refresh matching Find tabs explicitly,
+    // since that isn't part of the restored-workspace lifecycle.
+    listen('document-saved', (e) => {
+      refreshFindWorkspacesAfterDocumentSave(tabs.value, e.payload, runQuery)
+    }),
+  ]
 
   if (NATIVE_MENU_OWNS_SHORTCUTS === false) {
     window.addEventListener('keydown', onGlobalKeydown)
@@ -86,6 +89,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopAutoSave()
+  unlisten.forEach(p => p.then(off => off()))
   window.removeEventListener('keydown', onGlobalKeydown)
 });
 

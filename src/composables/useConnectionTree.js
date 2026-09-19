@@ -84,20 +84,25 @@ export function useConnectionTree({ props, emit }) {
     // to run inline.
   }, { flush: 'sync' })
 
+  let unlisten = []
+
   onMounted(async () => {
     // The sidebar shows only the connections that are open; the full saved list
     // lives in the Connection Manager. A connection's `open` flag is persisted, so
     // only the ones that were open before a restart come back.
     await loadOpenConnections()
-    await listen('connection-saved', (e) => addOpenConnection(e.payload))
-    await listen('connection-updated', (e) => updateOpenConnection(e.payload))
-    await listen('connection-deleted', (e) => {
-      disconnectConn(e.payload.id, { persist: false })
-    })
+    unlisten = [
+      listen('connection-saved', (e) => addOpenConnection(e.payload)),
+      listen('connection-updated', (e) => updateOpenConnection(e.payload)),
+      listen('connection-deleted', (e) => {
+        disconnectConn(e.payload.id, { persist: false })
+      }),
+    ]
     document.addEventListener('click', clearSelectionOnOutsideClick)
   })
 
   onUnmounted(() => {
+    unlisten.forEach(p => p.then(off => off()))
     document.removeEventListener('click', clearSelectionOnOutsideClick)
   })
 

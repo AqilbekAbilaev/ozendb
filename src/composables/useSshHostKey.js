@@ -1,4 +1,4 @@
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { respondSshHostKey, forgetSshHost } from '../appApi/sshTrust'
 import { listen } from '@tauri-apps/api/event'
 
@@ -10,11 +10,17 @@ export function useSshHostKey() {
   const sshHostKeyPrompt = ref(null)   // { requestId, host, port, fingerprint }
   const sshHostKeyChanged = ref(null)  // { host, port, storedFingerprint, presentedFingerprint }
 
+  let unlisten = []
+
   onMounted(() => {
     // Backend-raised SSH host-key prompts (global emits, so use the app-wide listen).
-    listen('ssh-host-key-prompt', (e) => { sshHostKeyPrompt.value = e.payload })
-    listen('ssh-host-key-changed', (e) => { sshHostKeyChanged.value = e.payload })
+    unlisten = [
+      listen('ssh-host-key-prompt', (e) => { sshHostKeyPrompt.value = e.payload }),
+      listen('ssh-host-key-changed', (e) => { sshHostKeyChanged.value = e.payload }),
+    ]
   })
+
+  onUnmounted(() => unlisten.forEach(p => p.then(off => off())))
 
   function onHostKeyTrust() {
     if (sshHostKeyPrompt.value) {
