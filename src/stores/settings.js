@@ -4,6 +4,7 @@ import { mergeBindings } from '../utils/keybindings'
 import { normalizedTheme, writeThemeMirror } from '../utils/themeMirror'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { DEFAULT_ZOOM, nearestZoom } from '../utils/zoom'
+import { loadNodeTags } from './nodeTags'
 
 const DEFAULTS = {
   defaultQueryLimit: 50,
@@ -61,6 +62,7 @@ export async function loadSettings() {
     keyBindings.value = mergeBindings(await getKeybindings())
   } catch (_) {}
   await applyZoom(settings?.ui_zoom)
+  await loadNodeTags()
   return settings
 }
 

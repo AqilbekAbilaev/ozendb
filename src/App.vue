@@ -77,8 +77,6 @@ onMounted(async () => {
     recordFrontendError(`loadSettings: ${describeError(e)}`).catch(() => {})
   }
 
-  await loadNodeTags()
-
   // Session load always runs (migrates/validates a legacy file); tab restore is opt-in.
   const session = await initializeSession({ restore: restoreSessionEnabled.value })
   const notice = sessionRestoreNotice(session)
@@ -145,7 +143,7 @@ provide('showToast', showToast)
 provide('defaultResultView', defaultResultView)
 provide('editorTabWidth', editorTabWidth)
 
-const { tagOverrides, loadNodeTags, applyColorTag } = useNodeTags()
+const { tagOverrides, applyColorTag } = useNodeTags()
 
 // The launch check below is silent; Help → Check for Updates… is the loud one.
 const updater = useUpdater({

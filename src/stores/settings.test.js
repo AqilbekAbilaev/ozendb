@@ -5,6 +5,8 @@ vi.mock('@tauri-apps/api/webview', () => ({
   getCurrentWebview: () => ({ setZoom }),
 }))
 
+vi.mock('./nodeTags', () => ({ loadNodeTags: vi.fn() }))
+
 vi.mock('../appApi/settings', () => ({
   getKeybindings: vi.fn(),
   getSettings: vi.fn(),
@@ -13,6 +15,7 @@ vi.mock('../appApi/settings', () => ({
 }))
 
 import { getKeybindings, getSettings, updateKeybindings, updateSettings } from '../appApi/settings'
+import { loadNodeTags } from './nodeTags'
 import {
   defaultQueryLimit,
   defaultResultView,
@@ -120,5 +123,15 @@ describe('zoom', () => {
     setZoom.mockRejectedValueOnce(new Error('no zoom here'))
     await expect(loadSettings()).resolves.toBeTruthy()
     expect(zoom.value).toBe(1.5)
+  })
+})
+
+describe('node tags', () => {
+  // Colour tags are a persisted preference like any other, so they ride along with settings.
+  it('loads the colour tags as part of loading settings', async () => {
+    getSettings.mockResolvedValue({})
+    getKeybindings.mockResolvedValue({})
+    await loadSettings()
+    expect(loadNodeTags).toHaveBeenCalledTimes(1)
   })
 })
