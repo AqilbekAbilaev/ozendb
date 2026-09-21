@@ -1,4 +1,5 @@
 import { updateSettings } from '../appApi/settings'
+import { showToast } from '../stores/toast'
 import { applyZoom, zoom } from '../stores/settings'
 import { DEFAULT_ZOOM, stepZoom } from '../utils/zoom'
 
@@ -11,7 +12,7 @@ import { DEFAULT_ZOOM, stepZoom } from '../utils/zoom'
 //
 // The ladder and clamping live in utils/zoom.js; the value and its application live in
 // stores/settings.js alongside the other persisted preferences. This is only the stepping.
-export function useZoom({ showToast }) {
+export function useZoom() {
   async function apply(factor) {
     await applyZoom(factor)
     try { await updateSettings({ uiZoom: factor }) } catch (_) {}

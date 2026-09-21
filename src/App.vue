@@ -2,13 +2,11 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { runQuery, runAggregate, cancelQuery } from './stores/queryRunner'
-import { openCollectionTab, openQuickstart } from './stores/tabCreators'
+import { openCollectionTab } from './stores/tabCreators'
 import { useMenu } from './composables/useMenu'
 import { useOperations } from './composables/useOperations'
 import { useFeatures } from './composables/useFeatures'
 import { useSessionPersistence } from './composables/useSessionPersistence'
-import { useZoom } from './composables/useZoom'
-import { showToast } from './stores/toast'
 import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
   tabs, activeTabId,
@@ -61,7 +59,6 @@ const sidebarWidth = ref(320)
 const sidebarOpen = ref(true)   // the "Open connections" rail entry toggles the tree
 
 const { operations, runningCount, clearFinished } = useOperations()
-const { zoomIn, zoomOut, resetZoom } = useZoom({ showToast: showToast })
 const operationsPaneOpen = ref(false)
 const operationsPaneHeight = ref(200)
 
@@ -75,19 +72,7 @@ const { menuTarget } = useMenu()
 
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({ menuTarget })
 
-useAppMenuActions({
-  openQuickstart,
-  menuTarget,
-  openCollectionTab,
-  handleTool,
-  menuNode,
-  showToast,
-  refreshAll,
-  zoomIn,
-  zoomOut,
-  resetZoom,
-  toolbarHidden,
-})
+useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden })
 </script>
 
 <template>

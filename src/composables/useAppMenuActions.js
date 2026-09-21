@@ -1,4 +1,7 @@
 import { nextTick, onMounted, onUnmounted } from 'vue'
+import { showToast } from '../stores/toast'
+import { openCollectionTab, openQuickstart } from '../stores/tabCreators'
+import { useZoom } from './useZoom'
 import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction } from '../stores/menuRequests'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -12,19 +15,11 @@ import { keyBindings } from '../stores/settings'
 import { matchBinding } from '../utils/keybindings'
 import { isEditingTarget } from '../utils/editingTarget'
 
-export function useAppMenuActions({
-  openQuickstart,
-  menuTarget,
-  openCollectionTab,
-  handleTool,
-  menuNode,
-  showToast,
-  refreshAll,
-  zoomIn,
-  zoomOut,
-  resetZoom,
-  toolbarHidden,
-}) {
+// `menuTarget` comes from useMenu and the three dispatchers from useFeatures — App.vue
+// constructs both once and hands over what this needs of them. `toolbarHidden` is
+// App.vue's own layout state; the View menu just toggles it.
+export function useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden }) {
+  const { zoomIn, zoomOut, resetZoom } = useZoom()
   const appWindow = getCurrentWindow()
 
   function indexMenuAction(method, ...args) {
