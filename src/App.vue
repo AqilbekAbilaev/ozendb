@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted, provide } from 'vue'
+import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
@@ -118,11 +118,6 @@ const {
 } = useDbTransfer({
   showToast: showToast,
   openImportTab: openImportTab,
-})
-
-// Closing the last tab reopens Quickstart instead of leaving an empty, tab-less pane.
-watch(() => tabs.value.length, (count) => {
-  if (count === 0) openQuickstart()
 })
 
 const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence()

@@ -51,6 +51,14 @@ export function cycleTab(delta) {
   activateTab(tabs.value[next].id)
 }
 
+// The workspace never shows an empty pane: closing the last tab seeds a Quickstart.
+function seedIfEmpty() {
+  if (tabs.value.length) return
+  const tab = createWorkspace('app.quickstart')
+  tabs.value.push(tab)
+  activeTabId.value = tab.id
+}
+
 export function closeTab(id, activateFallback = true) {
   const idx = tabs.value.findIndex(t => t.id === id)
   if (idx < 0) return
@@ -64,6 +72,8 @@ export function closeTab(id, activateFallback = true) {
     if (next) activateTab(next.id)
     else activeTabId.value = null
   }
+  // Bulk closes seed once at the end, after they have settled the active tab.
+  if (activateFallback) seedIfEmpty()
 }
 
 function closeTabs(ids) {
@@ -79,6 +89,7 @@ function closeTabs(ids) {
   const next = previous || original.find(t => !victims.has(t.id))
   if (next) activateTab(next.id)
   else activeTabId.value = null
+  seedIfEmpty()
 }
 
 // These all map to ids first: closeTab splices, so iterating the live array would skip.

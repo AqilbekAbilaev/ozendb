@@ -85,11 +85,11 @@ describe('closeTab — which tab becomes active', () => {
     expect(activeTabId.value).toBe('b')
   })
 
-  it('clears the active id when the last tab closes', () => {
+  it('never leaves the pane empty: the last close seeds Quickstart', () => {
     seed(['a'], 'a')
     closeTab('a')
-    expect(idsOf()).toEqual([])
-    expect(activeTabId.value).toBe(null)
+    expect(tabs.value.map(t => t.kind)).toEqual(['quickstart'])
+    expect(activeTabId.value).toBe(tabs.value[0].id)
   })
 
   it('ignores an unknown tab id', () => {
@@ -162,10 +162,10 @@ describe('bulk close — iterating while the array reindexes', () => {
     expect(activeTabId.value).toBe('c')
   })
 
-  it('closes all tabs', () => {
+  it('closes all tabs, leaving a fresh Quickstart', () => {
     seed(['a', 'b', 'c'], 'b')
     handleTabAction('Close All Tabs', 'b')
-    expect(idsOf()).toEqual([])
+    expect(tabs.value.map(t => t.kind)).toEqual(['quickstart'])
   })
 
   it('ignores a side-close against an unknown tab id', () => {
@@ -396,5 +396,15 @@ describe('newTabId', () => {
   it('gives every tab a distinct id even when created in one tick', () => {
     const ids = new Set(Array.from({ length: 1000 }, newTabId))
     expect(ids.size).toBe(1000)
+  })
+})
+
+// The workspace never shows an empty, tab-less pane: whichever path closes the last
+// tab seeds a fresh Quickstart and makes it active.
+describe('closing the last tab', () => {
+  it('does not seed while tabs remain', () => {
+    seed(['a', 'b'], 'a')
+    closeTab('a')
+    expect(tabs.value.map(t => t.id)).toEqual(['b'])
   })
 })
