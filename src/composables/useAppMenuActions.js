@@ -1,4 +1,5 @@
-import { nextTick } from 'vue'
+import { nextTick, onMounted, onUnmounted } from 'vue'
+import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
@@ -6,6 +7,9 @@ import { tabs, activeTabId, closeTab, cycleTab } from '../stores/tabs'
 import { openModal, openModals } from '../stores/modals'
 import { checkNow as checkForUpdates } from '../stores/updater'
 import { vqbOpen } from '../stores/visualQueryBuilder'
+import { keyBindings } from '../stores/settings'
+import { matchBinding } from '../utils/keybindings'
+import { isEditingTarget } from '../utils/editingTarget'
 
 export function useAppMenuActions({
   openQuickstart,
@@ -284,5 +288,29 @@ export function useAppMenuActions({
     await nextTick()
     openModals.gridfs.menuRequest = { action: action, nonce: Date.now() }
   }
+  // Two ways an action arrives: the native menu emits the clicked item's id, and on
+  // Linux — where WebKitGTK swallows native accelerators, so menu.rs attaches none —
+  // the webview matches the keyboard against the user's bindings itself.
+  const nativeMenuOwnsShortcuts = !/Linux/i.test(navigator.userAgent)
+
+  function onGlobalKeydown(e) {
+    if (isEditingTarget(e.target)) return
+    const id = matchBinding(e, keyBindings.value)
+    if (id) {
+      e.preventDefault()
+      handleMenuAction(id)
+    }
+  }
+
+  let unlisten
+  onMounted(() => {
+    unlisten = listen('menu-action', (e) => handleMenuAction(e.payload))
+    if (!nativeMenuOwnsShortcuts) window.addEventListener('keydown', onGlobalKeydown)
+  })
+  onUnmounted(() => {
+    unlisten.then(off => off())
+    window.removeEventListener('keydown', onGlobalKeydown)
+  })
+
   return { handleMenuAction }
 }

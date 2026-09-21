@@ -162,8 +162,8 @@ removed.
   selection is too shallow — so an enabled item always fires on a node deep enough for the gate that
   lit it up.
 - **Accelerators** are attached on macOS/Windows only. On Linux they're omitted (WebKitGTK swallows
-  editing keys) and `App.vue`'s `onGlobalKeydown` keeps the JS shortcuts instead — gated by
-  `NATIVE_MENU_OWNS_SHORTCUTS`.
+  editing keys) and `useAppMenuActions` keeps the JS shortcuts instead, matched against the
+  user's bindings.
 - The gate→enabled derivation is unit-tested in `menu.rs` (`cargo test`) and `menuContext.test.js`
   (`npm test`).
 

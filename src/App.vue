@@ -1,8 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
-import { matchBinding } from './utils/keybindings'
-import { isEditingTarget } from './utils/editingTarget'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
@@ -25,7 +23,6 @@ import {
   defaultQueryLimit,
   defaultResultView,
   editorTabWidth,
-  keyBindings,
   loadSettings,
   restoreSessionEnabled,
 } from './stores/settings'
@@ -40,26 +37,14 @@ import OperationsPane from './components/panes/OperationsPane.vue'
 
 import { listen } from '@tauri-apps/api/event';
 
-// Linux's WebKitGTK swallows the accelerators the native menu would otherwise own,
-// so the webview keeps its own shortcut handling there instead.
-const NATIVE_MENU_OWNS_SHORTCUTS = !/Linux/i.test(navigator.userAgent);
-
-let unlisten = []
+let unlisten
 
 onMounted(async () => {
-  unlisten = [
-    // menu.rs emits the clicked item's id here.
-    listen('menu-action', (e) => handleMenuAction(e.payload)),
-    // The pop-out editor emits this after a save; refresh matching Find tabs explicitly,
-    // since that isn't part of the restored-workspace lifecycle.
-    listen('document-saved', (e) => {
-      refreshFindWorkspacesAfterDocumentSave(tabs.value, e.payload, runQuery)
-    }),
-  ]
-
-  if (NATIVE_MENU_OWNS_SHORTCUTS === false) {
-    window.addEventListener('keydown', onGlobalKeydown)
-  }
+  // The pop-out editor emits this after a save; refresh matching Find tabs explicitly,
+  // since that isn't part of the restored-workspace lifecycle.
+  unlisten = listen('document-saved', (e) => {
+    refreshFindWorkspacesAfterDocumentSave(tabs.value, e.payload, runQuery)
+  })
 
   // Settings must load before restoring tabs so new workspaces use the stored defaults.
   await loadSettings()
@@ -72,8 +57,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopAutoSave()
-  unlisten.forEach(p => p.then(off => off()))
-  window.removeEventListener('keydown', onGlobalKeydown)
+  unlisten.then(off => off())
 });
 
 const connectionTreeRef = ref(null)
@@ -188,7 +172,7 @@ const activeCollectionKey = computed(() => {
     : null
 })
 
-const { handleMenuAction } = useAppMenuActions({
+useAppMenuActions({
   openQuickstart,
   menuTarget,
   openCollectionTab,
@@ -205,15 +189,6 @@ const { handleMenuAction } = useAppMenuActions({
   docMenuRequest,
   toolbarHidden,
 })
-// Linux only; skip text fields/editors so the webview keeps its native editing keys.
-function onGlobalKeydown(e) {
-  if (isEditingTarget(e.target)) return
-  const id = matchBinding(e, keyBindings.value)
-  if (id) {
-    e.preventDefault()
-    handleMenuAction(id)
-  }
-}
 
 // indexesApi/sshApi can't move to a store as-is: useIndexes needs App.vue's showToast
 // (only reachable via inject, which needs a component context), and useSshHostKey
@@ -228,7 +203,7 @@ provide('appModals', {
 <template>
   <div class="app-layout">
     <!-- The menu bar is the native OS menu (installed from src-tauri/src/menu.rs);
-         see handleMenuAction for how its clicks are routed back into the app. -->
+         useAppMenuActions routes its clicks and, on Linux, its shortcuts. -->
 
     <!-- Toolbar -->
     <Toolbar :hidden="toolbarHidden" @tool="handleTool" />
