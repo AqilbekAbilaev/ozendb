@@ -2,14 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
 vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
+vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn() }))
 vi.mock('../appApi/updater', () => ({ canSelfUpdate: vi.fn() }))
-vi.mock('../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
+vi.mock('./modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
+vi.mock('./toast', () => ({ showToast: vi.fn() }))
 
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { canSelfUpdate } from '../appApi/updater'
-import { openModal, closeModal } from '../stores/modals'
-import { useUpdater } from './useUpdater'
+import { openModal, closeModal } from './modals'
+import { showToast } from './toast'
+import * as updater from './updater'
 
 // The updater has two audiences that must not be confused: installs that can replace
 // themselves (macOS, Windows, Linux AppImage) and installs that can't (deb/rpm, owned
@@ -17,14 +21,13 @@ import { useUpdater } from './useUpdater'
 // after the user has agreed to it, so the split is what these pin.
 
 function harness() {
+  updater.resetUpdater()
   const calls = { toasts: [], opened: [], closed: [], downloads: 0 }
   openModal.mockImplementation((id, payload, options) => calls.opened.push({ id, payload, options }))
   closeModal.mockImplementation((id) => calls.closed.push(id))
-  const api = useUpdater({
-    showToast: (m) => calls.toasts.push(m),
-    openDownloadsPage: () => { calls.downloads += 1 },
-  })
-  return { api, calls }
+  showToast.mockImplementation((m) => calls.toasts.push(m))
+  openUrl.mockImplementation(() => { calls.downloads += 1; return Promise.resolve() })
+  return { api: updater, calls }
 }
 
 const anUpdate = (over = {}) => ({

@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { parseField } from './utils/queryParser'
 import { setCollectionQueryMode } from './utils/queryMode'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
@@ -9,13 +8,11 @@ import { matchBinding } from './utils/keybindings'
 import { errText } from './utils/errors'
 import { describeError } from './utils/errorReport'
 import { recordFrontendError } from './appApi/errorLog'
-import { RELEASES_URL } from './constants/helpLinks'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
 import { useDbActions } from './composables/useDbActions'
 import { useMenu } from './composables/useMenu'
-import { useUpdater } from './composables/useUpdater'
 import { useOperations } from './composables/useOperations'
 import { useNodeTags } from './composables/useNodeTags'
 import { useDbTransfer } from './composables/useDbTransfer'
@@ -86,9 +83,6 @@ onMounted(async () => {
   if (notice.log) recordFrontendError(notice.log).catch(() => {})
 
   startAutoSave()
-
-  // Not awaited: a slow or failed check must never hold up startup.
-  updater.checkOnLaunch()
 });
 
 onUnmounted(() => {
@@ -139,12 +133,6 @@ provide('defaultResultView', defaultResultView)
 provide('editorTabWidth', editorTabWidth)
 
 const { tagOverrides, applyColorTag } = useNodeTags()
-
-// The launch check below is silent; Help → Check for Updates… is the loud one.
-const updater = useUpdater({
-  showToast: showToast,
-  openDownloadsPage: () => openUrl(RELEASES_URL).catch(() => showToast('Could not open link')),
-})
 
 const indexesApi = useIndexes({ showToast: showToast })
 // Only the Index-menu binding is needed here; IndexManagerPane consumes the rest via inject.
@@ -219,7 +207,6 @@ const activeCollectionKey = computed(() => {
 
 const { handleMenuAction } = useAppMenuActions({
   openQuickstart,
-  updater,
   menuTarget,
   openCollectionTab,
   vqbOpen,

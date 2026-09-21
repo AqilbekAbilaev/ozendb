@@ -4,10 +4,10 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
 import { tabs, activeTabId, closeTab, cycleTab } from '../stores/tabs'
 import { openModal, openModals } from '../stores/modals'
+import { checkNow as checkForUpdates } from '../stores/updater'
 
 export function useAppMenuActions({
   openQuickstart,
-  updater,
   menuTarget,
   openCollectionTab,
   vqbOpen,
@@ -48,7 +48,7 @@ export function useAppMenuActions({
       case 'edit:preferences': openModal('preferences', undefined, { props: { initialTab: 'general' } }); return
       case 'help:shortcuts':   openModal('preferences', undefined, { props: { initialTab: 'keyboard' } }); return
       case 'help:quickstart':  openQuickstart(); return
-      case 'help:updates':     updater.checkNow(); return
+      case 'help:updates':     checkForUpdates(); return
       case 'coll:vqb': {
         const tab = menuTarget('collection')
         if (!tab || tab.kind !== 'collection' || !tab.collectionName) {

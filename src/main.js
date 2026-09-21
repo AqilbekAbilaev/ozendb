@@ -9,6 +9,7 @@ import App from "./App.vue";
 import { installErrorReporting, describeError } from "./utils/errorReport";
 import { prePaintTheme } from "./utils/themeMirror";
 import { installInputUndo } from "./utils/inputUndo";
+import { checkOnLaunch } from "./stores/updater";
 
 prePaintTheme();
 
@@ -30,3 +31,6 @@ app.config.errorHandler = (err) => {
   console.error(err);
 };
 app.mount("#app");
+
+// Silent, and never awaited: a slow or failed check must not hold up startup.
+checkOnLaunch();
