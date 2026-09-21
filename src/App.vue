@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
-import { sessionRestoreNotice } from './utils/sessionMigration'
 import { matchBinding } from './utils/keybindings'
 import { errText } from './utils/errors'
 import { describeError } from './utils/errorReport'
@@ -75,10 +74,7 @@ onMounted(async () => {
   }
 
   // Session load always runs (migrates/validates a legacy file); tab restore is opt-in.
-  const session = await initializeSession({ restore: restoreSessionEnabled.value })
-  const notice = sessionRestoreNotice(session)
-  if (notice.toast) showToast(notice.toast)
-  if (notice.log) recordFrontendError(notice.log).catch(() => {})
+  await initializeSession({ restore: restoreSessionEnabled.value })
 
   startAutoSave()
 });

@@ -15,6 +15,8 @@ vi.mock('../appApi/session', () => ({
   getOpenTabs: vi.fn(),
   setOpenTabs: vi.fn(() => Promise.resolve()),
 }))
+vi.mock('../stores/toast', () => ({ showToast: vi.fn() }))
+vi.mock('../appApi/errorLog', () => ({ recordFrontendError: vi.fn(() => Promise.resolve()) }))
 vi.mock('../engines/mongodb/api/connections', () => ({
   listConnections: vi.fn(() => Promise.resolve([
     { id: 'c1', name: 'Sales' },
@@ -23,6 +25,8 @@ vi.mock('../engines/mongodb/api/connections', () => ({
 }))
 
 const { getOpenTabs, setOpenTabs } = await import('../appApi/session')
+const { showToast } = await import('../stores/toast')
+const { recordFrontendError } = await import('../appApi/errorLog')
 const { listConnections } = await import('../engines/mongodb/api/connections')
 
 const TARGET = (connId) => ({
@@ -362,5 +366,32 @@ describe('stopAutoSave', () => {
     await nextTick()
     vi.advanceTimersByTime(400)
     expect(setOpenTabs).not.toHaveBeenCalled()
+  })
+})
+
+// initializeSession reports its own outcome; App.vue only sequences it.
+describe('reporting the restore outcome', () => {
+  it('says nothing for a clean restore', async () => {
+    seedStore([], null)
+    getOpenTabs.mockResolvedValue({ schemaVersion: 2, activeTabId: null, tabs: [canonicalFind('r1')] })
+    await useSessionPersistence().initializeSession({ restore: true })
+    expect(showToast).not.toHaveBeenCalled()
+    expect(recordFrontendError).not.toHaveBeenCalled()
+  })
+
+  it('toasts and logs when the session cannot be read', async () => {
+    seedStore([], null)
+    getOpenTabs.mockRejectedValue(new Error('EACCES'))
+    await useSessionPersistence().initializeSession({ restore: true })
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/tabs will not be saved/))
+    expect(recordFrontendError).toHaveBeenCalledWith(expect.stringContaining('read-failed'))
+  })
+
+  it('logs but does not toast a tab skipped for a missing connection', async () => {
+    seedStore([], null)
+    getOpenTabs.mockResolvedValue({ schemaVersion: 2, activeTabId: null, tabs: [canonicalFind('r1', 'gone')] })
+    await useSessionPersistence().initializeSession({ restore: true })
+    expect(showToast).not.toHaveBeenCalled()
+    expect(recordFrontendError).toHaveBeenCalledWith(expect.stringContaining('connection no longer exists'))
   })
 })

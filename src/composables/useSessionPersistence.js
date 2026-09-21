@@ -4,7 +4,9 @@ import { getOpenTabs, setOpenTabs } from '../appApi/session'
 import { tabs, activeTabId } from '../stores/tabs'
 import { restoreWorkspace } from '../workspaces/lifecycle'
 import { getWorkspaceDefinition } from '../workspaces/registry'
-import { migrateSession, toLegacyRecord } from '../utils/sessionMigration'
+import { migrateSession, toLegacyRecord, sessionRestoreNotice } from '../utils/sessionMigration'
+import { showToast } from '../stores/toast'
+import { recordFrontendError } from '../appApi/errorLog'
 
 // Tab-session persistence (Work 7). On-disk sessions are canonical v2 records;
 // legacy unversioned files migrate in memory on load and are written back as v2.
@@ -53,7 +55,7 @@ export function useSessionPersistence() {
   // Load + validate once, then restore if asked. Returns a diagnostics shape the
   // caller can ignore: `{ ok, sourceVersion, migrated, warnings }` or a failure
   // with `reason`. When ok and the file was legacy, it is written back as v2.
-  async function initializeSession({ restore } = {}) {
+  async function loadSession({ restore }) {
     let raw
     try {
       raw = await getOpenTabs()
@@ -108,6 +110,15 @@ export function useSessionPersistence() {
       }
     }
     return { ok: true, sourceVersion: result.sourceVersion, migrated: result.migrated, warnings: result.warnings }
+  }
+
+  // A failed load also disables autosave, so the user is told; skipped tabs only log.
+  async function initializeSession({ restore } = {}) {
+    const result = await loadSession({ restore })
+    const notice = sessionRestoreNotice(result)
+    if (notice.toast) showToast(notice.toast)
+    if (notice.log) recordFrontendError(notice.log).catch(() => {})
+    return result
   }
 
   // Save on any change to the open tabs or the active tab. The watched getter reads
