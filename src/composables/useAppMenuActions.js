@@ -1,4 +1,5 @@
 import { nextTick, onMounted, onUnmounted } from 'vue'
+import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction } from '../stores/menuRequests'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -18,14 +19,10 @@ export function useAppMenuActions({
   handleTool,
   menuNode,
   showToast,
-  browserRequest,
-  saveQueryRequest,
-  historyRequest,
   refreshAll,
   zoomIn,
   zoomOut,
   resetZoom,
-  docMenuRequest,
   toolbarHidden,
 }) {
   const appWindow = getCurrentWindow()
@@ -78,8 +75,8 @@ export function useAppMenuActions({
       case 'file:save': {
         const tab = tabs.value.find(t => t.id === activeTabId.value)
         if (!tab || tab.kind !== 'collection') { showToast('Open a collection tab first'); return }
-        if (id === 'file:load') browserRequest.value = { nonce: Date.now() }
-        else saveQueryRequest.value = { nonce: Date.now() }
+        if (id === 'file:load') requestSavedQueryBrowser()
+        else requestSaveQuery()
         return
       }
       case 'file:search':       handleTool('search', menuTarget('database')); return
@@ -203,7 +200,7 @@ export function useAppMenuActions({
       case 'view:step_out': {
         const tab = tabs.value.find(t => t.id === activeTabId.value)
         if (!tab || tab.kind !== 'collection') { showToast('Open a collection tab first'); return }
-        docMenuRequest.value = { action: id, nonce: Date.now() }
+        requestDocAction(id)
         return
       }
 
@@ -218,7 +215,7 @@ export function useAppMenuActions({
       case 'view:history': {
         const tab = tabs.value.find(t => t.id === activeTabId.value)
         if (!tab || tab.kind !== 'collection') { showToast('Open a collection tab first'); return }
-        historyRequest.value = { nonce: Date.now() }
+        requestHistory()
         return
       }
     }
@@ -233,7 +230,7 @@ export function useAppMenuActions({
       showToast('Select a document in the results first')
       return
     }
-    docMenuRequest.value = { action: action, nonce: Date.now() }
+    requestDocAction(action)
   }
 
   // Route a Collection document-editing action (Insert / Update / Delete dialog, Clear)
@@ -262,7 +259,7 @@ export function useAppMenuActions({
       })
     }
     await nextTick()
-    docMenuRequest.value = { action: action, nonce: Date.now() }
+    requestDocAction(action)
   }
 
   // GridFS menu actions operate inside the GridFS modal on its selected file/bucket.

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
+import { historyRequest, saveQueryRequest } from '../../stores/menuRequests'
 import { getQueryHistory, clearQueryHistory, setDefaultQuery, clearDefaultQuery, saveQuery } from '../../engines/mongodb/api/queryLibrary'
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
@@ -19,8 +20,6 @@ const props = defineProps({
   isAggregate:    { type: Boolean, default: false },
   runValid:       { type: Boolean, default: true },
   queryErrorText: { type: String,  default: null },
-  historyRequest: { type: Object,  default: null },
-  saveRequest:    { type: Object,  default: null },
 })
 const emit = defineEmits(['run', 'open-browser'])
 const { showToast } = useToast()
@@ -80,13 +79,13 @@ async function openHistoryMenu() {
 }
 
 // View → History Manager: open the query-history menu on request from the native menu.
-watch(() => props.historyRequest && props.historyRequest.nonce, (nonce) => {
+watch(() => historyRequest.value?.nonce, (nonce) => {
   if (nonce == null) return
   if (!historyMenu.value) openHistoryMenu()
 })
 
 // File → Save: open the save-query form on request from the native menu.
-watch(() => props.saveRequest && props.saveRequest.nonce, (nonce) => {
+watch(() => saveQueryRequest.value?.nonce, (nonce) => {
   if (nonce == null) return
   showSaveForm.value = true
 })

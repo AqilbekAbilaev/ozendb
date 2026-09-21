@@ -24,10 +24,7 @@ const props = defineProps({
   tabs:             { type: Array,  required: true },
   activeTabId:      { type: String, required: true },
   resultTab:        { type: String, required: true },
-  docMenuRequest:   { type: Object, default: null },
-  historyRequest:   { type: Object, default: null },
   savedQueryRequest: { type: Object, default: null },
-  saveQueryRequest: { type: Object, default: null },
 })
 const emit = defineEmits([
   'update:result-tab', 'run-query', 'run-aggregate',
@@ -310,8 +307,6 @@ watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
       :is-aggregate="isAggregate"
       :run-valid="runValid"
       :query-error-text="queryErrorText"
-      :history-request="historyRequest"
-      :save-request="saveQueryRequest"
       @run="run"
       @open-browser="emit('open-query-browser')"
     />
@@ -333,7 +328,6 @@ watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
     :rtab="resultTab"
     :tabs="tabs"
     :active-tab-id="activeTabId"
-    :doc-menu-request="docMenuRequest"
     @run="run"
     @requery="runQuery"
     @select-rtab="selectRtab"

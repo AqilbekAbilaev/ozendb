@@ -5,6 +5,7 @@
 // Props/listeners are built per resolved key so collection-only attributes never leak
 // onto ordinary panes' root DOM nodes.
 import { ref, computed, watch } from 'vue'
+import { savedQueryBrowserRequest } from '../../stores/menuRequests'
 import TabBar from '../base/TabBar.vue'
 import QueryBrowserModal from '../query/QueryBrowserModal.vue'
 import { WORKSPACE_COMPONENTS, workspaceComponentFor } from '../../workspaces/registry'
@@ -13,10 +14,6 @@ import { useSavedQueryBrowser } from '../../composables/useSavedQueryBrowser'
 const props = defineProps({
   tabs:           { type: Array,   required: true },
   activeTabId:    { type: String,  required: true },
-  docMenuRequest: { type: Object,  default: null },
-  historyRequest: { type: Object,  default: null },
-  browserRequest: { type: Object,  default: null },
-  saveQueryRequest: { type: Object, default: null },
 })
 const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'run-query', 'run-aggregate', 'cancel-query', 'follow-reference'])
 
@@ -26,7 +23,7 @@ const savedQueryBrowser = useSavedQueryBrowser({
   activate: (id) => emit('activate-tab', id),
 })
 
-watch(() => props.browserRequest?.nonce, (nonce) => {
+watch(() => savedQueryBrowserRequest.value?.nonce, (nonce) => {
   if (nonce != null) savedQueryBrowser.open(activeTab.value)
 })
 watch(() => props.tabs.map(tab => tab.id), (ids) => {
@@ -48,10 +45,7 @@ const bindings = computed(() => {
       tabs:             props.tabs,
       activeTabId:      props.activeTabId,
       resultTab:        rtab.value,
-      docMenuRequest:   props.docMenuRequest,
-      historyRequest:   props.historyRequest,
       savedQueryRequest: savedQueryBrowser.request.value,
-      saveQueryRequest: props.saveQueryRequest,
     }
   }
   return component.value ? { activeTab: activeTab.value } : {}

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
+import { docMenuRequest } from '../../stores/menuRequests'
 import { vqbOpen } from '../../stores/visualQueryBuilder'
 import BaseIcon from '../base/BaseIcon.vue'
 import FieldEditModal from './FieldEditModal.vue'
@@ -34,7 +35,6 @@ const props = defineProps({
   activeTabId: { type: String,  required: true },
   // One-shot Document/Collection editing request from the native menu (see App.vue's
   // requestDocMenuAction). `{ action, nonce }`; a new nonce re-fires the dispatch.
-  docMenuRequest: { type: Object, default: null },
 })
 
 // `run` re-runs the active tab in its current mode (the toolbar refresh button).
@@ -93,7 +93,7 @@ const {
   onFieldEditSave, onRemoveFieldConfirm, onClearConfirm, onUpdateDialogDone, onDeleteDialogDone,
 } = useDocumentActions({
   activeTab: () => props.activeTab,
-  docMenuRequest: () => props.docMenuRequest,
+  docMenuRequest: () => docMenuRequest.value,
   viewMode: viewMode,
   showToast: showToast,
   requery: (history, tab) => emit('requery', history, tab),

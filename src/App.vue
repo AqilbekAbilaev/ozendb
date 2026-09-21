@@ -67,11 +67,7 @@ const treeSelection = ref(null)       // { connectionId, connectionName, dbName,
 const treeConnectionCount = ref(0)
 // One-shot request from the native menu to the active collection's ResultsPanel; bumping
 // `nonce` re-fires its watcher, `action` is the menu item id.
-const docMenuRequest = ref(null)      // { action, nonce } | null
 const toolbarHidden = ref(false)      // View → Hide Global Toolbar toggle
-const historyRequest = ref(null)      // View → History Manager: { nonce } signal to the QueryBar
-const browserRequest = ref(null)      // File → Load: { nonce } signal to open the saved-query browser
-const saveQueryRequest = ref(null)    // File → Save: { nonce } signal to open the save-query form
 const dbClipboard = ref(null)         // Copy/Paste: { kind: 'collection'|'database', connId, connName, dbName, collName? }
 
 const sidebarWidth = ref(320)
@@ -166,14 +162,10 @@ useAppMenuActions({
   handleTool,
   menuNode,
   showToast,
-  browserRequest,
-  saveQueryRequest,
-  historyRequest,
   refreshAll,
   zoomIn,
   zoomOut,
   resetZoom,
-  docMenuRequest,
   toolbarHidden,
 })
 
@@ -237,10 +229,6 @@ provide('appModals', {
       <WorkspaceArea
         :tabs="tabs"
         :active-tab-id="activeTabId"
-        :doc-menu-request="docMenuRequest"
-        :history-request="historyRequest"
-        :browser-request="browserRequest"
-        :save-query-request="saveQueryRequest"
         @activate-tab="activateTab"
         @close-tab="closeTab"
         @reorder-tab="moveTab"
