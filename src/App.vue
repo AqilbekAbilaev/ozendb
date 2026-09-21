@@ -2,15 +2,9 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { runQuery, runAggregate, cancelQuery } from './stores/queryRunner'
-import {
-  openCollectionTab, openSqlTab, openShellTab, openIndexManagerTab, openSchemaTab,
-  openExportSource, openSearchTab, openCurrentOpsTab, openImportTab, openQuickstart,
-} from './stores/tabCreators'
-import { useDbActions } from './composables/useDbActions'
+import { openCollectionTab, openQuickstart } from './stores/tabCreators'
 import { useMenu } from './composables/useMenu'
 import { useOperations } from './composables/useOperations'
-import { useNodeTags } from './composables/useNodeTags'
-import { useDbTransfer } from './composables/useDbTransfer'
 import { useFeatures } from './composables/useFeatures'
 import { useSessionPersistence } from './composables/useSessionPersistence'
 import { useZoom } from './composables/useZoom'
@@ -18,7 +12,7 @@ import { showToast } from './stores/toast'
 import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
   tabs, activeTabId,
-  activateTab, closeTab, moveTab, handleTabAction,
+  activateTab, closeTab, moveTab,
 } from './stores/tabs'
 import {
   loadSettings,
@@ -75,35 +69,11 @@ function toggleOperationsPane() {
   operationsPaneOpen.value = !operationsPaneOpen.value
 }
 
-
-const { applyColorTag } = useNodeTags()
-
-
-const {
-  openImportWizard,
-  exportDatabase,
-  importDatabase,
-} = useDbTransfer({
-  showToast: showToast,
-  openImportTab: openImportTab,
-})
-
 const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence()
-
-const dbActionsApi = useDbActions({ showToast: showToast })
 
 const { menuTarget } = useMenu()
 
-const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
-  dbActions: dbActionsApi,
-  showToast: showToast, applyColorTag: applyColorTag, menuTarget: menuTarget,
-  handleTabAction: handleTabAction, openCollectionTab: openCollectionTab,
-  openShellTab: openShellTab, openIndexManagerTab: openIndexManagerTab, openSqlTab: openSqlTab,
-  openSchemaTab: openSchemaTab,
-  openSearchTab: openSearchTab, openCurrentOpsTab: openCurrentOpsTab,
-  openExportSource: openExportSource, openImportWizard: openImportWizard,
-  exportDatabase: exportDatabase, importDatabase: importDatabase,
-})
+const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({ menuTarget })
 
 useAppMenuActions({
   openQuickstart,

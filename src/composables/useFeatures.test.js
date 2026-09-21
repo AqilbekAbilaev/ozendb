@@ -8,7 +8,22 @@ import { createResourceRef } from '../utils/resourceRef'
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 registerWorkspaceDefinitions()
 
+const applyColorTag = vi.hoisted(() => vi.fn())
+vi.mock('../stores/toast', () => ({ showToast: vi.fn() }))
+vi.mock('../stores/tabCreators', () => ({
+  openCollectionTab: vi.fn(), openShellTab: vi.fn(), openIndexManagerTab: vi.fn(),
+  openSqlTab: vi.fn(), openSchemaTab: vi.fn(), openSearchTab: vi.fn(),
+  openCurrentOpsTab: vi.fn(), openExportSource: vi.fn(),
+}))
+vi.mock('./useDbActions', () => ({ useDbActions: () => ({ pasteClipboard: vi.fn() }) }))
+vi.mock('./useNodeTags', () => ({ useNodeTags: () => ({ applyColorTag }) }))
+vi.mock('./useDbTransfer', () => ({
+  useDbTransfer: () => ({ openImportWizard: vi.fn(), exportDatabase: vi.fn(), importDatabase: vi.fn() }),
+}))
+
 const { tabs, activeTabId } = await import('../stores/tabs')
+const { showToast } = await import('../stores/toast')
+const { openCollectionTab, openShellTab, openSqlTab } = await import('../stores/tabCreators')
 const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
 const { MENUS } = await import('../constants/contextMenus')
 const { contextMenu } = await import('../stores/contextMenu')
@@ -28,22 +43,11 @@ const {
   openConnections, addOpenConnection, resetOpenConnections,
 } = await import('../stores/openConnections')
 
-// A minimal harness: useFeatures' dependencies are injected, so every other slice is
-// a stub and only the tab store is real. The tested surface is the disconnect paths:
-// which tabs survive, whether disposal runs, and the active-tab fallback.
-function makeFeatures(overrides = {}) {
-  return useFeatures({
-    dbActions: { pasteClipboard: vi.fn() },
-    showToast: vi.fn(),
-    applyColorTag: vi.fn(),
-    menuTarget: vi.fn(),
-    handleTabAction: vi.fn(),
-    openCollectionTab: vi.fn(), openShellTab: vi.fn(), openIndexManagerTab: vi.fn(),
-    openSqlTab: vi.fn(), openSchemaTab: vi.fn(), openSearchTab: vi.fn(),
-    openCurrentOpsTab: vi.fn(), openExportSource: vi.fn(), openImportWizard: vi.fn(),
-    exportDatabase: vi.fn(), importDatabase: vi.fn(),
-    ...overrides,
-  })
+// A minimal harness: every slice useFeatures wires is mocked above and only the tab
+// store is real. The tested surface is the disconnect paths — which tabs survive,
+// whether disposal runs, and the active-tab fallback — plus toolbar routing.
+function makeFeatures() {
+  return useFeatures({ menuTarget: vi.fn() })
 }
 
 // A resource-scoped tab shaped like the real workspaces: long identity keys for
@@ -75,26 +79,23 @@ beforeEach(() => {
 
 describe('resource refresh actions', () => {
   it('refreshes the selected connection without a tree refresh method', async () => {
-    const showToast = vi.fn()
-    await makeFeatures({ showToast }).runFeature('Refresh', { connId: 'c1' })
+    await makeFeatures().runFeature('Refresh', { connId: 'c1' })
     expect(refreshConnectionResources).toHaveBeenCalledWith('c1')
     expect(showToast).toHaveBeenCalledWith('Refreshed')
   })
 
   it('reports selected refresh failure without rejecting', async () => {
     refreshConnectionResources.mockRejectedValue({ code: 'network', message: 'offline' })
-    const showToast = vi.fn()
-    await makeFeatures({ showToast }).runFeature('Refresh', { connId: 'c1' })
+    await makeFeatures().runFeature('Refresh', { connId: 'c1' })
     expect(showToast).toHaveBeenCalledWith("Refresh failed: Can't reach the server")
   })
 
   it('refreshes every open connection even if one fails', async () => {
     refreshConnectionResources.mockRejectedValueOnce('offline')
-    const showToast = vi.fn()
     resetOpenConnections()
     addOpenConnection({ id: 'c1' })
     addOpenConnection({ id: 'c2' })
-    const features = makeFeatures({ showToast })
+    const features = makeFeatures()
     await features.runFeature('Refresh All', {})
     expect(refreshConnectionResources.mock.calls).toEqual([['c1'], ['c2']])
     expect(showToast).toHaveBeenCalledWith('Refreshed 1 connection, 1 failed')
@@ -193,9 +194,8 @@ describe('disconnect paths close affected workspaces through the store', () => {
 
 describe('global toolbar routing', () => {
   it('routes a database tool through the active tab', () => {
-    const openShellTab = vi.fn()
     seedStore([tab('f', 'c1', 'shop', 'orders')], 'f')
-    const features = makeFeatures({ openShellTab })
+    const features = makeFeatures()
 
     features.handleTool('shell')
 
@@ -207,9 +207,8 @@ describe('global toolbar routing', () => {
   })
 
   it('opens the collection explicitly resolved by the native menu', () => {
-    const openCollectionTab = vi.fn()
     const target = tab('target', 'c2', 'warehouse', 'stock')
-    const features = makeFeatures({ openCollectionTab })
+    const features = makeFeatures()
 
     features.handleTool('collection', target)
 
@@ -225,19 +224,16 @@ describe('global toolbar routing', () => {
   // highlighted in the sidebar — and clears that highlight, since the opened tab's
   // own active-collection highlight takes over.
   it('opens the sidebar selection when no target is given', () => {
-    const openCollectionTab = vi.fn()
     setTreeSelection({ connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders', kind: 'collection' })
-    makeFeatures({ openCollectionTab }).handleTool('collection')
+    makeFeatures().handleTool('collection')
 
     expect(openCollectionTab).toHaveBeenCalledWith(expect.objectContaining({ dbName: 'shop', collectionName: 'orders' }))
     expect(treeSelection.value).toBeNull()
   })
 
   it('guides the user when nothing in the sidebar is a collection', () => {
-    const openCollectionTab = vi.fn()
-    const showToast = vi.fn()
     setTreeSelection({ connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', kind: 'database' })
-    makeFeatures({ openCollectionTab, showToast }).handleTool('collection')
+    makeFeatures().handleTool('collection')
 
     expect(openCollectionTab).not.toHaveBeenCalled()
     expect(showToast).toHaveBeenCalledWith('Select a collection in the sidebar first')
@@ -250,9 +246,8 @@ describe('color tag persistence', () => {
       type: 'collection',
       nodeData: { connId: 'c1', dbName: 'db', collName: 'orders' },
     }
-    const showToast = vi.fn()
-    const applyColorTag = vi.fn().mockRejectedValue({ code: 'command', message: 'disk full' })
-    const features = makeFeatures({ showToast, applyColorTag })
+    applyColorTag.mockRejectedValue({ code: 'command', message: 'disk full' })
+    const features = makeFeatures()
 
     await features.handleContextAction('Choose Color:red')
 
@@ -281,9 +276,7 @@ describe('handleTool falling back to the active workspace', () => {
   // `tab.connectionId` off a short-alias tool tab yields undefined, and the action
   // silently degrades into a "select something first" toast.
   it('opens IntelliShell for the database a Schema tab is scoped to', () => {
-    const openShellTab = vi.fn()
-    const showToast = vi.fn()
-    makeFeatures({ openShellTab, showToast }).handleTool('shell')
+    makeFeatures().handleTool('shell')
     expect(openShellTab).toHaveBeenCalledWith({
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
     })
@@ -291,8 +284,7 @@ describe('handleTool falling back to the active workspace', () => {
   })
 
   it('opens SQL for the collection a Schema tab is scoped to', () => {
-    const openSqlTab = vi.fn()
-    makeFeatures({ openSqlTab }).handleTool('sql')
+    makeFeatures().handleTool('sql')
     expect(openSqlTab).toHaveBeenCalledWith({
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     })
@@ -303,9 +295,7 @@ describe('handleTool falling back to the active workspace', () => {
   it('does not treat Current Operations filters as a database', () => {
     tabs.value = [toolTab('o1', 'c1', 'shop', 'orders', 'currentOps')]
     activeTabId.value = 'o1'
-    const openShellTab = vi.fn()
-    const showToast = vi.fn()
-    makeFeatures({ openShellTab, showToast }).handleTool('shell')
+    makeFeatures().handleTool('shell')
     expect(openShellTab).not.toHaveBeenCalled()
     expect(showToast).toHaveBeenCalled()
   })
@@ -350,17 +340,15 @@ describe('context menu coverage', () => {
   })
 
   it('reports an unknown action as a fault instead of an unbuilt feature', () => {
-    const showToast = vi.fn()
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    makeFeatures({ showToast }).runFeature('Definitely Not A Feature', { connId: 'c1' })
+    makeFeatures().runFeature('Definitely Not A Feature', { connId: 'c1' })
     expect(showToast).toHaveBeenCalledWith('Could not run "Definitely Not A Feature"')
     expect(error).toHaveBeenCalled()
     error.mockRestore()
   })
 
   it('still says "coming soon" for the acknowledged placeholders', () => {
-    const showToast = vi.fn()
-    makeFeatures({ showToast }).runFeature('Export URI…', { connId: 'c1' })
+    makeFeatures().runFeature('Export URI…', { connId: 'c1' })
     expect(showToast).toHaveBeenCalledWith('Export URI… — coming to OzenDB')
   })
 })

@@ -1,4 +1,5 @@
 import { listDatabases } from '../engines/mongodb/api/resources'
+import { showToast } from '../stores/toast'
 import { dbClipboard } from '../stores/dbClipboard'
 import { copyCollection, copyCollectionToConnection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'
@@ -8,7 +9,7 @@ import { invalidateConnectionResources } from '../stores/connectionData'
 // add/drop/rename/duplicate dialogs used to live here too; each is now a component that
 // owns its own form state (see constants/modalRegistry.js). `showToast` is injected so
 // this stays UI-agnostic; the resource store refreshes after a change;
-export function useDbActions({ showToast }) {
+export function useDbActions() {
   // Copy one collection from the clipboard's connection to the paste target. Same
   // connection uses the fast server-side `$out`; a different connection streams the
   // documents across via `copy_collection_to_connection`.

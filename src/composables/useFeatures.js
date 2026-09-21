@@ -1,10 +1,18 @@
 import { disconnect } from '../engines/mongodb/api/connections'
+import { showToast } from '../stores/toast'
+import {
+  openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab, openSchemaTab,
+  openSearchTab, openCurrentOpsTab, openExportSource,
+} from '../stores/tabCreators'
+import { useDbActions } from './useDbActions'
+import { useNodeTags } from './useNodeTags'
+import { useDbTransfer } from './useDbTransfer'
 import { dbClipboard } from '../stores/dbClipboard'
 import { treeSelection, setTreeSelection } from '../stores/connectionNavigation'
 import { contextMenu } from '../stores/contextMenu'
 import { TOOLS } from '../constants/tools'
 import { MODALS } from '../constants/modalRegistry'
-import { activeTab, closeWhere } from '../stores/tabs'
+import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
 import { resourceFromLegacyTab, legacyTargetFromResource } from '../utils/legacyResourceRef'
@@ -31,17 +39,12 @@ export const UNBUILT_ACTIONS = new Set([
   'Export URI…',
 ])
 
-export function useFeatures({
-  // shared reactive state
-  // sibling composable API
-  dbActions,
-  // injected functions
-  showToast, applyColorTag, menuTarget,
-  handleTabAction, openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab,
-  openSchemaTab, openSearchTab, openCurrentOpsTab,
-  openExportSource, openImportWizard, exportDatabase, importDatabase,
-}) {
-  const { pasteClipboard } = dbActions
+// `menuTarget` comes from useMenu, which App.vue constructs once because it also
+// owns the watcher that pushes the menu context to the native menu.
+export function useFeatures({ menuTarget }) {
+  const { pasteClipboard } = useDbActions()
+  const { applyColorTag } = useNodeTags()
+  const { openImportWizard, exportDatabase, importDatabase } = useDbTransfer()
 
   const CONN = ['connId', 'connName']
   const DB   = ['connId', 'connName', 'dbName']

@@ -1,4 +1,6 @@
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { showToast } from '../stores/toast'
+import { openImportTab } from '../stores/tabCreators'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { exportCollection, importCollection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'
@@ -8,7 +10,7 @@ import { openModal, closeModal } from '../stores/modals'
 // Import / export flows. Per-collection export is a workspace tab (see openExportTab in
 // App.vue); import opens a format picker first. The database-level Export/Import
 // Collections… run the plain per-collection commands in a loop over a chosen folder/files.
-export function useDbTransfer({ showToast, openImportTab }) {
+export function useDbTransfer() {
   // Import starts with the format picker; on Configure it opens the matching import tab.
   function openImportWizard(nodeData) {
     const target = {
