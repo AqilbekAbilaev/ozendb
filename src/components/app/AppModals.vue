@@ -1,5 +1,7 @@
 <script setup>
-import { inject, unref } from 'vue'
+import { unref } from 'vue'
+import * as indexesStore from '../../stores/indexes'
+import { useSshHostKey } from '../../composables/useSshHostKey'
 import { MODALS } from '../../constants/modalRegistry'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -12,7 +14,6 @@ import { renameTabTarget, renameTabValue, confirmRenameTab } from '../../stores/
 
 // indexes/ssh still come through App.vue's appModals provide — see the comment there
 // for why useIndexes/useSshHostKey can't be module-scope stores yet.
-const ctx = inject('appModals')
 
 // Registry-driven modals are bound generically: every modal gets `close`; node-targeted
 // modals get their payload as `target`; the opener owns any session props and events.
@@ -48,7 +49,7 @@ const {
   dropIndexBusy,
   confirmDropIndex,
   formatIndexSince,
-} = ctx.indexes
+} = indexesStore
 
 const {
   sshHostKeyPrompt,
@@ -56,7 +57,7 @@ const {
   onHostKeyTrust,
   onHostKeyCancel,
   onHostKeyForget,
-} = ctx.ssh
+} = useSshHostKey()
 </script>
 
 <template>

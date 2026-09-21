@@ -1,8 +1,6 @@
 <script setup>
-import { ref, onMounted, onUnmounted, provide } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
-import { useIndexes } from './composables/useIndexes'
-import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
 import { useDbActions } from './composables/useDbActions'
 import { useMenu } from './composables/useMenu'
@@ -79,14 +77,6 @@ function toggleOperationsPane() {
 
 const { applyColorTag } = useNodeTags()
 
-const indexesApi = useIndexes({ showToast: showToast })
-// Only the Index-menu binding is needed here; IndexManagerPane consumes the rest via inject.
-const {
-  selectedIndex,
-} = indexesApi
-
-const sshApi = useSshHostKey()
-
 const { runQuery, runAggregate, cancelQuery } = useQueryRunner({ showToast: showToast })
 
 // Constructed here, not as free functions, since they need the query runner and settings defaults.
@@ -119,7 +109,7 @@ const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence
 
 const dbActionsApi = useDbActions({ showToast: showToast })
 
-const { menuTarget } = useMenu({ selectedIndex: selectedIndex })
+const { menuTarget } = useMenu()
 
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
   dbActions: dbActionsApi,
@@ -144,15 +134,6 @@ useAppMenuActions({
   zoomOut,
   resetZoom,
   toolbarHidden,
-})
-
-// indexesApi/sshApi can't move to a store as-is: useIndexes needs App.vue's showToast
-// (only reachable via inject, which needs a component context), and useSshHostKey
-// registers its Tauri listeners inside onMounted. Everyone else reads stores/modals.js
-// and stores/tabs.js directly instead of going through this bundle.
-provide('appModals', {
-  indexes: indexesApi,
-  ssh: sshApi,
 })
 </script>
 

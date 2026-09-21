@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // API boundary, including the frozen drop target — a tab switch while the confirm
 // modal is open must never redirect the drop — and the revision signal the pane
 // watches to reload its own list after a confirmed drop.
+vi.mock('./toast', () => ({ showToast: vi.fn() }))
 vi.mock('../engines/mongodb/api/indexes', () => ({
   createIndex: vi.fn(),
   dropIndex: vi.fn(),
@@ -13,7 +14,8 @@ vi.mock('../engines/mongodb/api/indexes', () => ({
   setIndexHidden: vi.fn(),
 }))
 
-const { useIndexes } = await import('./useIndexes')
+const ix = await import('./indexes')
+const { showToast } = await import('./toast')
 const api = await import('../engines/mongodb/api/indexes')
 
 beforeEach(() => {
@@ -25,8 +27,9 @@ afterEach(() => {
 })
 
 function harness() {
+  ix.resetIndexes()
   const toasts = []
-  const ix = useIndexes({ showToast: (m) => toasts.push(m) })
+  showToast.mockImplementation((m) => toasts.push(m))
   ix.indexesTarget.value = { connId: 'c1', dbName: 'db', collName: 'coll' }
   return { ix, toasts }
 }

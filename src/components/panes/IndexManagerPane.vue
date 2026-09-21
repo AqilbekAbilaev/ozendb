@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref, inject, watch, onUnmounted } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
+import * as idx from '../../stores/indexes'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import IndexAddDialog from '../query/IndexAddDialog.vue'
@@ -23,8 +24,6 @@ const props = defineProps({
   activeTab: { type: Object, required: true },
 })
 
-const bundle = inject('appModals')
-const idx = bundle.indexes
 
 // Per-tab state (not shared across tabs)
 const localIndexesList     = ref([])
