@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { isEditingTarget } from '../../utils/editingTarget'
 import BaseIcon from './BaseIcon.vue'
 
 // Shared search bar for Table, JSON, and Tree result views.
@@ -38,8 +39,7 @@ function onKeydown(e) {
 
   // Bail if focus is inside an editor/field the app owns — unless that editor lives
   // inside our own results view (e.g. the JSON code view), where search must still work.
-  const inField = t?.closest?.('input, textarea, [contenteditable], .cm-editor, .monaco-editor')
-  if (inField && !(props.scope && props.scope.contains(t))) return
+  if (isEditingTarget(t) && !(props.scope && props.scope.contains(t))) return
 
   // Ctrl/Cmd+F — open
   if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) {

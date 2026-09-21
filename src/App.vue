@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { matchBinding } from './utils/keybindings'
+import { isEditingTarget } from './utils/editingTarget'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
@@ -206,10 +207,7 @@ const { handleMenuAction } = useAppMenuActions({
 })
 // Linux only; skip text fields/editors so the webview keeps its native editing keys.
 function onGlobalKeydown(e) {
-  const t = e.target
-  if (t && t.closest && t.closest('input, textarea, [contenteditable], .cm-editor, .monaco-editor')) {
-    return
-  }
+  if (isEditingTarget(e.target)) return
   const id = matchBinding(e, keyBindings.value)
   if (id) {
     e.preventDefault()
