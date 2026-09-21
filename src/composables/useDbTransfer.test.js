@@ -1,5 +1,4 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
 vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases: vi.fn() }))
@@ -15,6 +14,7 @@ import { listDatabases } from '../engines/mongodb/api/resources'
 import { importCollection, copyCollection, copyCollectionToConnection } from '../engines/mongodb/api/transfer'
 import { invalidateConnectionResources } from '../stores/connectionData'
 import { openModal, closeModal } from '../stores/modals'
+import { dbClipboard } from '../stores/dbClipboard'
 import { useDbTransfer } from './useDbTransfer'
 import { useDbActions } from './useDbActions'
 
@@ -54,8 +54,8 @@ it('does not invalidate when every import fails', async () => {
 
 it.each(['destination', 'source'])('invalidates the destination after collection paste from %s', async connId => {
   const showToast = vi.fn()
-  const dbClipboard = ref({ kind: 'collection', connId, dbName: 'sourceDb', collName: 'items' })
-  await useDbActions({ showToast, dbClipboard }).pasteClipboard(target)
+  dbClipboard.value = { kind: 'collection', connId, dbName: 'sourceDb', collName: 'items' }
+  await useDbActions({ showToast }).pasteClipboard(target)
   expect(connId === target.connId ? copyCollection : copyCollectionToConnection).toHaveBeenCalledOnce()
   expect(invalidateConnectionResources).toHaveBeenCalledWith('destination')
   expect(showToast).toHaveBeenCalledTimes(1)
@@ -66,8 +66,8 @@ it('invalidates successful database copies even when later collections fail', as
   listDatabases.mockResolvedValue([{ name: 'sourceDb', collections: ['a', 'b'] }])
   copyCollectionToConnection.mockResolvedValueOnce(1).mockRejectedValueOnce('Failed')
   const showToast = vi.fn()
-  const dbClipboard = ref({ kind: 'database', connId: 'source', dbName: 'sourceDb' })
-  await useDbActions({ showToast, dbClipboard }).pasteClipboard(target)
+  dbClipboard.value = { kind: 'database', connId: 'source', dbName: 'sourceDb' }
+  await useDbActions({ showToast }).pasteClipboard(target)
   expect(invalidateConnectionResources).toHaveBeenCalledWith('destination')
   expect(showToast).toHaveBeenLastCalledWith('Pasted 1 collection into db (cross-server)')
 })

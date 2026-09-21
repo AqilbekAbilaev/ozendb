@@ -64,7 +64,6 @@ onUnmounted(() => {
 // One-shot request from the native menu to the active collection's ResultsPanel; bumping
 // `nonce` re-fires its watcher, `action` is the menu item id.
 const toolbarHidden = ref(false)      // View → Hide Global Toolbar toggle
-const dbClipboard = ref(null)         // Copy/Paste: { kind: 'collection'|'database', connId, connName, dbName, collName? }
 
 const sidebarWidth = ref(320)
 const sidebarOpen = ref(true)   // the "Open connections" rail entry toggles the tree
@@ -128,12 +127,11 @@ watch(() => tabs.value.length, (count) => {
 
 const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence()
 
-const dbActionsApi = useDbActions({ showToast: showToast, dbClipboard: dbClipboard })
+const dbActionsApi = useDbActions({ showToast: showToast })
 
 const { menuTarget } = useMenu({ selectedIndex: selectedIndex })
 
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
-  dbClipboard: dbClipboard,
   dbActions: dbActionsApi,
   showToast: showToast, applyColorTag: applyColorTag, menuTarget: menuTarget,
   handleTabAction: handleTabAction, openCollectionTab: openCollectionTab,

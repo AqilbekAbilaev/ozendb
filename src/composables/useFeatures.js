@@ -1,4 +1,5 @@
 import { disconnect } from '../engines/mongodb/api/connections'
+import { dbClipboard } from '../stores/dbClipboard'
 import { treeSelection, setTreeSelection } from '../stores/connectionNavigation'
 import { contextMenu } from '../stores/contextMenu'
 import { TOOLS } from '../constants/tools'
@@ -32,7 +33,6 @@ export const UNBUILT_ACTIONS = new Set([
 
 export function useFeatures({
   // shared reactive state
-  dbClipboard,
   // sibling composable API
   dbActions,
   // injected functions

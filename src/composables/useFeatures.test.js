@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ref } from 'vue'
 import { createResourceRef } from '../utils/resourceRef'
 
 // The tab store builds its module-scope Quickstart through a definition, so the
@@ -34,7 +33,6 @@ const {
 // which tabs survive, whether disposal runs, and the active-tab fallback.
 function makeFeatures(overrides = {}) {
   return useFeatures({
-    dbClipboard: ref(null),
     dbActions: { pasteClipboard: vi.fn() },
     showToast: vi.fn(),
     applyColorTag: vi.fn(),
