@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import { colorHex, tabColorName } from '../../utils/tabColor.js'
+import { tagOverrides } from '../../stores/nodeTags'
 import { findDropIndex } from '../../composables/useColumnReorder'
 
 const props = defineProps({
@@ -9,13 +10,12 @@ const props = defineProps({
   activeTabId:  { type: String, required: true },
   // Colour tags for tree nodes (keyed by connId / connId/db / connId/db/coll).
   // A tab with no colour of its own inherits the colour of the node it opened.
-  tagOverrides: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'tab-context'])
 
 // The colour name shown on a tab, resolved (with inheritance) by the shared util.
 function tabColor(t) {
-  return tabColorName(t, props.tagOverrides)
+  return tabColorName(t, tagOverrides.value)
 }
 
 // Overflow handling: tabs keep their natural (content) width, so we measure each

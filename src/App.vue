@@ -129,7 +129,7 @@ provide('showToast', showToast)
 provide('defaultResultView', defaultResultView)
 provide('editorTabWidth', editorTabWidth)
 
-const { tagOverrides, applyColorTag } = useNodeTags()
+const { applyColorTag } = useNodeTags()
 
 const indexesApi = useIndexes({ showToast: showToast })
 // Only the Index-menu binding is needed here; IndexManagerPane consumes the rest via inject.
@@ -283,7 +283,6 @@ provide('appModals', {
         ref="connectionTreeRef"
         :width="sidebarWidth"
         :active-collection-key="activeCollectionKey"
-        :tag-overrides="tagOverrides"
         :context-active-node-key="contextActiveNodeKey"
         @select-collection="openCollectionTab"
         @select-node="treeSelection = $event"
@@ -296,7 +295,6 @@ provide('appModals', {
       <WorkspaceArea
         :tabs="tabs"
         :active-tab-id="activeTabId"
-        :tag-overrides="tagOverrides"
         :vqb-open="vqbOpen"
         :doc-menu-request="docMenuRequest"
         :history-request="historyRequest"

@@ -13,7 +13,6 @@ import { useSavedQueryBrowser } from '../../composables/useSavedQueryBrowser'
 const props = defineProps({
   tabs:           { type: Array,   required: true },
   activeTabId:    { type: String,  required: true },
-  tagOverrides:   { type: Object,  default: () => ({}) },
   vqbOpen:        { type: Boolean, default: false },
   docMenuRequest: { type: Object,  default: null },
   historyRequest: { type: Object,  default: null },
@@ -80,7 +79,6 @@ const collectionListeners = {
     <TabBar
       :tabs="tabs"
       :active-tab-id="activeTabId"
-      :tag-overrides="tagOverrides"
       @activate-tab="emit('activate-tab', $event)"
       @close-tab="emit('close-tab', $event)"
       @reorder-tab="(id, beforeId) => emit('reorder-tab', id, beforeId)"

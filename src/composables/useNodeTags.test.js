@@ -9,6 +9,7 @@ vi.mock('../appApi/tags', () => ({
 }))
 
 const { useNodeTags } = await import('./useNodeTags')
+const { tagOverrides } = await import('../stores/nodeTags')
 const tagsApi = await import('../appApi/tags')
 
 beforeEach(() => {
@@ -21,7 +22,7 @@ beforeEach(() => {
 describe('applyColorTag', () => {
   it('leaves local tags unchanged when the tag write fails', async () => {
     const tags = useNodeTags()
-    tags.tagOverrides.value = { existing: 'blue' }
+    tagOverrides.value = { existing: 'blue' }
     tagsApi.setNodeTag.mockRejectedValue(new Error('disk full'))
 
     await expect(tags.applyColorTag({
@@ -30,30 +31,30 @@ describe('applyColorTag', () => {
       color: 'red',
     })).rejects.toThrow('disk full')
 
-    expect(tags.tagOverrides.value).toEqual({ existing: 'blue' })
+    expect(tagOverrides.value).toEqual({ existing: 'blue' })
   })
 
   it('reflects the persisted parent but keeps descendants when their clear fails', async () => {
     const tags = useNodeTags()
-    tags.tagOverrides.value = { 'c1/db': 'green' }
+    tagOverrides.value = { 'c1/db': 'green' }
     tagsApi.clearNodeTagsUnder.mockRejectedValue(new Error('write failed'))
 
     await expect(tags.applyColorTag({
       type: 'connection', nodeData: { connId: 'c1' }, color: 'red',
     })).rejects.toThrow('write failed')
 
-    expect(tags.tagOverrides.value).toEqual({ c1: 'red', 'c1/db': 'green' })
+    expect(tagOverrides.value).toEqual({ c1: 'red', 'c1/db': 'green' })
   })
 
   it('updates local tags only after persistence succeeds', async () => {
     const tags = useNodeTags()
-    tags.tagOverrides.value = { 'c1/db': 'green', c2: 'blue' }
+    tagOverrides.value = { 'c1/db': 'green', c2: 'blue' }
 
     await tags.applyColorTag({
       type: 'connection', nodeData: { connId: 'c1' }, color: 'red',
     })
 
-    expect(tags.tagOverrides.value).toEqual({ c1: 'red', c2: 'blue' })
+    expect(tagOverrides.value).toEqual({ c1: 'red', c2: 'blue' })
   })
 
   it('serializes rapid changes so the final persisted color wins locally', async () => {
@@ -74,6 +75,6 @@ describe('applyColorTag', () => {
     await Promise.all([first, second])
 
     expect(tagsApi.setConnectionTag.mock.calls.map(([, color]) => color)).toEqual(['red', 'blue'])
-    expect(tags.tagOverrides.value.c1).toBe('blue')
+    expect(tagOverrides.value.c1).toBe('blue')
   })
 })

@@ -49,5 +49,5 @@ export function useNodeTags() {
     tagOverrides.value = updated
   }
 
-  return { tagOverrides: tagOverrides, applyColorTag: applyColorTag }
+  return { applyColorTag: applyColorTag }
 }

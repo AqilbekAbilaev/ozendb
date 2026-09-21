@@ -7,12 +7,12 @@ import StatsTip from './StatsTip.vue'
 import { useStatsTip } from '../../composables/useStatsTip'
 import { colorHex } from '../../utils/tabColor.js'
 import { connDatabases } from '../../stores/connectionData.js'
+import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
 
 const props = defineProps({
   activeCollectionKey: String,
   width: { type: Number, default: 320 },
-  tagOverrides: { type: Object, default: () => ({}) },
   contextActiveNodeKey: { type: String, default: null },
 })
 const emit = defineEmits(['select-collection', 'context-menu', 'select-node', 'connections-changed'])
@@ -28,7 +28,7 @@ const {
 // full path) wins, otherwise the persisted fallback tag (connections only).
 // Returns null when the node has no colour of its own (untagged or 'none').
 function nodeTag(key, fallbackTag) {
-  const override = props.tagOverrides[key]
+  const override = tagOverrides.value[key]
   const name = override !== undefined ? override : (fallbackTag || null)
   return name && name !== 'none' ? name : null
 }
