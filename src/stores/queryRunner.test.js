@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
+vi.mock('./toast', () => ({ showToast: vi.fn() }))
 
 // The store may build a Quickstart tab through its workspace definition (see
 // initializeTabs in stores/tabs.js), so definitions are registered before the store
@@ -9,8 +10,9 @@ import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 registerWorkspaceDefinitions()
 
 const { invoke } = await import('@tauri-apps/api/core')
-const { useQueryRunner } = await import('./useQueryRunner')
-const { tabs } = await import('../stores/tabs')
+const api = await import('./queryRunner')
+const { showToast } = await import('./toast')
+const { tabs } = await import('./tabs')
 
 // The timing on the toast is the server's, not this process's. Wall clock here also
 // pays for IPC and result marshalling, which grow with the page size and say nothing
@@ -19,7 +21,8 @@ const { tabs } = await import('../stores/tabs')
 function harness() {
   const toasts = []
   tabs.value = [{ id: 't1', connectionId: 'c1', dbName: 'db', collectionName: 'coll', mode: 'find' }]
-  return { api: useQueryRunner({ showToast: (m) => toasts.push(m) }), toasts, tab: tabs.value[0] }
+  showToast.mockImplementation((m) => toasts.push(m))
+  return { api, toasts, tab: tabs.value[0] }
 }
 
 beforeEach(() => {

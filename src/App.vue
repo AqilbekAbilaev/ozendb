@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
-import { useQueryRunner } from './composables/useQueryRunner'
+import { runQuery, runAggregate, cancelQuery } from './stores/queryRunner'
 import { useDbActions } from './composables/useDbActions'
 import { useMenu } from './composables/useMenu'
 import { useOperations } from './composables/useOperations'
@@ -76,8 +76,6 @@ function toggleOperationsPane() {
 
 
 const { applyColorTag } = useNodeTags()
-
-const { runQuery, runAggregate, cancelQuery } = useQueryRunner({ showToast: showToast })
 
 // Constructed here, not as free functions, since they need the query runner and settings defaults.
 const {
