@@ -6,9 +6,13 @@ export const contextMenu = ref(null)
 
 // The tree node the menu is open on, so the sidebar can keep it highlighted.
 export const contextActiveNodeKey = computed(() => {
-  if (!contextMenu.value) return null
-  const nd = contextMenu.value.nodeData
-  if (contextMenu.value.type === 'connection') return nd.connId
-  if (contextMenu.value.type === 'database') return nd.connId + '/' + nd.dbName
-  return nd.connId + '/' + nd.dbName + '/' + nd.collName
+  const m = contextMenu.value
+  if (!m) return null
+  const nd = m.nodeData
+  switch (m.type) {
+    case 'connection': return nd.connId
+    case 'database':   return nd.connId + '/' + nd.dbName
+    case 'collection': return nd.connId + '/' + nd.dbName + '/' + nd.collName
+    default:           return null
+  }
 })

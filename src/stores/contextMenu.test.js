@@ -16,4 +16,11 @@ describe('contextActiveNodeKey', () => {
     contextMenu.value = { type: 'collection', nodeData: { connId: 'c1', dbName: 'shop', collName: 'a/b' } }
     expect(contextActiveNodeKey.value).toBe('c1/shop/a/b')
   })
+
+  // A tab menu has no tree node; it used to fall into the collection branch and hand
+  // the sidebar "undefined/undefined/undefined" to highlight.
+  it('is null for a menu that is not on a tree node', () => {
+    contextMenu.value = { type: 'tab', nodeData: { tabId: 't1' } }
+    expect(contextActiveNodeKey.value).toBeNull()
+  })
 })
