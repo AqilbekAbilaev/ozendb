@@ -7,7 +7,7 @@ import { listen, emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
 import { colorHex } from '../../utils/tabColor.js'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { useConnectionFolders } from '../../composables/useConnectionFolders'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
@@ -19,7 +19,6 @@ import ContextMenu from '../base/ContextMenu.vue'
 import { formatNow } from '../../utils/format'
 
 const emit = defineEmits(['close'])
-const { showToast } = useToast()
 
 const connections = ref([])
 const selectedId = ref(null)

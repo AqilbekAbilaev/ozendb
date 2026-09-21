@@ -6,7 +6,7 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 
 // Connection → Add Database…: MongoDB only materialises a database once it holds a
@@ -16,7 +16,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['close'])
 
-const { showToast } = useToast()
 
 const dbName = ref('')
 const collName = ref('')

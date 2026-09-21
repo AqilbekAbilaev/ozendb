@@ -4,7 +4,7 @@ import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { exportCollectionFields } from '../../engines/mongodb/api/transfer'
 import { runFind } from '../../engines/mongodb/api/queries'
 import { errText, errCode } from '../../utils/errors'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -26,7 +26,6 @@ import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT } from '../../constants/dataT
 const props = defineProps({
   activeTab: { type: Object, required: true },
 })
-const { showToast } = useToast()
 
 // Sample rows back the preview only. They're re-fetched on mount rather than stored,
 // so a restored tab previews the collection's current contents, not a stale snapshot.

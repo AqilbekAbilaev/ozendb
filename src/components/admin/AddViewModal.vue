@@ -8,7 +8,7 @@ import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { parsePipeline } from '../../utils/queryParser'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 
 // Add View… (from a database node) opens with no source; Add View Here… (from a
@@ -18,7 +18,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['close'])
 
-const { showToast } = useToast()
 
 const name = ref('')
 const source = ref(props.target.source || '')

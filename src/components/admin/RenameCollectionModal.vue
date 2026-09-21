@@ -6,7 +6,7 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { tabs } from '../../stores/tabs'
 import { retargetResource } from '../../workspaces/lifecycle'
@@ -19,7 +19,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['close'])
 
-const { showToast } = useToast()
 
 const name = ref(props.target.collectionName)
 const error = ref(null)

@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { fmtBytes, fmtBytesExact, fmtNum } from '../../utils/format'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 
 // The hover card for a sidebar row: how big a database or collection is without opening
 // it, reporting what Studio-3T's tooltips do.
@@ -13,7 +13,6 @@ const props = defineProps({
 // to stay open once the pointer reaches it.
 defineEmits(['keep', 'leave', 'refresh'])
 
-const { showToast } = useToast()
 
 // Click a value to copy it. Selecting the text by hand was the obvious alternative, but
 // WebKit paints selection gap fill across a right-aligned grid cell, which put a stray

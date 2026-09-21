@@ -5,7 +5,7 @@ import { stageImportText } from '../../appApi/files'
 import { importPreview, importCollectionMapped } from '../../engines/mongodb/api/transfer'
 import { errText, errCode } from '../../utils/errors'
 import { invalidateConnectionResources } from '../../stores/connectionData'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
@@ -27,7 +27,6 @@ const props = defineProps({
   activeTab: { type: Object, required: true },
 })
 
-const { showToast } = useToast()
 
 const SUB_TABS = [
   { value: 'source', label: 'Source options' },

@@ -22,7 +22,6 @@ import {
 import {
   defaultQueryLimit,
   defaultResultView,
-  editorTabWidth,
   loadSettings,
   restoreSessionEnabled,
 } from './stores/settings'
@@ -77,10 +76,6 @@ function toggleOperationsPane() {
   operationsPaneOpen.value = !operationsPaneOpen.value
 }
 
-// Provided once here (rather than bubbled as an event) since toast is an app-wide concern.
-provide('showToast', showToast)
-provide('defaultResultView', defaultResultView)
-provide('editorTabWidth', editorTabWidth)
 
 const { applyColorTag } = useNodeTags()
 

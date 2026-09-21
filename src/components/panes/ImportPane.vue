@@ -8,7 +8,7 @@ import { invalidateConnectionResources } from '../../stores/connectionData'
 import { openModal } from '../../stores/modals'
 import { useImportPaneLifecycle } from '../../composables/useImportPaneLifecycle'
 import { useImportPreview } from '../../composables/useImportPreview'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -28,7 +28,6 @@ const props = defineProps({
   activeTab: { type: Object, required: true },
 })
 
-const { showToast } = useToast()
 
 // "Change target" opens the Connection Manager (the app's single place to pick /
 // edit connections).

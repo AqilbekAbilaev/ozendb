@@ -6,12 +6,11 @@ import { updateLastAccessed } from '../../appApi/connectionState'
 import { requestConnectionOpen } from '../../stores/connectionNavigation'
 import { setTheme as saveTheme, theme } from '../../stores/settings'
 import { openModal } from '../../stores/modals'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import { formatNow } from '../../utils/format'
 
-const { showToast } = useToast()
 
 // ── recent connections ─────────────────────────────────────
 const recent  = ref([])

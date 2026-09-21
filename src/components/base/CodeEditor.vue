@@ -1,5 +1,5 @@
 <script setup>
-import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { EditorView, lineNumbers as lineNumbersExt, keymap } from '@codemirror/view'
 import { EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
@@ -8,6 +8,7 @@ import { syntaxHighlighting, indentUnit, bracketMatching } from '@codemirror/lan
 import { baseTheme, codeHighlightStyle, jsonHighlightStyle } from '../../utils/codemirror/theme'
 import { languageExtension } from '../../utils/codemirror/languages'
 import { useMomentumScroll } from '../../composables/useMomentumScroll'
+import { editorTabWidth } from '../../stores/settings'
 
 // Reusable CodeMirror 6 editor/viewer. Owns the EditorView lifecycle and v-model sync;
 // everything site-specific (Mongo autocomplete, run/save keymaps, code folding, doc
@@ -30,7 +31,6 @@ const emit = defineEmits(['update:modelValue'])
 
 // Spaces per indent level (Preferences → Appearance). Injected so every editor —
 // IntelliShell, the document editor, the JSON view — honors the one setting.
-const editorTabWidth = inject('editorTabWidth', ref(4))
 
 const hostEl = ref(null)
 const view = shallowRef(null)

@@ -14,7 +14,7 @@ import {
 } from '../../engines/mongodb/api/gridfs'
 import { errText, errCode } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { parseField } from '../../utils/queryParser'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -35,7 +35,6 @@ const props = defineProps({
   target: { type: Object, required: true },  // { connectionId, connectionName, dbName, menuRequest? }
 })
 defineEmits(['close'])
-const { showToast } = useToast()
 
 const buckets = ref([])
 const selectedBucket = ref('fs')

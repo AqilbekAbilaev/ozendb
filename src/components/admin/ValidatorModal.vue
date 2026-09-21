@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { getValidator, setValidator } from '../../engines/mongodb/api/admin'
 import { errText } from '../../utils/errors'
 import { parseField } from '../../utils/queryParser'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModal from '../base/BaseModal.vue'
@@ -20,7 +20,6 @@ const props = defineProps({
   target: { type: Object, required: true },  // { connectionId, connectionName, dbName, collectionName }
 })
 const emit = defineEmits(['close'])
-const { showToast } = useToast()
 
 const loading = ref(true)
 const saving = ref(false)

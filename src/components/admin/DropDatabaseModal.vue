@@ -5,7 +5,7 @@ import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { closeWhere } from '../../stores/tabs'
 import { affectedByResource } from '../../workspaces/lifecycle'
@@ -18,7 +18,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['close'])
 
-const { showToast } = useToast()
 
 const error = ref(null)
 const deleting = ref(false)

@@ -3,7 +3,7 @@ import { ref, watch, nextTick } from 'vue'
 import { historyRequest, saveQueryRequest } from '../../stores/menuRequests'
 import { getQueryHistory, clearQueryHistory, setDefaultQuery, clearDefaultQuery, saveQuery } from '../../engines/mongodb/api/queryLibrary'
 import { errText } from '../../utils/errors'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { setCollectionQueryMode } from '../../utils/queryMode'
 import { clipboardQuery, copyQuery, pasteQuery } from '../../stores/queryClipboard'
 import { vqbOpen } from '../../stores/visualQueryBuilder'
@@ -22,7 +22,6 @@ const props = defineProps({
   queryErrorText: { type: String,  default: null },
 })
 const emit = defineEmits(['run', 'open-browser'])
-const { showToast } = useToast()
 
 function onCopy() {
   copyQuery(props.activeTab)

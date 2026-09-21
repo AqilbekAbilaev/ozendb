@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed } from 'vue'
 import { docMenuRequest } from '../../stores/menuRequests'
 import { vqbOpen } from '../../stores/visualQueryBuilder'
+import { defaultResultView } from '../../stores/settings'
 import BaseIcon from '../base/BaseIcon.vue'
 import FieldEditModal from './FieldEditModal.vue'
 import UpdateDocumentsModal from './UpdateDocumentsModal.vue'
@@ -21,7 +22,7 @@ import TabStrip from '../base/TabStrip.vue'
 import Resizer from '../base/Resizer.vue'
 import FieldError from '../base/FieldError.vue'
 import { useDocumentActions } from '../../composables/useDocumentActions'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { useTicker } from '../../composables/useTicker'
 import { useResultsPagination } from '../../composables/useResultsPagination'
 import { PAGE_SIZES } from '../../constants/pageSizes'
@@ -41,11 +42,9 @@ const props = defineProps({
 // `requery` re-runs the find query with an explicit history flag (pagination, CRUD
 // refresh). Both delegate to the parent, which owns the parse + run pipeline.
 const emit = defineEmits(['run', 'requery', 'select-rtab', 'explain-verbosity', 'cancel', 'follow-reference'])
-const { showToast } = useToast()
 
 // The Table/JSON/Tree view lives on the active tab, so each tab keeps its own view;
 // a tab that has none yet falls back to the configured default (Preferences → General).
-const defaultResultView = inject('defaultResultView', ref('table'))
 const viewMode = computed({
   get() {
     return props.activeTab && props.activeTab.resultView ? props.activeTab.resultView : defaultResultView.value

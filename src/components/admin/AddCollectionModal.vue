@@ -8,7 +8,7 @@ import BaseRadio from '../base/BaseRadio.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
-import { useToast } from '../../composables/useToast'
+import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { buildCollectionOptions, emptyCollectionOptions } from '../../utils/collectionOptions'
 
@@ -20,7 +20,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['close'])
 
-const { showToast } = useToast()
 
 // Time-series granularity choices for the BaseSelect.
 const GRANULARITY_OPTIONS = [
