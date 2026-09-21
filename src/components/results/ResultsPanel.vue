@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
+import { vqbOpen } from '../../stores/visualQueryBuilder'
 import BaseIcon from '../base/BaseIcon.vue'
 import FieldEditModal from './FieldEditModal.vue'
 import UpdateDocumentsModal from './UpdateDocumentsModal.vue'
@@ -29,7 +30,6 @@ const props = defineProps({
   isAggregate: { type: Boolean, default: false },
   runValid:    { type: Boolean, default: true },
   rtab:        { type: String,  default: 'Result' },
-  vqbOpen:     { type: Boolean, default: false },
   tabs:        { type: Array,   required: true },
   activeTabId: { type: String,  required: true },
   // One-shot Document/Collection editing request from the native menu (see App.vue's
@@ -40,7 +40,7 @@ const props = defineProps({
 // `run` re-runs the active tab in its current mode (the toolbar refresh button).
 // `requery` re-runs the find query with an explicit history flag (pagination, CRUD
 // refresh). Both delegate to the parent, which owns the parse + run pipeline.
-const emit = defineEmits(['run', 'requery', 'select-rtab', 'explain-verbosity', 'open-vqb', 'close-vqb', 'cancel', 'follow-reference'])
+const emit = defineEmits(['run', 'requery', 'select-rtab', 'explain-verbosity', 'cancel', 'follow-reference'])
 const { showToast } = useToast()
 
 // The Table/JSON/Tree view lives on the active tab, so each tab keeps its own view;
@@ -261,13 +261,10 @@ function toggleReadOnly() {
       v-else-if="rtab === 'Result' && viewMode === 'table'"
       :active-tab="activeTab"
       :readonly="!!activeTab.readOnly"
-      :vqb-open="vqbOpen"
       v-model:drillPath="drillPath"
       @dragged-field="draggedField = $event"
       @drag-over-section="dragOverSection = $event"
       @vqb-drop="vqbDrop = $event"
-      @open-vqb="emit('open-vqb')"
-      @close-vqb="emit('close-vqb')"
       @crud-error="crudError = $event"
       @paste-documents="pasteDocuments()"
       @follow-reference="emit('follow-reference', $event)"

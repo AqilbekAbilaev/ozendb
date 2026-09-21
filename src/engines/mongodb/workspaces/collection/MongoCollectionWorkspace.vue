@@ -24,7 +24,6 @@ const props = defineProps({
   tabs:             { type: Array,  required: true },
   activeTabId:      { type: String, required: true },
   resultTab:        { type: String, required: true },
-  vqbOpen:          { type: Boolean, default: false },
   docMenuRequest:   { type: Object, default: null },
   historyRequest:   { type: Object, default: null },
   savedQueryRequest: { type: Object, default: null },
@@ -32,7 +31,6 @@ const props = defineProps({
 })
 const emit = defineEmits([
   'update:result-tab', 'run-query', 'run-aggregate',
-  'toggle-vqb', 'open-vqb', 'close-vqb',
   'cancel-query', 'follow-reference', 'open-query-browser', 'saved-query-applied',
 ])
 
@@ -312,11 +310,9 @@ watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
       :is-aggregate="isAggregate"
       :run-valid="runValid"
       :query-error-text="queryErrorText"
-      :vqb-open="vqbOpen"
       :history-request="historyRequest"
       :save-request="saveQueryRequest"
       @run="run"
-      @toggle-vqb="emit('toggle-vqb')"
       @open-browser="emit('open-query-browser')"
     />
 
@@ -335,7 +331,6 @@ watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
     :is-aggregate="isAggregate"
     :run-valid="runValid"
     :rtab="resultTab"
-    :vqb-open="vqbOpen"
     :tabs="tabs"
     :active-tab-id="activeTabId"
     :doc-menu-request="docMenuRequest"
@@ -343,8 +338,6 @@ watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
     @requery="runQuery"
     @select-rtab="selectRtab"
     @explain-verbosity="onExplainVerbosity"
-    @open-vqb="emit('open-vqb')"
-    @close-vqb="emit('close-vqb')"
     @cancel="activeTab && emit('cancel-query', activeTab.id)"
     @follow-reference="emit('follow-reference', $event)"
   />

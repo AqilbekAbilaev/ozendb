@@ -5,12 +5,12 @@ import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
 import { tabs, activeTabId, closeTab, cycleTab } from '../stores/tabs'
 import { openModal, openModals } from '../stores/modals'
 import { checkNow as checkForUpdates } from '../stores/updater'
+import { vqbOpen } from '../stores/visualQueryBuilder'
 
 export function useAppMenuActions({
   openQuickstart,
   menuTarget,
   openCollectionTab,
-  vqbOpen,
   handleTool,
   menuNode,
   showToast,

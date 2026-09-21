@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
+import { vqbOpen } from '../../stores/visualQueryBuilder'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { guessType, TYPE_CLASS, formatCell, columns, getAtPath } from '../../utils/resultGrid'
 import { useResultSearch } from '../../composables/useResultSearch'
@@ -16,7 +17,6 @@ import SearchBar from '../base/SearchBar.vue'
 
 const props = defineProps({
   activeTab: { type: Object,  required: true },
-  vqbOpen:   { type: Boolean, default: false },
   drillPath: { type: Array,   default: () => [] },  // field-name path navigated into
   // Read-only grid (IntelliShell, Current Operations): no inline cell editing; drill-down still works.
   readonly:  { type: Boolean, default: false },
@@ -27,21 +27,18 @@ const props = defineProps({
 // consumed by VisualQueryBuilder, which lives beside this grid in ResultsPanel, so they
 // bubble up rather than being held here. `update:drillPath` keeps drill state (owned by
 // ResultsPanel so it survives view switches and the run-reset) in sync via v-model.
-const emit = defineEmits(['dragged-field', 'drag-over-section', 'vqb-drop', 'open-vqb', 'close-vqb', 'crud-error', 'update:drillPath', 'follow-reference', 'paste-documents'])
+const emit = defineEmits(['dragged-field', 'drag-over-section', 'vqb-drop', 'crud-error', 'update:drillPath', 'follow-reference', 'paste-documents'])
 
 function onThClick(col) {
   if (suppressNextClick.value) { suppressNextClick.value = false; return }
-  if (!props.vqbOpen) return
+  if (!vqbOpen.value) return
   emit('dragged-field', col)
   nextTick(() => { emit('dragged-field', '') })
 }
 
 // Dragging a cell into the Visual Query Builder. The gesture itself lives in the
 // composable; what a mousedown means for editing and selection stays here.
-const { dragging, dragGhost, suppressNextClick, beginDrag } = useFieldDrag({
-  vqbOpen: () => props.vqbOpen,
-  emit:    emit,
-})
+const { dragging, dragGhost, suppressNextClick, beginDrag } = useFieldDrag({ emit: emit })
 
 function onCellMouseDown(e, col, value) {
   if (e.button !== 0) return

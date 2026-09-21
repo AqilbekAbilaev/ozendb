@@ -13,13 +13,12 @@ import { useSavedQueryBrowser } from '../../composables/useSavedQueryBrowser'
 const props = defineProps({
   tabs:           { type: Array,   required: true },
   activeTabId:    { type: String,  required: true },
-  vqbOpen:        { type: Boolean, default: false },
   docMenuRequest: { type: Object,  default: null },
   historyRequest: { type: Object,  default: null },
   browserRequest: { type: Object,  default: null },
   saveQueryRequest: { type: Object, default: null },
 })
-const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'tab-context', 'run-query', 'run-aggregate', 'toggle-vqb', 'open-vqb', 'close-vqb', 'cancel-query', 'follow-reference'])
+const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'tab-context', 'run-query', 'run-aggregate', 'cancel-query', 'follow-reference'])
 
 const activeTab = computed(() => props.tabs.find(t => t.id === props.activeTabId))
 const component = computed(() => workspaceComponentFor(activeTab.value))
@@ -49,7 +48,6 @@ const bindings = computed(() => {
       tabs:             props.tabs,
       activeTabId:      props.activeTabId,
       resultTab:        rtab.value,
-      vqbOpen:          props.vqbOpen,
       docMenuRequest:   props.docMenuRequest,
       historyRequest:   props.historyRequest,
       savedQueryRequest: savedQueryBrowser.request.value,
@@ -63,9 +61,6 @@ const collectionListeners = {
   'update:result-tab': (v) => { rtab.value = v },
   'run-query': (id, q) => emit('run-query', id, q),
   'run-aggregate': (id, a) => emit('run-aggregate', id, a),
-  'toggle-vqb': () => emit('toggle-vqb'),
-  'open-vqb': () => emit('open-vqb'),
-  'close-vqb': () => emit('close-vqb'),
   'cancel-query': (id) => emit('cancel-query', id),
   'follow-reference': (e) => emit('follow-reference', e),
   'open-query-browser': () => savedQueryBrowser.open(activeTab.value),

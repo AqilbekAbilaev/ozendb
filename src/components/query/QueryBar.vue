@@ -5,6 +5,7 @@ import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
 import { setCollectionQueryMode } from '../../utils/queryMode'
 import { clipboardQuery, copyQuery, pasteQuery } from '../../stores/queryClipboard'
+import { vqbOpen } from '../../stores/visualQueryBuilder'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
@@ -18,11 +19,10 @@ const props = defineProps({
   isAggregate:    { type: Boolean, default: false },
   runValid:       { type: Boolean, default: true },
   queryErrorText: { type: String,  default: null },
-  vqbOpen:        { type: Boolean, default: false },
   historyRequest: { type: Object,  default: null },
   saveRequest:    { type: Object,  default: null },
 })
-const emit = defineEmits(['run', 'toggle-vqb', 'open-browser'])
+const emit = defineEmits(['run', 'open-browser'])
 const { showToast } = useToast()
 
 function onCopy() {
@@ -299,7 +299,7 @@ watch(() => props.activeTab && props.activeTab.id, () => {
       </BaseButton>
     </template>
     <span class="qbar-spacer"></span>
-    <BaseButton v-if="!isAggregate" bordered class="vqb-toggle" :class="{ on: vqbOpen }" @click="emit('toggle-vqb')">
+    <BaseButton v-if="!isAggregate" bordered class="vqb-toggle" :class="{ on: vqbOpen }" @click="vqbOpen = !vqbOpen">
       <BaseIcon name="aggregate" :size="15" /> Visual Query Builder
     </BaseButton>
   </div>

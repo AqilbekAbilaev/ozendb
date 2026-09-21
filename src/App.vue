@@ -102,7 +102,6 @@ const browserRequest = ref(null)      // File → Load: { nonce } signal to open
 const saveQueryRequest = ref(null)    // File → Save: { nonce } signal to open the save-query form
 const dbClipboard = ref(null)         // Copy/Paste: { kind: 'collection'|'database', connId, connName, dbName, collName? }
 
-const vqbOpen        = ref(false)
 const contextMenu = ref(null)
 
 const contextActiveNodeKey = computed(() => {
@@ -206,7 +205,6 @@ const { handleMenuAction } = useAppMenuActions({
   openQuickstart,
   menuTarget,
   openCollectionTab,
-  vqbOpen,
   handleTool,
   menuNode,
   showToast,
@@ -295,7 +293,6 @@ provide('appModals', {
       <WorkspaceArea
         :tabs="tabs"
         :active-tab-id="activeTabId"
-        :vqb-open="vqbOpen"
         :doc-menu-request="docMenuRequest"
         :history-request="historyRequest"
         :browser-request="browserRequest"
@@ -307,9 +304,6 @@ provide('appModals', {
         @run-query="runQuery"
         @run-aggregate="runAggregate"
         @cancel-query="cancelQuery"
-        @toggle-vqb="vqbOpen = !vqbOpen"
-        @open-vqb="vqbOpen = true"
-        @close-vqb="vqbOpen = false"
         @follow-reference="openCollectionTab"
       />
     </div>

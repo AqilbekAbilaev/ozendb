@@ -12,9 +12,11 @@ import { ref, onUnmounted } from 'vue'
 // calls `beginDrag` once it has decided a drag may start. `suppressNextClick` is exposed
 // because the click that fires after a real drag has to be swallowed by the caller's
 // click handlers, which own cell selection.
+import { vqbOpen } from '../stores/visualQueryBuilder'
+
 const DRAG_THRESHOLD = 5
 
-export function useFieldDrag({ vqbOpen, emit }) {
+export function useFieldDrag({ emit }) {
   const dragging  = ref(false)
   const dragGhost = ref({ x: 0, y: 0, label: '' })
   const suppressNextClick = ref(false)
@@ -52,7 +54,7 @@ export function useFieldDrag({ vqbOpen, emit }) {
       document.body.style.cursor = 'grabbing'
       // Opening the panel mid-drag renders its drop zones (data-vqb-drop) just in
       // time for the pointer to reach them, so the drop hit-test below still works.
-      if (!vqbOpen()) { openedByDrag = true; emit('open-vqb') }
+      if (!vqbOpen.value) { openedByDrag = true; vqbOpen.value = true }
     }
     dragGhost.value = { x: e.clientX, y: e.clientY, label: dragField }
     emit('drag-over-section', sectionAtPoint(e.clientX, e.clientY))
@@ -66,7 +68,7 @@ export function useFieldDrag({ vqbOpen, emit }) {
       const section = sectionAtPoint(e.clientX, e.clientY)
       if (section) emit('vqb-drop', { field: dragField, value: dragValue, section: section, nonce: Date.now() })
       // Dropped outside the panel: if this drag is what opened it, close it again.
-      else if (openedByDrag) emit('close-vqb')
+      else if (openedByDrag) vqbOpen.value = false
       suppressNextClick.value = true  // swallow the click that fires after a real drag
     }
     dragging.value = false
