@@ -11,11 +11,4 @@ describe('App workspace bindings', () => {
     expect(descriptor.template.content).toContain('@close-tab="closeTab"')
     expect(script.bindings.closeTab).toBe('setup-maybe-ref')
   })
-
-  it('keeps pasted query mode aligned with its workspace type', () => {
-    const source = readFileSync(new URL('./App.vue', import.meta.url), 'utf8')
-    const { descriptor } = parse(source)
-
-    expect(descriptor.scriptSetup.content).toContain('setCollectionQueryMode(tab, q.mode)')
-  })
 })

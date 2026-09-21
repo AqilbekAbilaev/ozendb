@@ -32,5 +32,4 @@ app.config.errorHandler = (err) => {
 };
 app.mount("#app");
 
-// Silent, and never awaited: a slow or failed check must not hold up startup.
 checkOnLaunch();

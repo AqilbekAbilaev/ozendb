@@ -25,7 +25,6 @@ const props = defineProps({
   activeTabId:      { type: String, required: true },
   resultTab:        { type: String, required: true },
   vqbOpen:          { type: Boolean, default: false },
-  clipboardQuery:   { type: Object, default: null },
   docMenuRequest:   { type: Object, default: null },
   historyRequest:   { type: Object, default: null },
   savedQueryRequest: { type: Object, default: null },
@@ -33,7 +32,7 @@ const props = defineProps({
 })
 const emit = defineEmits([
   'update:result-tab', 'run-query', 'run-aggregate',
-  'toggle-vqb', 'open-vqb', 'close-vqb', 'copy-query', 'paste-query',
+  'toggle-vqb', 'open-vqb', 'close-vqb',
   'cancel-query', 'follow-reference', 'open-query-browser', 'saved-query-applied',
 ])
 
@@ -314,12 +313,9 @@ watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
       :run-valid="runValid"
       :query-error-text="queryErrorText"
       :vqb-open="vqbOpen"
-      :clipboard-query="clipboardQuery"
       :history-request="historyRequest"
       :save-request="saveQueryRequest"
       @run="run"
-      @copy-query="emit('copy-query')"
-      @paste-query="emit('paste-query')"
       @toggle-vqb="emit('toggle-vqb')"
       @open-browser="emit('open-query-browser')"
     />

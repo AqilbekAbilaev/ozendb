@@ -4,6 +4,7 @@ import { getQueryHistory, clearQueryHistory, setDefaultQuery, clearDefaultQuery,
 import { errText } from '../../utils/errors'
 import { useToast } from '../../composables/useToast'
 import { setCollectionQueryMode } from '../../utils/queryMode'
+import { clipboardQuery, copyQuery, pasteQuery } from '../../stores/queryClipboard'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
@@ -18,12 +19,21 @@ const props = defineProps({
   runValid:       { type: Boolean, default: true },
   queryErrorText: { type: String,  default: null },
   vqbOpen:        { type: Boolean, default: false },
-  clipboardQuery: { type: Object,  default: null },
   historyRequest: { type: Object,  default: null },
   saveRequest:    { type: Object,  default: null },
 })
-const emit = defineEmits(['run', 'copy-query', 'paste-query', 'toggle-vqb', 'open-browser'])
+const emit = defineEmits(['run', 'toggle-vqb', 'open-browser'])
 const { showToast } = useToast()
+
+function onCopy() {
+  copyQuery(props.activeTab)
+  showToast('Query copied.')
+}
+// A pasted find re-runs through the Run button's own path, so it parses, validates
+// and lands in history exactly as if typed.
+function onPaste() {
+  if (pasteQuery(props.activeTab) && props.activeTab.mode !== 'aggregate') emit('run')
+}
 
 // autofocus directive for the save-query input
 const vFocus = { mounted(el) { el.focus(); el.select() } }
@@ -281,10 +291,10 @@ watch(() => props.activeTab && props.activeTab.id, () => {
           </MenuItem>
         </div>
       </div>
-      <BaseButton variant="ghost" class="qbar-copy" @click="emit('copy-query')">
+      <BaseButton variant="ghost" class="qbar-copy" @click="onCopy">
         <BaseIcon name="copy" :size="18" class="ic" /> Copy
       </BaseButton>
-      <BaseButton variant="ghost" class="qbar-paste" :disabled="!clipboardQuery" @click="emit('paste-query')">
+      <BaseButton variant="ghost" class="qbar-paste" :disabled="!clipboardQuery" @click="onPaste">
         <BaseIcon name="paste" :size="18" class="ic" /> Paste
       </BaseButton>
     </template>

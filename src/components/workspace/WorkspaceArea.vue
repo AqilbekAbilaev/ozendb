@@ -15,13 +15,12 @@ const props = defineProps({
   activeTabId:    { type: String,  required: true },
   tagOverrides:   { type: Object,  default: () => ({}) },
   vqbOpen:        { type: Boolean, default: false },
-  clipboardQuery: { type: Object,  default: null },
   docMenuRequest: { type: Object,  default: null },
   historyRequest: { type: Object,  default: null },
   browserRequest: { type: Object,  default: null },
   saveQueryRequest: { type: Object, default: null },
 })
-const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'tab-context', 'run-query', 'run-aggregate', 'toggle-vqb', 'open-vqb', 'close-vqb', 'copy-query', 'paste-query', 'cancel-query', 'follow-reference'])
+const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'tab-context', 'run-query', 'run-aggregate', 'toggle-vqb', 'open-vqb', 'close-vqb', 'cancel-query', 'follow-reference'])
 
 const activeTab = computed(() => props.tabs.find(t => t.id === props.activeTabId))
 const component = computed(() => workspaceComponentFor(activeTab.value))
@@ -52,7 +51,6 @@ const bindings = computed(() => {
       activeTabId:      props.activeTabId,
       resultTab:        rtab.value,
       vqbOpen:          props.vqbOpen,
-      clipboardQuery:   props.clipboardQuery,
       docMenuRequest:   props.docMenuRequest,
       historyRequest:   props.historyRequest,
       savedQueryRequest: savedQueryBrowser.request.value,
@@ -69,8 +67,6 @@ const collectionListeners = {
   'toggle-vqb': () => emit('toggle-vqb'),
   'open-vqb': () => emit('open-vqb'),
   'close-vqb': () => emit('close-vqb'),
-  'copy-query': () => emit('copy-query'),
-  'paste-query': () => emit('paste-query'),
   'cancel-query': (id) => emit('cancel-query', id),
   'follow-reference': (e) => emit('follow-reference', e),
   'open-query-browser': () => savedQueryBrowser.open(activeTab.value),

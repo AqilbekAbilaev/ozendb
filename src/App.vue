@@ -1,7 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
-import { parseField } from './utils/queryParser'
-import { setCollectionQueryMode } from './utils/queryMode'
+import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { sessionRestoreNotice } from './utils/sessionMigration'
 import { matchBinding } from './utils/keybindings'
@@ -105,7 +103,6 @@ const saveQueryRequest = ref(null)    // File → Save: { nonce } signal to open
 const dbClipboard = ref(null)         // Copy/Paste: { kind: 'collection'|'database', connId, connName, dbName, collName? }
 
 const vqbOpen        = ref(false)
-const clipboardQuery = ref(null)
 const contextMenu = ref(null)
 
 const contextActiveNodeKey = computed(() => {
@@ -236,45 +233,6 @@ function onGlobalKeydown(e) {
   }
 }
 
-function onCopyQuery() {
-  const tab = activeTab.value
-  if (!tab) return
-  clipboardQuery.value = {
-    mode:       tab.mode       || 'find',
-    filter:     tab.filter     || '',
-    sort:       tab.sort       || '',
-    projection: tab.projection || '',
-    skip:       tab.skip       ?? 0,
-    limit:      tab.limit      ?? 50,
-    pipeline:   tab.pipeline   || '',
-  }
-  showToast('Query copied.')
-}
-async function onPasteQuery() {
-  const tab = activeTab.value
-  if (!tab || !clipboardQuery.value) return
-  const q = clipboardQuery.value
-  setCollectionQueryMode(tab, q.mode)
-  tab.filter     = q.filter
-  tab.sort       = q.sort
-  tab.projection = q.projection
-  tab.skip       = Number(q.skip)
-  tab.limit      = Number(q.limit)
-  tab.pipeline   = q.pipeline
-  if (q.mode !== 'find') return
-  const pf = parseField(q.filter     || '')
-  const ps = parseField(q.sort       || '')
-  const pp = parseField(q.projection || '')
-  await nextTick()
-  runQuery(tab.id, {
-    filter:     pf.ok ? pf.ejson : '{}',
-    sort:       ps.ok ? ps.ejson : '{}',
-    projection: pp.ok ? pp.ejson : '{}',
-    skip:       Number(q.skip),
-    limit:      Number(q.limit),
-  })
-}
-
 // indexesApi/sshApi can't move to a store as-is: useIndexes needs App.vue's showToast
 // (only reachable via inject, which needs a component context), and useSshHostKey
 // registers its Tauri listeners inside onMounted. Everyone else reads stores/modals.js
@@ -340,7 +298,6 @@ provide('appModals', {
         :active-tab-id="activeTabId"
         :tag-overrides="tagOverrides"
         :vqb-open="vqbOpen"
-        :clipboard-query="clipboardQuery"
         :doc-menu-request="docMenuRequest"
         :history-request="historyRequest"
         :browser-request="browserRequest"
@@ -355,8 +312,6 @@ provide('appModals', {
         @toggle-vqb="vqbOpen = !vqbOpen"
         @open-vqb="vqbOpen = true"
         @close-vqb="vqbOpen = false"
-        @copy-query="onCopyQuery"
-        @paste-query="onPasteQuery"
         @follow-reference="openCollectionTab"
       />
     </div>
