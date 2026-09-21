@@ -2,9 +2,6 @@
 import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { matchBinding } from './utils/keybindings'
-import { errText } from './utils/errors'
-import { describeError } from './utils/errorReport'
-import { recordFrontendError } from './appApi/errorLog'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
 import { useQueryRunner } from './composables/useQueryRunner'
@@ -64,14 +61,7 @@ onMounted(async () => {
   }
 
   // Settings must load before restoring tabs so new workspaces use the stored defaults.
-  try {
-    await loadSettings()
-  } catch (e) {
-    // Defaults keep the app usable, so the only symptom is preferences appearing to be
-    // ignored — say so rather than letting the user think they never saved.
-    showToast(`Could not load settings — using defaults. ${errText(e)}`)
-    recordFrontendError(`loadSettings: ${describeError(e)}`).catch(() => {})
-  }
+  await loadSettings()
 
   // Session load always runs (migrates/validates a legacy file); tab restore is opt-in.
   await initializeSession({ restore: restoreSessionEnabled.value })

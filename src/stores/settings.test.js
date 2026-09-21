@@ -6,6 +6,8 @@ vi.mock('@tauri-apps/api/webview', () => ({
 }))
 
 vi.mock('./nodeTags', () => ({ loadNodeTags: vi.fn() }))
+vi.mock('./toast', () => ({ showToast: vi.fn() }))
+vi.mock('../appApi/errorLog', () => ({ recordFrontendError: vi.fn(() => Promise.resolve()) }))
 
 vi.mock('../appApi/settings', () => ({
   getKeybindings: vi.fn(),
@@ -16,6 +18,8 @@ vi.mock('../appApi/settings', () => ({
 
 import { getKeybindings, getSettings, updateKeybindings, updateSettings } from '../appApi/settings'
 import { loadNodeTags } from './nodeTags'
+import { showToast } from './toast'
+import { recordFrontendError } from '../appApi/errorLog'
 import {
   defaultQueryLimit,
   defaultResultView,
@@ -133,5 +137,35 @@ describe('node tags', () => {
     getKeybindings.mockResolvedValue({})
     await loadSettings()
     expect(loadNodeTags).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Defaults keep the app usable when settings.json is unreadable, so the only symptom
+// would be preferences appearing to be ignored — loadSettings says so itself.
+describe('when the settings file cannot be read', () => {
+  it('keeps the defaults, tells the user, and logs it', async () => {
+    getSettings.mockRejectedValue(new Error('EACCES'))
+    getKeybindings.mockResolvedValue({})
+    await loadSettings()
+    expect(defaultQueryLimit.value).toBe(50)
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/using defaults/))
+    expect(recordFrontendError).toHaveBeenCalledWith(expect.stringContaining('EACCES'))
+  })
+
+  it('still loads what does not live in that file', async () => {
+    getSettings.mockRejectedValue(new Error('EACCES'))
+    getKeybindings.mockResolvedValue({})
+    await loadSettings()
+    expect(zoom.value).toBe(1)
+    expect(setZoom).toHaveBeenCalledWith(1)
+    expect(loadNodeTags).toHaveBeenCalledTimes(1)
+  })
+
+  it('says nothing when the read succeeds', async () => {
+    getSettings.mockResolvedValue({})
+    getKeybindings.mockResolvedValue({})
+    await loadSettings()
+    expect(showToast).not.toHaveBeenCalled()
+    expect(recordFrontendError).not.toHaveBeenCalled()
   })
 })

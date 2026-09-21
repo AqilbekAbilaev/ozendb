@@ -5,6 +5,10 @@ import { normalizedTheme, writeThemeMirror } from '../utils/themeMirror'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { DEFAULT_ZOOM, nearestZoom } from '../utils/zoom'
 import { loadNodeTags } from './nodeTags'
+import { showToast } from './toast'
+import { recordFrontendError } from '../appApi/errorLog'
+import { errText } from '../utils/errors'
+import { describeError } from '../utils/errorReport'
 
 const DEFAULTS = {
   defaultQueryLimit: 50,
@@ -56,8 +60,16 @@ export async function applyZoom(factor) {
 }
 
 export async function loadSettings() {
-  const settings = await getSettings()
-  adoptSettings(settings)
+  let settings = null
+  try {
+    settings = await getSettings()
+    adoptSettings(settings)
+  } catch (e) {
+    // Defaults keep the app usable, so the only symptom would be preferences looking
+    // ignored — say so, rather than letting the user think they never saved.
+    showToast(`Could not load settings — using defaults. ${errText(e)}`)
+    recordFrontendError(`loadSettings: ${describeError(e)}`).catch(() => {})
+  }
   try {
     keyBindings.value = mergeBindings(await getKeybindings())
   } catch (_) {}
