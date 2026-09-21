@@ -1,5 +1,6 @@
 <script setup>
 import { errTitle } from '../../utils/errors'
+import { contextMenu, contextActiveNodeKey } from '../../stores/contextMenu'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -13,9 +14,8 @@ import { useConnectionTree } from '../../composables/useConnectionTree.js'
 const props = defineProps({
   activeCollectionKey: String,
   width: { type: Number, default: 320 },
-  contextActiveNodeKey: { type: String, default: null },
 })
-const emit = defineEmits(['select-collection', 'context-menu', 'select-node', 'connections-changed'])
+const emit = defineEmits(['select-collection', 'select-node', 'connections-changed'])
 
 const {
   expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
@@ -72,7 +72,7 @@ function onNodeContext(e, type, label, nodeData) {
   // The stats card opens at the pointer, which is exactly where the menu is about to
   // appear — drop it at once rather than leaving it to the hover grace period.
   statsTip.hide()
-  emit('context-menu', { type: type, x: e.clientX, y: e.clientY, label: label, nodeData: nodeData })
+  contextMenu.value = { type: type, x: e.clientX, y: e.clientY, label: label, nodeData: nodeData }
 }
 // Hovering a database or collection row pops its stats card (see useStatsTip). The rows
 // pass their own target, so the card needs no per-kind handler here.
@@ -108,7 +108,7 @@ defineExpose({ openSelectedCollection })
           class="tnode"
           :class="{
             sel: activeCollectionKey?.startsWith(conn.id),
-            'ctx-sel': props.contextActiveNodeKey === conn.id,
+            'ctx-sel': contextActiveNodeKey === conn.id,
             tagged: !!connColor(conn),
           }"
           :style="connColor(conn) ? { '--tag-color': colorHex(connColor(conn)) } : null"
@@ -158,7 +158,7 @@ defineExpose({ openSelectedCollection })
               :class="{
                 tagged: !!dbColor(conn, db.name),
                 locked: !db.accessible,
-                'ctx-sel': props.contextActiveNodeKey === conn.id + '/' + db.name,
+                'ctx-sel': contextActiveNodeKey === conn.id + '/' + db.name,
               }"
               :style="dbColor(conn, db.name) ? { '--tag-color': colorHex(dbColor(conn, db.name)) } : null"
               style="padding-left: 21px"
@@ -186,7 +186,7 @@ defineExpose({ openSelectedCollection })
                 :class="{
                   sel: activeCollectionKey === collectionKey(conn.id, db.name, coll)
                     || selectedKey === collectionKey(conn.id, db.name, coll),
-                  'ctx-sel': props.contextActiveNodeKey === collectionKey(conn.id, db.name, coll),
+                  'ctx-sel': contextActiveNodeKey === collectionKey(conn.id, db.name, coll),
                   tagged: !!collColor(conn, db.name, coll),
                 }"
                 :style="collColor(conn, db.name, coll) ? { '--tag-color': colorHex(collColor(conn, db.name, coll)) } : null"

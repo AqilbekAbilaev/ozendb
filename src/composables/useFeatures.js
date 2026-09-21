@@ -1,4 +1,5 @@
 import { disconnect } from '../engines/mongodb/api/connections'
+import { contextMenu } from '../stores/contextMenu'
 import { TOOLS } from '../constants/tools'
 import { MODALS } from '../constants/modalRegistry'
 import { activeTab, closeWhere } from '../stores/tabs'
@@ -30,7 +31,7 @@ export const UNBUILT_ACTIONS = new Set([
 
 export function useFeatures({
   // shared reactive state
-  contextMenu, connectionTreeRef, dbClipboard,
+  connectionTreeRef, dbClipboard,
   // sibling composable API
   dbActions,
   // injected functions

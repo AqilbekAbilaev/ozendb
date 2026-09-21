@@ -29,6 +29,7 @@ import {
 import ConnectionTree from './components/connection/ConnectionTree.vue'
 import WorkspaceArea from './components/workspace/WorkspaceArea.vue'
 import ContextMenu from './components/base/ContextMenu.vue'
+import { contextMenu } from './stores/contextMenu'
 import AppModals from './components/app/AppModals.vue'
 import AppToast from './components/app/AppToast.vue'
 import Resizer from './components/base/Resizer.vue'
@@ -73,15 +74,6 @@ const browserRequest = ref(null)      // File → Load: { nonce } signal to open
 const saveQueryRequest = ref(null)    // File → Save: { nonce } signal to open the save-query form
 const dbClipboard = ref(null)         // Copy/Paste: { kind: 'collection'|'database', connId, connName, dbName, collName? }
 
-const contextMenu = ref(null)
-
-const contextActiveNodeKey = computed(() => {
-  if (!contextMenu.value) return null
-  const nd = contextMenu.value.nodeData
-  if (contextMenu.value.type === 'connection') return nd.connId
-  if (contextMenu.value.type === 'database') return nd.connId + '/' + nd.dbName
-  return nd.connId + '/' + nd.dbName + '/' + nd.collName
-})
 const sidebarWidth = ref(320)
 const sidebarOpen = ref(true)   // the "Open connections" rail entry toggles the tree
 
@@ -142,10 +134,6 @@ watch(() => tabs.value.length, (count) => {
   if (count === 0) openQuickstart()
 })
 
-function onTabContext({ id, x, y }) {
-  contextMenu.value = { type: 'tab', x: x, y: y, nodeData: { tabId: id } }
-}
-
 const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence()
 
 const dbActionsApi = useDbActions({ showToast: showToast, dbClipboard: dbClipboard })
@@ -153,7 +141,6 @@ const dbActionsApi = useDbActions({ showToast: showToast, dbClipboard: dbClipboa
 const { menuTarget } = useMenu({ treeSelection: treeSelection, treeConnectionCount: treeConnectionCount, selectedIndex: selectedIndex })
 
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
-  contextMenu: contextMenu,
   connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard,
   dbActions: dbActionsApi,
   showToast: showToast, applyColorTag: applyColorTag, menuTarget: menuTarget,
@@ -240,11 +227,9 @@ provide('appModals', {
         ref="connectionTreeRef"
         :width="sidebarWidth"
         :active-collection-key="activeCollectionKey"
-        :context-active-node-key="contextActiveNodeKey"
         @select-collection="openCollectionTab"
         @select-node="treeSelection = $event"
         @connections-changed="treeConnectionCount = $event"
-        @context-menu="contextMenu = $event"
       />
       <Resizer v-show="sidebarOpen" v-model="sidebarWidth" axis="x" :min="200" :max="560" />
 
@@ -259,7 +244,6 @@ provide('appModals', {
         @activate-tab="activateTab"
         @close-tab="closeTab"
         @reorder-tab="moveTab"
-        @tab-context="onTabContext"
         @run-query="runQuery"
         @run-aggregate="runAggregate"
         @cancel-query="cancelQuery"

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { contextMenu } from '../../stores/contextMenu'
 import BaseIcon from './BaseIcon.vue'
 import { colorHex, tabColorName } from '../../utils/tabColor.js'
 import { tagOverrides } from '../../stores/nodeTags'
@@ -11,7 +12,7 @@ const props = defineProps({
   // Colour tags for tree nodes (keyed by connId / connId/db / connId/db/coll).
   // A tab with no colour of its own inherits the colour of the node it opened.
 })
-const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'tab-context'])
+const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab'])
 
 // The colour name shown on a tab, resolved (with inheritance) by the shared util.
 function tabColor(t) {
@@ -243,7 +244,7 @@ onUnmounted(() => {
       @mousedown="onTabMouseDown($event, t)"
       @click="onTabClick(t)"
       @auxclick.middle.prevent="onTabAuxClick(t)"
-      @contextmenu.prevent="emit('tab-context', { id: t.id, x: $event.clientX, y: $event.clientY })"
+      @contextmenu.prevent="contextMenu = { type: 'tab', x: $event.clientX, y: $event.clientY, nodeData: { tabId: t.id } }"
     >
       <span v-if="colorHex(tabColor(t))" class="dot" :style="{ background: colorHex(tabColor(t)) }"></span>
       <span class="title">{{ t.title }}</span>

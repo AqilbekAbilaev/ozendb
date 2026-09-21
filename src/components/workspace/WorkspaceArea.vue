@@ -18,7 +18,7 @@ const props = defineProps({
   browserRequest: { type: Object,  default: null },
   saveQueryRequest: { type: Object, default: null },
 })
-const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'tab-context', 'run-query', 'run-aggregate', 'cancel-query', 'follow-reference'])
+const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'run-query', 'run-aggregate', 'cancel-query', 'follow-reference'])
 
 const activeTab = computed(() => props.tabs.find(t => t.id === props.activeTabId))
 const component = computed(() => workspaceComponentFor(activeTab.value))
@@ -77,7 +77,6 @@ const collectionListeners = {
       @activate-tab="emit('activate-tab', $event)"
       @close-tab="emit('close-tab', $event)"
       @reorder-tab="(id, beforeId) => emit('reorder-tab', id, beforeId)"
-      @tab-context="emit('tab-context', $event)"
     />
 
     <!-- Resolved workspace / pane -->

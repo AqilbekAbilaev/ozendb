@@ -12,6 +12,7 @@ registerWorkspaceDefinitions()
 const { tabs, activeTabId } = await import('../stores/tabs')
 const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
 const { MENUS } = await import('../constants/contextMenus')
+const { contextMenu } = await import('../stores/contextMenu')
 
 vi.mock('../engines/mongodb/api/connections', () => ({
   disconnect: vi.fn(() => Promise.resolve()),
@@ -32,7 +33,6 @@ const {
 // which tabs survive, whether disposal runs, and the active-tab fallback.
 function makeFeatures(connectionRef, overrides = {}) {
   return useFeatures({
-    contextMenu: ref(null),
     connectionTreeRef: ref(connectionRef),
     dbClipboard: ref(null),
     dbActions: { pasteClipboard: vi.fn() },
@@ -226,13 +226,13 @@ describe('global toolbar routing', () => {
 
 describe('color tag persistence', () => {
   it('shows a normalized error when saving a tag fails', async () => {
-    const contextMenu = ref({
+    contextMenu.value = {
       type: 'collection',
       nodeData: { connId: 'c1', dbName: 'db', collName: 'orders' },
-    })
+    }
     const showToast = vi.fn()
     const applyColorTag = vi.fn().mockRejectedValue({ code: 'command', message: 'disk full' })
-    const features = makeFeatures({}, { contextMenu, showToast, applyColorTag })
+    const features = makeFeatures({}, { showToast, applyColorTag })
 
     await features.handleContextAction('Choose Color:red')
 
