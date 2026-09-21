@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
+import { ref, watch, onMounted, onUnmounted, provide } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { useIndexes } from './composables/useIndexes'
 import { useSshHostKey } from './composables/useSshHostKey'
@@ -16,7 +16,7 @@ import { useTabCreators } from './composables/useTabCreators'
 import { showToast } from './stores/toast'
 import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
-  tabs, activeTabId, activeTab,
+  tabs, activeTabId,
   activateTab, closeTab, moveTab, handleTabAction,
 } from './stores/tabs'
 import {
@@ -142,13 +142,6 @@ const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
   exportDatabase: exportDatabase, importDatabase: importDatabase,
 })
 
-const activeCollectionKey = computed(() => {
-  const t = activeTab.value
-  return t?.kind === 'collection'
-    ? `${t.connectionId}/${t.dbName}/${t.collectionName}`
-    : null
-})
-
 useAppMenuActions({
   openQuickstart,
   menuTarget,
@@ -211,7 +204,6 @@ provide('appModals', {
       <ConnectionTree
         v-show="sidebarOpen"
         :width="sidebarWidth"
-        :active-collection-key="activeCollectionKey"
         @select-collection="openCollectionTab"
       />
       <Resizer v-show="sidebarOpen" v-model="sidebarWidth" axis="x" :min="200" :max="560" />

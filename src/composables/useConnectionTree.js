@@ -1,6 +1,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { errCode, errMessage } from '../utils/errors'
+import { activeTab } from '../stores/tabs'
 import {
   connectionResourceLoading, connectionResourceErrors,
   ensureConnectionResources, refreshConnectionResources,
@@ -15,7 +16,7 @@ import {
   treeSelection, setTreeSelection,
 } from '../stores/connectionNavigation'
 
-export function useConnectionTree({ props, emit }) {
+export function useConnectionTree({ emit }) {
   // The open-connection registry lives in the store; the tree renders it and owns
   // only its own view state (expansion, selection, search).
   const connections = openConnections
@@ -194,29 +195,28 @@ export function useConnectionTree({ props, emit }) {
     if (pending) openRequestedConnection(pending)
   })
 
-  // When a collection becomes the active one (e.g. switching tabs in the
-  // workspace), expand the sidebar down to it so the highlighted row is visible.
-  // Only the connId and dbName are needed; a collection name may contain slashes,
-  // so split on the first two separators only.
-  watch(() => props.activeCollectionKey, async (key) => {
-    if (!key) return
-    const slash1 = key.indexOf('/')
-    const slash2 = key.indexOf('/', slash1 + 1)
-    if (slash1 === -1 || slash2 === -1) return
-    const connId = key.slice(0, slash1)
-    const dbName = key.slice(slash1 + 1, slash2)
-
-    const conn = connections.value.find(c => c.id === connId)
-    if (!conn) return  // not a connection the sidebar currently shows
-
-    if (!expandedConns.value[connId]) {
-      await toggleConnection(conn)
-    }
-    expandedDbs.value[`${connId}/${dbName}`] = true
+  // The collection open in the active tab, so its row (and its connection) highlight.
+  const activeCollection = computed(() => {
+    const t = activeTab.value
+    return t?.kind === 'collection' ? t : null
+  })
+  const activeCollectionKey = computed(() => {
+    const t = activeCollection.value
+    return t ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
   })
 
-  // Tell App.vue how many connections are open, so the View → Refresh menu item
-  // (which refreshes every connection) can enable whenever at least one exists.
+  // When a collection becomes the active one (e.g. switching tabs in the
+  // workspace), expand the sidebar down to it so the highlighted row is visible.
+  watch(activeCollection, async (t) => {
+    if (!t) return
+    const conn = connections.value.find(c => c.id === t.connectionId)
+    if (!conn) return  // not a connection the sidebar currently shows
+
+    if (!expandedConns.value[t.connectionId]) {
+      await toggleConnection(conn)
+    }
+    expandedDbs.value[`${t.connectionId}/${t.dbName}`] = true
+  })
 
   const filtered = computed(() => {
     if (!searchText.value) return connections.value
@@ -247,6 +247,7 @@ export function useConnectionTree({ props, emit }) {
     retryConnection,
     toggleDatabase,
     highlightCollection,
+    activeCollectionKey,
     openCollection,
     collectionKey,
     disconnectConn,

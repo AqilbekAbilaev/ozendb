@@ -12,7 +12,6 @@ import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
 
 const props = defineProps({
-  activeCollectionKey: String,
   width: { type: Number, default: 320 },
 })
 const emit = defineEmits(['select-collection'])
@@ -20,9 +19,9 @@ const emit = defineEmits(['select-collection'])
 const {
   expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
-  retryConnection, toggleDatabase, highlightCollection,
+  retryConnection, toggleDatabase, highlightCollection, activeCollectionKey,
   openCollection, collectionKey,
-} = useConnectionTree({ props, emit })
+} = useConnectionTree({ emit })
 
 // The colour name explicitly set on a node — its override (keyed by the node's
 // full path) wins, otherwise the persisted fallback tag (connections only).

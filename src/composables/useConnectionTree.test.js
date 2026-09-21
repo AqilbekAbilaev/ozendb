@@ -26,7 +26,7 @@ beforeEach(() => {
   clearConnectionResources('a')
   consumeConnectionOpenRequest()
   scope = effectScope()
-  tree = scope.run(() => useConnectionTree({ props: {}, emit: vi.fn() }))
+  tree = scope.run(() => useConnectionTree({ emit: vi.fn() }))
   tree.connections.value = [conn]
 })
 afterEach(() => scope.stop())
@@ -97,7 +97,7 @@ it('does not repopulate disconnected data when discovery finishes late', async (
 it('records a resource ref for a selected connection', () => {
   const emit = vi.fn()
   const s = effectScope()
-  const t = s.run(() => useConnectionTree({ props: {}, emit }))
+  const t = s.run(() => useConnectionTree({ emit }))
   t.selectConnection(conn)
   expect(treeSelection.value).toEqual(expect.objectContaining({
     resource: { connectionId: 'a', segments: [] },
@@ -109,7 +109,7 @@ it('records a resource ref for a selected connection', () => {
 it('records a resource ref for a selected database', () => {
   const emit = vi.fn()
   const s = effectScope()
-  const t = s.run(() => useConnectionTree({ props: {}, emit }))
+  const t = s.run(() => useConnectionTree({ emit }))
   t.toggleDatabase(conn, 'shop')
   expect(treeSelection.value).toEqual(expect.objectContaining({
     resource: { connectionId: 'a', segments: [{ kind: 'database', name: 'shop' }] },
@@ -121,7 +121,7 @@ it('records a resource ref for a selected database', () => {
 it('records a resource ref for a highlighted collection', () => {
   const emit = vi.fn()
   const s = effectScope()
-  const t = s.run(() => useConnectionTree({ props: {}, emit }))
+  const t = s.run(() => useConnectionTree({ emit }))
   t.highlightCollection(conn, { name: 'shop' }, 'orders')
   expect(treeSelection.value).toEqual(expect.objectContaining({
     resource: {
@@ -137,7 +137,7 @@ it('records a resource ref for a highlighted collection', () => {
 it('keeps a name containing a slash in one segment', () => {
   const emit = vi.fn()
   const s = effectScope()
-  const t = s.run(() => useConnectionTree({ props: {}, emit }))
+  const t = s.run(() => useConnectionTree({ emit }))
   t.highlightCollection(conn, { name: 'shop' }, 'a/b')
   expect(treeSelection.value.resource.segments).toEqual([
     { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'a/b' },
@@ -148,7 +148,7 @@ it('keeps a name containing a slash in one segment', () => {
 it('clears the resource ref along with the selection', () => {
   const emit = vi.fn()
   const s = effectScope()
-  const t = s.run(() => useConnectionTree({ props: {}, emit }))
+  const t = s.run(() => useConnectionTree({ emit }))
   t.selectConnection(conn)
   t.disconnectConn('a', { persist: false })
   expect(treeSelection.value).toBeNull()
