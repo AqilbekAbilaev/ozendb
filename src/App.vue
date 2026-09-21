@@ -2,6 +2,10 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
 import { runQuery, runAggregate, cancelQuery } from './stores/queryRunner'
+import {
+  openCollectionTab, openSqlTab, openShellTab, openIndexManagerTab, openSchemaTab,
+  openExportSource, openSearchTab, openCurrentOpsTab, openImportTab, openQuickstart,
+} from './stores/tabCreators'
 import { useDbActions } from './composables/useDbActions'
 import { useMenu } from './composables/useMenu'
 import { useOperations } from './composables/useOperations'
@@ -10,7 +14,6 @@ import { useDbTransfer } from './composables/useDbTransfer'
 import { useFeatures } from './composables/useFeatures'
 import { useSessionPersistence } from './composables/useSessionPersistence'
 import { useZoom } from './composables/useZoom'
-import { useTabCreators } from './composables/useTabCreators'
 import { showToast } from './stores/toast'
 import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
@@ -18,8 +21,6 @@ import {
   activateTab, closeTab, moveTab, handleTabAction,
 } from './stores/tabs'
 import {
-  defaultQueryLimit,
-  defaultResultView,
   loadSettings,
   restoreSessionEnabled,
 } from './stores/settings'
@@ -77,22 +78,6 @@ function toggleOperationsPane() {
 
 const { applyColorTag } = useNodeTags()
 
-// Constructed here, not as free functions, since they need the query runner and settings defaults.
-const {
-  openCollectionTab,
-  openSqlTab,
-  openShellTab,
-  openIndexManagerTab,
-  openSchemaTab,
-  openExportSource,
-  openSearchTab, openCurrentOpsTab,
-  openImportTab,
-  openQuickstart,
-} = useTabCreators({
-  defaultQueryLimit: defaultQueryLimit,
-  defaultResultView: defaultResultView,
-  runQuery: runQuery,
-})
 
 const {
   openImportWizard,

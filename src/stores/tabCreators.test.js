@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
-vi.mock('../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
+vi.mock('./modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
+vi.mock('./queryRunner', () => ({ runQuery: vi.fn() }))
 
 // Definitions must be registered before the tab store can build its Quickstart tab
 // (stores/tabs.js creates it through createWorkspace, see initializeTabs). Static
@@ -10,28 +11,24 @@ vi.mock('../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 registerWorkspaceDefinitions()
 
-const { useTabCreators } = await import('./useTabCreators')
-const { tabs, activeTabId } = await import('../stores/tabs')
-const { openModal, closeModal } = await import('../stores/modals')
+const creators = await import('./tabCreators')
+const { runQuery } = await import('./queryRunner')
+const { defaultQueryLimit, defaultResultView } = await import('./settings')
+const { tabs, activeTabId } = await import('./tabs')
+const { openModal, closeModal } = await import('./modals')
 const { getDefaultQuery } = await import('../engines/mongodb/api/queryLibrary')
 
 vi.mock('../engines/mongodb/api/queryLibrary', () => ({
   getDefaultQuery: vi.fn(),
 }))
 
-// Each test seeds a clean tab strip; the creators append to it. The query runner is a
-// fake so no Tauri call can leak into the assertions; the modal store is mocked above.
+// Each test seeds a clean tab strip; the creators append to it. The query runner is
+// mocked so no Tauri call can leak into the assertions; the modal store likewise.
 function harness() {
   tabs.value = [{ id: 't0', kind: 'quickstart', title: 'Quickstart' }]
   activeTabId.value = 't0'
-  const runQuery = vi.fn()
-  const defaultQueryLimit = { value: 50 }
-  const defaultResultView = { value: 'table' }
-  const creators = useTabCreators({
-    defaultQueryLimit,
-    defaultResultView,
-    runQuery,
-  })
+  defaultQueryLimit.value = 50
+  defaultResultView.value = 'table'
   return { ...creators, runQuery, defaultQueryLimit, defaultResultView }
 }
 
