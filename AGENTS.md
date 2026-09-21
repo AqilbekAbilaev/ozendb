@@ -27,6 +27,9 @@ npm run dev
 
 # Run frontend unit tests (Vitest; specs live next to sources, e.g. src/utils/*.test.js)
 npm test
+
+# Unused-code lint (eslint + eslint-plugin-vue); not yet a CI gate
+npm run lint
 ```
 
 ---
@@ -38,7 +41,7 @@ npm test
 ### Data flow
 
 ```
-main.js  (registers workspace definitions, seeds the first tab, then mounts — in that order)
+main.js  (pre-paints the theme, installs the undo shim, registers workspace definitions, seeds the first tab, mounts, then starts the silent update check — in that order)
 └── App.vue  (composition root: wires the composables, owns split-pane sizing)
     ├── app/Toolbar.vue                (global toolbar actions → handleTool)
     ├── connection/ConnectionTree.vue  (sidebar; emits select-node / select-collection)
@@ -56,7 +59,7 @@ Four rings, outermost first. A ring may import inwards, never outwards.
 |---|---|
 | `src/components/` | Rendering and event wiring only. Grouped by area: `admin/`, `app/`, `base/`, `connection/`, `panes/`, `query/`, `results/`, `tools/`, `workspace/`. |
 | `src/composables/` | Stateful, reusable slices (`useModals`, `useQueryRunner`, `useFeatures`, `useMenu`, …). One composable owns one slice end to end. |
-| `src/stores/` | Module-scope state shared by every importer: `tabs.js` (the tab spine), `connectionData.js` (databases per connection), `connectionNavigation.js`, `settings.js`. |
+| `src/stores/` | Module-scope state shared by every importer: `tabs.js` (the tab spine), `connectionData.js` (databases per connection), `openConnections.js`, `connectionNavigation.js`, `settings.js` (also owns zoom and loads `nodeTags.js`), `modals.js`, `toast.js`, `updater.js`, `queryClipboard.js`, `visualQueryBuilder.js`. Anything one leaf writes and another reads goes here rather than being threaded through App.vue as props and relayed emits. |
 | `src/utils/` | Pure functions. No Vue, no I/O. |
 
 ### The Tauri boundary
@@ -177,9 +180,9 @@ removed.
 
 ## Code quality
 
-There is no linter or formatter in this repo. CI runs `npm test`, `cargo test`, and the file-size
-check below — every other rule here is enforced by review, so they have to be short enough to
-actually hold in your head.
+`npm run lint` runs eslint with unused-code rules only — no style rules, no formatter — and is
+not yet a CI gate. CI runs `npm test`, `cargo test`, and the file-size check below; every other
+rule here is enforced by review, so they have to be short enough to actually hold in your head.
 
 ### Where code goes
 
@@ -230,7 +233,7 @@ When you touch an over-limit file for another reason, leave it no bigger than yo
 
 ### Dependencies
 
-Four devDependencies and a deliberately small crate list — keep it that way. A new dependency
+Six devDependencies and a deliberately small crate list — keep it that way. A new dependency
 needs a reason a few lines of code can't cover, and the user approves it before it lands. The
 inverse also holds: don't hand-roll what an already-installed library does (the codebase uses
 `sqlparser`, `boa`, `russh` rather than home-grown equivalents).
