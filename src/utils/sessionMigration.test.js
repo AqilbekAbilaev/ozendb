@@ -2,7 +2,7 @@
 // v2 → legacy bridge against every definition's restore hook, so serialize,
 // bridge and restore can never drift from each other.
 import { describe, it, expect } from 'vitest'
-import { migrateSession, toLegacyRecord } from './sessionMigration'
+import { migrateSession, toLegacyRecord, sessionRestoreNotice } from './sessionMigration'
 import { restoreWorkspace } from '../workspaces/lifecycle'
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 import { getWorkspaceDefinition } from '../workspaces/registry'
@@ -301,5 +301,42 @@ describe('toLegacyRecord bridge', () => {
   it('never throws for unknown types', () => {
     expect(() => toLegacyRecord({ type: 'no.such.type', id: 'x' })).not.toThrow()
     expect(() => toLegacyRecord({ id: 'x' })).not.toThrow()
+  })
+})
+
+describe('sessionRestoreNotice', () => {
+  it('says nothing for a clean restore', () => {
+    expect(sessionRestoreNotice({ ok: true, warnings: [] })).toEqual({ toast: null, log: null })
+  })
+
+  // A failed restore also disables autosave, so the user has to hear that their tabs
+  // will not be kept this run — not just that the old ones did not come back.
+  it('toasts and logs every failure reason', () => {
+    for (const reason of ['read-failed', 'invalid-session', 'future-version', 'unknown-workspace-type']) {
+      const n = sessionRestoreNotice({ ok: false, reason })
+      expect(n.toast).toMatch(/tabs will not be saved/)
+      expect(n.log).toContain(reason)
+    }
+  })
+
+  it('names the specific problem in the toast', () => {
+    expect(sessionRestoreNotice({ ok: false, reason: 'future-version' }).toast).toMatch(/newer version/)
+    expect(sessionRestoreNotice({ ok: false, reason: 'read-failed' }).toast).toMatch(/read/)
+  })
+
+  it('falls back to a generic line for an unlisted reason', () => {
+    expect(sessionRestoreNotice({ ok: false, reason: 'whatever' }).toast).toMatch(/Could not restore/)
+  })
+
+  // Per-tab warnings explain a missing tab; they are worth a log line, not a toast.
+  it('logs warnings without toasting', () => {
+    const n = sessionRestoreNotice({ ok: true, warnings: [
+      { id: 't1', message: 'connection no longer exists: c9' },
+      { id: 't2', message: 'unreadable kind/mode: x/y' },
+    ] })
+    expect(n.toast).toBeNull()
+    expect(n.log).toContain('t1')
+    expect(n.log).toContain('connection no longer exists: c9')
+    expect(n.log).toContain('unreadable kind/mode: x/y')
   })
 })

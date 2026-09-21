@@ -4,6 +4,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { parseField } from './utils/queryParser'
 import { setCollectionQueryMode } from './utils/queryMode'
 import { refreshFindWorkspacesAfterDocumentSave } from './utils/documentSaveRefresh'
+import { sessionRestoreNotice } from './utils/sessionMigration'
 import { matchBinding } from './utils/keybindings'
 import { errText } from './utils/errors'
 import { describeError } from './utils/errorReport'
@@ -79,7 +80,10 @@ onMounted(async () => {
   await loadNodeTags()
 
   // Session load always runs (migrates/validates a legacy file); tab restore is opt-in.
-  await initializeSession({ restore: restoreSessionEnabled.value })
+  const session = await initializeSession({ restore: restoreSessionEnabled.value })
+  const notice = sessionRestoreNotice(session)
+  if (notice.toast) showToast(notice.toast)
+  if (notice.log) recordFrontendError(notice.log).catch(() => {})
 
   startAutoSave()
 

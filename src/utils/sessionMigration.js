@@ -206,3 +206,23 @@ export function toLegacyRecord(v2, connectionName = null) {
     ...v2.state,
   }
 }
+
+// What to tell the user about an initializeSession result. A failure also switched
+// autosave off, so the toast has to say the tabs will not be kept — the missing old
+// ones are the smaller loss. Per-tab warnings only explain a gap, so they just log.
+const FAILURE_TEXT = {
+  'read-failed':            'Could not read the saved session',
+  'invalid-session':        'The saved session file is not valid',
+  'future-version':         'The saved session was written by a newer version of OzenDB',
+  'unknown-workspace-type': 'The saved session contains a tab type this version does not know',
+}
+
+export function sessionRestoreNotice(result) {
+  if (!result.ok) {
+    const what = FAILURE_TEXT[result.reason] || 'Could not restore the saved session'
+    return { toast: `${what} — tabs will not be saved this run.`, log: `session restore: ${result.reason}` }
+  }
+  if (!result.warnings.length) return { toast: null, log: null }
+  const lines = result.warnings.map((w) => `${w.id ?? '?'}: ${w.message}`)
+  return { toast: null, log: `session restore skipped ${lines.length} tab(s): ${lines.join('; ')}` }
+}
