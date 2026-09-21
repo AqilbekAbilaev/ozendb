@@ -23,6 +23,7 @@ import { useFeatures } from './composables/useFeatures'
 import { useSessionPersistence } from './composables/useSessionPersistence'
 import { useZoom } from './composables/useZoom'
 import { useTabCreators } from './composables/useTabCreators'
+import { showToast } from './stores/toast'
 import { useAppMenuActions } from './composables/useAppMenuActions'
 import {
   tabs, activeTabId, activeTab,
@@ -40,6 +41,7 @@ import ConnectionTree from './components/connection/ConnectionTree.vue'
 import WorkspaceArea from './components/workspace/WorkspaceArea.vue'
 import ContextMenu from './components/base/ContextMenu.vue'
 import AppModals from './components/app/AppModals.vue'
+import AppToast from './components/app/AppToast.vue'
 import Resizer from './components/base/Resizer.vue'
 import Toolbar from './components/app/Toolbar.vue'
 import OperationsPane from './components/panes/OperationsPane.vue'
@@ -95,8 +97,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
 });
 
-const toast = ref(null)
-let toastTimer = null
 const connectionTreeRef = ref(null)
 // Feeds menuContext, so the native menu reflects tree selection, not just the active tab.
 const treeSelection = ref(null)       // { connectionId, connectionName, dbName, collectionName, kind } | null
@@ -133,11 +133,6 @@ function toggleOperationsPane() {
   operationsPaneOpen.value = !operationsPaneOpen.value
 }
 
-function showToast(msg) {
-  clearTimeout(toastTimer)
-  toast.value = msg
-  toastTimer = setTimeout(() => { toast.value = null }, 2200)
-}
 // Provided once here (rather than bubbled as an event) since toast is an app-wide concern.
 provide('showToast', showToast)
 provide('defaultResultView', defaultResultView)
@@ -401,8 +396,7 @@ provide('appModals', {
 
     <AppModals />
 
-    <!-- Toast -->
-    <div v-if="toast" class="toast">{{ toast }}</div>
+    <AppToast />
   </div>
 </template>
 
