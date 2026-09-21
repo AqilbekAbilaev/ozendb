@@ -14,7 +14,7 @@ import { onMounted, onUnmounted } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { connDatabases, clearConnectionResources, invalidateConnectionResources, refreshConnectionResources } from '../stores/connectionData'
-import { consumeConnectionOpenRequest, requestConnectionOpen } from '../stores/connectionNavigation'
+import { consumeConnectionOpenRequest, requestConnectionOpen, treeSelection } from '../stores/connectionNavigation'
 import { useConnectionTree } from './useConnectionTree'
 
 let scope
@@ -94,36 +94,36 @@ it('does not repopulate disconnected data when discovery finishes late', async (
 // flat fields, so consumers can move onto it before the flat ones are dropped. The
 // ref is built here, where the clicked level is known for certain, rather than being
 // re-inferred downstream from which fields happen to be set.
-it('emits a resource ref for a selected connection', () => {
+it('records a resource ref for a selected connection', () => {
   const emit = vi.fn()
   const s = effectScope()
   const t = s.run(() => useConnectionTree({ props: {}, emit }))
   t.selectConnection(conn)
-  expect(emit).toHaveBeenCalledWith('select-node', expect.objectContaining({
+  expect(treeSelection.value).toEqual(expect.objectContaining({
     resource: { connectionId: 'a', segments: [] },
     connectionId: 'a', kind: 'connection',
   }))
   s.stop()
 })
 
-it('emits a resource ref for a selected database', () => {
+it('records a resource ref for a selected database', () => {
   const emit = vi.fn()
   const s = effectScope()
   const t = s.run(() => useConnectionTree({ props: {}, emit }))
   t.toggleDatabase(conn, 'shop')
-  expect(emit).toHaveBeenCalledWith('select-node', expect.objectContaining({
+  expect(treeSelection.value).toEqual(expect.objectContaining({
     resource: { connectionId: 'a', segments: [{ kind: 'database', name: 'shop' }] },
     dbName: 'shop', kind: 'database',
   }))
   s.stop()
 })
 
-it('emits a resource ref for a highlighted collection', () => {
+it('records a resource ref for a highlighted collection', () => {
   const emit = vi.fn()
   const s = effectScope()
   const t = s.run(() => useConnectionTree({ props: {}, emit }))
   t.highlightCollection(conn, { name: 'shop' }, 'orders')
-  expect(emit).toHaveBeenCalledWith('select-node', expect.objectContaining({
+  expect(treeSelection.value).toEqual(expect.objectContaining({
     resource: {
       connectionId: 'a',
       segments: [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }],
@@ -139,8 +139,7 @@ it('keeps a name containing a slash in one segment', () => {
   const s = effectScope()
   const t = s.run(() => useConnectionTree({ props: {}, emit }))
   t.highlightCollection(conn, { name: 'shop' }, 'a/b')
-  const [, sel] = emit.mock.calls.at(-1)
-  expect(sel.resource.segments).toEqual([
+  expect(treeSelection.value.resource.segments).toEqual([
     { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'a/b' },
   ])
   s.stop()
@@ -152,7 +151,7 @@ it('clears the resource ref along with the selection', () => {
   const t = s.run(() => useConnectionTree({ props: {}, emit }))
   t.selectConnection(conn)
   t.disconnectConn('a', { persist: false })
-  expect(emit).toHaveBeenLastCalledWith('select-node', null)
+  expect(treeSelection.value).toBeNull()
   s.stop()
 })
 

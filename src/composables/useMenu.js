@@ -2,12 +2,14 @@ import { computed, watch } from 'vue'
 import { setMenuContext } from '../appApi/menu'
 import { deriveMenuContext, resolveMenuTarget } from '../utils/menuContext'
 import { activeTab } from '../stores/tabs'
+import { treeSelection } from '../stores/connectionNavigation'
+import { openConnections } from '../stores/openConnections'
 
 // Derives what the native menu treats as "selected" and keeps the backend menu in
 // step with it, plus resolves the node a menu action should act on. The actual
 // menu-action routing (handleMenuAction / menuNode) stays in App.vue — this owns
 // only the selection-context derivation and the target resolution.
-export function useMenu({ treeSelection, treeConnectionCount, selectedIndex }) {
+export function useMenu({ selectedIndex }) {
   // What the native menu treats as "selected", so items enable/disable live. The
   // context is the UNION of the active tab and the sidebar/tree selection: a
   // collection tab satisfies all three, and so does a collection highlighted in the
@@ -17,7 +19,7 @@ export function useMenu({ treeSelection, treeConnectionCount, selectedIndex }) {
   const menuContext = computed(() => deriveMenuContext(
     activeTab.value,
     treeSelection.value,
-    treeConnectionCount.value,
+    openConnections.value.length,
     !!selectedIndex.value,
   ))
 

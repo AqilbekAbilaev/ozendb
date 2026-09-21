@@ -1,7 +1,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { errCode, errMessage } from '../utils/errors'
-import { resourceFromTreeSelection } from '../utils/legacyResourceRef'
 import {
   connectionResourceLoading, connectionResourceErrors,
   ensureConnectionResources, refreshConnectionResources,
@@ -13,6 +12,7 @@ import {
 import {
   connectionOpenRequest,
   consumeConnectionOpenRequest,
+  treeSelection, setTreeSelection,
 } from '../stores/connectionNavigation'
 
 export function useConnectionTree({ props, emit }) {
@@ -27,30 +27,20 @@ export function useConnectionTree({ props, emit }) {
     ]),
   ))
   const expandedDbs = ref({})        // "connId/dbName" → boolean
-  const selectedKey = ref(null)      // collection row highlighted by a single click
-  // The current single-click sidebar selection, at whatever level was clicked:
-  //   { connectionId, connectionName, dbName, collectionName, kind, resource } | null
-  // This is what the native menu gates on (a selected connection/database/
-  // collection enables the matching items), so it's emitted to App.vue.
-  const selection = ref(null)
-  const searchText = ref('')
-
-  // Records the selection at any tree level and tells App.vue, which folds it into
-  // the menu context. Also drives the collection-row highlight (selectedKey).
-  function setSelection(sel) {
-    // Dual-carry: the canonical ResourceRef rides alongside the flat fields so
-    // consumers can move onto it before those are dropped. Derived here, where the
-    // clicked level is known for certain, instead of being re-inferred downstream
-    // from which fields happen to be set.
-    selection.value = sel && { ...sel, resource: resourceFromTreeSelection(sel) }
-    selectedKey.value = sel && sel.kind === 'collection'
+  // The collection row highlighted by a single click — derived, since the selection
+  // can also be cleared from outside the tree (opening it from the toolbar).
+  const selectedKey = computed(() => {
+    const sel = treeSelection.value
+    return sel && sel.kind === 'collection'
       ? collectionKey(sel.connectionId, sel.dbName, sel.collectionName)
       : null
-    emit('select-node', selection.value)
-  }
+  })
+  const searchText = ref('')
+
+  const setSelection = setTreeSelection
 
   function clearSelection() {
-    if (selection.value) setSelection(null)
+    if (treeSelection.value) setSelection(null)
   }
   const sidebarEl = ref(null)        // root element, used to detect outside clicks
 
@@ -69,7 +59,7 @@ export function useConnectionTree({ props, emit }) {
   // just to keep its expansion state honest.
   watch(openConnections, (list) => {
     const live = new Set(list.map(c => c.id))
-    if (selection.value && !live.has(selection.value.connectionId)) setSelection(null)
+    if (treeSelection.value && !live.has(treeSelection.value.connectionId)) setSelection(null)
     for (const id of Object.keys(expandedConns.value)) {
       if (!live.has(id)) delete expandedConns.value[id]
     }
@@ -168,16 +158,6 @@ export function useConnectionTree({ props, emit }) {
     })
   }
 
-  // Opens whatever collection is currently highlighted (single-click) in the tree.
-  // Used by the toolbar's "Collection" button and the Collection menu. Returns false
-  // when nothing is highlighted so the caller can guide the user.
-  function openSelectedCollection() {
-    const sel = selection.value
-    if (!sel || sel.kind !== 'collection') return false
-    openCollectionFor(sel.connectionId, sel.connectionName, sel.dbName, sel.collectionName)
-    return true
-  }
-
   function openCollection(conn, db, collName) {
     openCollectionFor(conn.id, conn.name, db.name, collName)
   }
@@ -237,7 +217,6 @@ export function useConnectionTree({ props, emit }) {
 
   // Tell App.vue how many connections are open, so the View → Refresh menu item
   // (which refreshes every connection) can enable whenever at least one exists.
-  watch(() => connections.value.length, (count) => emit('connections-changed', count), { immediate: true })
 
   const filtered = computed(() => {
     if (!searchText.value) return connections.value
@@ -268,7 +247,6 @@ export function useConnectionTree({ props, emit }) {
     retryConnection,
     toggleDatabase,
     highlightCollection,
-    openSelectedCollection,
     openCollection,
     collectionKey,
     disconnectConn,

@@ -15,12 +15,12 @@ const props = defineProps({
   activeCollectionKey: String,
   width: { type: Number, default: 320 },
 })
-const emit = defineEmits(['select-collection', 'select-node', 'connections-changed'])
+const emit = defineEmits(['select-collection'])
 
 const {
   expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
-  retryConnection, toggleDatabase, highlightCollection, openSelectedCollection,
+  retryConnection, toggleDatabase, highlightCollection,
   openCollection, collectionKey,
 } = useConnectionTree({ props, emit })
 
@@ -80,7 +80,6 @@ const { tip, ...statsTip } = useStatsTip()
 
 // The registry moved to stores/openConnections, so the only thing left worth exposing
 // is the one genuinely visual question: open whatever row the user has highlighted.
-defineExpose({ openSelectedCollection })
 </script>
 
 <template>

@@ -61,10 +61,6 @@ onUnmounted(() => {
   unlisten.then(off => off())
 });
 
-const connectionTreeRef = ref(null)
-// Feeds menuContext, so the native menu reflects tree selection, not just the active tab.
-const treeSelection = ref(null)       // { connectionId, connectionName, dbName, collectionName, kind } | null
-const treeConnectionCount = ref(0)
 // One-shot request from the native menu to the active collection's ResultsPanel; bumping
 // `nonce` re-fires its watcher, `action` is the menu item id.
 const toolbarHidden = ref(false)      // View → Hide Global Toolbar toggle
@@ -134,10 +130,10 @@ const { initializeSession, startAutoSave, stopAutoSave } = useSessionPersistence
 
 const dbActionsApi = useDbActions({ showToast: showToast, dbClipboard: dbClipboard })
 
-const { menuTarget } = useMenu({ treeSelection: treeSelection, treeConnectionCount: treeConnectionCount, selectedIndex: selectedIndex })
+const { menuTarget } = useMenu({ selectedIndex: selectedIndex })
 
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({
-  connectionTreeRef: connectionTreeRef, dbClipboard: dbClipboard,
+  dbClipboard: dbClipboard,
   dbActions: dbActionsApi,
   showToast: showToast, applyColorTag: applyColorTag, menuTarget: menuTarget,
   handleTabAction: handleTabAction, openCollectionTab: openCollectionTab,
@@ -216,12 +212,9 @@ provide('appModals', {
       <!-- Sidebar -->
       <ConnectionTree
         v-show="sidebarOpen"
-        ref="connectionTreeRef"
         :width="sidebarWidth"
         :active-collection-key="activeCollectionKey"
         @select-collection="openCollectionTab"
-        @select-node="treeSelection = $event"
-        @connections-changed="treeConnectionCount = $event"
       />
       <Resizer v-show="sidebarOpen" v-model="sidebarWidth" axis="x" :min="200" :max="560" />
 

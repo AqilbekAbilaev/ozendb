@@ -1,4 +1,5 @@
 import { disconnect } from '../engines/mongodb/api/connections'
+import { treeSelection, setTreeSelection } from '../stores/connectionNavigation'
 import { contextMenu } from '../stores/contextMenu'
 import { TOOLS } from '../constants/tools'
 import { MODALS } from '../constants/modalRegistry'
@@ -31,7 +32,7 @@ export const UNBUILT_ACTIONS = new Set([
 
 export function useFeatures({
   // shared reactive state
-  connectionTreeRef, dbClipboard,
+  dbClipboard,
   // sibling composable API
   dbActions,
   // injected functions
@@ -318,11 +319,16 @@ export function useFeatures({
         })
         return
       }
-      // Opens the collection currently highlighted in the sidebar, same as
-      // double-clicking it. Guides the user when nothing is highlighted.
-      if (!connectionTreeRef.value.openSelectedCollection()) {
+      // Opens the collection highlighted in the sidebar, same as double-clicking it.
+      // Opening makes it the active collection, whose highlight takes over — so the
+      // single-click selection is cleared rather than lingering as a second one.
+      const sel = treeSelection.value
+      if (!sel || sel.kind !== 'collection') {
         showToast('Select a collection in the sidebar first')
+        return
       }
+      setTreeSelection(null)
+      openCollectionTab(sel)
       return
     }
 
