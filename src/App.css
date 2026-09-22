@@ -35,51 +35,6 @@
   min-height: 0;
 }
 
-/* ── Left rail ── */
-.rail-left {
-  width: 26px;
-  flex: none;
-  background: var(--bg-panel-2);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 0;
-}
-.rail-label {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: .3px;
-}
-/* The "Operations" rail entry is a toggle for the bottom dock. */
-.rail-toggle {
-  appearance: none;
-  background: none;
-  border: none;
-  padding: 4px 2px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  border-radius: 5px;
-}
-.rail-toggle:hover { background: var(--bg-hover); }
-.rail-toggle:hover .rail-label { color: var(--text); }
-.rail-toggle.active .rail-label { color: var(--accent); }
-.rail-badge {
-  min-width: 15px;
-  font-size: 9.5px;
-  line-height: 15px;
-  color: #fff;
-  background: var(--accent);
-  border-radius: 8px;
-  padding: 0 4px;
-  text-align: center;
-}
-
 /* ── Operations dock (bottom) ── */
 .ops-dock {
   flex: none;

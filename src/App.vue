@@ -18,6 +18,7 @@ import AppModals from './components/app/AppModals.vue'
 import AppToast from './components/app/AppToast.vue'
 import Resizer from './components/base/Resizer.vue'
 import Toolbar from './components/app/Toolbar.vue'
+import AppRail from './components/app/AppRail.vue'
 import OperationsPane from './components/panes/OperationsPane.vue'
 
 const toolbarHidden = ref(false)      // View → Hide Global Toolbar toggle
@@ -28,10 +29,6 @@ const sidebarOpen = ref(true)   // the "Open connections" rail entry toggles the
 const { operations, runningCount, clearFinished } = useOperations()
 const operationsPaneOpen = ref(false)
 const operationsPaneHeight = ref(200)
-
-function toggleOperationsPane() {
-  operationsPaneOpen.value = !operationsPaneOpen.value
-}
 
 const { menuTarget } = useMenu()
 
@@ -50,29 +47,11 @@ useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden 
 
     <!-- Main row -->
     <div class="app-main">
-      <!-- Left rail -->
-      <div class="rail-left">
-        <button
-          class="rail-toggle"
-          :class="{ active: sidebarOpen }"
-          type="button"
-          :title="sidebarOpen ? 'Hide connections' : 'Show connections'"
-          @click="sidebarOpen = !sidebarOpen"
-        >
-          <span class="rail-label">{{ sidebarOpen ? 'Hide connections' : 'Show connections' }}</span>
-        </button>
-        <button
-          class="rail-toggle"
-          :class="{ active: operationsPaneOpen }"
-          style="margin-top:auto"
-          type="button"
-          :title="operationsPaneOpen ? 'Hide operations' : 'Show operations'"
-          @click="toggleOperationsPane"
-        >
-          <span class="rail-label">Operations</span>
-          <span v-if="runningCount" class="rail-badge">{{ runningCount }}</span>
-        </button>
-      </div>
+      <AppRail
+        v-model:sidebar-open="sidebarOpen"
+        v-model:operations-open="operationsPaneOpen"
+        :running-count="runningCount"
+      />
 
       <!-- Sidebar -->
       <ConnectionTree
