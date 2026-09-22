@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseRadio from '../base/BaseRadio.vue'
@@ -8,11 +8,13 @@ import BaseRadio from '../base/BaseRadio.vue'
 // choosing Import. It only selects an input format — on Configure it emits the
 // chosen format and the caller opens the matching import surface. The formats we
 // don't implement yet are listed (for parity with Studio 3T) but disabled.
-defineProps({
-  // { connId, connName, dbName, collName } — shown in the modal title so the user
-  // knows what they're importing into. Not otherwise used here.
+const props = defineProps({
+  // Always collection-scoped (the Import… action requires that level), and named in
+  // the title so the destination is visible while picking a format.
   target: { type: Object, required: true },
 })
+
+const destination = computed(() => `${props.target.dbName}.${props.target.collName}`)
 const emit = defineEmits(['configure', 'close'])
 
 const FORMATS = [
@@ -68,7 +70,7 @@ function configure() {
 </script>
 
 <template>
-  <BaseModal title="Import" width="640px" max-width="94vw" @close="$emit('close')">
+  <BaseModal :title="`Import into ${destination}`" width="640px" max-width="94vw" @close="$emit('close')">
     <div class="ifm-head">
       <div class="ifm-title">Import format</div>
       <div class="ifm-sub">To start the import process, please select an input format</div>

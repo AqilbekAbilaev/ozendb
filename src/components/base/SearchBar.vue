@@ -12,7 +12,7 @@ const props = defineProps({
   // The results container element. When focus is inside another editor (the query
   // editor, some field) we bail — but an editor *inside* our own view (the JSON code
   // view) must still trigger search. Passing that element lets us tell them apart.
-  scope:   { default: null },
+  scope:   { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:open', 'update:query', 'next', 'prev', 'close'])

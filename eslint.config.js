@@ -34,6 +34,19 @@ export default [
       }],
       // Best-effort persistence and optional platform APIs intentionally ignore failures.
       'no-empty': ['error', { allowEmptyCatch: true }],
+      // The rest were already true of every file when they were turned on, so they cost
+      // nothing to keep true. `null: 'ignore'` keeps `== null` as the both-nullish check.
+      'prefer-const': 'error',
+      'no-var': 'error',
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      // Diagnostics belong in the error log (utils/errorReport.js), not the console —
+      // warn/error stay for the handful of places that report a genuine fault.
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+      'vue/no-unused-refs': 'error',
+      'vue/require-default-prop': 'error',
+      'vue/require-prop-types': 'error',
+      // Catches a prop left behind after its use moved or was relayed away.
+      'vue/no-unused-properties': ['error', { groups: ['props'] }],
     },
   },
 ]

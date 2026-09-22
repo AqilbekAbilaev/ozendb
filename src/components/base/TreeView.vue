@@ -8,7 +8,7 @@ import { isEjsonScalar } from '../../utils/mongoFormat'
 // caller (ResultsPanel) loops the result documents and passes each as a root.
 const props = defineProps({
   label:    { type: String,  required: true },
-  value:    { default: undefined },
+  value:    { type: null,    default: undefined },
   depth:    { type: Number,  default: 0 },
   expanded: { type: Boolean, default: false },
   // Namespaced path of THIS node (e.g. "0.address.city"); root nodes get the doc index.
@@ -16,7 +16,7 @@ const props = defineProps({
   path:        { type: String,  default: '' },
   // While a search is active, every ancestor path of a match is in this set so matched
   // branches auto-expand; nodes outside it stay collapsed (keeps the render cheap).
-  expandPaths: { default: null },
+  expandPaths: { type: Set, default: null },
   searching:   { type: Boolean, default: false },
 })
 

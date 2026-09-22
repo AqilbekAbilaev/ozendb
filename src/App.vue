@@ -53,7 +53,6 @@ useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden 
         :running-count="runningCount"
       />
 
-      <!-- Sidebar -->
       <ConnectionTree
         v-show="sidebarOpen"
         :width="sidebarWidth"
@@ -61,7 +60,6 @@ useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden 
       />
       <Resizer v-show="sidebarOpen" v-model="sidebarWidth" axis="x" :min="200" :max="560" />
 
-      <!-- Workspace -->
       <WorkspaceArea
         :tabs="tabs"
         :active-tab-id="activeTabId"
@@ -75,7 +73,6 @@ useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden 
       />
     </div>
 
-    <!-- Operations dock (bottom) -->
     <template v-if="operationsPaneOpen">
       <Resizer v-model="operationsPaneHeight" axis="y" :min="120" :max="560" invert />
       <div class="ops-dock" :style="{ height: operationsPaneHeight + 'px' }">
@@ -87,7 +84,6 @@ useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden 
       </div>
     </template>
 
-    <!-- Context menu -->
     <ContextMenu
       v-if="contextMenu"
       :menu="contextMenu"
