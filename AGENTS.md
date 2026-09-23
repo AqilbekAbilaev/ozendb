@@ -41,25 +41,33 @@ npm run lint
 ### Data flow
 
 ```
-main.js  (pre-paints the theme, installs the undo shim, registers workspace definitions, seeds the first tab, mounts, then starts the silent update check — in that order)
-└── App.vue  (composition root: wires the composables, owns split-pane sizing)
+main.js  (the whole startup sequence, in order: pre-paint the theme, install the undo
+          shim, register workspace definitions, seed the first tab, mount, then load
+          settings → restore the session → start autosave → check for updates)
+└── App.vue  (layout only: which panes exist and how wide they are. It holds no app
+              state — every slice below reads its own store — and wires just three
+              things: useMenu, useFeatures, useAppMenuActions)
     ├── app/Toolbar.vue                (global toolbar actions → handleTool)
-    ├── connection/ConnectionTree.vue  (sidebar; emits select-node / select-collection)
+    ├── app/AppRail.vue                (the vertical rail; toggles the sidebar and the ops dock)
+    ├── connection/ConnectionTree.vue  (sidebar; writes the tree selection to its store)
     ├── workspace/WorkspaceArea.vue    (the tab strip and whichever workspace is active)
     ├── panes/OperationsPane.vue       (bottom dock for long-running operations)
     ├── app/AppModals.vue              (every top-level modal, incl. ConnectionManager → NewConnection)
+    ├── app/AppToast.vue               (the one transient message)
     └── base/ContextMenu.vue           (routed through useFeatures' handleContextAction)
 ```
 
 ### The layers
 
-Four rings, outermost first. A ring may import inwards, never outwards.
+Four rings, outermost first. A ring may import inwards, never outwards — **enforced by
+`no-restricted-imports` in `eslint.config.js`** for every direction that currently holds.
+`src/importCycles.test.js` additionally fails on any circular import.
 
 | Layer | What lives there |
 |---|---|
 | `src/components/` | Rendering and event wiring only. Grouped by area: `admin/`, `app/`, `base/`, `connection/`, `panes/`, `query/`, `results/`, `tools/`, `workspace/`. |
-| `src/composables/` | Stateful, reusable slices (`useModals`, `useQueryRunner`, `useFeatures`, `useMenu`, …). One composable owns one slice end to end. |
-| `src/stores/` | Module-scope state shared by every importer: `tabs.js` (the tab spine), `connectionData.js` (databases per connection), `openConnections.js`, `connectionNavigation.js`, `settings.js` (also owns zoom and loads `nodeTags.js`), `modals.js`, `toast.js`, `updater.js`, `queryClipboard.js`, `visualQueryBuilder.js`. Anything one leaf writes and another reads goes here rather than being threaded through App.vue as props and relayed emits. |
+| `src/composables/` | Stateful slices that need a component's lifetime or a caller's wiring (`useFeatures`, `useMenu`, `useConnectionTree`, `useDbActions`, …). Anything that is really app-wide state belongs in `stores/` instead — most of what used to live here has moved. |
+| `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (every "open a tab" entry point) · `queryRunner.js` · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `indexes.js` · `updater.js` · `toast.js` · `dbClipboard.js` · `queryClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
 | `src/utils/` | Pure functions. No Vue, no I/O. |
 
 ### The Tauri boundary
@@ -68,6 +76,11 @@ Nothing outside two roots may call `invoke`. **This is enforced, not a conventio
 `src/appApi/apiBoundary.test.js` lists every engine-neutral command and fails the suite
 if one is invoked elsewhere, or if any production file outside the roots imports
 `@tauri-apps/api/core` at all.
+
+The boundary is about `invoke` specifically, because command names and payload keys are
+strings the backend adjudicates — a typo there fails silently at runtime. Tauri's *plugin*
+APIs (`plugin-dialog`, `plugin-opener`, `plugin-updater`, `plugin-process`) are ordinary
+typed calls with no wire shape, so they are imported directly wherever they are needed.
 
 - **`src/appApi/`** — engine-neutral commands: `settings`, `session`, `menu`, `folders`,
   `tags`, `operations`, `errorLog`, `files`, `sshTrust`, `updater`, `connectionState`.
@@ -105,8 +118,9 @@ create a workspace during module evaluation.
 plus every mutation (activate/close/cycle/duplicate/reorder/rename), shared by every
 importer. Tabs are plain objects and children mutate their properties directly (e.g.
 `tab.filter`, `tab.skip`), which works because Vue 3 makes array items reactive. The tab
-*creators* live in `src/composables/useTabCreators.js`, which App.vue constructs with
-the query runner and settings-backed defaults. Note: module-scope refs do not survive
+*creators* live in `src/stores/tabCreators.js` and the rule that the workspace never shows
+an empty pane — closing the last tab seeds a Quickstart — lives in `tabs.js` with the closes
+it guards. Note: module-scope refs do not survive
 Vite HMR cleanly — restart the dev server before blaming the code for stale tab state.
 
 ### Resource identity
@@ -180,9 +194,13 @@ removed.
 
 ## Code quality
 
-`npm run lint` runs eslint with unused-code rules only — no style rules, no formatter — and is
-not yet a CI gate. CI runs `npm test`, `cargo test`, and the file-size check below; every other
-rule here is enforced by review, so they have to be short enough to actually hold in your head.
+CI runs `npm run lint`, `npm test`, `cargo test`, and the file-size check below. Lint covers
+correctness and dead code — ESLint's recommended set, Vue's essentials, the layering rules, and
+a handful more (`prefer-const`, `eqeqeq`, `no-console`, `vue/require-prop-types`,
+`vue/no-unused-properties`). It deliberately carries **no style rules and no formatter**: the
+`flat/strongly-recommended` tier is ~4,000 whitespace findings and adopting it would rewrite
+every template in one commit. Every other rule here is enforced by review, so they have to be
+short enough to actually hold in your head.
 
 ### Where code goes
 
