@@ -34,6 +34,8 @@ fn test_config() -> Option<ConnectionConfig> {
     Some(ConnectionConfig {
         id: String::from("it-test"),
         name: String::from("integration-test"),
+        engine: String::from("mongodb"),
+        database: None,
         hosts: vec![HostEntry { host: host, port: port }],
         connection_type: String::from("standalone"),
         replica_set_name: None,

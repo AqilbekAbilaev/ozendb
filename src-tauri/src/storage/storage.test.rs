@@ -5,6 +5,8 @@ fn conn(id: &str, name: &str) -> ConnectionConfig {
     ConnectionConfig {
         id: id.into(),
         name: name.into(),
+        engine: String::from("mongodb"),
+        database: None,
         hosts: vec![HostEntry { host: String::from("localhost"), port: 27017 }],
         connection_type: String::from("standalone"),
         replica_set_name: None,
@@ -163,12 +165,46 @@ fn load_preserves_existing_hosts_array() {
 }
 
 #[test]
+fn load_defaults_engine_for_files_written_before_the_field_existed() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("connections.json");
+    std::fs::write(
+        &path,
+        r#"[{"id":"1","name":"Local","hosts":[{"host":"a","port":1}],"connection_type":"standalone"}]"#,
+    ).unwrap();
+    let storage = Storage::new(path);
+    assert_eq!(storage.load()[0].engine, "mongodb");
+}
+
+#[test]
 fn save_creates_parent_directories() {
     let dir = tempdir().unwrap();
     let nested_path = dir.path().join("a").join("b").join("connections.json");
     let storage = Storage::new(nested_path);
     storage.save(&[conn("1", "Local")]).unwrap();
     assert_eq!(storage.load().len(), 1);
+}
+
+#[test]
+fn engine_maps_known_strings() {
+    assert_eq!(Engine::from_str("mongodb"), Engine::Mongo);
+    assert_eq!(Engine::from_str("postgresql"), Engine::Postgres);
+}
+
+#[test]
+fn engine_unknown_or_missing_falls_back_to_mongo() {
+    // Connections saved before this field existed have no `engine` key; serde's
+    // `default_engine` already turns that into `"mongodb"`, but `from_str` itself
+    // must also treat any unrecognized value as Mongo rather than erroring.
+    assert_eq!(Engine::from_str(""), Engine::Mongo);
+    assert_eq!(Engine::from_str("whatever"), Engine::Mongo);
+}
+
+#[test]
+fn config_engine_kind_reads_the_stored_string() {
+    let mut config = conn("1", "Local");
+    config.engine = String::from("postgresql");
+    assert_eq!(config.engine_kind(), Engine::Postgres);
 }
 
 #[test]

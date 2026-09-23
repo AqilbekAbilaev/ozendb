@@ -5,6 +5,8 @@ fn base_config() -> ConnectionConfig {
     ConnectionConfig {
         id: String::from("test"),
         name: String::from("Test"),
+        engine: String::from("mongodb"),
+        database: None,
         hosts: vec![HostEntry { host: String::from("localhost"), port: 27017 }],
         connection_type: String::from("standalone"),
         replica_set_name: None,

@@ -83,6 +83,12 @@ sqlparser = "0.62.0"
 # built transitively via mongodb; promoted to a direct dependency so we can compile
 # user-supplied patterns. Substring search is the default path and needs no regex.
 regex = "1"
+# Async Postgres driver for the (in-progress) PostgreSQL engine. `tls-rustls-ring`
+# picks the same rustls/ring crypto backend `russh` above already uses, rather than
+# the default aws-lc-rs, so this doesn't pull in a second C/asm crypto build.
+# `runtime-tokio` integrates with the existing tokio runtime already used everywhere
+# else. Has its own connection pooling built in, so no separate pooling crate.
+sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring"] }
 
 # keyring needs a per-platform backend feature; without one it silently uses an
 # in-memory mock store that loses every password when the app exits (which made

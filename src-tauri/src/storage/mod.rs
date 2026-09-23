@@ -6,6 +6,7 @@ use std::sync::{Mutex, MutexGuard};
 
 fn default_connection_type() -> String { String::from("standalone") }
 fn default_ssh_port() -> u16 { 22 }
+fn default_engine() -> String { String::from("mongodb") }
 
 /// One host of a (possibly multi-host) seed list. SRV connections use a single
 /// entry and ignore the port.
@@ -19,6 +20,17 @@ pub struct HostEntry {
 pub struct ConnectionConfig {
     pub id: String,
     pub name: String,
+    /// Which database driver this connection dials. Stored so the pool and every
+    /// command can branch on it; new connections default to `"mongodb"` so existing
+    /// `connections.json` files (written before this field existed) still parse.
+    #[serde(default = "default_engine")]
+    pub engine: String,
+    /// The database to connect to. Only meaningful for relational engines
+    /// (PostgreSQL, and any future MySQL) — a Postgres connection must name one
+    /// database up front, unlike MongoDB, which connects at the server level and
+    /// picks a database per query. Unused when `engine == "mongodb"`.
+    #[serde(default)]
+    pub database: Option<String>,
     /// The seed list. Normally populated by the connection editor; `uri::build_uri`
     /// falls back to `localhost:27017` if it is ever empty.
     #[serde(default)]
@@ -81,6 +93,28 @@ pub struct ConnectionConfig {
     pub open: bool,
 }
 
+/// The database driver, as an exhaustively-matchable view of the stored `engine`
+/// string. As with `ConnectionKind` below, the string stays the persisted/wire
+/// form and this is only the internal view — matched on wherever code needs to
+/// pick a driver-specific path (pool connect, URI building, command dispatch).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Engine {
+    Mongo,
+    Postgres,
+}
+
+impl Engine {
+    /// Maps a stored `engine` value to a driver. Any unknown or legacy (pre-field)
+    /// value falls back to `Mongo` — the only driver that existed before this field
+    /// was added.
+    pub fn from_str(value: &str) -> Engine {
+        match value {
+            "postgresql" => Engine::Postgres,
+            _ => Engine::Mongo,
+        }
+    }
+}
+
 /// The connection scheme, as an exhaustively-matchable view of the stored
 /// `connection_type` string. The string remains the persisted/wire form (the
 /// frontend sends it and it round-trips through `connections.json` untouched);
@@ -132,6 +166,12 @@ impl SshAuthMethod {
 }
 
 impl ConnectionConfig {
+    /// The database driver as an exhaustively-matchable enum. Derived from the
+    /// stored `engine` string; see `Engine`.
+    pub fn engine_kind(&self) -> Engine {
+        Engine::from_str(&self.engine)
+    }
+
     /// The connection scheme as an exhaustively-matchable enum. Derived from the
     /// stored `connection_type` string; see `ConnectionKind`.
     pub fn kind(&self) -> ConnectionKind {

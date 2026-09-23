@@ -236,11 +236,19 @@ pub async fn tcp_probe(uri: &str) -> Result<(), AppError> {
         Some(val) => val,
         None => return Ok(()),
     };
+    probe_host_port(&host_port).await
+}
 
-    let addrs: Vec<_> = match tokio::net::lookup_host(&host_port).await {
+/// The engine-agnostic core of `tcp_probe`: resolve `host_port` and try connecting
+/// to every address it resolves to (e.g. both `::1` and `127.0.0.1` for
+/// "localhost"), succeeding as soon as one connects. Shared with `pg_uri::tcp_probe`
+/// rather than duplicated, since neither the DNS/timeout/retry logic nor its error
+/// reporting is specific to MongoDB.
+pub(crate) async fn probe_host_port(host_port: &str) -> Result<(), AppError> {
+    let addrs: Vec<_> = match tokio::net::lookup_host(host_port).await {
         Ok(val) => val.collect(),
         Err(e) => return Err(AppError::Unreachable {
-            address: host_port.clone(),
+            address: host_port.to_string(),
             reason: e.to_string(),
         }),
     };
@@ -266,7 +274,7 @@ pub async fn tcp_probe(uri: &str) -> Result<(), AppError> {
     }
 
     Err(AppError::Unreachable {
-        address: host_port,
+        address: host_port.to_string(),
         reason: last_err,
     })
 }

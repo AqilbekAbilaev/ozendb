@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::node_tags::NodeTagStorage;
-use crate::storage::{ConnectionConfig, HostEntry};
+use crate::storage::{ConnectionConfig, Engine, HostEntry};
 use super::AppContext;
 use crate::uri;
 use mongodb::Client;
@@ -10,6 +10,9 @@ use uuid::Uuid;
 mod ssh;
 pub use ssh::{forget_ssh_host, respond_ssh_host_key, test_ssh_connection};
 
+mod postgres;
+use postgres::test_postgres_connection;
+
 /// The connection editor's form, exactly as the frontend sends it. `save_connection`
 /// and `update_connection` take the same payload; the fields the editor doesn't own
 /// (id, folder, last_accessed, open) are supplied by the caller instead.
@@ -17,6 +20,15 @@ pub use ssh::{forget_ssh_host, respond_ssh_host_key, test_ssh_connection};
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionFields {
     pub name: String,
+    // Not yet sent by the connection editor (MongoDB is still the only engine it
+    // offers), so this defaults to absent rather than being a required field —
+    // `into_config` treats a missing/empty value as `"mongodb"`.
+    #[serde(default)]
+    pub engine: Option<String>,
+    // Not yet sent either (relational engines have no editor UI yet); see
+    // `ConnectionConfig::database`'s doc comment for what it's for.
+    #[serde(default)]
+    pub database: Option<String>,
     pub hosts: Vec<HostEntry>,
     pub connection_type: String,
     pub replica_set_name: Option<String>,
@@ -57,6 +69,8 @@ impl ConnectionFields {
         ConnectionConfig {
             id: id,
             name: self.name,
+            engine: self.engine.filter(|s| !s.is_empty()).unwrap_or_else(|| String::from("mongodb")),
+            database: self.database,
             hosts: self.hosts,
             connection_type: self.connection_type,
             replica_set_name: self.replica_set_name,
@@ -106,7 +120,15 @@ pub async fn test_connection(id: Option<String>, fields: ConnectionFields) -> Re
         None => id.as_deref().and_then(crate::keychain::get),
     };
     let config = fields.into_config(id.unwrap_or_default(), None, None, false);
-    let uri = uri::build_uri(&config, password.as_deref());
+
+    match config.engine_kind() {
+        Engine::Postgres => test_postgres_connection(&config, password.as_deref()).await,
+        Engine::Mongo => test_mongo_connection(&config, password.as_deref()).await,
+    }
+}
+
+async fn test_mongo_connection(config: &ConnectionConfig, password: Option<&str>) -> Result<(), AppError> {
+    let uri = uri::build_uri(config, password);
 
     match uri::tcp_probe(&uri).await {
         Ok(val) => val,
@@ -119,6 +141,7 @@ pub async fn test_connection(id: Option<String>, fields: ConnectionFields) -> Re
     };
     Ok(())
 }
+
 
 
 /// Which stored secrets an updated config can still use. A `false` means the
@@ -186,13 +209,16 @@ pub async fn save_connection(
         Err(e) => return Err(e),
     };
 
-    // Create and cache the client immediately so the first expand is instant.
+    // Create and cache the client/pool immediately so the first expand is instant.
     // The password was just written to the keychain above, so the pool reads it
     // back when it opens the connection.
-    match ctx.pool.connect(&config).await {
-        Ok(_) => {}
-        Err(e) => return Err(e),
+    let warm = match config.engine_kind() {
+        Engine::Postgres => ctx.pool.connect_postgres(&config).await.map(|_| ()),
+        Engine::Mongo => ctx.pool.connect(&config).await.map(|_| ()),
     };
+    if let Err(e) = warm {
+        return Err(e);
+    }
 
     Ok(id)
 }

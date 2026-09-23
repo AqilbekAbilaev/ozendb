@@ -24,6 +24,9 @@ mod menu;
 mod node_tags;
 mod operations;
 mod persist;
+#[cfg(test)]
+mod pg_integration_tests;
+mod pg_uri;
 mod pool;
 mod saved_queries;
 mod settings;

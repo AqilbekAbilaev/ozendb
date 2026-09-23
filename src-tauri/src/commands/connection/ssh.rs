@@ -40,7 +40,8 @@ pub async fn test_ssh_connection(
         params, Arc::clone(known_hosts.inner()), Arc::clone(prompts.inner()), app,
     ).await?;
     let cfg = ConnectionConfig {
-        id: String::new(), name: String::new(), hosts: vec![HostEntry { host: mongo_host, port: mongo_port }],
+        id: String::new(), name: String::new(), engine: String::from("mongodb"), database: None,
+        hosts: vec![HostEntry { host: mongo_host, port: mongo_port }],
         connection_type: String::from("standalone"), replica_set_name: None, username, auth_db, auth_mechanism,
         options: std::collections::BTreeMap::new(), tls: false, tls_ca_file: None, tls_cert_key_file: None,
         tls_allow_invalid_certificates: false, ssh_enabled: false, ssh_host: None, ssh_port: 22,

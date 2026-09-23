@@ -6,6 +6,8 @@ fn config() -> ConnectionConfig {
     ConnectionConfig {
         id: String::from("c1"),
         name: String::from("test"),
+        engine: String::from("mongodb"),
+        database: None,
         hosts: vec![HostEntry { host: String::from("localhost"), port: 27017 }],
         connection_type: String::from("standalone"),
         replica_set_name: None,
@@ -36,6 +38,8 @@ fn config() -> ConnectionConfig {
 fn fields() -> ConnectionFields {
     ConnectionFields {
         name: String::from("prod"),
+        engine: None,
+        database: Some(String::from("appdb")),
         hosts: vec![HostEntry { host: String::from("db1"), port: 27018 }],
         connection_type: String::from("replica"),
         replica_set_name: Some(String::from("rs0")),
@@ -69,6 +73,7 @@ fn into_config_carries_every_editable_field() {
     let c = fields().into_config(String::from("c1"), None, None, true);
 
     assert_eq!(c.name, "prod");
+    assert_eq!(c.database.as_deref(), Some("appdb"));
     assert_eq!(c.hosts, vec![HostEntry { host: String::from("db1"), port: 27018 }]);
     assert_eq!(c.connection_type, "replica");
     assert_eq!(c.replica_set_name.as_deref(), Some("rs0"));
@@ -88,6 +93,22 @@ fn into_config_carries_every_editable_field() {
     assert_eq!(c.ssh_key_file.as_deref(), Some("/id_ed25519"));
     assert_eq!(c.tag.as_deref(), Some("red"));
     assert_eq!(c.read_only, true);
+}
+
+#[test]
+fn into_config_defaults_engine_to_mongodb_when_absent() {
+    // The connection editor doesn't send `engine` yet (MongoDB is the only engine
+    // it offers), so an absent or blank value must not become an empty string.
+    let c = fields().into_config(String::from("c1"), None, None, true);
+    assert_eq!(c.engine, "mongodb");
+}
+
+#[test]
+fn into_config_honors_an_explicit_engine() {
+    let mut f = fields();
+    f.engine = Some(String::from("postgresql"));
+    let c = f.into_config(String::from("c1"), None, None, true);
+    assert_eq!(c.engine, "postgresql");
 }
 
 #[test]
