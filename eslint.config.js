@@ -19,6 +19,39 @@ export default [
       globals: { ...globals.browser, ...globals.node },
     },
   },
+  // The layering rule from CLAUDE.md: a ring may import inwards, never outwards.
+  // Only the directions that already hold everywhere are enforced — utils' two reaches
+  // into appApi and workspaces predate this and are left to be dealt with separately.
+  {
+    files: ['src/utils/**/*.js'],
+    ignores: ['**/*.test.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/stores/*', '**/composables/*', '**/components/*', '**/engines/*'],
+        message: 'utils/ holds pure functions — no Vue, no I/O, no app state.',
+      }] }],
+    },
+  },
+  {
+    files: ['src/stores/**/*.js'],
+    ignores: ['**/*.test.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/composables/*', '**/components/*'],
+        message: 'stores/ is imported by composables and components, not the other way round.',
+      }] }],
+    },
+  },
+  {
+    files: ['src/composables/**/*.js'],
+    ignores: ['**/*.test.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/components/*'],
+        message: 'composables/ is imported by components, not the other way round.',
+      }] }],
+    },
+  },
   {
     rules: {
       // Single-word component names are the convention throughout src/components.
