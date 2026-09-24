@@ -67,6 +67,16 @@ impl ConnectionFields {
     /// editor doesn't carry either field yet and letting an edit silently default
     /// them back to MongoDB would re-point a saved Postgres connection at the wrong
     /// driver.
+    ///
+    /// Deliberate consequence, not an oversight: **an edit can never change a
+    /// connection's engine**, even once the editor grows a picker and starts
+    /// sending `self.engine` — `existing`'s value always wins here. Changing that
+    /// (e.g. to let an explicit form value override `existing`) is a real product
+    /// decision, not a mechanical fix, so it's pinned by
+    /// `into_config_ignores_a_form_supplied_engine_when_editing` in
+    /// `commands/connection.test.rs` (where `into_config`'s other tests already
+    /// live): that test must be consciously revisited, not just deleted, before
+    /// this function ever lets an edit switch engines.
     pub(super) fn into_config(
         self,
         id: String,

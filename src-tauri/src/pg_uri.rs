@@ -72,18 +72,19 @@ fn options_for(
     // `Require` only encrypts — per sqlx's own `maybe_upgrade`, it does not verify
     // the server certificate or hostname (only `VerifyCa`/`VerifyFull` do), despite
     // what the mode's doc comment implies. So `tls: true` defaults to `VerifyFull`
-    // (verified against the bundled/system roots this crate already builds with);
-    // a configured CA relaxes that to `VerifyCa` (trust that CA, skip the hostname
-    // check, since a custom CA's certs commonly don't match a browsable hostname);
+    // (verified against this crate's bundled webpki roots, plus any CA below);
     // `tls_allow_invalid_certificates` is the explicit, opt-in escape hatch to the
-    // unverified `Require`.
+    // unverified `Require`. A configured CA does *not* drop this to `VerifyCa`: sqlx
+    // adds a configured `ssl_root_cert` to the imported root store rather than
+    // replacing it, so `VerifyFull` + a custom CA still verifies the hostname too —
+    // silently trading that away just because a CA was given would be a real (if
+    // narrower) version of this same weakening, for anyone whose internal CA's certs
+    // happen to carry a matching hostname.
     let ca_file = config.tls_ca_file.as_deref().filter(|s| !s.is_empty());
     let ssl_mode = if !config.tls {
         PgSslMode::Disable
     } else if config.tls_allow_invalid_certificates {
         PgSslMode::Require
-    } else if ca_file.is_some() {
-        PgSslMode::VerifyCa
     } else {
         PgSslMode::VerifyFull
     };

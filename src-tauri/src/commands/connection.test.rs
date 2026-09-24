@@ -153,6 +153,27 @@ fn into_config_preserves_engine_and_database_from_the_existing_record_on_update(
 }
 
 #[test]
+fn into_config_ignores_a_form_supplied_engine_when_editing() {
+    // Pinning test, not an incidental assertion — see the doc comment on
+    // `into_config` in fields.rs. Today the editor never sends `fields.engine` on
+    // an edit, so this can't happen in practice; once a picker exists and starts
+    // sending one, this test starts failing on purpose, so switching a connection's
+    // engine on edit becomes a deliberate change to this function rather than a
+    // side effect of the picker landing. If you're here because that's exactly
+    // what you want: update this test's expectation, don't delete it.
+    let mut existing = config();
+    existing.engine = String::from("mongodb");
+
+    let mut edited_fields = fields();
+    edited_fields.engine = Some(String::from("postgresql"));
+    let c = edited_fields
+        .into_config(String::from("c1"), Some(&existing), None, None, true)
+        .unwrap();
+
+    assert_eq!(c.engine, "mongodb", "existing record wins over the form, even though the form now supplies one");
+}
+
+#[test]
 fn into_config_takes_the_non_editable_fields_from_the_caller() {
     // The edit dialog doesn't carry these, so an update must supply the existing
     // record's values rather than let the form blank them.

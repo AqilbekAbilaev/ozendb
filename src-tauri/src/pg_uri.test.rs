@@ -106,12 +106,16 @@ fn build_options_verifies_full_when_tls_is_on_with_no_ca_file() {
 }
 
 #[test]
-fn build_options_verifies_ca_only_when_a_ca_file_is_given() {
+fn build_options_stays_verify_full_even_with_a_ca_file_configured() {
+    // A custom CA must not silently drop the hostname check — sqlx adds the CA to
+    // its imported root store rather than replacing it, so VerifyFull still works
+    // with a custom CA; downgrading to VerifyCa just because one was given would
+    // weaken verification for anyone whose CA's certs do carry a matching hostname.
     let mut config = base_config();
     config.tls = true;
     config.tls_ca_file = Some(String::from("/ca.pem"));
     let options = build_options(&config, None).unwrap();
-    assert!(matches!(options.get_ssl_mode(), PgSslMode::VerifyCa));
+    assert!(matches!(options.get_ssl_mode(), PgSslMode::VerifyFull));
 }
 
 #[test]
