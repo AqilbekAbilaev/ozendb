@@ -10,7 +10,7 @@ pub(super) async fn test_postgres_connection(
     config: &ConnectionConfig,
     password: Option<&str>,
 ) -> Result<(), AppError> {
-    let options = pg_uri::build_options(config, password);
+    let options = pg_uri::build_options(config, password)?;
 
     match pg_uri::tcp_probe(&options).await {
         Ok(val) => val,

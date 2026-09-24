@@ -177,7 +177,7 @@ impl ConnectionPool {
             let password = crate::keychain::get(&config.id);
             let host = String::from("127.0.0.1");
             let port = tunnel.local_addr.port();
-            let options = pg_uri::build_options_to(config, password.as_deref(), &host, port);
+            let options = pg_uri::build_options_to(config, password.as_deref(), &host, port)?;
             return self.get_or_create_postgres(&config.id, options).await;
         }
 
@@ -185,7 +185,7 @@ impl ConnectionPool {
             return Ok(pool);
         }
         let password = crate::keychain::get(&config.id);
-        let options = pg_uri::build_options(config, password.as_deref());
+        let options = pg_uri::build_options(config, password.as_deref())?;
         self.get_or_create_postgres(&config.id, options).await
     }
 
@@ -234,7 +234,7 @@ impl ConnectionPool {
         // not supported, so the tunnel targets the first host of the list.
         let (mongo_host, mongo_port) = match config.hosts.first() {
             Some(entry) => (entry.host.clone(), entry.port),
-            None => (String::from("localhost"), 27017),
+            None => (String::from("localhost"), default_port_for(config)),
         };
         let params = SshParams {
             ssh_host: config.ssh_host.clone().unwrap_or_default(),
@@ -298,18 +298,29 @@ fn require_postgres(config: &ConnectionConfig) -> Result<(), AppError> {
     }
 }
 
+/// The SSH tunnel's fallback port when `config.hosts` is empty — matches whichever
+/// driver this connection actually dials, since a Postgres connection defaulting to
+/// Mongo's 27017 (or vice versa) tunnels to the wrong service entirely.
+fn default_port_for(config: &ConnectionConfig) -> u16 {
+    match config.engine_kind() {
+        Engine::Postgres => pg_uri::DEFAULT_PORT,
+        Engine::Mongo => 27017,
+    }
+}
+
 // NOTE: the pool previously had two trivial unit tests (empty `get` returns
 // None; `remove` of an absent id is a no-op). Constructing a pool now requires a
 // real Tauri AppHandle (for the SSH host-key prompt), which a plain unit test
 // can't build, and making the pool generic over the runtime purely to keep two
 // HashMap-wrapper assertions would be over-engineering. The pool's real paths
 // (client creation, tunnels) need a live MongoDB/SSH server and are covered by
-// manual/integration testing instead. `require_mongo`/`require_postgres` above are
-// the exception: they take no pool state, so they get a real test module below.
+// manual/integration testing instead. `require_mongo`/`require_postgres`/
+// `default_port_for` above are the exception: they take no pool state, so they get
+// a real test module below.
 
 #[cfg(test)]
 mod tests {
-    use super::{require_mongo, require_postgres};
+    use super::{default_port_for, require_mongo, require_postgres};
     use crate::storage::ConnectionConfig;
 
     fn config(engine: &str) -> ConnectionConfig {
@@ -353,5 +364,11 @@ mod tests {
     fn require_postgres_passes_postgres_and_rejects_mongo() {
         assert!(require_postgres(&config("postgresql")).is_ok());
         assert_eq!(require_postgres(&config("mongodb")).unwrap_err().code(), "validation");
+    }
+
+    #[test]
+    fn default_port_for_matches_the_configs_own_engine() {
+        assert_eq!(default_port_for(&config("mongodb")), 27017);
+        assert_eq!(default_port_for(&config("postgresql")), 5432);
     }
 }

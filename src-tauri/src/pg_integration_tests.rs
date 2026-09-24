@@ -8,7 +8,10 @@
 //! variable is absent.
 //!
 //! Run them with, e.g.:
-//!   OZENDB_TEST_POSTGRES=127.0.0.1:5432 OZENDB_TEST_POSTGRES_USER=postgres cargo test pg_integration
+//!   OZENDB_TEST_POSTGRES=127.0.0.1:5432 cargo test pg_integration
+//! `OZENDB_TEST_POSTGRES_USER`/`OZENDB_TEST_POSTGRES_PASSWORD` override the
+//! username (default "postgres") and password (default none) if the test server
+//! needs different credentials.
 
 use crate::pg_uri;
 use crate::storage::{ConnectionConfig, HostEntry};
@@ -41,7 +44,9 @@ fn test_config() -> Option<ConnectionConfig> {
         hosts: vec![HostEntry { host: host, port: port }],
         connection_type: String::from("standalone"),
         replica_set_name: None,
-        username: std::env::var("OZENDB_TEST_POSTGRES_USER").ok(),
+        // `build_options` now rejects an empty username, so this always resolves to
+        // something — "postgres" (the common default superuser) unless overridden.
+        username: Some(std::env::var("OZENDB_TEST_POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"))),
         auth_db: None,
         auth_mechanism: None,
         options: std::collections::BTreeMap::new(),
@@ -69,7 +74,10 @@ fn test_config() -> Option<ConnectionConfig> {
 /// live Tauri `AppHandle`, which a plain test can't build).
 async fn connect(config: &ConnectionConfig) -> sqlx::PgConnection {
     let password = std::env::var("OZENDB_TEST_POSTGRES_PASSWORD").ok();
-    let options = pg_uri::build_options(config, password.as_deref());
+    let options = match pg_uri::build_options(config, password.as_deref()) {
+        Ok(val) => val,
+        Err(e) => panic!("could not build connect options: {}", e),
+    };
     match sqlx::PgConnection::connect_with(&options).await {
         Ok(val) => val,
         Err(e) => panic!("could not connect to test Postgres: {}", e),

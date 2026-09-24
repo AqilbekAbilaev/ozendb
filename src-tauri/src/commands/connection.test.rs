@@ -1,4 +1,5 @@
 use super::*;
+use crate::storage::HostEntry;
 
 // A config with no credentials and no SSH — the baseline each test tweaks. Every
 // field is spelled out because `ConnectionConfig` has no `Default`.
@@ -70,7 +71,7 @@ fn fields() -> ConnectionFields {
 
 #[test]
 fn into_config_carries_every_editable_field() {
-    let c = fields().into_config(String::from("c1"), None, None, true);
+    let c = fields().into_config(String::from("c1"), None, None, None, true).unwrap();
 
     assert_eq!(c.name, "prod");
     assert_eq!(c.database.as_deref(), Some("appdb"));
@@ -99,7 +100,7 @@ fn into_config_carries_every_editable_field() {
 fn into_config_defaults_engine_to_mongodb_when_absent() {
     // The connection editor doesn't send `engine` yet (MongoDB is the only engine
     // it offers), so an absent or blank value must not become an empty string.
-    let c = fields().into_config(String::from("c1"), None, None, true);
+    let c = fields().into_config(String::from("c1"), None, None, None, true).unwrap();
     assert_eq!(c.engine, "mongodb");
 }
 
@@ -107,20 +108,63 @@ fn into_config_defaults_engine_to_mongodb_when_absent() {
 fn into_config_honors_an_explicit_engine() {
     let mut f = fields();
     f.engine = Some(String::from("postgresql"));
-    let c = f.into_config(String::from("c1"), None, None, true);
+    let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
     assert_eq!(c.engine, "postgresql");
+}
+
+#[test]
+fn into_config_accepts_postgres_as_a_synonym_for_postgresql() {
+    // "postgres" is the spelling sqlx, libpq and the connection-string scheme all
+    // use; it must canonicalize to the same stored value as "postgresql" rather
+    // than silently falling through to the MongoDB default.
+    let mut f = fields();
+    f.engine = Some(String::from("postgres"));
+    let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
+    assert_eq!(c.engine, "postgresql");
+}
+
+#[test]
+fn into_config_rejects_an_unknown_engine_instead_of_guessing_mongodb() {
+    // A garbled or unsupported engine value must be a loud error, not a silent
+    // MongoDB default — a silent default would dial the wrong driver entirely.
+    let mut f = fields();
+    f.engine = Some(String::from("mysql"));
+    let err = f.into_config(String::from("c1"), None, None, None, true).unwrap_err();
+    assert_eq!(err.code(), "validation");
+}
+
+#[test]
+fn into_config_preserves_engine_and_database_from_the_existing_record_on_update() {
+    // The edit dialog doesn't carry `engine`/`database` any more than it carries
+    // folder_id/last_accessed/open — an edit must not silently re-point a saved
+    // Postgres connection at the MongoDB driver just because the form is blank.
+    let mut existing = config();
+    existing.engine = String::from("postgresql");
+    existing.database = Some(String::from("appdb"));
+
+    let mut edited_fields = fields();
+    edited_fields.engine = None; // the editor still can't send this
+    let c = edited_fields
+        .into_config(String::from("c1"), Some(&existing), None, None, true)
+        .unwrap();
+
+    assert_eq!(c.engine, "postgresql");
+    assert_eq!(c.database.as_deref(), Some("appdb"));
 }
 
 #[test]
 fn into_config_takes_the_non_editable_fields_from_the_caller() {
     // The edit dialog doesn't carry these, so an update must supply the existing
     // record's values rather than let the form blank them.
-    let c = fields().into_config(
-        String::from("c1"),
-        Some(String::from("folder-7")),
-        Some(String::from("2026-01-01")),
-        false,
-    );
+    let c = fields()
+        .into_config(
+            String::from("c1"),
+            None,
+            Some(String::from("folder-7")),
+            Some(String::from("2026-01-01")),
+            false,
+        )
+        .unwrap();
 
     assert_eq!(c.id, "c1");
     assert_eq!(c.folder_id.as_deref(), Some("folder-7"));
@@ -139,7 +183,7 @@ fn secrets_are_lifted_out_and_never_reach_the_config() {
 
     // `ConnectionConfig` is what gets written to connections.json, so a secret
     // landing in it would be a credential on disk.
-    let json = serde_json::to_string(&f.into_config(String::from("c1"), None, None, true)).unwrap();
+    let json = serde_json::to_string(&f.into_config(String::from("c1"), None, None, None, true).unwrap()).unwrap();
     assert_eq!(json.contains("pw"), false);
     assert_eq!(json.contains("phrase"), false);
 }
@@ -150,7 +194,7 @@ fn a_tested_form_is_dialled_the_way_it_will_be_saved() {
     // replicaSet and mapped only OIDC — so a green test said nothing about the
     // connection that got saved. Both paths now run the form through `build_uri`.
     let uri = crate::uri::build_uri(
-        &fields().into_config(String::from("c1"), None, None, false),
+        &fields().into_config(String::from("c1"), None, None, None, false).unwrap(),
         Some("pw"),
     );
 

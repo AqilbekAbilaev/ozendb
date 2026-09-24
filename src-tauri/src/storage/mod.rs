@@ -106,10 +106,14 @@ pub enum Engine {
 impl Engine {
     /// Maps a stored `engine` value to a driver. Any unknown or legacy (pre-field)
     /// value falls back to `Mongo` — the only driver that existed before this field
-    /// was added.
+    /// was added. The app itself only ever writes the canonical `"postgresql"` (see
+    /// `commands::connection::fields::resolve_engine`), but `"postgres"` — the
+    /// spelling sqlx, libpq and the URI scheme all use — is recognized too, in case
+    /// `connections.json` was hand-edited with that spelling: silently treating it
+    /// as Mongo would dial the wrong driver entirely.
     pub fn from_str(value: &str) -> Engine {
         match value {
-            "postgresql" => Engine::Postgres,
+            "postgresql" | "postgres" => Engine::Postgres,
             _ => Engine::Mongo,
         }
     }

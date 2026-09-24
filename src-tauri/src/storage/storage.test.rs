@@ -189,6 +189,9 @@ fn save_creates_parent_directories() {
 fn engine_maps_known_strings() {
     assert_eq!(Engine::from_str("mongodb"), Engine::Mongo);
     assert_eq!(Engine::from_str("postgresql"), Engine::Postgres);
+    // The app itself never writes this spelling (see resolve_engine), but a
+    // hand-edited connections.json using it must still dial Postgres, not Mongo.
+    assert_eq!(Engine::from_str("postgres"), Engine::Postgres);
 }
 
 #[test]

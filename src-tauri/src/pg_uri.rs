@@ -3,13 +3,13 @@ use crate::storage::ConnectionConfig;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 const DEFAULT_DATABASE: &str = "postgres";
-const DEFAULT_PORT: u16 = 5432;
+pub(crate) const DEFAULT_PORT: u16 = 5432;
 
 /// Builds sqlx's typed connect-options from a stored `ConnectionConfig` plus the
 /// password fetched separately from the OS keychain — the same split `uri::build_uri`
 /// uses for MongoDB. Structured options rather than a connection string, since
 /// `PgConnectOptions` already handles its own escaping.
-pub fn build_options(config: &ConnectionConfig, password: Option<&str>) -> PgConnectOptions {
+pub fn build_options(config: &ConnectionConfig, password: Option<&str>) -> Result<PgConnectOptions, AppError> {
     let (host, port) = match config.hosts.first() {
         Some(entry) => (entry.host.clone(), entry.port),
         None => (String::from("localhost"), DEFAULT_PORT),
@@ -24,7 +24,7 @@ pub fn build_options_to(
     password: Option<&str>,
     host: &str,
     port: u16,
-) -> PgConnectOptions {
+) -> Result<PgConnectOptions, AppError> {
     options_for(config, password, host, port)
 }
 
@@ -33,35 +33,71 @@ fn options_for(
     password: Option<&str>,
     host: &str,
     port: u16,
-) -> PgConnectOptions {
+) -> Result<PgConnectOptions, AppError> {
     let database = config
         .database
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_DATABASE);
 
+    // Postgres has no "no user" concept — an empty username is always rejected by
+    // the server (`FATAL: role "" does not exist`), so this is caught here with a
+    // clear message rather than left to fail confusingly inside the driver. This is
+    // also why username is required rather than silently falling back to
+    // `new_without_pgpass()`'s own `PGUSER`/OS-user default: that default is exactly
+    // the ambient-environment leakage the rest of this function refuses.
+    let username = match config.username.as_deref().filter(|s| !s.is_empty()) {
+        Some(user) => user,
+        None => {
+            return Err(AppError::Validation(
+                "PostgreSQL connections require a username.".to_string(),
+            ))
+        }
+    };
+
     // `PgConnectOptions::new()` seeds itself from the `PG*` environment variables and
     // (via `apply_pgpass`) the `~/.pgpass` file — libpq's usual fallbacks. A desktop
-    // app must not let a saved connection silently pick up credentials from whatever
-    // shell environment it happened to launch in, so this starts from
-    // `new_without_pgpass()` (skips the pgpass file) and then sets username/password
-    // unconditionally — including to empty when the config/keychain has none — rather
-    // than leaving an env-sourced value in place by only setting them when present.
+    // app must not let a saved connection silently pick up credentials — or TLS
+    // settings — from whatever shell environment it happened to launch in, so this
+    // starts from `new_without_pgpass()` (skips the pgpass file) and then sets
+    // every security-relevant field unconditionally below, rather than leaving an
+    // env-sourced value in place by only setting a field when the config has one.
     let mut options = PgConnectOptions::new_without_pgpass()
         .host(host)
         .port(port)
         .database(database)
-        .username(config.username.as_deref().unwrap_or(""))
+        .username(username)
         .password(password.unwrap_or(""));
 
-    if config.tls {
-        options = options.ssl_mode(PgSslMode::Require);
-        if let Some(ca) = config.tls_ca_file.as_deref().filter(|s| !s.is_empty()) {
-            options = options.ssl_root_cert(ca);
-        }
-    }
+    // `Require` only encrypts — per sqlx's own `maybe_upgrade`, it does not verify
+    // the server certificate or hostname (only `VerifyCa`/`VerifyFull` do), despite
+    // what the mode's doc comment implies. So `tls: true` defaults to `VerifyFull`
+    // (verified against the bundled/system roots this crate already builds with);
+    // a configured CA relaxes that to `VerifyCa` (trust that CA, skip the hostname
+    // check, since a custom CA's certs commonly don't match a browsable hostname);
+    // `tls_allow_invalid_certificates` is the explicit, opt-in escape hatch to the
+    // unverified `Require`.
+    let ca_file = config.tls_ca_file.as_deref().filter(|s| !s.is_empty());
+    let ssl_mode = if !config.tls {
+        PgSslMode::Disable
+    } else if config.tls_allow_invalid_certificates {
+        PgSslMode::Require
+    } else if ca_file.is_some() {
+        PgSslMode::VerifyCa
+    } else {
+        PgSslMode::VerifyFull
+    };
+    options = options.ssl_mode(ssl_mode);
+    options = match ca_file {
+        Some(ca) => options.ssl_root_cert(ca),
+        // Explicit empty override, the same reasoning as username/password above —
+        // sqlx's own doc example for `ssl_root_cert_from_pem` recommends exactly
+        // this for "no additional CA" rather than leaving an ambient `PGSSLROOTCERT`
+        // file path in place.
+        None => options.ssl_root_cert_from_pem(Vec::new()),
+    };
 
-    options
+    Ok(options)
 }
 
 /// Performs an async TCP probe against the options' host:port, the same way
