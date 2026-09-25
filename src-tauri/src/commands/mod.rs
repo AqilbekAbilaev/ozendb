@@ -8,6 +8,7 @@ use serde::Serialize;
 use std::time::Duration;
 
 pub mod connection;
+pub mod postgres;
 pub mod query;
 pub mod admin;
 pub mod persistence;
@@ -33,6 +34,7 @@ pub mod error_log;
 pub mod updater;
 
 pub use connection::*;
+pub use postgres::*;
 pub use query::*;
 pub use admin::*;
 pub use persistence::*;
@@ -173,6 +175,30 @@ impl AppContext {
         Ok(client
             .database(database)
             .collection::<bson::Document>(collection))
+    }
+
+    /// The Postgres sibling of `client`: resolves a `PgPool` instead of a
+    /// `mongodb::Client`. Every Postgres command goes through here or
+    /// `pg_pool_for_write`, the same choke-point shape as the Mongo pair above.
+    pub async fn pg_pool(&self, id: &str) -> Result<sqlx::PgPool, AppError> {
+        let config = match self.storage.find(id) {
+            Some(val) => val,
+            None => return Err(AppError::UnknownConnection(id.to_string())),
+        };
+        self.pool.connect_postgres(&config).await
+    }
+
+    /// The write-gated sibling of `pg_pool`, mirroring `client_for_write`: a
+    /// `read_only` connection is refused before any write reaches the driver.
+    pub async fn pg_pool_for_write(&self, id: &str) -> Result<sqlx::PgPool, AppError> {
+        let config = match self.storage.find(id) {
+            Some(val) => val,
+            None => return Err(AppError::UnknownConnection(id.to_string())),
+        };
+        if config.read_only {
+            return Err(AppError::ReadOnly { name: config.name.clone() });
+        }
+        self.pool.connect_postgres(&config).await
     }
 }
 

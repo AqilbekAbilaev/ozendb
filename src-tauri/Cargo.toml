@@ -88,7 +88,11 @@ regex = "1"
 # the default aws-lc-rs, so this doesn't pull in a second C/asm crypto build.
 # `runtime-tokio` integrates with the existing tokio runtime already used everywhere
 # else. Has its own connection pooling built in, so no separate pooling crate.
-sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring"] }
+# `json` lets a query decode a row straight into `serde_json::Value` — how
+# run_pg_query/browse_pg_table read arbitrary Postgres rows without a per-type
+# decoder: the row is wrapped in `to_jsonb()` server-side and decoded here as one
+# jsonb column, rather than hand-matching every possible Postgres column type.
+sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring", "json"] }
 
 # keyring needs a per-platform backend feature; without one it silently uses an
 # in-memory mock store that loses every password when the app exits (which made

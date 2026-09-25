@@ -8,9 +8,6 @@ use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoCon
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionFields {
     pub name: String,
-    // Not yet sent by the connection editor (MongoDB is still the only engine it
-    // offers), so this defaults to absent rather than being a required field —
-    // `into_config` treats a missing/empty value as `"mongodb"`.
     #[serde(default)]
     pub engine: Option<String>,
     // Not yet sent either (relational engines have no editor UI yet); see
