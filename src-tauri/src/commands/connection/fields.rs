@@ -14,7 +14,7 @@ pub struct ConnectionFields {
     #[serde(default)]
     pub engine: Option<String>,
     // Not yet sent either (relational engines have no editor UI yet); see
-    // `ConnectionConfig::database`'s doc comment for what it's for.
+    // `PostgresConfig::database`'s doc comment for what it's for.
     #[serde(default)]
     pub database: Option<String>,
     pub hosts: Vec<HostEntry>,
@@ -60,23 +60,13 @@ fn resolve_engine(raw: Option<&str>) -> Result<Engine, AppError> {
 
 impl ConnectionFields {
     /// The stored config this form describes. `folder_id`/`last_accessed`/`open`
-    /// come from the caller the same way regardless: a new connection invents them,
-    /// an edit preserves the existing record's.
-    ///
-    /// `existing` decides only *which driver* this is — the form's `engine` on a
-    /// create, the stored record's on an edit. The driver's own settings always come
-    /// from the form, so editing a connection still edits its settings; what an edit
-    /// cannot do is change which driver they belong to.
-    ///
-    /// Deliberate consequence, not an oversight: **an edit can never change a
-    /// connection's engine**, even once the editor grows a picker and starts
-    /// sending `self.engine` — `existing`'s value always wins here. Changing that
-    /// (e.g. to let an explicit form value override `existing`) is a real product
-    /// decision, not a mechanical fix, so it's pinned by
+    /// come from the caller either way (new: invented; edit: preserved).
+    /// `existing` likewise decides which *driver* this is — never the form's
+    /// `engine`, even once the editor sends one. An edit can change a driver's
+    /// settings, never which driver they belong to. Deliberate, and pinned by
     /// `into_config_ignores_a_form_supplied_engine_when_editing` in
-    /// `commands/connection.test.rs` (where `into_config`'s other tests already
-    /// live): that test must be consciously revisited, not just deleted, before
-    /// this function ever lets an edit switch engines.
+    /// `commands/connection.test.rs`: don't delete that test without deciding, on
+    /// purpose, to let edits switch engines.
     pub(super) fn into_config(
         self,
         id: String,
@@ -85,9 +75,6 @@ impl ConnectionFields {
         last_accessed: Option<String>,
         open: bool,
     ) -> Result<ConnectionConfig, AppError> {
-        // Which driver: the existing record's on an edit, the form's on a create.
-        // The driver's *settings* always come from the form either way — an edit
-        // edits settings, it just can't switch engines.
         let engine = match existing {
             Some(record) => record.engine_kind(),
             None => resolve_engine(self.engine.as_deref())?,
