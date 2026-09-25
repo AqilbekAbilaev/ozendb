@@ -1,52 +1,40 @@
 use super::*;
-use crate::storage::{ConnectionConfig, HostEntry};
+use crate::storage::{ConnectionConfig, HostEntry, MongoConfig};
 
 fn base_config() -> ConnectionConfig {
     ConnectionConfig {
         id: String::from("test"),
         name: String::from("Test"),
-        engine: String::from("mongodb"),
-        database: None,
         hosts: vec![HostEntry { host: String::from("localhost"), port: 27017 }],
-        connection_type: String::from("standalone"),
-        replica_set_name: None,
-        username: None,
-        auth_db: None,
-        auth_mechanism: None,
-        options: std::collections::BTreeMap::new(),
-        tls: false,
-        tls_ca_file: None,
-        tls_cert_key_file: None,
-        tls_allow_invalid_certificates: false,
-        ssh_enabled: false,
-        ssh_host: None,
-        ssh_port: 22,
-        ssh_user: None,
-        ssh_auth: None,
-        ssh_key_file: None,
-        tag: None,
-        read_only: false,
-        folder_id: None,
-        last_accessed: None,
-        open: false,
+        ..Default::default()
     }
+}
+
+/// The MongoDB half of `base_config`, which every `build_uri` call now needs
+/// alongside the shared half.
+fn base_mongo() -> MongoConfig {
+    MongoConfig::default()
 }
 
 #[test]
 fn build_uri_no_auth() {
     let config = base_config();
-    assert_eq!(build_uri(&config, None), "mongodb://localhost:27017/");
+    let mongo = base_mongo();
+    assert_eq!(build_uri(&config, &mongo, None), "mongodb://localhost:27017/");
 }
 
 #[test]
 fn build_uri_with_auth() {
     let config = ConnectionConfig {
         username: Some(String::from("alice")),
-        auth_db: Some(String::from("admin")),
         ..base_config()
     };
+    let mongo = MongoConfig {
+        auth_db: Some(String::from("admin")),
+        ..Default::default()
+    };
     assert_eq!(
-        build_uri(&config, Some("secret")),
+        build_uri(&config, &mongo, Some("secret")),
         "mongodb://alice:secret@localhost:27017/?authSource=admin"
     );
 }
@@ -55,10 +43,13 @@ fn build_uri_with_auth() {
 fn build_uri_encodes_special_chars_in_credentials() {
     let config = ConnectionConfig {
         username: Some(String::from("user@example")),
-        auth_db: Some(String::from("admin")),
         ..base_config()
     };
-    let uri = build_uri(&config, Some("p@ss:word"));
+    let mongo = MongoConfig {
+        auth_db: Some(String::from("admin")),
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, Some("p@ss:word"));
     assert!(uri.contains("user%40example"));
     assert!(uri.contains("p%40ss%3Aword"));
 }
@@ -66,19 +57,20 @@ fn build_uri_encodes_special_chars_in_credentials() {
 #[test]
 fn build_uri_srv_scheme() {
     let config = ConnectionConfig {
-        connection_type: String::from("srv"),
         hosts: vec![HostEntry { host: String::from("cluster.example.com"), port: 27017 }],
         ..base_config()
     };
-    assert!(build_uri(&config, None).starts_with("mongodb+srv://"));
-    assert!(!build_uri(&config, None).contains(":27017"));
+    let mongo = MongoConfig {
+        connection_type: String::from("srv"),
+        ..Default::default()
+    };
+    assert!(build_uri(&config, &mongo, None).starts_with("mongodb+srv://"));
+    assert!(!build_uri(&config, &mongo, None).contains(":27017"));
 }
 
 #[test]
 fn build_uri_multi_host_seed_list() {
     let config = ConnectionConfig {
-        connection_type: String::from("replica"),
-        replica_set_name: Some(String::from("rs0")),
         hosts: vec![
             HostEntry { host: String::from("a.example.com"), port: 27017 },
             HostEntry { host: String::from("b.example.com"), port: 27017 },
@@ -86,15 +78,24 @@ fn build_uri_multi_host_seed_list() {
         ],
         ..base_config()
     };
-    let uri = build_uri(&config, None);
+    let mongo = MongoConfig {
+        connection_type: String::from("replica"),
+        replica_set_name: Some(String::from("rs0")),
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, None);
     assert!(uri.contains("a.example.com:27017,b.example.com:27017,c.example.com:27018"));
     assert!(uri.contains("replicaSet=rs0"));
 }
 
 #[test]
 fn build_uri_empty_hosts_falls_back() {
-    let config = ConnectionConfig { hosts: vec![], ..base_config() };
-    assert_eq!(build_uri(&config, None), "mongodb://localhost:27017/");
+    let config = ConnectionConfig {
+        hosts: vec![],
+        ..base_config()
+    };
+    let mongo = base_mongo();
+    assert_eq!(build_uri(&config, &mongo, None), "mongodb://localhost:27017/");
 }
 
 #[test]
@@ -102,8 +103,14 @@ fn build_uri_appends_passthrough_options() {
     let mut options = std::collections::BTreeMap::new();
     options.insert(String::from("retryWrites"), String::from("true"));
     options.insert(String::from("socketTimeoutMS"), String::from("600000"));
-    let config = ConnectionConfig { options: options, ..base_config() };
-    let uri = build_uri(&config, None);
+    let config = ConnectionConfig {
+        ..base_config()
+    };
+    let mongo = MongoConfig {
+        options: options,
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, None);
     assert!(uri.contains("retryWrites=true"));
     assert!(uri.contains("socketTimeoutMS=600000"));
 }
@@ -113,11 +120,14 @@ fn build_uri_tls_with_files() {
     let config = ConnectionConfig {
         tls: true,
         tls_ca_file: Some(String::from("/etc/ssl/My CA.pem")),
-        tls_cert_key_file: Some(String::from("/etc/ssl/client.pem")),
         tls_allow_invalid_certificates: true,
         ..base_config()
     };
-    let uri = build_uri(&config, None);
+    let mongo = MongoConfig {
+        tls_cert_key_file: Some(String::from("/etc/ssl/client.pem")),
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, None);
     assert!(uri.contains("tls=true"));
     // path is percent-encoded ('/' → %2F, ' ' → %20)
     assert!(uri.contains("tlsCAFile=%2Fetc%2Fssl%2FMy%20CA.pem"));
@@ -127,28 +137,34 @@ fn build_uri_tls_with_files() {
 
 #[test]
 fn build_uri_no_tls_omits_params() {
-    let uri = build_uri(&base_config(), None);
+    let uri = build_uri(&base_config(), &base_mongo(), None);
     assert!(!uri.contains("tls"));
 }
 
 #[test]
 fn build_uri_replica_set() {
     let config = ConnectionConfig {
-        connection_type: String::from("replica"),
-        replica_set_name: Some(String::from("rs0")),
         ..base_config()
     };
-    assert!(build_uri(&config, None).contains("replicaSet=rs0"));
+    let mongo = MongoConfig {
+        connection_type: String::from("replica"),
+        replica_set_name: Some(String::from("rs0")),
+        ..Default::default()
+    };
+    assert!(build_uri(&config, &mongo, None).contains("replicaSet=rs0"));
 }
 
 #[test]
 fn build_uri_username_no_password() {
     let config = ConnectionConfig {
         username: Some(String::from("alice")),
-        auth_db: Some(String::from("admin")),
         ..base_config()
     };
-    let uri = build_uri(&config, None);
+    let mongo = MongoConfig {
+        auth_db: Some(String::from("admin")),
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, None);
     assert!(uri.starts_with("mongodb://alice@"));
     assert!(uri.contains("authSource=admin"));
 }
@@ -157,11 +173,14 @@ fn build_uri_username_no_password() {
 fn build_uri_auth_mechanism_scram_sha_256() {
     let config = ConnectionConfig {
         username: Some(String::from("alice")),
-        auth_db: Some(String::from("admin")),
-        auth_mechanism: Some(String::from("SCRAM-SHA-256")),
         ..base_config()
     };
-    let uri = build_uri(&config, Some("secret"));
+    let mongo = MongoConfig {
+        auth_db: Some(String::from("admin")),
+        auth_mechanism: Some(String::from("SCRAM-SHA-256")),
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, Some("secret"));
     assert!(uri.contains("authMechanism=SCRAM-SHA-256"));
 }
 
@@ -169,11 +188,14 @@ fn build_uri_auth_mechanism_scram_sha_256() {
 fn build_uri_auth_mechanism_scram_sha_1() {
     let config = ConnectionConfig {
         username: Some(String::from("alice")),
-        auth_db: Some(String::from("admin")),
-        auth_mechanism: Some(String::from("SCRAM-SHA-1")),
         ..base_config()
     };
-    let uri = build_uri(&config, Some("secret"));
+    let mongo = MongoConfig {
+        auth_db: Some(String::from("admin")),
+        auth_mechanism: Some(String::from("SCRAM-SHA-1")),
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, Some("secret"));
     assert!(uri.contains("authMechanism=SCRAM-SHA-1"));
 }
 
@@ -181,11 +203,14 @@ fn build_uri_auth_mechanism_scram_sha_1() {
 fn build_uri_auth_mechanism_plain() {
     let config = ConnectionConfig {
         username: Some(String::from("alice")),
-        auth_db: Some(String::from("$external")),
-        auth_mechanism: Some(String::from("PLAIN")),
         ..base_config()
     };
-    let uri = build_uri(&config, Some("secret"));
+    let mongo = MongoConfig {
+        auth_db: Some(String::from("$external")),
+        auth_mechanism: Some(String::from("PLAIN")),
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, Some("secret"));
     assert!(uri.contains("authMechanism=PLAIN"));
 }
 
@@ -193,10 +218,13 @@ fn build_uri_auth_mechanism_plain() {
 fn build_uri_auth_mechanism_none_omits_credentials() {
     let config = ConnectionConfig {
         username: Some(String::from("alice")),
-        auth_mechanism: Some(String::from("none")),
         ..base_config()
     };
-    let uri = build_uri(&config, Some("secret"));
+    let mongo = MongoConfig {
+        auth_mechanism: Some(String::from("none")),
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, Some("secret"));
     assert!(!uri.contains("alice"));
     assert!(!uri.contains("secret"));
     assert!(!uri.contains("authMechanism"));
@@ -326,11 +354,14 @@ fn build_uri_oidc_emits_canonical_mechanism_and_properties() {
         String::from("ENVIRONMENT:azure,TOKEN_RESOURCE:api://abc"),
     );
     let config = ConnectionConfig {
-        auth_mechanism: Some(String::from("OIDC")),
-        options: options,
         ..base_config()
     };
-    let uri = build_uri(&config, None);
+    let mongo = MongoConfig {
+        auth_mechanism: Some(String::from("OIDC")),
+        options: options,
+        ..Default::default()
+    };
+    let uri = build_uri(&config, &mongo, None);
     // OIDC uses no username → no credentials, no authSource.
     assert!(!uri.contains('@'));
     assert!(!uri.contains("authSource"));

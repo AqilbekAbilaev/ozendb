@@ -14,7 +14,7 @@
 //! needs different credentials.
 
 use crate::pg_uri;
-use crate::storage::{ConnectionConfig, HostEntry};
+use crate::storage::{ConnectionConfig, EngineConfig, HostEntry, PostgresConfig};
 use sqlx::{Connection, Row};
 
 /// A `ConnectionConfig` pointing at the test server, or `None` when the env var
@@ -39,32 +39,14 @@ fn test_config() -> Option<ConnectionConfig> {
     Some(ConnectionConfig {
         id: String::from("pg-it-test"),
         name: String::from("integration-test"),
-        engine: String::from("postgresql"),
-        database: None,
         hosts: vec![HostEntry { host: host, port: port }],
-        connection_type: String::from("standalone"),
-        replica_set_name: None,
-        // `build_options` now rejects an empty username, so this always resolves to
+        // `build_options` rejects an empty username, so this always resolves to
         // something — "postgres" (the common default superuser) unless overridden.
-        username: Some(std::env::var("OZENDB_TEST_POSTGRES_USER").unwrap_or_else(|_| String::from("postgres"))),
-        auth_db: None,
-        auth_mechanism: None,
-        options: std::collections::BTreeMap::new(),
-        tls: false,
-        tls_ca_file: None,
-        tls_cert_key_file: None,
-        tls_allow_invalid_certificates: false,
-        ssh_enabled: false,
-        ssh_host: None,
-        ssh_port: 22,
-        ssh_user: None,
-        ssh_auth: None,
-        ssh_key_file: None,
-        tag: None,
-        read_only: false,
-        folder_id: None,
-        last_accessed: None,
-        open: false,
+        username: Some(
+            std::env::var("OZENDB_TEST_POSTGRES_USER").unwrap_or_else(|_| String::from("postgres")),
+        ),
+        engine: EngineConfig::Postgres(PostgresConfig::default()),
+        ..Default::default()
     })
 }
 
@@ -74,7 +56,11 @@ fn test_config() -> Option<ConnectionConfig> {
 /// live Tauri `AppHandle`, which a plain test can't build).
 async fn connect(config: &ConnectionConfig) -> sqlx::PgConnection {
     let password = std::env::var("OZENDB_TEST_POSTGRES_PASSWORD").ok();
-    let options = match pg_uri::build_options(config, password.as_deref()) {
+    let options = match pg_uri::build_options(
+        config,
+        config.engine.as_postgres().expect("the integration config is Postgres"),
+        password.as_deref(),
+    ) {
         Ok(val) => val,
         Err(e) => panic!("could not build connect options: {}", e),
     };

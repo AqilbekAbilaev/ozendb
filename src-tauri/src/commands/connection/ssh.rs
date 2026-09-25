@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::known_hosts::KnownHostsStore;
 use crate::ssh::HostKeyPrompts;
-use crate::storage::{ConnectionConfig, HostEntry, SshAuthMethod};
+use crate::storage::{ConnectionConfig, EngineConfig, HostEntry, MongoConfig, SshAuthMethod};
 use crate::uri;
 use mongodb::Client;
 use std::sync::Arc;
@@ -40,16 +40,21 @@ pub async fn test_ssh_connection(
         params, Arc::clone(known_hosts.inner()), Arc::clone(prompts.inner()), app,
     ).await?;
     let cfg = ConnectionConfig {
-        id: String::new(), name: String::new(), engine: String::from("mongodb"), database: None,
+        id: String::new(), name: String::new(),
         hosts: vec![HostEntry { host: mongo_host, port: mongo_port }],
-        connection_type: String::from("standalone"), replica_set_name: None, username, auth_db, auth_mechanism,
-        options: std::collections::BTreeMap::new(), tls: false, tls_ca_file: None, tls_cert_key_file: None,
+        username,
+        engine: EngineConfig::Mongo(MongoConfig {
+            connection_type: String::from("standalone"), replica_set_name: None,
+            auth_db, auth_mechanism,
+            options: std::collections::BTreeMap::new(), tls_cert_key_file: None,
+        }),
+        tls: false, tls_ca_file: None,
         tls_allow_invalid_certificates: false, ssh_enabled: false, ssh_host: None, ssh_port: 22,
         ssh_user: None, ssh_auth: None, ssh_key_file: None, tag: None, read_only: false,
         folder_id: None, last_accessed: None, open: false,
     };
     let uri = uri::with_timeout(&uri::build_uri_to(
-        &cfg, password.as_deref(), "127.0.0.1", tunnel.local_addr.port(),
+        &cfg, cfg.engine.as_mongo().expect("just built as Mongo"), password.as_deref(), "127.0.0.1", tunnel.local_addr.port(),
     ));
     Client::with_uri_str(&uri).await?.list_database_names().await.map_err(AppError::Mongo)?;
     Ok(())

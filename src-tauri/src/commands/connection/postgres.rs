@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::pg_uri;
-use crate::storage::ConnectionConfig;
+use crate::storage::{ConnectionConfig, PostgresConfig};
 use sqlx::Connection as _;
 
 /// The Postgres half of `test_connection`, split out the way `ssh.rs` holds the
@@ -8,9 +8,10 @@ use sqlx::Connection as _;
 /// failed test leaves nothing cached), mirroring the Mongo path's ad-hoc `Client`.
 pub(super) async fn test_postgres_connection(
     config: &ConnectionConfig,
+    postgres: &PostgresConfig,
     password: Option<&str>,
 ) -> Result<(), AppError> {
-    let options = pg_uri::build_options(config, password)?;
+    let options = pg_uri::build_options(config, postgres, password)?;
 
     match pg_uri::tcp_probe(&options).await {
         Ok(val) => val,

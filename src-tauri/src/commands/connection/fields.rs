@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::storage::{ConnectionConfig, HostEntry};
+use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
 
 /// The connection editor's form, exactly as the frontend sends it. `save_connection`
 /// and `update_connection` take the same payload; the fields the editor doesn't own
@@ -50,10 +50,10 @@ pub struct ConnectionFields {
 /// fallback — an unrecognized `connection_type` just picks a topology default —
 /// an unrecognized *engine* would silently pick the wrong driver, so this rejects
 /// rather than guesses.
-fn resolve_engine(raw: Option<&str>) -> Result<String, AppError> {
+fn resolve_engine(raw: Option<&str>) -> Result<Engine, AppError> {
     match raw.filter(|s| !s.is_empty()) {
-        None | Some("mongodb") => Ok(String::from("mongodb")),
-        Some("postgresql") | Some("postgres") => Ok(String::from("postgresql")),
+        None | Some("mongodb") => Ok(Engine::Mongo),
+        Some("postgresql") | Some("postgres") => Ok(Engine::Postgres),
         Some(other) => Err(AppError::Validation(format!("Unknown connection engine \"{other}\"."))),
     }
 }
@@ -61,12 +61,12 @@ fn resolve_engine(raw: Option<&str>) -> Result<String, AppError> {
 impl ConnectionFields {
     /// The stored config this form describes. `folder_id`/`last_accessed`/`open`
     /// come from the caller the same way regardless: a new connection invents them,
-    /// an edit preserves the existing record's. `existing` drives `engine`/
-    /// `database` the same way — `None` for a new connection (so they come from the
-    /// form, defaulting to MongoDB) and `Some(&record)` for an edit, since the
-    /// editor doesn't carry either field yet and letting an edit silently default
-    /// them back to MongoDB would re-point a saved Postgres connection at the wrong
-    /// driver.
+    /// an edit preserves the existing record's.
+    ///
+    /// `existing` decides only *which driver* this is — the form's `engine` on a
+    /// create, the stored record's on an edit. The driver's own settings always come
+    /// from the form, so editing a connection still edits its settings; what an edit
+    /// cannot do is change which driver they belong to.
     ///
     /// Deliberate consequence, not an oversight: **an edit can never change a
     /// connection's engine**, even once the editor grows a picker and starts
@@ -85,25 +85,41 @@ impl ConnectionFields {
         last_accessed: Option<String>,
         open: bool,
     ) -> Result<ConnectionConfig, AppError> {
-        let (engine, database) = match existing {
-            Some(record) => (record.engine.clone(), record.database.clone()),
-            None => (resolve_engine(self.engine.as_deref())?, self.database),
+        // Which driver: the existing record's on an edit, the form's on a create.
+        // The driver's *settings* always come from the form either way — an edit
+        // edits settings, it just can't switch engines.
+        let engine = match existing {
+            Some(record) => record.engine_kind(),
+            None => resolve_engine(self.engine.as_deref())?,
+        };
+        let engine = match engine {
+            Engine::Mongo => EngineConfig::Mongo(MongoConfig {
+                connection_type: self.connection_type,
+                replica_set_name: self.replica_set_name,
+                auth_db: self.auth_db,
+                auth_mechanism: self.auth_mechanism,
+                options: self.options,
+                tls_cert_key_file: self.tls_cert_key_file,
+            }),
+            // The editor has no database field yet, so a `None` from the form keeps
+            // whatever the record already had rather than blanking it; once the
+            // editor does send one, the form wins like every other setting.
+            Engine::Postgres => EngineConfig::Postgres(PostgresConfig {
+                database: self.database.or_else(|| {
+                    existing
+                        .and_then(|record| record.engine.as_postgres())
+                        .and_then(|postgres| postgres.database.clone())
+                }),
+            }),
         };
         Ok(ConnectionConfig {
             id: id,
             name: self.name,
             engine: engine,
-            database: database,
             hosts: self.hosts,
-            connection_type: self.connection_type,
-            replica_set_name: self.replica_set_name,
             username: self.username,
-            auth_db: self.auth_db,
-            auth_mechanism: self.auth_mechanism,
-            options: self.options,
             tls: self.tls,
             tls_ca_file: self.tls_ca_file,
-            tls_cert_key_file: self.tls_cert_key_file,
             tls_allow_invalid_certificates: self.tls_allow_invalid_certificates,
             ssh_enabled: self.ssh_enabled,
             ssh_host: self.ssh_host,

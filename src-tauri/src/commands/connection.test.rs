@@ -1,36 +1,13 @@
 use super::*;
-use crate::storage::HostEntry;
+use crate::storage::{Engine, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
 
-// A config with no credentials and no SSH — the baseline each test tweaks. Every
-// field is spelled out because `ConnectionConfig` has no `Default`.
+// A config with no credentials and no SSH — the baseline each test tweaks.
 fn config() -> ConnectionConfig {
     ConnectionConfig {
         id: String::from("c1"),
         name: String::from("test"),
-        engine: String::from("mongodb"),
-        database: None,
         hosts: vec![HostEntry { host: String::from("localhost"), port: 27017 }],
-        connection_type: String::from("standalone"),
-        replica_set_name: None,
-        username: None,
-        auth_db: None,
-        auth_mechanism: None,
-        options: std::collections::BTreeMap::new(),
-        tls: false,
-        tls_ca_file: None,
-        tls_cert_key_file: None,
-        tls_allow_invalid_certificates: false,
-        ssh_enabled: false,
-        ssh_host: None,
-        ssh_port: 22,
-        ssh_user: None,
-        ssh_auth: None,
-        ssh_key_file: None,
-        tag: None,
-        read_only: false,
-        folder_id: None,
-        last_accessed: None,
-        open: false,
+        ..Default::default()
     }
 }
 
@@ -74,18 +51,21 @@ fn into_config_carries_every_editable_field() {
     let c = fields().into_config(String::from("c1"), None, None, None, true).unwrap();
 
     assert_eq!(c.name, "prod");
-    assert_eq!(c.database.as_deref(), Some("appdb"));
     assert_eq!(c.hosts, vec![HostEntry { host: String::from("db1"), port: 27018 }]);
-    assert_eq!(c.connection_type, "replica");
-    assert_eq!(c.replica_set_name.as_deref(), Some("rs0"));
     assert_eq!(c.username.as_deref(), Some("admin"));
-    assert_eq!(c.auth_db.as_deref(), Some("authdb"));
-    assert_eq!(c.auth_mechanism.as_deref(), Some("X509"));
-    assert_eq!(c.options.get("retryWrites").map(String::as_str), Some("true"));
     assert_eq!(c.tls, true);
     assert_eq!(c.tls_ca_file.as_deref(), Some("/ca.pem"));
-    assert_eq!(c.tls_cert_key_file.as_deref(), Some("/cert.pem"));
     assert_eq!(c.tls_allow_invalid_certificates, true);
+
+    // The form's MongoDB half. `database` is deliberately absent: it is a Postgres
+    // setting, and a MongoDB connection no longer has anywhere to put it.
+    let mongo = c.engine.as_mongo().expect("form with no engine builds a MongoDB connection");
+    assert_eq!(mongo.connection_type, "replica");
+    assert_eq!(mongo.replica_set_name.as_deref(), Some("rs0"));
+    assert_eq!(mongo.auth_db.as_deref(), Some("authdb"));
+    assert_eq!(mongo.auth_mechanism.as_deref(), Some("X509"));
+    assert_eq!(mongo.options.get("retryWrites").map(String::as_str), Some("true"));
+    assert_eq!(mongo.tls_cert_key_file.as_deref(), Some("/cert.pem"));
     assert_eq!(c.ssh_enabled, true);
     assert_eq!(c.ssh_host.as_deref(), Some("bastion"));
     assert_eq!(c.ssh_port, 2222);
@@ -101,7 +81,7 @@ fn into_config_defaults_engine_to_mongodb_when_absent() {
     // The connection editor doesn't send `engine` yet (MongoDB is the only engine
     // it offers), so an absent or blank value must not become an empty string.
     let c = fields().into_config(String::from("c1"), None, None, None, true).unwrap();
-    assert_eq!(c.engine, "mongodb");
+    assert_eq!(c.engine_kind(), Engine::Mongo);
 }
 
 #[test]
@@ -109,7 +89,7 @@ fn into_config_honors_an_explicit_engine() {
     let mut f = fields();
     f.engine = Some(String::from("postgresql"));
     let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
-    assert_eq!(c.engine, "postgresql");
+    assert_eq!(c.engine_kind(), Engine::Postgres);
 }
 
 #[test]
@@ -120,7 +100,7 @@ fn into_config_accepts_postgres_as_a_synonym_for_postgresql() {
     let mut f = fields();
     f.engine = Some(String::from("postgres"));
     let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
-    assert_eq!(c.engine, "postgresql");
+    assert_eq!(c.engine_kind(), Engine::Postgres);
 }
 
 #[test]
@@ -139,8 +119,9 @@ fn into_config_preserves_engine_and_database_from_the_existing_record_on_update(
     // folder_id/last_accessed/open — an edit must not silently re-point a saved
     // Postgres connection at the MongoDB driver just because the form is blank.
     let mut existing = config();
-    existing.engine = String::from("postgresql");
-    existing.database = Some(String::from("appdb"));
+    existing.engine = EngineConfig::Postgres(PostgresConfig {
+        database: Some(String::from("appdb")),
+    });
 
     let mut edited_fields = fields();
     edited_fields.engine = None; // the editor still can't send this
@@ -148,8 +129,11 @@ fn into_config_preserves_engine_and_database_from_the_existing_record_on_update(
         .into_config(String::from("c1"), Some(&existing), None, None, true)
         .unwrap();
 
-    assert_eq!(c.engine, "postgresql");
-    assert_eq!(c.database.as_deref(), Some("appdb"));
+    assert_eq!(c.engine_kind(), Engine::Postgres);
+    assert_eq!(
+        c.engine.as_postgres().and_then(|p| p.database.as_deref()),
+        Some("appdb")
+    );
 }
 
 #[test]
@@ -161,8 +145,7 @@ fn into_config_ignores_a_form_supplied_engine_when_editing() {
     // engine on edit becomes a deliberate change to this function rather than a
     // side effect of the picker landing. If you're here because that's exactly
     // what you want: update this test's expectation, don't delete it.
-    let mut existing = config();
-    existing.engine = String::from("mongodb");
+    let existing = config(); // MongoDB by default
 
     let mut edited_fields = fields();
     edited_fields.engine = Some(String::from("postgresql"));
@@ -170,7 +153,7 @@ fn into_config_ignores_a_form_supplied_engine_when_editing() {
         .into_config(String::from("c1"), Some(&existing), None, None, true)
         .unwrap();
 
-    assert_eq!(c.engine, "mongodb", "existing record wins over the form, even though the form now supplies one");
+    assert_eq!(c.engine_kind(), Engine::Mongo, "existing record wins over the form, even though the form now supplies one");
 }
 
 #[test]
@@ -214,8 +197,10 @@ fn a_tested_form_is_dialled_the_way_it_will_be_saved() {
     // Test Connection used to build its own URI in the frontend, which never emitted
     // replicaSet and mapped only OIDC — so a green test said nothing about the
     // connection that got saved. Both paths now run the form through `build_uri`.
+    let config = fields().into_config(String::from("c1"), None, None, None, false).unwrap();
     let uri = crate::uri::build_uri(
-        &fields().into_config(String::from("c1"), None, None, None, false).unwrap(),
+        &config,
+        config.engine.as_mongo().expect("the form builds a MongoDB connection"),
         Some("pw"),
     );
 
@@ -245,7 +230,10 @@ fn auth_mechanism_none_retires_the_password() {
     // "none" means the URI carries no credentials at all, username or not.
     let mut c = config();
     c.username = Some(String::from("admin"));
-    c.auth_mechanism = Some(String::from("none"));
+    c.engine = EngineConfig::Mongo(MongoConfig {
+        auth_mechanism: Some(String::from("none")),
+        ..Default::default()
+    });
     assert_eq!(usable_secrets(&c).0, false);
 }
 

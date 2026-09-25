@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::node_tags::NodeTagStorage;
-use crate::storage::{ConnectionConfig, Engine};
+use crate::storage::{ConnectionConfig, EngineConfig, MongoConfig};
 use super::AppContext;
 use crate::uri;
 use mongodb::Client;
@@ -38,14 +38,24 @@ pub async fn test_connection(
     };
     let config = fields.into_config(id.unwrap_or_default(), existing.as_ref(), None, None, false)?;
 
-    match config.engine_kind() {
-        Engine::Postgres => test_postgres_connection(&config, password.as_deref()).await,
-        Engine::Mongo => test_mongo_connection(&config, password.as_deref()).await,
+    // Matching the variant rather than an engine tag hands each arm exactly the
+    // settings its driver needs, so neither can be called without them.
+    match &config.engine {
+        EngineConfig::Postgres(postgres) => {
+            test_postgres_connection(&config, postgres, password.as_deref()).await
+        }
+        EngineConfig::Mongo(mongo) => {
+            test_mongo_connection(&config, mongo, password.as_deref()).await
+        }
     }
 }
 
-async fn test_mongo_connection(config: &ConnectionConfig, password: Option<&str>) -> Result<(), AppError> {
-    let uri = uri::build_uri(config, password);
+async fn test_mongo_connection(
+    config: &ConnectionConfig,
+    mongo: &MongoConfig,
+    password: Option<&str>,
+) -> Result<(), AppError> {
+    let uri = uri::build_uri(config, mongo, password);
 
     match uri::tcp_probe(&uri).await {
         Ok(val) => val,
@@ -69,7 +79,13 @@ async fn test_mongo_connection(config: &ConnectionConfig, password: Option<&str>
 /// Kept as a pure function so the decision is unit-testable without touching a real
 /// OS keychain. Returns `(password, ssh_password, ssh_passphrase)`.
 pub(crate) fn usable_secrets(config: &ConnectionConfig) -> (bool, bool, bool) {
-    let no_auth = config.auth_mechanism.as_deref() == Some("none");
+    // Only MongoDB has an auth mechanism; on any other driver a username is a
+    // username, so there is no "none" mode to suppress it.
+    let no_auth = config
+        .engine
+        .as_mongo()
+        .and_then(|mongo| mongo.auth_mechanism.as_deref())
+        == Some("none");
     let has_user = !no_auth
         && config.username.as_deref().filter(|s| !s.is_empty()).is_some();
     let ssh_password = config.ssh_enabled && config.ssh_auth.as_deref() == Some("password");
@@ -130,9 +146,9 @@ pub async fn save_connection(
     // Create and cache the client/pool immediately so the first expand is instant.
     // The password was just written to the keychain above, so the pool reads it
     // back when it opens the connection.
-    let warm = match config.engine_kind() {
-        Engine::Postgres => ctx.pool.connect_postgres(&config).await.map(|_| ()),
-        Engine::Mongo => ctx.pool.connect(&config).await.map(|_| ()),
+    let warm = match &config.engine {
+        EngineConfig::Postgres(_) => ctx.pool.connect_postgres(&config).await.map(|_| ()),
+        EngineConfig::Mongo(_) => ctx.pool.connect(&config).await.map(|_| ()),
     };
     if let Err(e) = warm {
         return Err(e);
@@ -155,7 +171,18 @@ pub fn connection_uri(ctx: State<'_, AppContext>, id: String) -> Result<String, 
         Some(val) => val,
         None => return Err(AppError::UnknownConnection(id)),
     };
-    Ok(crate::uri::build_uri(&config, None))
+    // MongoDB-only by definition — it returns a `mongodb://` string. A Postgres
+    // connection has no MongoDB settings to build one from, so this says so rather
+    // than inventing a URI in the wrong dialect.
+    let mongo = match config.engine.as_mongo() {
+        Some(mongo) => mongo,
+        None => {
+            return Err(AppError::Validation(
+                "A connection string is only available for MongoDB connections.".to_string(),
+            ))
+        }
+    };
+    Ok(crate::uri::build_uri(&config, mongo, None))
 }
 
 /// The three keychain keys a connection may hold a secret under. Secrets are keyed by

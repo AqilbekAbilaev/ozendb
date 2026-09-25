@@ -5,30 +5,8 @@ fn conn(id: &str, name: &str) -> ConnectionConfig {
     ConnectionConfig {
         id: id.into(),
         name: name.into(),
-        engine: String::from("mongodb"),
-        database: None,
         hosts: vec![HostEntry { host: String::from("localhost"), port: 27017 }],
-        connection_type: String::from("standalone"),
-        replica_set_name: None,
-        username: None,
-        auth_db: None,
-        auth_mechanism: None,
-        options: BTreeMap::new(),
-        tls: false,
-        tls_ca_file: None,
-        tls_cert_key_file: None,
-        tls_allow_invalid_certificates: false,
-        ssh_enabled: false,
-        ssh_host: None,
-        ssh_port: 22,
-        ssh_user: None,
-        ssh_auth: None,
-        ssh_key_file: None,
-        tag: None,
-        read_only: false,
-        folder_id: None,
-        last_accessed: None,
-        open: false,
+        ..Default::default()
     }
 }
 
@@ -173,7 +151,7 @@ fn load_defaults_engine_for_files_written_before_the_field_existed() {
         r#"[{"id":"1","name":"Local","hosts":[{"host":"a","port":1}],"connection_type":"standalone"}]"#,
     ).unwrap();
     let storage = Storage::new(path);
-    assert_eq!(storage.load()[0].engine, "mongodb");
+    assert_eq!(storage.load()[0].engine_kind(), Engine::Mongo);
 }
 
 #[test]
@@ -186,28 +164,46 @@ fn save_creates_parent_directories() {
 }
 
 #[test]
-fn engine_maps_known_strings() {
-    assert_eq!(Engine::from_str("mongodb"), Engine::Mongo);
-    assert_eq!(Engine::from_str("postgresql"), Engine::Postgres);
-    // The app itself never writes this spelling (see resolve_engine), but a
-    // hand-edited connections.json using it must still dial Postgres, not Mongo.
-    assert_eq!(Engine::from_str("postgres"), Engine::Postgres);
+fn a_record_without_an_engine_key_loads_as_mongodb() {
+    // Every connections.json written before the engine field existed looks like
+    // this, and MongoDB is the only driver it could have described.
+    let json = r#"{"id":"1","name":"Local","connection_type":"standalone","auth_db":"admin"}"#;
+    let config: ConnectionConfig = serde_json::from_str(json).unwrap();
+    assert_eq!(config.engine_kind(), Engine::Mongo);
+    let mongo = config.engine.as_mongo().unwrap();
+    assert_eq!(mongo.auth_db.as_deref(), Some("admin"));
 }
 
 #[test]
-fn engine_unknown_or_missing_falls_back_to_mongo() {
-    // Connections saved before this field existed have no `engine` key; serde's
-    // `default_engine` already turns that into `"mongodb"`, but `from_str` itself
-    // must also treat any unrecognized value as Mongo rather than erroring.
-    assert_eq!(Engine::from_str(""), Engine::Mongo);
-    assert_eq!(Engine::from_str("whatever"), Engine::Mongo);
-}
-
-#[test]
-fn config_engine_kind_reads_the_stored_string() {
-    let mut config = conn("1", "Local");
-    config.engine = String::from("postgresql");
+fn postgres_is_accepted_as_a_synonym_for_postgresql() {
+    // The app only ever writes "postgresql", but "postgres" is the spelling sqlx,
+    // libpq and the URI scheme use, so a hand-edited file may well carry it.
+    let json = r#"{"id":"1","name":"Local","engine":"postgres","database":"appdb"}"#;
+    let config: ConnectionConfig = serde_json::from_str(json).unwrap();
     assert_eq!(config.engine_kind(), Engine::Postgres);
+    assert_eq!(
+        config.engine.as_postgres().and_then(|p| p.database.as_deref()),
+        Some("appdb")
+    );
+}
+
+#[test]
+fn an_unknown_engine_is_an_error_rather_than_a_silent_mongodb() {
+    // Guessing here would dial the wrong driver entirely. The file is quarantined
+    // rather than emptied (see read_from_disk), so a typo is recoverable.
+    let json = r#"{"id":"1","name":"Local","engine":"cassandra"}"#;
+    assert!(serde_json::from_str::<ConnectionConfig>(json).is_err());
+}
+
+#[test]
+fn a_saved_record_writes_its_engine_tag_back() {
+    let config = ConnectionConfig {
+        engine: EngineConfig::Postgres(PostgresConfig { database: Some(String::from("appdb")) }),
+        ..conn("1", "Local")
+    };
+    let json = serde_json::to_string(&config).unwrap();
+    assert!(json.contains(r#""engine":"postgresql""#), "tag must round-trip: {json}");
+    assert_eq!(serde_json::from_str::<ConnectionConfig>(&json).unwrap(), config);
 }
 
 #[test]
@@ -227,10 +223,9 @@ fn connection_kind_unknown_falls_back_to_standalone() {
 }
 
 #[test]
-fn config_kind_reads_the_stored_string() {
-    let mut config = conn("1", "Local");
-    config.connection_type = String::from("srv");
-    assert_eq!(config.kind(), ConnectionKind::Srv);
+fn mongo_config_kind_reads_the_stored_string() {
+    let mongo = MongoConfig { connection_type: String::from("srv"), ..Default::default() };
+    assert_eq!(mongo.kind(), ConnectionKind::Srv);
 }
 
 #[test]
@@ -251,3 +246,4 @@ fn config_ssh_auth_method_reads_the_stored_string() {
     config.ssh_auth = None;
     assert_eq!(config.ssh_auth_method(), SshAuthMethod::Password);
 }
+

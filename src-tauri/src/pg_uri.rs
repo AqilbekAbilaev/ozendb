@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::storage::ConnectionConfig;
+use crate::storage::{ConnectionConfig, PostgresConfig};
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 const DEFAULT_DATABASE: &str = "postgres";
@@ -9,32 +9,34 @@ pub(crate) const DEFAULT_PORT: u16 = 5432;
 /// password fetched separately from the OS keychain — the same split `uri::build_uri`
 /// uses for MongoDB. Structured options rather than a connection string, since
 /// `PgConnectOptions` already handles its own escaping.
-pub fn build_options(config: &ConnectionConfig, password: Option<&str>) -> Result<PgConnectOptions, AppError> {
+pub fn build_options(config: &ConnectionConfig, postgres: &PostgresConfig, password: Option<&str>) -> Result<PgConnectOptions, AppError> {
     let (host, port) = match config.hosts.first() {
         Some(entry) => (entry.host.clone(), entry.port),
         None => (String::from("localhost"), DEFAULT_PORT),
     };
-    options_for(config, password, &host, port)
+    options_for(config, postgres, password, &host, port)
 }
 
 /// Like `build_options` but targets an explicit `host:port` (an SSH tunnel's local
 /// forwarded port) instead of the config's own host list.
 pub fn build_options_to(
     config: &ConnectionConfig,
+    postgres: &PostgresConfig,
     password: Option<&str>,
     host: &str,
     port: u16,
 ) -> Result<PgConnectOptions, AppError> {
-    options_for(config, password, host, port)
+    options_for(config, postgres, password, host, port)
 }
 
 fn options_for(
     config: &ConnectionConfig,
+    postgres: &PostgresConfig,
     password: Option<&str>,
     host: &str,
     port: u16,
 ) -> Result<PgConnectOptions, AppError> {
-    let database = config
+    let database = postgres
         .database
         .as_deref()
         .filter(|s| !s.is_empty())

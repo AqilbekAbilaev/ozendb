@@ -2,7 +2,7 @@ use crate::error::AppError;
 use crate::known_hosts::KnownHostsStore;
 use crate::pg_uri;
 use crate::ssh::{self, HostKeyPrompts, SshAuth, SshParams, SshTunnel};
-use crate::storage::{ConnectionConfig, Engine, SshAuthMethod};
+use crate::storage::{ConnectionConfig, Engine, MongoConfig, PostgresConfig, SshAuthMethod};
 use crate::uri;
 use mongodb::Client;
 use sqlx::postgres::PgConnectOptions;
@@ -129,7 +129,7 @@ impl ConnectionPool {
     /// round-trip. The pool owns credential resolution end to end (it already
     /// reads the SSH secrets in `ensure_tunnel`).
     pub async fn connect(&self, config: &ConnectionConfig) -> Result<Client, AppError> {
-        require_mongo(config)?;
+        let mongo = mongo_config(config)?;
 
         // SSH: ensure the tunnel first (this re-establishes a dead one and evicts
         // the stale client, so the liveness check must run before the cache read).
@@ -145,7 +145,7 @@ impl ConnectionPool {
             let password = crate::keychain::get(&config.id);
             let host = String::from("127.0.0.1");
             let port = tunnel.local_addr.port();
-            let built_uri = uri::build_uri_to(config, password.as_deref(), &host, port);
+            let built_uri = uri::build_uri_to(config, mongo, password.as_deref(), &host, port);
             return self
                 .get_or_create(&config.id, &uri::with_timeout(&built_uri))
                 .await;
@@ -156,7 +156,7 @@ impl ConnectionPool {
             return Ok(client);
         }
         let password = crate::keychain::get(&config.id);
-        let built_uri = uri::build_uri(config, password.as_deref());
+        let built_uri = uri::build_uri(config, mongo, password.as_deref());
         self.get_or_create(&config.id, &uri::with_timeout(&built_uri))
             .await
     }
@@ -164,7 +164,7 @@ impl ConnectionPool {
     /// Postgres sibling of `connect`: same tunnel-then-cache shape, resolving a
     /// `PgPool` from the parallel `pg_pools` map instead of a `mongodb::Client`.
     pub async fn connect_postgres(&self, config: &ConnectionConfig) -> Result<PgPool, AppError> {
-        require_postgres(config)?;
+        let postgres = postgres_config(config)?;
 
         if config.ssh_enabled {
             let tunnel = match self.ensure_tunnel(config).await {
@@ -177,7 +177,7 @@ impl ConnectionPool {
             let password = crate::keychain::get(&config.id);
             let host = String::from("127.0.0.1");
             let port = tunnel.local_addr.port();
-            let options = pg_uri::build_options_to(config, password.as_deref(), &host, port)?;
+            let options = pg_uri::build_options_to(config, postgres, password.as_deref(), &host, port)?;
             return self.get_or_create_postgres(&config.id, options).await;
         }
 
@@ -185,7 +185,7 @@ impl ConnectionPool {
             return Ok(pool);
         }
         let password = crate::keychain::get(&config.id);
-        let options = pg_uri::build_options(config, password.as_deref())?;
+        let options = pg_uri::build_options(config, postgres, password.as_deref())?;
         self.get_or_create_postgres(&config.id, options).await
     }
 
@@ -273,26 +273,26 @@ impl ConnectionPool {
     }
 }
 
-/// The `connect()` entry guard: a Postgres-tagged config can never produce a
-/// `mongodb::Client`, so this stops it here with a clear message instead of
-/// letting it fall through to the Mongo-only machinery below and fail confusingly
-/// on a Postgres host. Pure, so it's unit-testable without a live `AppHandle` — see
-/// the NOTE below for why `ConnectionPool` itself mostly isn't.
-fn require_mongo(config: &ConnectionConfig) -> Result<(), AppError> {
-    match config.engine_kind() {
-        Engine::Mongo => Ok(()),
-        Engine::Postgres => Err(AppError::Validation(
+/// The `connect()` entry guard, which is now also the extraction: a Postgres-tagged
+/// config carries no MongoDB settings at all, so there is nothing to build a URI
+/// from. Returning the `MongoConfig` rather than `()` means the caller cannot reach
+/// the Mongo machinery without having proved the connection is one — the check and
+/// the thing it licenses are the same step.
+fn mongo_config(config: &ConnectionConfig) -> Result<&MongoConfig, AppError> {
+    match config.engine.as_mongo() {
+        Some(mongo) => Ok(mongo),
+        None => Err(AppError::Validation(
             "This connection is configured for PostgreSQL, not MongoDB.".to_string(),
         )),
     }
 }
 
-/// The `connect_postgres()` sibling of `require_mongo`, for the same reason in
-/// the other direction.
-fn require_postgres(config: &ConnectionConfig) -> Result<(), AppError> {
-    match config.engine_kind() {
-        Engine::Postgres => Ok(()),
-        Engine::Mongo => Err(AppError::Validation(
+/// The `connect_postgres()` sibling of `mongo_config`, for the same reason in the
+/// other direction.
+fn postgres_config(config: &ConnectionConfig) -> Result<&PostgresConfig, AppError> {
+    match config.engine.as_postgres() {
+        Some(postgres) => Ok(postgres),
+        None => Err(AppError::Validation(
             "This connection is configured for MongoDB, not PostgreSQL.".to_string(),
         )),
     }
@@ -314,61 +314,42 @@ fn default_port_for(config: &ConnectionConfig) -> u16 {
 // can't build, and making the pool generic over the runtime purely to keep two
 // HashMap-wrapper assertions would be over-engineering. The pool's real paths
 // (client creation, tunnels) need a live MongoDB/SSH server and are covered by
-// manual/integration testing instead. `require_mongo`/`require_postgres`/
+// manual/integration testing instead. `mongo_config`/`postgres_config`/
 // `default_port_for` above are the exception: they take no pool state, so they get
 // a real test module below.
 
 #[cfg(test)]
 mod tests {
-    use super::{default_port_for, require_mongo, require_postgres};
-    use crate::storage::ConnectionConfig;
+    use super::{default_port_for, mongo_config, postgres_config};
+    use crate::storage::{ConnectionConfig, Engine, EngineConfig, MongoConfig, PostgresConfig};
 
-    fn config(engine: &str) -> ConnectionConfig {
+    fn config(engine: Engine) -> ConnectionConfig {
         ConnectionConfig {
             id: String::from("1"),
             name: String::from("test"),
-            engine: String::from(engine),
-            database: None,
-            hosts: vec![],
-            connection_type: String::from("standalone"),
-            replica_set_name: None,
-            username: None,
-            auth_db: None,
-            auth_mechanism: None,
-            options: std::collections::BTreeMap::new(),
-            tls: false,
-            tls_ca_file: None,
-            tls_cert_key_file: None,
-            tls_allow_invalid_certificates: false,
-            ssh_enabled: false,
-            ssh_host: None,
-            ssh_port: 22,
-            ssh_user: None,
-            ssh_auth: None,
-            ssh_key_file: None,
-            tag: None,
-            read_only: false,
-            folder_id: None,
-            last_accessed: None,
-            open: false,
+            engine: match engine {
+                Engine::Mongo => EngineConfig::Mongo(MongoConfig::default()),
+                Engine::Postgres => EngineConfig::Postgres(PostgresConfig::default()),
+            },
+            ..Default::default()
         }
     }
 
     #[test]
-    fn require_mongo_passes_mongo_and_rejects_postgres() {
-        assert!(require_mongo(&config("mongodb")).is_ok());
-        assert_eq!(require_mongo(&config("postgresql")).unwrap_err().code(), "validation");
+    fn mongo_config_passes_mongo_and_rejects_postgres() {
+        assert!(mongo_config(&config(Engine::Mongo)).is_ok());
+        assert_eq!(mongo_config(&config(Engine::Postgres)).unwrap_err().code(), "validation");
     }
 
     #[test]
-    fn require_postgres_passes_postgres_and_rejects_mongo() {
-        assert!(require_postgres(&config("postgresql")).is_ok());
-        assert_eq!(require_postgres(&config("mongodb")).unwrap_err().code(), "validation");
+    fn postgres_config_passes_postgres_and_rejects_mongo() {
+        assert!(postgres_config(&config(Engine::Postgres)).is_ok());
+        assert_eq!(postgres_config(&config(Engine::Mongo)).unwrap_err().code(), "validation");
     }
 
     #[test]
     fn default_port_for_matches_the_configs_own_engine() {
-        assert_eq!(default_port_for(&config("mongodb")), 27017);
-        assert_eq!(default_port_for(&config("postgresql")), 5432);
+        assert_eq!(default_port_for(&config(Engine::Mongo)), 27017);
+        assert_eq!(default_port_for(&config(Engine::Postgres)), 5432);
     }
 }
