@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::node_tags::NodeTagStorage;
-use crate::storage::{ConnectionConfig, HostEntry};
+use crate::storage::{ConnectionConfig, EngineConfig, MongoConfig};
 use super::AppContext;
 use crate::uri;
 use mongodb::Client;
@@ -10,103 +10,52 @@ use uuid::Uuid;
 mod ssh;
 pub use ssh::{forget_ssh_host, respond_ssh_host_key, test_ssh_connection};
 
-/// The connection editor's form, exactly as the frontend sends it. `save_connection`
-/// and `update_connection` take the same payload; the fields the editor doesn't own
-/// (id, folder, last_accessed, open) are supplied by the caller instead.
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectionFields {
-    pub name: String,
-    pub hosts: Vec<HostEntry>,
-    pub connection_type: String,
-    pub replica_set_name: Option<String>,
-    pub username: Option<String>,
-    pub auth_db: Option<String>,
-    pub auth_mechanism: Option<String>,
-    pub options: std::collections::BTreeMap<String, String>,
-    pub tls: bool,
-    pub tls_ca_file: Option<String>,
-    pub tls_cert_key_file: Option<String>,
-    pub tls_allow_invalid_certificates: bool,
-    pub ssh_enabled: bool,
-    pub ssh_host: Option<String>,
-    pub ssh_port: u16,
-    pub ssh_user: Option<String>,
-    pub ssh_auth: Option<String>,
-    pub ssh_key_file: Option<String>,
-    pub tag: Option<String>,
-    pub read_only: bool,
-    // Secrets ride in the same payload but have no place in `ConnectionConfig` —
-    // they go to the keychain and nowhere else.
-    pub password: Option<String>,
-    pub ssh_password: Option<String>,
-    pub ssh_passphrase: Option<String>,
-}
+mod postgres;
+use postgres::test_postgres_connection;
 
-impl ConnectionFields {
-    /// The stored config this form describes. The four fields the editor doesn't
-    /// carry come from the caller: a new connection invents them, an edit preserves
-    /// the existing record's.
-    fn into_config(
-        self,
-        id: String,
-        folder_id: Option<String>,
-        last_accessed: Option<String>,
-        open: bool,
-    ) -> ConnectionConfig {
-        ConnectionConfig {
-            id: id,
-            name: self.name,
-            hosts: self.hosts,
-            connection_type: self.connection_type,
-            replica_set_name: self.replica_set_name,
-            username: self.username,
-            auth_db: self.auth_db,
-            auth_mechanism: self.auth_mechanism,
-            options: self.options,
-            tls: self.tls,
-            tls_ca_file: self.tls_ca_file,
-            tls_cert_key_file: self.tls_cert_key_file,
-            tls_allow_invalid_certificates: self.tls_allow_invalid_certificates,
-            ssh_enabled: self.ssh_enabled,
-            ssh_host: self.ssh_host,
-            ssh_port: self.ssh_port,
-            ssh_user: self.ssh_user,
-            ssh_auth: self.ssh_auth,
-            ssh_key_file: self.ssh_key_file,
-            tag: self.tag,
-            read_only: self.read_only,
-            folder_id: folder_id,
-            last_accessed: last_accessed,
-            open: open,
-        }
-    }
+mod fields;
+use fields::ConnectionFields;
 
-    /// The three secrets, lifted out before `into_config` consumes the form.
-    fn secrets(&self) -> (Option<String>, Option<String>, Option<String>) {
-        (
-            self.password.clone(),
-            self.ssh_password.clone(),
-            self.ssh_passphrase.clone(),
-        )
-    }
-}
-
-/// Test the connection the editor currently describes, without saving it. The URI comes
-/// from `uri::build_uri` — the same function the real connect path uses — so a green test
-/// means the connection will be dialled exactly the way it was tested.
+/// Test the connection the editor currently describes, without saving it. Dials
+/// through `uri::build_uri` (MongoDB) or `pg_uri::build_options` (PostgreSQL) — the
+/// same functions the real connect paths use — so a green test means the connection
+/// will be dialled exactly the way it was tested.
 ///
 /// `id` is set when editing an existing connection, where a blank password field means
 /// "keep the stored one" (the rule `update_connection` follows); the secret then comes
-/// from the keychain rather than the form.
+/// from the keychain rather than the form. `engine`/`database` fall back the same way,
+/// to the stored record, since the editor doesn't carry either field yet.
 #[tauri::command]
-pub async fn test_connection(id: Option<String>, fields: ConnectionFields) -> Result<(), AppError> {
+pub async fn test_connection(
+    ctx: State<'_, AppContext>,
+    id: Option<String>,
+    fields: ConnectionFields,
+) -> Result<(), AppError> {
+    let existing = id.as_deref().and_then(|val| ctx.storage.find(val));
     let password = match fields.password.clone().filter(|s| !s.is_empty()) {
         Some(typed) => Some(typed),
         None => id.as_deref().and_then(crate::keychain::get),
     };
-    let config = fields.into_config(id.unwrap_or_default(), None, None, false);
-    let uri = uri::build_uri(&config, password.as_deref());
+    let config = fields.into_config(id.unwrap_or_default(), existing.as_ref(), None, None, false)?;
+
+    // Matching the variant rather than an engine tag hands each arm exactly the
+    // settings its driver needs, so neither can be called without them.
+    match &config.engine {
+        EngineConfig::Postgres(postgres) => {
+            test_postgres_connection(&config, postgres, password.as_deref()).await
+        }
+        EngineConfig::Mongo(mongo) => {
+            test_mongo_connection(&config, mongo, password.as_deref()).await
+        }
+    }
+}
+
+async fn test_mongo_connection(
+    config: &ConnectionConfig,
+    mongo: &MongoConfig,
+    password: Option<&str>,
+) -> Result<(), AppError> {
+    let uri = uri::build_uri(config, mongo, password);
 
     match uri::tcp_probe(&uri).await {
         Ok(val) => val,
@@ -121,6 +70,7 @@ pub async fn test_connection(id: Option<String>, fields: ConnectionFields) -> Re
 }
 
 
+
 /// Which stored secrets an updated config can still use. A `false` means the
 /// setting that justified the secret is gone — no username (or auth turned off),
 /// SSH disabled, or SSH switched to the other auth method — so the keychain entry
@@ -129,7 +79,13 @@ pub async fn test_connection(id: Option<String>, fields: ConnectionFields) -> Re
 /// Kept as a pure function so the decision is unit-testable without touching a real
 /// OS keychain. Returns `(password, ssh_password, ssh_passphrase)`.
 pub(crate) fn usable_secrets(config: &ConnectionConfig) -> (bool, bool, bool) {
-    let no_auth = config.auth_mechanism.as_deref() == Some("none");
+    // Only MongoDB has an auth mechanism; on any other driver a username is a
+    // username, so there is no "none" mode to suppress it.
+    let no_auth = config
+        .engine
+        .as_mongo()
+        .and_then(|mongo| mongo.auth_mechanism.as_deref())
+        == Some("none");
     let has_user = !no_auth
         && config.username.as_deref().filter(|s| !s.is_empty()).is_some();
     let ssh_password = config.ssh_enabled && config.ssh_auth.as_deref() == Some("password");
@@ -156,8 +112,9 @@ pub async fn save_connection(
             Err(e) => return Err(e),
         };
     }
-    // A newly saved connection starts at the root (no folder) and opened in the sidebar.
-    let config = fields.into_config(id.clone(), None, None, true);
+    // A newly saved connection starts at the root (no folder) and opened in the
+    // sidebar. `existing: None` — engine/database come from the form.
+    let config = fields.into_config(id.clone(), None, None, None, true)?;
 
     // Store password in OS keychain before persisting the rest to disk.
     let pw_ref = password.as_deref().filter(|s| !s.is_empty());
@@ -186,13 +143,16 @@ pub async fn save_connection(
         Err(e) => return Err(e),
     };
 
-    // Create and cache the client immediately so the first expand is instant.
+    // Create and cache the client/pool immediately so the first expand is instant.
     // The password was just written to the keychain above, so the pool reads it
     // back when it opens the connection.
-    match ctx.pool.connect(&config).await {
-        Ok(_) => {}
-        Err(e) => return Err(e),
+    let warm = match &config.engine {
+        EngineConfig::Postgres(_) => ctx.pool.connect_postgres(&config).await.map(|_| ()),
+        EngineConfig::Mongo(_) => ctx.pool.connect(&config).await.map(|_| ()),
     };
+    if let Err(e) = warm {
+        return Err(e);
+    }
 
     Ok(id)
 }
@@ -211,7 +171,18 @@ pub fn connection_uri(ctx: State<'_, AppContext>, id: String) -> Result<String, 
         Some(val) => val,
         None => return Err(AppError::UnknownConnection(id)),
     };
-    Ok(crate::uri::build_uri(&config, None))
+    // MongoDB-only by definition — it returns a `mongodb://` string. A Postgres
+    // connection has no MongoDB settings to build one from, so this says so rather
+    // than inventing a URI in the wrong dialect.
+    let mongo = match config.engine.as_mongo() {
+        Some(mongo) => mongo,
+        None => {
+            return Err(AppError::Validation(
+                "A connection string is only available for MongoDB connections.".to_string(),
+            ))
+        }
+    };
+    Ok(crate::uri::build_uri(&config, mongo, None))
 }
 
 /// The three keychain keys a connection may hold a secret under. Secrets are keyed by
@@ -329,7 +300,7 @@ pub async fn update_connection(
     let open = existing.as_ref().map(|c| c.open).unwrap_or(true);
 
     let (password, ssh_password, ssh_passphrase) = fields.secrets();
-    let config = fields.into_config(id.clone(), folder_id, last_accessed, open);
+    let config = fields.into_config(id.clone(), existing.as_ref(), folder_id, last_accessed, open)?;
 
     // Update keychain only when a new secret is supplied; empty = keep existing.
     let pw_ref = password.as_deref().filter(|s| !s.is_empty());

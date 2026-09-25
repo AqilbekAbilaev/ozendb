@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::storage::{ConnectionConfig, ConnectionKind};
+use crate::storage::{ConnectionConfig, ConnectionKind, MongoConfig};
 
 const TIMEOUT_MS: u64 = 5000;
 const TCP_PROBE_SECS: u64 = 3;
@@ -22,16 +22,16 @@ pub fn percent_encode(s: &str) -> String {
 /// password fetched separately from the OS keychain.
 /// The resulting URI is suitable for passing to `with_timeout()` and then
 /// to `Client::with_uri_str()`.
-pub fn build_uri(config: &ConnectionConfig, password: Option<&str>) -> String {
-    let scheme = if config.kind() == ConnectionKind::Srv {
+pub fn build_uri(config: &ConnectionConfig, mongo: &MongoConfig, password: Option<&str>) -> String {
+    let scheme = if mongo.kind() == ConnectionKind::Srv {
         "mongodb+srv"
     } else {
         "mongodb"
     };
 
-    let (creds, has_user) = build_credentials(config, password);
+    let (creds, has_user) = build_credentials(config, mongo, password);
 
-    let host_part = if config.kind() == ConnectionKind::Srv {
+    let host_part = if mongo.kind() == ConnectionKind::Srv {
         // SRV uses a single hostname and no port; take the first host.
         match config.hosts.first() {
             Some(entry) => entry.host.clone(),
@@ -49,14 +49,14 @@ pub fn build_uri(config: &ConnectionConfig, password: Option<&str>) -> String {
     };
 
     let mut query: Vec<String> = Vec::new();
-    push_auth_query(config, has_user, &mut query);
+    push_auth_query(mongo, has_user, &mut query);
 
-    if let Some(rs) = config.replica_set_name.as_deref().filter(|s| !s.is_empty()) {
+    if let Some(rs) = mongo.replica_set_name.as_deref().filter(|s| !s.is_empty()) {
         query.push(format!("replicaSet={}", rs));
     }
 
-    push_tls_query(config, &mut query);
-    push_options(config, &mut query);
+    push_tls_query(config, mongo, &mut query);
+    push_options(mongo, &mut query);
 
     assemble(scheme, &creds, &host_part, &query)
 }
@@ -67,18 +67,19 @@ pub fn build_uri(config: &ConnectionConfig, password: Option<&str>) -> String {
 /// the same credentials, auth, and TLS options.
 pub fn build_uri_to(
     config: &ConnectionConfig,
+    mongo: &MongoConfig,
     password: Option<&str>,
     host: &str,
     port: u16,
 ) -> String {
-    let (creds, has_user) = build_credentials(config, password);
+    let (creds, has_user) = build_credentials(config, mongo, password);
     let host_part = format!("{}:{}", host, port);
 
     let mut query: Vec<String> = Vec::new();
-    push_auth_query(config, has_user, &mut query);
+    push_auth_query(mongo, has_user, &mut query);
     query.push(String::from("directConnection=true"));
-    push_tls_query(config, &mut query);
-    push_options(config, &mut query);
+    push_tls_query(config, mongo, &mut query);
+    push_options(mongo, &mut query);
 
     assemble("mongodb", &creds, &host_part, &query)
 }
@@ -86,8 +87,8 @@ pub fn build_uri_to(
 /// Appends the passthrough `options` (any driver parameter the dedicated fields
 /// don't model) to the query string verbatim. Keys are emitted in sorted order
 /// (`BTreeMap`), so the built URI is deterministic.
-fn push_options(config: &ConnectionConfig, query: &mut Vec<String>) {
-    for (key, value) in config.options.iter() {
+fn push_options(mongo: &MongoConfig, query: &mut Vec<String>) {
+    for (key, value) in mongo.options.iter() {
         if key.is_empty() {
             continue;
         }
@@ -96,9 +97,9 @@ fn push_options(config: &ConnectionConfig, query: &mut Vec<String>) {
 }
 
 /// Returns the `user:pass@` prefix (empty when no auth) and whether a user is set.
-fn build_credentials(config: &ConnectionConfig, password: Option<&str>) -> (String, bool) {
+fn build_credentials(config: &ConnectionConfig, mongo: &MongoConfig, password: Option<&str>) -> (String, bool) {
     // "none" auth mechanism means no credentials in the URI at all.
-    let is_no_auth = config.auth_mechanism.as_deref() == Some("none");
+    let is_no_auth = mongo.auth_mechanism.as_deref() == Some("none");
     let has_user = !is_no_auth
         && config.username.as_deref().filter(|s| !s.is_empty()).is_some();
 
@@ -115,15 +116,15 @@ fn build_credentials(config: &ConnectionConfig, password: Option<&str>) -> (Stri
     (creds, has_user)
 }
 
-fn push_auth_query(config: &ConnectionConfig, has_user: bool, query: &mut Vec<String>) {
+fn push_auth_query(mongo: &MongoConfig, has_user: bool, query: &mut Vec<String>) {
     if has_user {
-        let auth_db = config.auth_db.as_deref().filter(|s| !s.is_empty()).unwrap_or("admin");
+        let auth_db = mongo.auth_db.as_deref().filter(|s| !s.is_empty()).unwrap_or("admin");
         query.push(format!("authSource={}", auth_db));
     }
     // Explicit mechanism for any mode other than "none" and the implicit default
     // (None / empty = let the driver negotiate). The UI stores short names; map them to
     // the canonical connection-string mechanism the driver expects.
-    if let Some(mech) = config.auth_mechanism.as_deref().filter(|s| !s.is_empty() && *s != "none") {
+    if let Some(mech) = mongo.auth_mechanism.as_deref().filter(|s| !s.is_empty() && *s != "none") {
         query.push(format!("authMechanism={}", canonical_mechanism(mech)));
     }
 }
@@ -140,14 +141,14 @@ fn canonical_mechanism(mech: &str) -> &str {
     }
 }
 
-fn push_tls_query(config: &ConnectionConfig, query: &mut Vec<String>) {
+fn push_tls_query(config: &ConnectionConfig, mongo: &MongoConfig, query: &mut Vec<String>) {
     // File paths are percent-encoded; the driver decodes query values.
     if config.tls {
         query.push(String::from("tls=true"));
         if let Some(ca) = config.tls_ca_file.as_deref().filter(|s| !s.is_empty()) {
             query.push(format!("tlsCAFile={}", percent_encode(ca)));
         }
-        if let Some(cert) = config.tls_cert_key_file.as_deref().filter(|s| !s.is_empty()) {
+        if let Some(cert) = mongo.tls_cert_key_file.as_deref().filter(|s| !s.is_empty()) {
             query.push(format!("tlsCertificateKeyFile={}", percent_encode(cert)));
         }
         if config.tls_allow_invalid_certificates {
@@ -236,11 +237,19 @@ pub async fn tcp_probe(uri: &str) -> Result<(), AppError> {
         Some(val) => val,
         None => return Ok(()),
     };
+    probe_host_port(&host_port).await
+}
 
-    let addrs: Vec<_> = match tokio::net::lookup_host(&host_port).await {
+/// The engine-agnostic core of `tcp_probe`: resolve `host_port` and try connecting
+/// to every address it resolves to (e.g. both `::1` and `127.0.0.1` for
+/// "localhost"), succeeding as soon as one connects. Shared with `pg_uri::tcp_probe`
+/// rather than duplicated, since neither the DNS/timeout/retry logic nor its error
+/// reporting is specific to MongoDB.
+pub(crate) async fn probe_host_port(host_port: &str) -> Result<(), AppError> {
+    let addrs: Vec<_> = match tokio::net::lookup_host(host_port).await {
         Ok(val) => val.collect(),
         Err(e) => return Err(AppError::Unreachable {
-            address: host_port.clone(),
+            address: host_port.to_string(),
             reason: e.to_string(),
         }),
     };
@@ -266,7 +275,7 @@ pub async fn tcp_probe(uri: &str) -> Result<(), AppError> {
     }
 
     Err(AppError::Unreachable {
-        address: host_port,
+        address: host_port.to_string(),
         reason: last_err,
     })
 }

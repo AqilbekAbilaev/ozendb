@@ -35,34 +35,18 @@ fn test_config() -> Option<ConnectionConfig> {
         id: String::from("it-test"),
         name: String::from("integration-test"),
         hosts: vec![HostEntry { host: host, port: port }],
-        connection_type: String::from("standalone"),
-        replica_set_name: None,
-        username: None,
-        auth_db: None,
-        auth_mechanism: None,
-        options: std::collections::BTreeMap::new(),
-        tls: false,
-        tls_ca_file: None,
-        tls_cert_key_file: None,
-        tls_allow_invalid_certificates: false,
-        ssh_enabled: false,
-        ssh_host: None,
-        ssh_port: 22,
-        ssh_user: None,
-        ssh_auth: None,
-        ssh_key_file: None,
-        tag: None,
-        read_only: false,
-        folder_id: None,
-        last_accessed: None,
-        open: false,
+        ..Default::default()
     })
 }
 
 /// Connect the way the pool does: build the URI from the config, add the standard
 /// timeouts, and hand it to the driver.
 async fn connect(config: &ConnectionConfig) -> Client {
-    let built = uri::with_timeout(&uri::build_uri(config, None));
+    let built = uri::with_timeout(&uri::build_uri(
+        config,
+        config.engine.as_mongo().expect("the integration config is MongoDB"),
+        None,
+    ));
     match Client::with_uri_str(&built).await {
         Ok(val) => val,
         Err(e) => panic!("could not connect to test MongoDB: {}", e),

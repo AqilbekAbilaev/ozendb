@@ -31,6 +31,10 @@ describe('errText', () => {
     const e = { code: 'mongo', message: 'some verbose driver dump …' }
     expect(errText(e)).toBe('The database reported an error')
   })
+  it('uses the friendly title for generic postgres errors', () => {
+    const e = { code: 'postgres', message: 'some verbose sqlx driver dump …' }
+    expect(errText(e)).toBe('The database reported an error')
+  })
   it('surfaces the server message directly for write errors (e.g. duplicate key)', () => {
     // The backend humanizes write/insert failures and tags them `write` (no friendly
     // title), so the actionable message reaches the user instead of "database error".

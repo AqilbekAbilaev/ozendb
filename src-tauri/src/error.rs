@@ -5,6 +5,9 @@ pub enum AppError {
     #[error("MongoDB error: {0}")]
     Mongo(#[from] mongodb::error::Error),
 
+    #[error("Postgres error: {0}")]
+    Postgres(#[from] sqlx::Error),
+
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -46,6 +49,7 @@ impl AppError {
     pub fn code(&self) -> &'static str {
         match self {
             AppError::Mongo(e) => mongo_code(e),
+            AppError::Postgres(e) => postgres_code(e),
             AppError::Io(_) => "io",
             AppError::Serde(_) => "serde",
             AppError::Unreachable { .. } => "unreachable",
@@ -94,6 +98,7 @@ impl serde::Serialize for AppError {
         // already Displays as a readable sentence.
         let message = match self {
             AppError::Mongo(e) => mongo_message(e),
+            AppError::Postgres(e) => postgres_message(e),
             _ => self.to_string(),
         };
         let wire = WireError {
@@ -163,6 +168,36 @@ fn mongo_message(e: &mongodb::error::Error) -> String {
         ErrorKind::Command(command_error) => {
             command_message(command_error.code, &command_error.message)
         }
+        _ => e.to_string(),
+    }
+}
+
+/// Sub-categorize a Postgres error the same way `mongo_code` does for MongoDB: auth/TLS/
+/// network drive connection hints, a server-rejected statement (bad SQL, permission
+/// denied, constraint violation, …) gets `command` since its own message is the useful
+/// part, everything else stays `postgres`.
+fn postgres_code(e: &sqlx::Error) -> &'static str {
+    match e {
+        // SQLSTATE 28000/28P01 are Postgres's invalid-authorization/invalid-password
+        // classes; every other database-rejected statement is a `command` error.
+        sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
+            Some("28000") | Some("28P01") => "auth",
+            _ => "command",
+        },
+        sqlx::Error::Tls(_) => "tls",
+        sqlx::Error::Io(_) | sqlx::Error::PoolTimedOut | sqlx::Error::PoolClosed
+        | sqlx::Error::WorkerCrashed => "network",
+        sqlx::Error::Configuration(_) | sqlx::Error::InvalidArgument(_) => "validation",
+        _ => "postgres",
+    }
+}
+
+/// Turn a Postgres driver error into a concise, human-readable message. A
+/// server-rejected statement's own message (e.g. `relation "x" does not exist`) is
+/// already the useful part; every other error kind already Displays as a sentence.
+fn postgres_message(e: &sqlx::Error) -> String {
+    match e {
+        sqlx::Error::Database(db_err) => db_err.message().to_string(),
         _ => e.to_string(),
     }
 }

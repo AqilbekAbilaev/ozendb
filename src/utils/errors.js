@@ -29,6 +29,7 @@ const FRIENDLY_TITLES = {
   network:   "Can't reach the server",
   tls:       'TLS / SSL connection problem',
   mongo:     'The database reported an error',
+  postgres:  'The database reported an error',
   read_only: 'Connection is read-only',
 }
 
