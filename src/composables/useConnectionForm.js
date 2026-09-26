@@ -6,6 +6,7 @@ import { errText } from '../utils/errors'
 import { connectionTargetChanged } from '../utils/connectionTarget.js'
 import { hasLoadedData } from '../stores/connectionData.js'
 import { OPTION_GROUPS, KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
+import { BUILD_FIELDS } from '../engines/connectionFields.js'
 
 // Options managed by dedicated fields outside the catalog (so they aren't treated as
 // "unknown" passthrough below).
@@ -241,21 +242,12 @@ export function useConnectionForm(editConn) {
   // The form as the backend takes it — shared by Save and Test Connection, so both
   // describe the same connection and the test can't pass on a URI Save wouldn't produce.
   function formFields() {
-    const fields = {
+    return {
       name:            connName.value.trim(),
       engine:          engine.value,
-      database:        null,
       hosts:           hosts.value.map(h => ({ host: h.host, port: Number(h.port) || DEFAULT_PORTS[engine.value] })),
-      connectionType:  connType.value,
-      replicaSetName:  replicaSetName.value || null,
-      options:         buildOptions(),
-      username:        authMode.value !== 'none' ? (username.value || null) : null,
-      password:        authMode.value !== 'none' ? (password.value || null) : null,
-      authDb:          authMode.value !== 'none' ? (authDb.value || null) : null,
-      authMechanism:   authMode.value,
       tls:                          useTls.value,
       tlsCaFile:                    useTls.value ? (tlsCaFile.value || null) : null,
-      tlsCertKeyFile:               useTls.value ? (tlsCertKeyFile.value || null) : null,
       tlsAllowInvalidCertificates:  useTls.value ? tlsAllowInvalidCerts.value : false,
       sshEnabled:    useSsh.value,
       sshHost:       useSsh.value ? (sshHost.value || null) : null,
@@ -267,20 +259,18 @@ export function useConnectionForm(editConn) {
       sshPassphrase: (useSsh.value && sshAuth.value === 'key') ? (sshKeyPassphrase.value || null) : null,
       tag:             selectedTag.value !== 'none' ? selectedTag.value : null,
       readOnly:        readOnly.value,
-    }
-    if (engine.value !== 'postgresql') return fields
-    // PostgreSQL has no auth modes or driver options; its editor shows none of them.
-    return {
-      ...fields,
-      database:       database.value.trim() || null,
-      connectionType: 'standalone',
-      replicaSetName: null,
-      options:        {},
-      username:       username.value || null,
-      password:       password.value || null,
-      authDb:         null,
-      authMechanism:  null,
-      tlsCertKeyFile: null,
+      ...BUILD_FIELDS[engine.value]({
+        database:       database.value,
+        connType:       connType.value,
+        replicaSetName: replicaSetName.value,
+        options:        buildOptions(),
+        authMode:       authMode.value,
+        username:       username.value,
+        password:       password.value,
+        authDb:         authDb.value,
+        useTls:         useTls.value,
+        tlsCertKeyFile: tlsCertKeyFile.value,
+      }),
     }
   }
 
