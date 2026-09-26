@@ -82,6 +82,7 @@ describe('workspace definition registry', () => {
       'mongodb.import',
       'mongodb.export',
       'mongodb.current_operations',
+      'postgresql.table_browse',
     ]
     for (const type of expected) {
       expect(getWorkspaceDefinition(type).type).toBe(type)

@@ -317,3 +317,17 @@ describe('ids', () => {
     expect(new Set(ids()).size).toBe(4)
   })
 })
+
+describe('PostgreSQL tables', () => {
+  const TABLE = { connectionId: 'c9', connectionName: 'pg', database: 'app', schema: 'public', table: 'users' }
+
+  it('opens a table-browse tab on every open, like a collection, and activates it', () => {
+    const c = harness()
+    c.openPostgresTable(TABLE)
+    c.openPostgresTable(TABLE)
+
+    expect(tabs.value.filter(t => t.type === 'postgresql.table_browse')).toHaveLength(2)
+    expect(lastTab()).toMatchObject({ kind: 'pgTable', engine: 'postgresql', schema: 'public', table: 'users' })
+    expect(activeTabId.value).toBe(lastTab().id)
+  })
+})

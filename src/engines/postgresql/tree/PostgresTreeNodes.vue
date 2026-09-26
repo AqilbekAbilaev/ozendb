@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import { usePostgresTree, visibleSchemas } from './usePostgresTree.js'
+import { openPostgresTable } from '../../../stores/tabCreators'
 
 const props = defineProps({
   conn: { type: Object, required: true },
@@ -11,6 +12,17 @@ const props = defineProps({
 const { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, toggleSchema } =
   usePostgresTree(props.conn.id)
 const shown = computed(() => visibleSchemas(props.schemas))
+const database = computed(() => props.conn.database || 'postgres')
+
+function openTable(schema, table) {
+  openPostgresTable({
+    connectionId: props.conn.id,
+    connectionName: props.conn.name,
+    database: database.value,
+    schema,
+    table,
+  })
+}
 </script>
 
 <template>
@@ -18,7 +30,7 @@ const shown = computed(() => visibleSchemas(props.schemas))
   <div class="tnode" style="padding-left: 21px" @click="toggleDatabase">
     <span class="tw"><BaseIcon :name="databaseOpen ? 'caretDown' : 'caret'" :size="12" /></span>
     <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
-    <span class="tt">{{ conn.database || 'postgres' }}</span>
+    <span class="tt">{{ database }}</span>
     <span v-if="shown.length" class="cnt">({{ shown.length }})</span>
   </div>
 
@@ -46,6 +58,7 @@ const shown = computed(() => visibleSchemas(props.schemas))
           :key="table.name"
           class="tnode"
           style="padding-left: 66px"
+          @dblclick="openTable(schema.name, table.name)"
         >
           <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
           <span class="ti"><BaseIcon name="collSmall" :size="15" /></span>

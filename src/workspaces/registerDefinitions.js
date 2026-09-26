@@ -7,9 +7,10 @@ import { registerWorkspaceDefinition } from './registry'
 import { appDefinitions } from './appDefinitions'
 import { queryDefinitions } from '../engines/mongodb/workspaces/queryDefinitions'
 import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
+import { postgresDefinitions } from '../engines/postgresql/workspaces/postgresDefinitions'
 
 export function registerWorkspaceDefinitions() {
-  for (const def of [...appDefinitions, ...queryDefinitions, ...toolDefinitions]) {
+  for (const def of [...appDefinitions, ...queryDefinitions, ...toolDefinitions, ...postgresDefinitions]) {
     registerWorkspaceDefinition(def)
   }
 }
