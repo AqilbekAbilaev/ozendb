@@ -81,6 +81,63 @@ describe('formFields', () => {
   })
 })
 
+describe('engine', () => {
+  it('starts a new connection as MongoDB', () => {
+    const fields = useConnectionForm(null).formFields()
+    expect(fields.engine).toBe('mongodb')
+    expect(fields.database).toBe(null)
+  })
+
+  it('moves a default port to the new engine\'s default and keeps a typed one', () => {
+    const f = useConnectionForm(null)
+    f.hosts.value = [{ host: 'a', port: 27017 }, { host: 'b', port: 6000 }]
+
+    f.setEngine('postgresql')
+
+    expect(f.engine.value).toBe('postgresql')
+    expect(f.hosts.value.map(h => h.port)).toEqual([5432, 6000])
+  })
+
+  it('sends PostgreSQL its database and credentials, and none of MongoDB\'s settings', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('postgresql')
+    f.database.value = ' app '
+    f.username.value = 'me'
+    f.password.value = 'pw'
+    f.authMode.value = 'none'
+    f.connType.value = 'replica'
+    f.replicaSetName.value = 'rs0'
+    f.useTls.value = true
+    f.tlsCertKeyFile.value = '/client.pem'
+
+    expect(f.formFields()).toMatchObject({
+      engine: 'postgresql',
+      database: 'app',
+      username: 'me',
+      password: 'pw',
+      connectionType: 'standalone',
+      replicaSetName: null,
+      authDb: null,
+      authMechanism: null,
+      options: {},
+      tlsCertKeyFile: null,
+    })
+  })
+
+  it('falls back to the engine\'s default port for a blank one', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('postgresql')
+    f.hosts.value = [{ host: 'db', port: '' }]
+    expect(f.formFields().hosts).toEqual([{ host: 'db', port: 5432 }])
+  })
+
+  it('seeds the engine and database when editing a PostgreSQL connection', () => {
+    const f = useConnectionForm(stored({ engine: 'postgresql', database: 'app', hosts: [{ host: 'pg', port: 5432 }] }))
+    expect(f.engine.value).toBe('postgresql')
+    expect(f.database.value).toBe('app')
+  })
+})
+
 describe('buildOptions', () => {
   it('omits unset options so the URI carries only real parameters', () => {
     const f = useConnectionForm(null)

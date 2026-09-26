@@ -93,6 +93,11 @@ export const KNOWN_OPTION_KEYS = OPTION_GROUPS.flatMap(g => g.options.map(o => o
 
 // The editor's tabs, and the fixed choice lists its selects offer. Constants rather
 // than form state, so they live with the option catalog instead of in the dialog.
+export const ENGINE_OPTIONS = [
+  { value: 'mongodb', label: 'MongoDB' },
+  { value: 'postgresql', label: 'PostgreSQL' },
+]
+
 export const TABS = [
   ['server', 'Server'],
   ['auth', 'Authentication'],
