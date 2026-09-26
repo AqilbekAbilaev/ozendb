@@ -1,9 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 
-vi.mock('../engines/mongodb/api/connections', () => ({ listConnections: vi.fn() }))
+vi.mock('../appApi/connections', () => ({ listConnections: vi.fn() }))
 vi.mock('../appApi/tags', () => ({ getNodeTags: vi.fn() }))
 
-import { listConnections } from '../engines/mongodb/api/connections'
+import { listConnections } from '../appApi/connections'
 import { getNodeTags } from '../appApi/tags'
 import { tagOverrides, loadNodeTags } from './nodeTags'
 

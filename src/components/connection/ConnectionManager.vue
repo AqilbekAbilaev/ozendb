@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import * as connApi from '../../engines/mongodb/api/connections'
+import * as connApi from '../../appApi/connections'
+import { connectionUri } from '../../engines/mongodb/api/connections'
 import { updateLastAccessed } from '../../appApi/connectionState'
 import { requestConnectionOpen } from '../../stores/connectionNavigation'
 import { listen, emit as tauriEmit } from '@tauri-apps/api/event'
@@ -133,7 +134,7 @@ async function duplicateSelected() {
 async function copyUri() {
   if (!selectedId.value) return
   try {
-    const uri = await connApi.connectionUri(selectedId.value)
+    const uri = await connectionUri(selectedId.value)
     await navigator.clipboard.writeText(uri)
     showToast('Connection URI copied (password excluded)')
   } catch (e) {

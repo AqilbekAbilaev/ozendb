@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { listConnections } from '../engines/mongodb/api/connections'
+import { listConnections } from '../appApi/connections'
 import { getNodeTags } from '../appApi/tags'
 
 // Colour tags by tree node key; drives the coloured dot in the sidebar and on tabs.

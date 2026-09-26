@@ -1,5 +1,5 @@
 import { watch } from 'vue'
-import { listConnections } from '../engines/mongodb/api/connections'
+import { listConnections } from '../appApi/connections'
 import { getOpenTabs, setOpenTabs } from '../appApi/session'
 import { tabs, activeTabId } from '../stores/tabs'
 import { restoreWorkspace } from '../workspaces/lifecycle'

@@ -1,4 +1,4 @@
-import { disconnect } from '../engines/mongodb/api/connections'
+import { disconnect } from '../appApi/connections'
 import { showToast } from '../stores/toast'
 import {
   openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab, openSchemaTab,

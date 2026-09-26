@@ -1,10 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 
-vi.mock('../engines/mongodb/api/connections', () => ({ listConnections: vi.fn() }))
+vi.mock('../appApi/connections', () => ({ listConnections: vi.fn() }))
 vi.mock('../appApi/connectionState', () => ({ setConnectionOpen: vi.fn() }))
 vi.mock('./connectionData', () => ({ clearConnectionResources: vi.fn() }))
 
-import { listConnections } from '../engines/mongodb/api/connections'
+import { listConnections } from '../appApi/connections'
 import { setConnectionOpen } from '../appApi/connectionState'
 import { clearConnectionResources } from './connectionData'
 import {

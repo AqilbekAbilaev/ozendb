@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listConnections } from '../../engines/mongodb/api/connections'
+import { listConnections } from '../../appApi/connections'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { updateLastAccessed } from '../../appApi/connectionState'
 import { requestConnectionOpen } from '../../stores/connectionNavigation'
