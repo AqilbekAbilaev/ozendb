@@ -60,6 +60,25 @@ pub async fn test_ssh_connection(
     Ok(())
 }
 
+/// The tunnel Test Connection dials through — built by the same `tunnel_params`
+/// as the pool's, so a green test means the real connection tunnels the same way.
+/// `None` when SSH is off.
+pub(super) async fn open_test_tunnel(
+    app: tauri::AppHandle,
+    known_hosts: &Arc<KnownHostsStore>,
+    prompts: &Arc<HostKeyPrompts>,
+    config: &ConnectionConfig,
+    ssh_password: Option<String>,
+    ssh_passphrase: Option<String>,
+) -> Result<Option<crate::ssh::SshTunnel>, AppError> {
+    if !config.ssh_enabled {
+        return Ok(None);
+    }
+    let params = crate::pool::tunnel_params(config, ssh_password, ssh_passphrase);
+    let tunnel = crate::ssh::establish(params, Arc::clone(known_hosts), Arc::clone(prompts), app).await?;
+    Ok(Some(tunnel))
+}
+
 #[tauri::command]
 pub fn respond_ssh_host_key(
     prompts: State<'_, Arc<HostKeyPrompts>>, request_id: u64, trust: bool,

@@ -2,13 +2,17 @@ use crate::error::AppError;
 use crate::node_tags::NodeTagStorage;
 use crate::storage::{ConnectionConfig, EngineConfig, MongoConfig};
 use super::AppContext;
+use crate::known_hosts::KnownHostsStore;
+use crate::ssh::HostKeyPrompts;
 use crate::uri;
 use mongodb::Client;
+use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
 
 mod ssh;
 pub use ssh::{forget_ssh_host, respond_ssh_host_key, test_ssh_connection};
+use ssh::open_test_tunnel;
 
 mod postgres;
 use postgres::test_postgres_connection;
@@ -27,35 +31,48 @@ use fields::ConnectionFields;
 /// to the stored record, since the editor doesn't carry either field yet.
 #[tauri::command]
 pub async fn test_connection(
+    app: tauri::AppHandle,
     ctx: State<'_, AppContext>,
+    known_hosts: State<'_, Arc<KnownHostsStore>>,
+    prompts: State<'_, Arc<HostKeyPrompts>>,
     id: Option<String>,
     fields: ConnectionFields,
 ) -> Result<(), AppError> {
     let existing = id.as_deref().and_then(|val| ctx.storage.find(val));
-    let password = match fields.password.clone().filter(|s| !s.is_empty()) {
-        Some(typed) => Some(typed),
-        None => id.as_deref().and_then(crate::keychain::get),
+    let typed_or_stored = |typed: Option<String>, key: Option<String>| {
+        typed.filter(|s| !s.is_empty()).or_else(|| key.as_deref().and_then(crate::keychain::get))
     };
+    let password = typed_or_stored(fields.password.clone(), id.clone());
+    let ssh_password = typed_or_stored(fields.ssh_password.clone(), id.as_ref().map(|v| format!("{v}::ssh-pass")));
+    let ssh_passphrase = typed_or_stored(fields.ssh_passphrase.clone(), id.as_ref().map(|v| format!("{v}::ssh-key-pass")));
     let config = fields.into_config(id.unwrap_or_default(), existing.as_ref(), None, None, false)?;
+
+    let tunnel = open_test_tunnel(app, known_hosts.inner(), prompts.inner(), &config, ssh_password, ssh_passphrase).await?;
+    let via = tunnel.as_ref().map(|t| t.local_addr.port());
 
     // Matching the variant rather than an engine tag hands each arm exactly the
     // settings its driver needs, so neither can be called without them.
     match &config.engine {
         EngineConfig::Postgres(postgres) => {
-            test_postgres_connection(&config, postgres, password.as_deref()).await
+            test_postgres_connection(&config, postgres, password.as_deref(), via).await
         }
         EngineConfig::Mongo(mongo) => {
-            test_mongo_connection(&config, mongo, password.as_deref()).await
+            test_mongo_connection(&config, mongo, password.as_deref(), via).await
         }
     }
 }
 
+/// `via` is the local port of an SSH tunnel, when the connection has one.
 async fn test_mongo_connection(
     config: &ConnectionConfig,
     mongo: &MongoConfig,
     password: Option<&str>,
+    via: Option<u16>,
 ) -> Result<(), AppError> {
-    let uri = uri::build_uri(config, mongo, password);
+    let uri = match via {
+        Some(port) => uri::build_uri_to(config, mongo, password, "127.0.0.1", port),
+        None => uri::build_uri(config, mongo, password),
+    };
 
     match uri::tcp_probe(&uri).await {
         Ok(val) => val,
