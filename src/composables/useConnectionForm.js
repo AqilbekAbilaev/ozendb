@@ -409,7 +409,7 @@ export function useConnectionForm(editConn) {
   }
 
   return {
-    connName, engine, database, setEngine, hosts, connType, replicaSetName, readPreference, isMultiHost,
+    isEditMode, connName, engine, database, setEngine, hosts, connType, replicaSetName, readPreference, isMultiHost,
     addHost, removeHost,
     authMode, username, password, authDb,
     oidcEnvironment, oidcTokenResource, oidcNeedsResource,

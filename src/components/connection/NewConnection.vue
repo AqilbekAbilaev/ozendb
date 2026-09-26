@@ -3,18 +3,14 @@ import { ref, computed } from 'vue'
 import { TAG_PRESETS } from '../../utils/tabColor.js'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
-import BaseSelect from '../base/BaseSelect.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
 import SegmentedControl from '../base/SegmentedControl.vue'
 import TabStrip from '../base/TabStrip.vue'
 import Disclosure from '../base/Disclosure.vue'
 import FormField from '../base/FormField.vue'
-import HintText from '../base/HintText.vue'
-import {
-  OPTION_GROUPS, TABS, AUTH_MODE_OPTIONS, READ_PREF_OPTIONS, BOOL_OPTIONS,
-  OIDC_ENVIRONMENTS, enumOptions,
-} from '../../data/connectionOptions.js'
+import { TABS } from '../../data/connectionOptions.js'
+import { CONNECTION_EDITORS } from '../../engines/connectionEditor.js'
 import ConnectionIntro from './ConnectionIntro.vue'
 import { useConnectionForm } from '../../composables/useConnectionForm.js'
 import { useMomentumScroll } from '../../composables/useMomentumScroll.js'
@@ -32,19 +28,16 @@ const activeTab = ref('server')
 
 const form = useConnectionForm(props.editConn)
 const {
-  connName, engine, database, hosts, connType, replicaSetName, readPreference, isMultiHost,
-  addHost, removeHost,
-  authMode, username, password, authDb,
-  oidcEnvironment, oidcTokenResource, oidcNeedsResource,
-  useTls, tlsCaFile, tlsCertKeyFile, tlsAllowInvalidCerts, pickTlsFile,
+  connName, engine, database, hosts, username, password,
+  useTls, tlsCaFile, tlsAllowInvalidCerts, pickTlsFile,
   useSsh, sshHost, sshPort, sshUser, sshAuth, sshPassword, sshKeyFile,
   sshKeyPassphrase, pickSshKey,
-  selectedTag, readOnly,
-  advancedOptions, optionVisible, optionDisabled, groupSetCount, openGroups, toggleGroup,
+  selectedTag, readOnly, openGroups, toggleGroup,
   status, isTesting, isSaving, blockedByLiveConnection,
   testConnection,
 } = form
 const isPg = computed(() => engine.value === 'postgresql')
+const editor = CONNECTION_EDITORS.mongodb
 
 // Opens the form for the engine picked on the intro step, pre-filled when it parsed a
 // connection string. `parsed` is null when the user chose to configure it by hand.
@@ -97,42 +90,19 @@ useMomentumScroll(bodyEl)
       <!-- Tab body -->
       <div ref="bodyEl" class="nc-body">
 
-        <!-- Server -->
-        <div v-if="activeTab === 'server'" class="nc-form">
-          <FormField v-if="!isPg" label="Connection type">
-            <SegmentedControl
-              class="nc-seg"
-              :model-value="connType"
-              :options="[{ value: 'standalone', label: 'Standalone' }, { value: 'replica', label: 'Replica Set' }, { value: 'sharded', label: 'Sharded' }, { value: 'srv', label: 'DNS Seedlist (SRV)' }]"
-              @update:model-value="connType = $event"
-            />
+        <!-- Server / Authentication / SSL -->
+        <div v-if="activeTab === 'server' && isPg" class="nc-form">
+          <FormField label="Server">
+            <div v-for="(h, i) in hosts" :key="i" class="nc-inline nc-host-row">
+              <BaseInput class="nc-input" v-model="h.host" style="flex:3" placeholder="localhost" />
+              <span class="nc-colon">:</span>
+              <BaseInput class="nc-input" v-model="h.port" type="number" style="flex:1" />
+            </div>
           </FormField>
-          <FormField :label="isPg ? 'Server' : connType === 'srv' ? 'Server (SRV hostname)' : (isMultiHost ? 'Server(s)' : 'Server')">
-            <BaseInput v-if="!isPg && connType === 'srv'" class="nc-input" v-model="hosts[0].host" placeholder="cluster.example.com" />
-            <template v-else>
-              <div v-for="(h, i) in hosts" :key="i" class="nc-inline nc-host-row">
-                <BaseInput class="nc-input" v-model="h.host" style="flex:3" placeholder="localhost" />
-                <span class="nc-colon">:</span>
-                <BaseInput class="nc-input" v-model="h.port" type="number" style="flex:1" />
-                <BaseButton v-if="!isPg && isMultiHost && hosts.length > 1" icon="close" :icon-size="12" title="Remove host" @click="removeHost(i)" />
-              </div>
-              <BaseButton v-if="!isPg && isMultiHost" variant="ghost" size="sm" class="nc-host-add" @click="addHost">
-                <BaseIcon name="plus" :size="12" /> Add host
-              </BaseButton>
-            </template>
-          </FormField>
-          <FormField v-if="isPg" label="Database">
+          <FormField label="Database">
             <BaseInput class="nc-input" v-model="database" placeholder="postgres" />
           </FormField>
-          <FormField v-if="!isPg && connType === 'replica'" label="Replica set name">
-            <BaseInput class="nc-input" v-model="replicaSetName" placeholder="myReplicaSet" />
-          </FormField>
-          <FormField v-if="!isPg && connType !== 'standalone'" label="Read preference">
-            <BaseSelect class="nc-sel" v-model="readPreference" :options="READ_PREF_OPTIONS" />
-          </FormField>
         </div>
-
-        <!-- Authentication -->
         <div v-else-if="activeTab === 'auth' && isPg" class="nc-form">
           <FormField label="User name">
             <BaseInput class="nc-input" v-model="username" />
@@ -146,47 +116,25 @@ useMomentumScroll(bodyEl)
             />
           </FormField>
         </div>
-        <div v-else-if="activeTab === 'auth'" class="nc-form">
-          <FormField label="Authentication mode">
-            <BaseSelect class="nc-sel" v-model="authMode" :options="AUTH_MODE_OPTIONS">
-              <template #option="{ option }">
-                <span>{{ option.label }}</span>
-                <span v-if="option.soon" class="nc-soon">soon</span>
-              </template>
-            </BaseSelect>
-          </FormField>
+        <div v-else-if="activeTab === 'ssl' && isPg" class="nc-form">
+          <label class="chk-line big" @click="useTls = !useTls">
+            <span class="cb" :class="{ on: useTls }"><BaseIcon v-if="useTls" name="check" :size="12" /></span>
+            Use SSL/TLS protocol to connect
+          </label>
 
-          <template v-if="authMode !== 'none' && authMode !== 'OIDC'">
-            <FormField label="User name">
-              <BaseInput class="nc-input" v-model="username" />
+          <template v-if="useTls">
+            <FormField label="Certificate Authority (.pem)">
+              <div class="nc-file-row">
+                <BaseInput class="nc-input" v-model="tlsCaFile" placeholder="Path to CA certificate" />
+                <BaseButton bordered type="button" @click="pickTlsFile('ca')">Browse…</BaseButton>
+              </div>
             </FormField>
-            <FormField label="Password">
-              <BaseInput
-                class="nc-input"
-                type="password"
-                v-model="password"
-                :placeholder="isEditMode ? 'Leave blank to keep existing password' : ''"
-              />
-            </FormField>
-            <FormField label="Authentication DB">
-              <BaseInput class="nc-input" v-model="authDb" :placeholder="authMode === 'PLAIN' ? '$external' : 'admin'" />
-            </FormField>
-            <div v-if="authMode === 'PLAIN'" class="nc-hint">
-              LDAP (PLAIN) requires SSL/TLS. Enable SSL in the SSL tab.
-            </div>
-          </template>
 
-          <template v-else-if="authMode === 'OIDC'">
-            <FormField label="Environment">
-              <BaseSelect class="nc-sel" v-model="oidcEnvironment" :options="OIDC_ENVIRONMENTS" />
-            </FormField>
-            <FormField v-if="oidcNeedsResource" label="Token resource">
-              <BaseInput class="nc-input" v-model="oidcTokenResource" placeholder="e.g. api://&lt;app-id&gt;" />
-            </FormField>
-            <div class="nc-hint">
-              Workload-identity OIDC: the token is obtained from the {{ oidcEnvironment }} environment — no username or password.
-              Interactive (device-flow) OIDC isn't supported yet.
-            </div>
+            <label class="chk-line" @click="tlsAllowInvalidCerts = !tlsAllowInvalidCerts">
+              <span class="cb" :class="{ on: tlsAllowInvalidCerts }"><BaseIcon v-if="tlsAllowInvalidCerts" name="check" :size="12" /></span>
+              Allow invalid certificates (accept self-signed / expired)
+            </label>
+            <div class="nc-hint">A Certificate Authority file verifies the server securely; “allow invalid certificates” skips that check.</div>
           </template>
         </div>
 
@@ -237,89 +185,13 @@ useMomentumScroll(bodyEl)
           </template>
         </div>
 
-        <!-- SSL -->
-        <div v-else-if="activeTab === 'ssl'" class="nc-form">
-          <label class="chk-line big" @click="useTls = !useTls">
-            <span class="cb" :class="{ on: useTls }"><BaseIcon v-if="useTls" name="check" :size="12" /></span>
-            Use SSL/TLS protocol to connect
-          </label>
-
-          <template v-if="useTls">
-            <FormField label="Certificate Authority (.pem)">
-              <div class="nc-file-row">
-                <BaseInput class="nc-input" v-model="tlsCaFile" placeholder="Path to CA certificate" />
-                <BaseButton bordered type="button" @click="pickTlsFile('ca')">Browse…</BaseButton>
-              </div>
-            </FormField>
-
-            <FormField v-if="!isPg" label="Client Certificate + Key (.pem)">
-              <div class="nc-file-row">
-                <BaseInput class="nc-input" v-model="tlsCertKeyFile" placeholder="Path to client certificate (optional)" />
-                <BaseButton bordered type="button" @click="pickTlsFile('cert')">Browse…</BaseButton>
-              </div>
-            </FormField>
-
-            <label class="chk-line" @click="tlsAllowInvalidCerts = !tlsAllowInvalidCerts">
-              <span class="cb" :class="{ on: tlsAllowInvalidCerts }"><BaseIcon v-if="tlsAllowInvalidCerts" name="check" :size="12" /></span>
-              Allow invalid certificates (accept self-signed / expired)
-            </label>
-            <div class="nc-hint">A Certificate Authority file verifies the server securely; “allow invalid certificates” skips that check.</div>
-          </template>
+        <div v-else-if="activeTab !== 'advanced'" class="nc-form">
+          <component :is="editor.sections[activeTab]" :form="form" />
         </div>
 
         <!-- Advanced -->
-        <div v-else-if="activeTab === 'advanced'" class="nc-form">
-          <div v-if="!isPg" class="nc-hint nc-adv-intro">
-            Optional MongoDB driver parameters. Leave a field empty to use the driver default.
-          </div>
-
-          <template v-for="group in (isPg ? [] : OPTION_GROUPS)" :key="group.title">
-            <Disclosure
-              class="nc-adv-group"
-              :model-value="openGroups[group.title]"
-              @update:model-value="toggleGroup(group.title)"
-            >
-              <span class="nc-adv-group-t">{{ group.title }}</span>
-              <span v-if="groupSetCount(group)" class="nc-adv-badge">{{ groupSetCount(group) }} set</span>
-            </Disclosure>
-            <template v-if="openGroups[group.title]">
-              <template v-for="opt in group.options" :key="opt.key">
-              <FormField v-if="optionVisible(opt)">
-                <template #label>
-                  {{ opt.label }}
-                  <span class="nc-adv-key">{{ opt.key }}</span>
-                </template>
-
-                <BaseSelect
-                  v-if="opt.type === 'bool'"
-                  class="nc-sel"
-                  v-model="advancedOptions[opt.key]"
-                  :options="BOOL_OPTIONS"
-                  :disabled="optionDisabled(opt)"
-                />
-
-                <BaseSelect
-                  v-else-if="opt.type === 'enum'"
-                  class="nc-sel"
-                  v-model="advancedOptions[opt.key]"
-                  :options="enumOptions(opt)"
-                  :disabled="optionDisabled(opt)"
-                />
-
-                <BaseInput
-                  v-else
-                  class="nc-input"
-                  :type="opt.type === 'int' ? 'number' : 'text'"
-                  v-model="advancedOptions[opt.key]"
-                  :placeholder="opt.placeholder || ''"
-                  :disabled="optionDisabled(opt)"
-                />
-
-                <HintText v-if="opt.hint">{{ opt.hint }}</HintText>
-              </FormField>
-              </template>
-            </template>
-          </template>
+        <div v-else class="nc-form">
+          <component :is="editor.sections.advanced" v-if="!isPg" :form="form" />
 
           <Disclosure
             class="nc-adv-group"
