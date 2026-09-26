@@ -64,6 +64,19 @@ describe('connectionTargetChanged', () => {
     expect(connectionTargetChanged(tunnelled, { ...sameTunnel, sshPort: 2222 })).toBe(true)
   })
 
+  it('treats a PostgreSQL record with no connection type as standalone', () => {
+    // Stored PostgreSQL connections carry no `connection_type`; the form sends 'standalone'.
+    const pg = stored({ engine: 'postgresql', connection_type: undefined, database: 'app' })
+    expect(connectionTargetChanged(pg, form({ database: 'app' }))).toBe(false)
+  })
+
+  it('sees a different PostgreSQL database', () => {
+    // A PostgreSQL connection is bound to one database, so moving it moves the target.
+    const pg = stored({ engine: 'postgresql', database: 'app' })
+    expect(connectionTargetChanged(pg, form({ database: 'other' }))).toBe(true)
+    expect(connectionTargetChanged(stored({ database: null }), form({ database: null }))).toBe(false)
+  })
+
   it('ignores everything that does not move the connection', () => {
     // A rename, a tag, a timeout or new credentials all apply to a live connection
     // safely: the pool is evicted and the next operation reconnects.

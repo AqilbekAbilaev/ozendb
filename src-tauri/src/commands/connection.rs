@@ -27,8 +27,8 @@ use fields::ConnectionFields;
 ///
 /// `id` is set when editing an existing connection, where a blank password field means
 /// "keep the stored one" (the rule `update_connection` follows); the secret then comes
-/// from the keychain rather than the form. `engine`/`database` fall back the same way,
-/// to the stored record, since the editor doesn't carry either field yet.
+/// from the keychain rather than the form. The engine always comes from the stored
+/// record (an edit can't switch drivers), and a blank database falls back to it.
 #[tauri::command]
 pub async fn test_connection(
     app: tauri::AppHandle,

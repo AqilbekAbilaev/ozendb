@@ -36,7 +36,7 @@ export function useConnectionForm(editConn) {
       ? editConn.hosts.map(h => ({ host: h.host, port: h.port }))
       : [{ host: 'localhost', port: DEFAULT_PORTS[engine.value] }]
   )
-  const connType       = ref(isEditMode ? editConn.connection_type : 'standalone')
+  const connType       = ref(isEditMode ? (editConn.connection_type ?? 'standalone') : 'standalone')
   const replicaSetName = ref(isEditMode ? (editConn.replica_set_name ?? '') : '')
 
   // Read preference lives on the Server tab (not Advanced) because it only makes sense
@@ -395,6 +395,8 @@ export function useConnectionForm(editConn) {
     const conn = {
       id:              id,
       name:            fields.name,
+      engine:          fields.engine,
+      database:        fields.database,
       hosts:           fields.hosts,
       connection_type: fields.connectionType,
       options:         fields.options,

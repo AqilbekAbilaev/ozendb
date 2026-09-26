@@ -25,10 +25,8 @@ if (isPg.value) mode.value = 'manual'
 // PostgreSQL connection strings aren't parsed yet, so it can only be configured by hand.
 function pickEngine(next) {
   engine.value = next
-  if (isPg.value) {
-    mode.value = 'manual'
-    uriError.value = ''
-  }
+  mode.value = isPg.value ? 'manual' : 'uri'
+  uriError.value = ''
 }
 
 // Emits the parsed connection string (or null when the user chose to configure the

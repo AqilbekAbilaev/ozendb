@@ -7,6 +7,7 @@ vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn() }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
 
 const { useConnectionForm } = await import('./useConnectionForm.js')
+const { emit: tauriEmit } = await import('@tauri-apps/api/event')
 
 const stored = (over = {}) => ({
   id: 'c1',
@@ -138,6 +139,21 @@ describe('engine', () => {
   })
 })
 
+describe('saving a new connection', () => {
+  it('broadcasts its engine and database, so an Edit before a refetch sees them', async () => {
+    invoke.mockReset()
+    invoke.mockResolvedValue('new-id')
+    const f = useConnectionForm(null)
+    f.setEngine('postgresql')
+    f.database.value = 'app'
+
+    const result = await f.save()
+
+    expect(result.conn).toMatchObject({ id: 'new-id', engine: 'postgresql', database: 'app' })
+    expect(tauriEmit).toHaveBeenCalledWith('connection-saved', result.conn)
+  })
+})
+
 describe('buildOptions', () => {
   it('omits unset options so the URI carries only real parameters', () => {
     const f = useConnectionForm(null)
@@ -253,6 +269,17 @@ describe('refusing an edit that would strand the sidebar', () => {
     const f = useConnectionForm(stored())
     f.connName.value = 'renamed'
     f.advancedOptions.value.socketTimeoutMS = '9000'
+
+    expect(await f.save()).not.toBe(null)
+    expect(f.blockedByLiveConnection.value).toBe(false)
+  })
+
+  it('allows renaming an open PostgreSQL connection', async () => {
+    // Stored PostgreSQL records carry no connection_type; that alone isn't a move.
+    sidebarShows('c1')
+    const pg = stored({ engine: 'postgresql', database: 'app', connection_type: undefined, hosts: [{ host: 'pg', port: 5432 }] })
+    const f = useConnectionForm(pg)
+    f.connName.value = 'renamed'
 
     expect(await f.save()).not.toBe(null)
     expect(f.blockedByLiveConnection.value).toBe(false)

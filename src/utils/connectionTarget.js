@@ -29,7 +29,10 @@ function sameHosts(before, after) {
  */
 export function connectionTargetChanged(before, after) {
   if (!sameHosts(before.hosts, after.hosts)) return true
-  if (before.connection_type !== after.connectionType) return true
+  // Stored PostgreSQL connections carry no connection type; the form sends 'standalone'.
+  if ((before.connection_type ?? 'standalone') !== after.connectionType) return true
+  // A PostgreSQL connection is bound to one database, so that is part of its target.
+  if ((before.database || '') !== (after.database || '')) return true
   if ((before.replica_set_name || '') !== (after.replicaSetName || '')) return true
 
   // A tunnel decides which machine the driver actually reaches, so its endpoint counts
