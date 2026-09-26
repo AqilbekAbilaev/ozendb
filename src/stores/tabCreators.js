@@ -223,3 +223,19 @@ export function openQuickstart() {
   tabs.value.push(tab)
   activateTab(tab.id)
 }
+
+// A PostgreSQL table, like a MongoDB collection, opens a new tab every time.
+export function openPostgresTable({ connectionId, connectionName, database, schema, table }) {
+  const tab = newWorkspace('postgresql.table_browse', {
+    target: { connectionId, connectionName, database, schema, table },
+  })
+  tabs.value.push(tab)
+  activateTab(tab.id)
+}
+
+// A SQL editor against a PostgreSQL connection's database; a new tab every time.
+export function openPostgresQuery({ connectionId, connectionName, database }) {
+  const tab = newWorkspace('postgresql.query', { target: { connectionId, connectionName, database } })
+  tabs.value.push(tab)
+  activateTab(tab.id)
+}

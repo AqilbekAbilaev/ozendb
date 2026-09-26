@@ -9,6 +9,7 @@ import { python } from '@codemirror/legacy-modes/mode/python'
 import { ruby } from '@codemirror/legacy-modes/mode/ruby'
 import { go } from '@codemirror/legacy-modes/mode/go'
 import { java, csharp } from '@codemirror/legacy-modes/mode/clike'
+import { pgSQL } from '@codemirror/legacy-modes/mode/sql'
 
 export function languageExtension(language) {
   switch (language) {
@@ -18,6 +19,7 @@ export function languageExtension(language) {
     case 'java':   return StreamLanguage.define(java)
     case 'csharp': return StreamLanguage.define(csharp)
     case 'php':    return php()
+    case 'sql':    return StreamLanguage.define(pgSQL)
     // 'js' (also used for Node.js and the Mongo shell, which are JS syntax) and anything
     // unrecognised fall back to the JS grammar.
     case 'js':

@@ -38,6 +38,13 @@ describe('workspaceComponentFor', () => {
     expect(workspaceComponentFor(undefined)).toBe(WORKSPACE_COMPONENTS.quickstart)
   })
 
+  it('falls back to the tab type\'s own definition for a kind it has no entry for', () => {
+    // How an engine's workspace renders without editing this map.
+    const component = { name: 'EngineOwnedPane' }
+    registerWorkspaceDefinition({ type: 'test.engine_owned', component })
+    expect(workspaceComponentFor({ type: 'test.engine_owned', kind: 'engineOwned' })).toBe(component)
+  })
+
   it('returns null for unknown kinds, preserving blank-pane behavior', () => {
     expect(workspaceComponentFor({ kind: 'bogus' })).toBe(null)
     expect(workspaceComponentFor({})).toBe(null)
@@ -75,6 +82,8 @@ describe('workspace definition registry', () => {
       'mongodb.import',
       'mongodb.export',
       'mongodb.current_operations',
+      'postgresql.table_browse',
+      'postgresql.query',
     ]
     for (const type of expected) {
       expect(getWorkspaceDefinition(type).type).toBe(type)
