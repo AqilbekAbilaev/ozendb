@@ -7,7 +7,7 @@ import FormField from '../../../components/base/FormField.vue'
 const props = defineProps({
   form: { type: Object, required: true },
 })
-const { useTls, tlsCaFile, tlsCertKeyFile, tlsAllowInvalidCerts, pickTlsFile } = props.form
+const { useTls, tlsCaFile, tlsCertKeyFile, tlsAllowInvalidCerts, pickTlsFile, pickClientCert } = props.form
 </script>
 
 <template>
@@ -20,14 +20,14 @@ const { useTls, tlsCaFile, tlsCertKeyFile, tlsAllowInvalidCerts, pickTlsFile } =
     <FormField label="Certificate Authority (.pem)">
       <div class="nc-file-row">
         <BaseInput class="nc-input" v-model="tlsCaFile" placeholder="Path to CA certificate" />
-        <BaseButton bordered type="button" @click="pickTlsFile('ca')">Browse…</BaseButton>
+        <BaseButton bordered type="button" @click="pickTlsFile">Browse…</BaseButton>
       </div>
     </FormField>
 
     <FormField label="Client Certificate + Key (.pem)">
       <div class="nc-file-row">
         <BaseInput class="nc-input" v-model="tlsCertKeyFile" placeholder="Path to client certificate (optional)" />
-        <BaseButton bordered type="button" @click="pickTlsFile('cert')">Browse…</BaseButton>
+        <BaseButton bordered type="button" @click="pickClientCert">Browse…</BaseButton>
       </div>
     </FormField>
 

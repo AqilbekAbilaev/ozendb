@@ -20,7 +20,7 @@ const { useTls, tlsCaFile, tlsAllowInvalidCerts, pickTlsFile } = props.form
     <FormField label="Certificate Authority (.pem)">
       <div class="nc-file-row">
         <BaseInput class="nc-input" v-model="tlsCaFile" placeholder="Path to CA certificate" />
-        <BaseButton bordered type="button" @click="pickTlsFile('ca')">Browse…</BaseButton>
+        <BaseButton bordered type="button" @click="pickTlsFile">Browse…</BaseButton>
       </div>
     </FormField>
 
