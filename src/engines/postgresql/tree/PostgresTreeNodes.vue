@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import { usePostgresTree, visibleSchemas } from './usePostgresTree.js'
-import { openPostgresTable } from '../../../stores/tabCreators'
+import { openPostgresTable, openPostgresQuery } from '../../../stores/tabCreators'
 
 const props = defineProps({
   conn: { type: Object, required: true },
@@ -13,6 +13,10 @@ const { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, togg
   usePostgresTree(props.conn.id)
 const shown = computed(() => visibleSchemas(props.schemas))
 const database = computed(() => props.conn.database || 'postgres')
+
+function openQuery() {
+  openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: database.value })
+}
 
 function openTable(schema, table) {
   openPostgresTable({
@@ -32,6 +36,9 @@ function openTable(schema, table) {
     <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
     <span class="tt">{{ database }}</span>
     <span v-if="shown.length" class="cnt">({{ shown.length }})</span>
+    <span class="row-action" title="New SQL query" @click.stop="openQuery">
+      <BaseIcon name="sql" :size="14" />
+    </span>
   </div>
 
   <template v-if="databaseOpen">
@@ -72,3 +79,12 @@ function openTable(schema, table) {
 <!-- Scoped styles don't reach into child components, so this scopes the tree's
      stylesheet itself. -->
 <style src="../../../components/connection/ConnectionTree.css" scoped></style>
+
+<style scoped>
+.row-action {
+  margin-left: auto; padding: 0 4px;
+  color: var(--text-dim); opacity: 0; cursor: pointer;
+}
+.tnode:hover .row-action { opacity: 1; }
+.row-action:hover { color: var(--text); }
+</style>
