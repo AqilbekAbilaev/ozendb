@@ -20,9 +20,16 @@ pub(super) fn quote_ident(name: &str) -> Result<String, AppError> {
     Ok(format!("\"{}\"", name.replace('"', "\"\"")))
 }
 
-/// The primary-key column set for one table, from `information_schema` rather
-/// than `pg_index` — same source `list_pg_columns` reads, so "is this a primary
-/// key" never disagrees between the schema browser and `update_pg_row`'s guard.
+/// The primary-key column set for one table, from `pg_catalog` rather than
+/// `information_schema.table_constraints`/`key_column_usage` — same source
+/// `list_pg_columns` reads, so "is this a primary key" never disagrees between
+/// the schema browser and `update_pg_row`'s guard. Two bugs in the
+/// `information_schema` version this replaced: that view only shows constraints
+/// for tables the role owns or holds a non-`SELECT` privilege on, so a
+/// read-only login saw no primary key at all; and joining on constraint name
+/// (unique only *per table*, not schema-wide) let a same-named constraint on a
+/// different table contribute its columns to this one's key. `pg_index`/
+/// `pg_attribute` have neither problem — verified against a `SELECT`-only role.
 pub(super) async fn primary_key_columns(
     pool: &sqlx::PgPool,
     schema: &str,
@@ -30,14 +37,14 @@ pub(super) async fn primary_key_columns(
 ) -> Result<std::collections::BTreeSet<String>, AppError> {
     let rows: Vec<(String,)> = match sqlx::query_as(
         r#"
-        SELECT kcu.column_name
-        FROM information_schema.table_constraints tc
-        JOIN information_schema.key_column_usage kcu
-            ON tc.constraint_name = kcu.constraint_name
-            AND tc.table_schema = kcu.table_schema
-        WHERE tc.constraint_type = 'PRIMARY KEY'
-            AND tc.table_schema = $1
-            AND tc.table_name = $2
+        SELECT a.attname
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey::int2[])
+        WHERE i.indisprimary
+            AND n.nspname = $1
+            AND c.relname = $2
         "#,
     )
     .bind(schema)
@@ -52,23 +59,5 @@ pub(super) async fn primary_key_columns(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::quote_ident;
-
-    #[test]
-    fn quote_ident_wraps_a_plain_name() {
-        assert_eq!(quote_ident("users").unwrap(), "\"users\"");
-    }
-
-    #[test]
-    fn quote_ident_doubles_embedded_quotes() {
-        // The name `a"b` must become `"a""b"` — a literal double quote inside a
-        // quoted identifier is escaped by doubling it, not backslash-escaped.
-        assert_eq!(quote_ident("a\"b").unwrap(), "\"a\"\"b\"");
-    }
-
-    #[test]
-    fn quote_ident_rejects_empty() {
-        assert_eq!(quote_ident("").unwrap_err().code(), "validation");
-    }
-}
+#[path = "postgres.test.rs"]
+mod tests;

@@ -113,6 +113,24 @@ fn build_options_allows_invalid_certs_only_when_explicitly_opted_in() {
 }
 
 #[test]
+fn build_options_leaves_the_session_writable_by_default() {
+    let options = build_options(&base_config(), &base_postgres(), None).unwrap();
+    assert_eq!(options.get_options(), None);
+}
+
+#[test]
+fn build_options_enforces_read_only_at_the_session_level() {
+    // Not just a Rust-side gate on which pool method got called — the server
+    // itself refuses any write for the life of the session, so a caller that
+    // reaches the driver a different way (e.g. `run_pg_query`'s wrapped
+    // arbitrary SQL) still can't sneak one through.
+    let mut config = base_config();
+    config.read_only = true;
+    let options = build_options(&config, &base_postgres(), None).unwrap();
+    assert_eq!(options.get_options(), Some("-c default_transaction_read_only=on"));
+}
+
+#[test]
 fn build_options_to_targets_the_given_host_and_port_instead_of_the_configs() {
     let options = build_options_to(&base_config(), &base_postgres(), None, "127.0.0.1", 15432).unwrap();
     assert_eq!(options.get_host(), "127.0.0.1");

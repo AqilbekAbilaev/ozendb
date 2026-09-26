@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use serde::{Deserialize, Serialize};
+use sqlx::{Column, Executor, SqlSafeStr};
 use tauri::State;
 
 use super::{primary_key_columns, quote_ident, AppContext};
@@ -13,43 +14,85 @@ const ROW_RESULT_CAP: i64 = 10_000;
 /// `limit` — mirrors `find_documents`' `FIND_LIMIT_FALLBACK`.
 const BROWSE_LIMIT_FALLBACK: i64 = 100;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PgQueryResult {
-    /// Column names in their query order, taken from the first row's own keys
-    /// (this crate already builds with serde_json's `preserve_order`, so decoded
-    /// object keys come back in whatever order the JSON text had them in — see
-    /// `run_wrapped`'s doc comment for why that means `to_json`, not `to_jsonb`).
-    /// Empty when the query returned zero rows — there is nothing to take them
-    /// from, and no separate DESCRIBE round trip is made just to fill this in.
+    /// Column names in the query's own order, from the statement's describe —
+    /// never inferred from a decoded row's own shape (see `run_wrapped`'s doc
+    /// comment for why: two columns can share a name, or have none at all).
     pub columns: Vec<String>,
-    pub rows: Vec<serde_json::Value>,
+    /// One array of values per row, aligned to `columns` by position — not one
+    /// JSON object per row, which would silently collapse duplicate column names.
+    pub rows: Vec<Vec<serde_json::Value>>,
     pub truncated: bool,
     pub elapsed_ms: u64,
 }
 
 /// Wraps `inner_sql` — one subquery-able SELECT/CTE/VALUES expression — so every
-/// row comes back as a single JSON object via Postgres's own `to_json`,
-/// sidestepping a per-Postgres-type Rust-side decoder entirely: whatever the
-/// query returns, the server already knows how to render as JSON. `to_json`, not
-/// `to_jsonb`: `jsonb` is a decomposed binary format that does not preserve key
-/// order (confirmed against a live server — `to_jsonb` came back with columns
-/// reordered), while `json` stores the serialized text as-is, so the object's
-/// keys land in the row's actual column order. This is also why `run_pg_query`
-/// only supports queries, not arbitrary statements — `to_json(t) FROM (<sql>) AS
-/// t` is only valid SQL when `<sql>` is something a FROM clause can wrap, which
+/// row comes back as a JSON array via Postgres's own `to_json`, sidestepping a
+/// per-Postgres-type Rust-side decoder entirely: whatever the query returns, the
+/// server already knows how to render as JSON. This is also why `run_pg_query`
+/// only supports queries, not arbitrary statements — the wrapper below is only
+/// valid SQL when `inner_sql` is something a `FROM` clause can wrap, which
 /// INSERT/UPDATE/DELETE/DDL are not.
+///
+/// Column names come from a separate `describe()` of `inner_sql` alone, not from
+/// the wrapped query or the decoded rows: `to_json` renders a row as a JSON
+/// *object*, whose keys silently collapse when two columns share a name (a join
+/// on `id`) or have none (`SELECT 1, 2`, both named `?column?`) — confirmed
+/// against a live server, losing a real column each time. The wrapper below
+/// works around this the same way: it aliases `inner_sql`'s columns positionally
+/// (`AS t(c0, c1, …)`, never by name) and returns `json_build_array(...)`, an
+/// array, not an object, so position — not a possibly-duplicate name — is what
+/// ties a decoded value back to `columns`.
+///
+/// `NUMERIC` columns are cast to `text` before `to_json` sees them: Postgres
+/// renders `numeric` with its full, arbitrary precision, but this crate's
+/// `serde_json` is built without `arbitrary_precision`, so decoding that back as
+/// a bare JSON number would silently round it to the nearest `f64` — including a
+/// numeric primary key, which would then fail to match anything in
+/// `update_pg_row`. Sent as a JSON string instead, the exact text survives.
 async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResult, AppError> {
+    let described = match pool
+        .describe(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str())
+        .await
+    {
+        Ok(val) => val,
+        Err(e) => return Err(AppError::Postgres(e)),
+    };
+    let columns: Vec<String> = described.columns().iter().map(|c| c.name().to_string()).collect();
+    if columns.is_empty() {
+        return Ok(PgQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0 });
+    }
+
+    let exprs: Vec<String> = described
+        .columns()
+        .iter()
+        .enumerate()
+        .map(|(i, col)| {
+            let alias = format!("c{i}");
+            if col.type_info().to_string().eq_ignore_ascii_case("numeric") {
+                format!("to_json((t.{alias})::text)")
+            } else {
+                format!("to_json(t.{alias})")
+            }
+        })
+        .collect();
+    let aliases: Vec<String> = (0..columns.len()).map(|i| format!("c{i}")).collect();
+
+    // The newline before the closing paren matters: without it, an `inner_sql`
+    // ending in a `--` line comment (e.g. `SELECT 1 AS a -- note`) would comment
+    // out the `) AS t(...)` that follows on the same line — confirmed against a
+    // live server, "syntax error at end of input".
     let wrapped = format!(
-        "SELECT to_json(t) AS row FROM ({inner_sql}) AS t LIMIT {}",
-        ROW_RESULT_CAP + 1
+        "SELECT json_build_array({}) AS row FROM ({inner_sql}\n) AS t({}) LIMIT {}",
+        exprs.join(", "),
+        aliases.join(", "),
+        ROW_RESULT_CAP + 1,
     );
+
     let started = std::time::Instant::now();
-    // `wrapped` is built from `inner_sql`, which every caller assembles from
-    // quoted identifiers (`quote_ident`) and either a formatted integer (LIMIT/
-    // OFFSET) or the caller's own arbitrary read query (`run_pg_query`, whose
-    // whole point is running caller-supplied SQL) — reviewed, not unaudited.
-    let mut rows: Vec<serde_json::Value> =
+    let mut raw_rows: Vec<serde_json::Value> =
         match sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped))
             .fetch_all(pool)
             .await
@@ -59,14 +102,20 @@ async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResu
         };
     let elapsed_ms = started.elapsed().as_millis() as u64;
 
-    let truncated = rows.len() > ROW_RESULT_CAP as usize;
+    let truncated = raw_rows.len() > ROW_RESULT_CAP as usize;
     if truncated {
-        rows.truncate(ROW_RESULT_CAP as usize);
+        raw_rows.truncate(ROW_RESULT_CAP as usize);
     }
-    let columns = match rows.first() {
-        Some(serde_json::Value::Object(map)) => map.keys().cloned().collect(),
-        _ => Vec::new(),
-    };
+    // `json_build_array` always yields a JSON array; the fallback only guards
+    // against that guarantee somehow not holding, rather than panicking.
+    let rows: Vec<Vec<serde_json::Value>> = raw_rows
+        .into_iter()
+        .map(|row| match row {
+            serde_json::Value::Array(values) => values,
+            other => vec![other],
+        })
+        .collect();
+
     Ok(PgQueryResult { columns, rows, truncated, elapsed_ms })
 }
 
@@ -79,10 +128,18 @@ pub(crate) async fn run_query_impl(pool: &sqlx::PgPool, sql: &str) -> Result<PgQ
 }
 
 /// Runs arbitrary read-oriented SQL (a single SELECT, CTE, or VALUES expression)
-/// and returns every row as a JSON object — the SQL editor workspace's core. A
-/// general SQL-*execution* surface (INSERT/UPDATE/DELETE/DDL, multiple
-/// statements) is out of v1's scope; see `run_wrapped`'s doc comment for why
-/// those fail with a Postgres syntax error here rather than running.
+/// and returns every row — the SQL editor workspace's core. A general
+/// SQL-*execution* surface (INSERT/UPDATE/DELETE/DDL, multiple statements) is out
+/// of v1's scope; see `run_wrapped`'s doc comment for why those fail with a
+/// Postgres syntax error here rather than running.
+///
+/// This still reaches the driver through `pg_pool`, not `pg_pool_for_write` — a
+/// `read_only` connection can't skip this check by construction, but a wrapped
+/// subquery only rules out statements that can't live in a `FROM` clause, not a
+/// volatile function usable inside one (`nextval`, `setval`,
+/// `pg_terminate_backend`, …). The real enforcement is server-side: see
+/// `pg_uri::options_for`'s `default_transaction_read_only` for `read_only`
+/// connections, which `pg_pool` and `pg_pool_for_write` both dial through.
 #[tauri::command]
 pub async fn run_pg_query(
     ctx: State<'_, AppContext>,
@@ -106,10 +163,29 @@ pub(crate) async fn browse_table_impl(
     let effective_limit = if limit <= 0 { BROWSE_LIMIT_FALLBACK } else { limit.min(ROW_RESULT_CAP) };
     let effective_offset = offset.max(0);
 
+    // `LIMIT`/`OFFSET` alone promise nothing about which rows land on which page
+    // — without an `ORDER BY`, Postgres is free to return them in a different
+    // order on every call, so rows can repeat or vanish between pages. An
+    // explicit `order_by` is quoted and used as given; absent one, this falls
+    // back to the primary key (stable and always unique) rather than paging
+    // unordered. A table with no primary key still pages, just without that
+    // guarantee — nothing safe to default to in that case.
+    let order_columns: Vec<String> = match order_by.filter(|s| !s.is_empty()) {
+        Some(col) => vec![quote_ident(col)?],
+        None => {
+            let pk = primary_key_columns(pool, schema, table).await?;
+            let mut quoted = Vec::with_capacity(pk.len());
+            for column in &pk {
+                quoted.push(quote_ident(column)?);
+            }
+            quoted
+        }
+    };
+
     let mut inner = format!("SELECT * FROM {qualified}");
-    if let Some(col) = order_by.filter(|s| !s.is_empty()) {
+    if !order_columns.is_empty() {
         let direction = if descending { "DESC" } else { "ASC" };
-        inner.push_str(&format!(" ORDER BY {} {direction}", quote_ident(col)?));
+        inner.push_str(&format!(" ORDER BY {} {direction}", order_columns.join(", ")));
     }
     inner.push_str(&format!(" LIMIT {effective_limit} OFFSET {effective_offset}"));
 
@@ -164,31 +240,35 @@ pub struct ColumnValue {
 /// Renders a JSON value as the text Postgres's own input parser expects behind a
 /// `$n::type` cast — the same "send everything as text, let the server parse it"
 /// approach libpq's simple protocol uses, so one function covers integers,
-/// booleans, timestamps, uuids, jsonb, … without a per-Postgres-type Rust encoder.
-/// `None` means a real SQL `NULL` (bound, not the text "null" — casting `NULL` to
-/// any type is always fine, so the caller never special-cases this).
-fn stringify_param(value: &serde_json::Value) -> Option<String> {
+/// booleans, timestamps, uuids, arrays, enums, … without a per-Postgres-type Rust
+/// encoder. `None` means a real SQL `NULL` (bound, not the text "null" — casting
+/// `NULL` to any type is always fine, so the caller never special-cases this).
+///
+/// `json`/`jsonb` are the one type family this can't treat like a plain scalar:
+/// a JSON *string* value (`"hi"`) must reach Postgres as the text `"hi"` — quotes
+/// included — because that's what a `json`/`jsonb` column actually stores; the
+/// bare text `hi` isn't valid JSON input at all. So for those two types this
+/// always serializes with `value.to_string()`, the same as the array/object arm
+/// below already did, rather than passing a JSON string's own contents through
+/// unquoted the way every other text-like column wants.
+fn stringify_param(value: &serde_json::Value, pg_type: &str) -> Option<String> {
+    if pg_type.eq_ignore_ascii_case("json") || pg_type.eq_ignore_ascii_case("jsonb") {
+        return match value {
+            serde_json::Value::Null => None,
+            other => Some(other.to_string()),
+        };
+    }
     match value {
         serde_json::Value::Null => None,
         serde_json::Value::Bool(b) => Some(b.to_string()),
         serde_json::Value::Number(n) => Some(n.to_string()),
         serde_json::Value::String(s) => Some(s.clone()),
-        // Postgres's `json`/`jsonb` input functions parse this directly; a real
-        // Postgres ARRAY column needs `{...}` array-literal syntax instead, which
-        // is exactly why `is_castable_type` refuses to reach this arm for one.
+        // Not generally valid for a real Postgres ARRAY column (whose input
+        // syntax is `{a,b}`, not JSON) — but is exactly what an enum or a
+        // composite type's text input expects for its sub-fields, and is at
+        // least explicit, reviewable behavior rather than a silent truncation.
         serde_json::Value::Array(_) | serde_json::Value::Object(_) => Some(value.to_string()),
     }
-}
-
-/// Whether `update_pg_row` can safely cast a bound text parameter to this
-/// `information_schema.columns.data_type`. Rejects `ARRAY` — the view reports
-/// every array column's type as that bare string, with the actual element type
-/// only in `udt_name`/`pg_catalog`, not enough to build a valid `::type` cast —
-/// and `USER-DEFINED` (enums, composite/custom types: same problem, `data_type`
-/// doesn't name a castable type). Editing either is a possible later
-/// improvement, not a v1 gap worth guessing around.
-fn is_castable_type(data_type: &str) -> bool {
-    data_type != "ARRAY" && data_type != "USER-DEFINED"
 }
 
 async fn column_types(
@@ -196,9 +276,21 @@ async fn column_types(
     schema: &str,
     table: &str,
 ) -> Result<std::collections::BTreeMap<String, String>, AppError> {
+    // `format_type`, not `information_schema.columns.data_type`: the latter
+    // drops the length/precision modifier (`character(10)` and `character(1)`
+    // both report plain "character" — a `char(10)` column then truncates any
+    // update past one character) and reports the non-castable placeholders
+    // "ARRAY"/"USER-DEFINED" for array and enum columns instead of a real,
+    // `::`-castable type name.
     let rows: Vec<(String, String)> = match sqlx::query_as(
-        "SELECT column_name, data_type FROM information_schema.columns \
-         WHERE table_schema = $1 AND table_name = $2",
+        r#"
+        SELECT a.attname, format_type(a.atttypid, a.atttypmod)
+        FROM pg_attribute a
+        JOIN pg_class c ON c.oid = a.attrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = $1 AND c.relname = $2
+            AND a.attnum > 0 AND NOT a.attisdropped
+        "#,
     )
     .bind(schema)
     .bind(table)
@@ -216,10 +308,7 @@ fn column_cast<'a>(
     column: &str,
 ) -> Result<&'a str, AppError> {
     match types.get(column) {
-        Some(data_type) if is_castable_type(data_type) => Ok(data_type.as_str()),
-        Some(_) => Err(AppError::Validation(format!(
-            "Column \"{column}\" isn't editable yet (array and custom types aren't supported)."
-        ))),
+        Some(data_type) => Ok(data_type.as_str()),
         None => Err(AppError::Validation(format!("Unknown column \"{column}\"."))),
     }
 }
@@ -270,7 +359,7 @@ pub(crate) async fn update_row_impl(
             sql.push_str(", ");
         }
         sql.push_str(&format!("{} = ${param}::{pg_type}", quote_ident(&item.column)?));
-        binds.push(stringify_param(&item.value));
+        binds.push(stringify_param(&item.value, pg_type));
     }
     sql.push_str(" WHERE ");
     for (i, item) in r#where.iter().enumerate() {
@@ -280,7 +369,7 @@ pub(crate) async fn update_row_impl(
             sql.push_str(" AND ");
         }
         sql.push_str(&format!("{} = ${param}::{pg_type}", quote_ident(&item.column)?));
-        binds.push(stringify_param(&item.value));
+        binds.push(stringify_param(&item.value, pg_type));
     }
 
     // `sql` interpolates only quoted identifiers (`quote_ident`, checked against
@@ -318,35 +407,5 @@ pub async fn update_pg_row(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{is_castable_type, stringify_param};
-    use serde_json::json;
-
-    #[test]
-    fn stringify_renders_scalars_as_plain_text() {
-        assert_eq!(stringify_param(&json!(true)), Some(String::from("true")));
-        assert_eq!(stringify_param(&json!(42)), Some(String::from("42")));
-        assert_eq!(stringify_param(&json!(3.5)), Some(String::from("3.5")));
-        assert_eq!(stringify_param(&json!("hello")), Some(String::from("hello")));
-    }
-
-    #[test]
-    fn stringify_renders_null_as_a_real_sql_null() {
-        assert_eq!(stringify_param(&serde_json::Value::Null), None);
-    }
-
-    #[test]
-    fn stringify_renders_containers_as_json_text() {
-        assert_eq!(stringify_param(&json!({"a": 1})), Some(String::from("{\"a\":1}")));
-        assert_eq!(stringify_param(&json!([1, 2])), Some(String::from("[1,2]")));
-    }
-
-    #[test]
-    fn castable_type_accepts_ordinary_types_and_rejects_array_and_user_defined() {
-        assert!(is_castable_type("integer"));
-        assert!(is_castable_type("character varying"));
-        assert!(is_castable_type("timestamp without time zone"));
-        assert!(!is_castable_type("ARRAY"));
-        assert!(!is_castable_type("USER-DEFINED"));
-    }
-}
+#[path = "query.test.rs"]
+mod tests;

@@ -123,9 +123,13 @@ pub async fn list_pg_tables(
 #[serde(rename_all = "camelCase")]
 pub struct PgColumnInfo {
     pub name: String,
-    /// `information_schema.columns.data_type` verbatim (e.g. "integer",
-    /// "character varying", "ARRAY"). Not necessarily a valid `::cast` target on
-    /// its own — see `query::is_castable_type`, which `update_pg_row` checks.
+    /// `format_type(atttypid, atttypmod)` from `pg_attribute`/`pg_type` — a real,
+    /// `::cast`-able type name including its length/precision modifier (e.g.
+    /// `character(10)`, `numeric(8,2)`, `text[]`, or an enum's own type name).
+    /// Not `information_schema.columns.data_type`: that view drops the modifier
+    /// (`character(10)` and `character(1)` both report plain "character") and
+    /// reports "ARRAY"/"USER-DEFINED" instead of a real, castable type name for
+    /// arrays and enums.
     pub data_type: String,
     pub nullable: bool,
     pub is_primary_key: bool,
@@ -137,11 +141,21 @@ pub(crate) async fn list_columns_impl(
     schema: &str,
     table: &str,
 ) -> Result<Vec<PgColumnInfo>, AppError> {
-    let rows: Vec<(String, String, String, Option<String>)> = match sqlx::query_as(
-        "SELECT column_name, data_type, is_nullable, column_default \
-         FROM information_schema.columns \
-         WHERE table_schema = $1 AND table_name = $2 \
-         ORDER BY ordinal_position",
+    let rows: Vec<(String, String, bool, Option<String>)> = match sqlx::query_as(
+        r#"
+        SELECT
+            a.attname,
+            format_type(a.atttypid, a.atttypmod),
+            NOT a.attnotnull,
+            pg_get_expr(ad.adbin, ad.adrelid)
+        FROM pg_attribute a
+        JOIN pg_class c ON c.oid = a.attrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+        WHERE n.nspname = $1 AND c.relname = $2
+            AND a.attnum > 0 AND NOT a.attisdropped
+        ORDER BY a.attnum
+        "#,
     )
     .bind(schema)
     .bind(table)
@@ -156,11 +170,11 @@ pub(crate) async fn list_columns_impl(
 
     Ok(rows
         .into_iter()
-        .map(|(name, data_type, is_nullable, default)| PgColumnInfo {
+        .map(|(name, data_type, nullable, default)| PgColumnInfo {
             is_primary_key: pk.contains(&name),
             name,
             data_type,
-            nullable: is_nullable == "YES",
+            nullable,
             default,
         })
         .collect())
@@ -178,22 +192,8 @@ pub async fn list_pg_columns(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::is_system_schema;
-
-    #[test]
-    fn flags_postgres_and_information_schema_as_system() {
-        assert!(is_system_schema("pg_catalog"));
-        assert!(is_system_schema("pg_toast"));
-        assert!(is_system_schema("information_schema"));
-    }
-
-    #[test]
-    fn leaves_an_ordinary_schema_alone() {
-        assert!(!is_system_schema("public"));
-        assert!(!is_system_schema("app"));
-    }
-}
+#[path = "schema.test.rs"]
+mod tests;
 
 // Live-Postgres coverage of `list_databases_impl`/`list_schemas_impl`/
 // `list_tables_impl`/`list_columns_impl` lives in pg_integration_tests.rs

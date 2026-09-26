@@ -100,6 +100,17 @@ fn options_for(
         None => options.ssl_root_cert_from_pem(Vec::new()),
     };
 
+    // A `read_only` connection is enforced server-side, not just by which pool
+    // method a command happens to call: `run_pg_query` executes arbitrary
+    // caller-supplied SQL wrapped in a subquery, which stops statements that
+    // can't live in a FROM clause but not a volatile function usable inside a
+    // SELECT (`nextval`, `setval`, `pg_terminate_backend`, …). Every session on
+    // this connection starts its (implicit or explicit) transaction read-only,
+    // so the server itself rejects any write attempt, guessed-around or not.
+    if config.read_only {
+        options = options.options([("default_transaction_read_only", "on")]);
+    }
+
     Ok(options)
 }
 
