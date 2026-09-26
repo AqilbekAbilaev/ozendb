@@ -125,7 +125,8 @@ fn a_payload_without_a_known_engine_is_rejected() {
 }
 
 #[test]
-fn a_blank_database_keeps_the_existing_one_on_update() {
+fn clearing_the_database_on_update_clears_it() {
+    // The editor has a Database field, so blank means "use the default", not "keep".
     let mut existing = config();
     existing.engine = EngineConfig::Postgres(PostgresConfig {
         database: Some(String::from("appdb")),
@@ -135,7 +136,7 @@ fn a_blank_database_keeps_the_existing_one_on_update() {
         .into_config(String::from("c1"), Some(&existing), None, None, true)
         .unwrap();
 
-    assert_eq!(c.engine.as_postgres().and_then(|p| p.database.as_deref()), Some("appdb"));
+    assert_eq!(c.engine.as_postgres().and_then(|p| p.database.as_deref()), None);
 }
 
 #[test]

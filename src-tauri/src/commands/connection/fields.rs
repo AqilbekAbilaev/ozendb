@@ -83,14 +83,8 @@ impl ConnectionFields {
                     tls_cert_key_file: mongo.tls_cert_key_file,
                 })
             }
-            // A blank database keeps whatever the record already had.
-            (EngineFields::Postgres(postgres), stored @ (None | Some(EngineConfig::Postgres(_)))) => {
-                let stored_database = stored
-                    .and_then(|config| config.as_postgres())
-                    .and_then(|config| config.database.clone());
-                EngineConfig::Postgres(PostgresConfig {
-                    database: postgres.database.or(stored_database),
-                })
+            (EngineFields::Postgres(postgres), None | Some(EngineConfig::Postgres(_))) => {
+                EngineConfig::Postgres(PostgresConfig { database: postgres.database })
             }
             _ => {
                 return Err(AppError::Validation(
