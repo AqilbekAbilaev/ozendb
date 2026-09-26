@@ -2,7 +2,6 @@
 export function buildMongoFields(v) {
   const auth = v.authMode !== 'none'
   return {
-    database:       null,
     connectionType: v.connType,
     replicaSetName: v.replicaSetName || null,
     options:        v.options,
