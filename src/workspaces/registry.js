@@ -30,15 +30,16 @@ export const WORKSPACE_COMPONENTS = Object.freeze({
   'import:csv': CsvImportPane,
 })
 
-// Compatibility resolution only. A missing active tab resolves to Quickstart (as
-// the old `!activeTab` branch did); unknown non-null kinds resolve to null so the
-// blank-pane behavior is preserved.
+// A missing active tab resolves to Quickstart (as the old `!activeTab` branch did).
+// The kind map covers the original MongoDB panes; any other tab renders its type's
+// own definition component, so an engine adds a workspace without editing this file.
+// A tab with neither resolves to null, preserving the blank-pane behavior.
 export function workspaceComponentFor(tab) {
   if (!tab || tab.kind === 'quickstart') return WORKSPACE_COMPONENTS.quickstart
   if (tab.kind === 'import') {
     return tab.format === 'csv' ? WORKSPACE_COMPONENTS['import:csv'] : WORKSPACE_COMPONENTS.import
   }
-  return WORKSPACE_COMPONENTS[tab.kind] || null
+  return WORKSPACE_COMPONENTS[tab.kind] || definitions.get(tab.type)?.component || null
 }
 
 // Definition registry (Work 5). Populated once at startup by registerDefinitions();
