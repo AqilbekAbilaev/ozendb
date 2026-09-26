@@ -7,9 +7,7 @@ import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
 import SegmentedControl from '../base/SegmentedControl.vue'
 import TabStrip from '../base/TabStrip.vue'
-import Disclosure from '../base/Disclosure.vue'
 import FormField from '../base/FormField.vue'
-import { TABS } from '../../data/connectionOptions.js'
 import { CONNECTION_EDITORS } from '../../engines/connectionEditor.js'
 import ConnectionIntro from './ConnectionIntro.vue'
 import { useConnectionForm } from '../../composables/useConnectionForm.js'
@@ -28,15 +26,13 @@ const activeTab = ref('server')
 
 const form = useConnectionForm(props.editConn)
 const {
-  connName, engine, database, hosts, username, password,
-  useTls, tlsCaFile, tlsAllowInvalidCerts, pickTlsFile,
+  connName, engine,
   useSsh, sshHost, sshPort, sshUser, sshAuth, sshPassword, sshKeyFile,
   sshKeyPassphrase, pickSshKey,
-  selectedTag, readOnly, openGroups, toggleGroup,
+  selectedTag, readOnly,
   status, isTesting, isSaving, blockedByLiveConnection,
   testConnection,
 } = form
-const isPg = computed(() => engine.value === 'postgresql')
 const editor = computed(() => CONNECTION_EDITORS[engine.value])
 
 // Opens the form for the engine picked on the intro step, pre-filled when it parsed a
@@ -73,7 +69,7 @@ useMomentumScroll(bodyEl)
       <div class="nc-top">
         <label class="nc-namelbl">Connection name</label>
         <BaseInput class="nc-name" v-model="connName" />
-        <BaseButton v-if="!isPg" bordered @click="step = 'intro'">
+        <BaseButton v-if="editor.supportsUri" bordered @click="step = 'intro'">
           <BaseIcon name="uri" :size="15" /> From URI
         </BaseButton>
       </div>
@@ -82,7 +78,7 @@ useMomentumScroll(bodyEl)
       <div class="nc-tabs">
         <TabStrip
           :model-value="activeTab"
-          :options="TABS.map(([value, label]) => ({ value, label }))"
+          :options="editor.tabs.map(([value, label]) => ({ value, label }))"
           @update:model-value="activeTab = $event"
         />
       </div>
@@ -90,56 +86,8 @@ useMomentumScroll(bodyEl)
       <!-- Tab body -->
       <div ref="bodyEl" class="nc-body">
 
-        <!-- Server / Authentication / SSL -->
-        <div v-if="activeTab === 'server' && isPg" class="nc-form">
-          <FormField label="Server">
-            <div v-for="(h, i) in hosts" :key="i" class="nc-inline nc-host-row">
-              <BaseInput class="nc-input" v-model="h.host" style="flex:3" placeholder="localhost" />
-              <span class="nc-colon">:</span>
-              <BaseInput class="nc-input" v-model="h.port" type="number" style="flex:1" />
-            </div>
-          </FormField>
-          <FormField label="Database">
-            <BaseInput class="nc-input" v-model="database" placeholder="postgres" />
-          </FormField>
-        </div>
-        <div v-else-if="activeTab === 'auth' && isPg" class="nc-form">
-          <FormField label="User name">
-            <BaseInput class="nc-input" v-model="username" />
-          </FormField>
-          <FormField label="Password">
-            <BaseInput
-              class="nc-input"
-              type="password"
-              v-model="password"
-              :placeholder="isEditMode ? 'Leave blank to keep existing password' : ''"
-            />
-          </FormField>
-        </div>
-        <div v-else-if="activeTab === 'ssl' && isPg" class="nc-form">
-          <label class="chk-line big" @click="useTls = !useTls">
-            <span class="cb" :class="{ on: useTls }"><BaseIcon v-if="useTls" name="check" :size="12" /></span>
-            Use SSL/TLS protocol to connect
-          </label>
-
-          <template v-if="useTls">
-            <FormField label="Certificate Authority (.pem)">
-              <div class="nc-file-row">
-                <BaseInput class="nc-input" v-model="tlsCaFile" placeholder="Path to CA certificate" />
-                <BaseButton bordered type="button" @click="pickTlsFile('ca')">Browse…</BaseButton>
-              </div>
-            </FormField>
-
-            <label class="chk-line" @click="tlsAllowInvalidCerts = !tlsAllowInvalidCerts">
-              <span class="cb" :class="{ on: tlsAllowInvalidCerts }"><BaseIcon v-if="tlsAllowInvalidCerts" name="check" :size="12" /></span>
-              Allow invalid certificates (accept self-signed / expired)
-            </label>
-            <div class="nc-hint">A Certificate Authority file verifies the server securely; “allow invalid certificates” skips that check.</div>
-          </template>
-        </div>
-
         <!-- SSH Tunnel -->
-        <div v-else-if="activeTab === 'ssh'" class="nc-form">
+        <div v-if="activeTab === 'ssh'" class="nc-form">
           <label class="chk-line big" @click="useSsh = !useSsh">
             <span class="cb" :class="{ on: useSsh }"><BaseIcon v-if="useSsh" name="check" :size="12" /></span>
             Use SSH tunnel
@@ -181,27 +129,13 @@ useMomentumScroll(bodyEl)
               </FormField>
             </template>
 
-            <div class="nc-hint">The server host/port (Server tab) are resolved from the SSH host.<template v-if="!isPg"> Standalone connections only — replica set / SRV over SSH aren't supported yet.</template></div>
+            <div class="nc-hint">The server host/port (Server tab) are resolved from the SSH host. {{ editor.sshHint }}</div>
           </template>
         </div>
 
-        <div v-else-if="activeTab !== 'advanced'" class="nc-form">
-          <component :is="editor.sections[activeTab]" :form="form" />
-        </div>
-
-        <!-- Advanced -->
-        <div v-else class="nc-form">
-          <component :is="editor.sections.advanced" v-if="!isPg" :form="form" />
-
-          <Disclosure
-            class="nc-adv-group"
-            :model-value="openGroups.Appearance"
-            @update:model-value="toggleGroup('Appearance')"
-          >
-            <span class="nc-adv-group-t">Appearance</span>
-            <span v-if="selectedTag !== 'none'" class="nc-adv-badge">1 set</span>
-          </Disclosure>
-          <FormField v-if="openGroups.Appearance" label="Color tag">
+        <!-- General -->
+        <div v-else-if="activeTab === 'general'" class="nc-form">
+          <FormField label="Color tag">
             <div class="tag-row">
               <span
                 v-for="p in TAG_PRESETS"
@@ -221,6 +155,10 @@ useMomentumScroll(bodyEl)
             Read-only connection
           </label>
           <div class="nc-hint">Blocks every write (insert, update, delete, drop, index changes…) against this connection at the backend.</div>
+        </div>
+
+        <div v-else class="nc-form">
+          <component :is="editor.sections[activeTab]" :form="form" />
         </div>
 
       </div>
