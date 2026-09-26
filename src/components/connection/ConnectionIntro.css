@@ -1,4 +1,6 @@
 .nci-body { padding: 22px 24px 8px; }
+.nci-engine { display: flex; align-items: center; gap: 14px; margin: 0 0 20px; }
+.nci-radio.off { opacity: .5; cursor: default; }
 .nci-lead { font-size: 13.5px; line-height: 1.6; color: var(--text); margin: 0 0 22px; }
 .nci-radio {
   display: flex; align-items: center; gap: 11px;

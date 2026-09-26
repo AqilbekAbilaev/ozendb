@@ -7,6 +7,7 @@ vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn() }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
 
 const { useConnectionForm } = await import('./useConnectionForm.js')
+const { emit: tauriEmit } = await import('@tauri-apps/api/event')
 
 const stored = (over = {}) => ({
   id: 'c1',
@@ -78,6 +79,78 @@ describe('formFields', () => {
     expect(f.formFields().tag).toBe(null)
     f.selectedTag.value = 'red'
     expect(f.formFields().tag).toBe('red')
+  })
+})
+
+describe('engine', () => {
+  it('starts a new connection as MongoDB', () => {
+    const fields = useConnectionForm(null).formFields()
+    expect(fields.engine).toBe('mongodb')
+    expect(fields.database).toBe(null)
+  })
+
+  it('moves a default port to the new engine\'s default and keeps a typed one', () => {
+    const f = useConnectionForm(null)
+    f.hosts.value = [{ host: 'a', port: 27017 }, { host: 'b', port: 6000 }]
+
+    f.setEngine('postgresql')
+
+    expect(f.engine.value).toBe('postgresql')
+    expect(f.hosts.value.map(h => h.port)).toEqual([5432, 6000])
+  })
+
+  it('sends PostgreSQL its database and credentials, and none of MongoDB\'s settings', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('postgresql')
+    f.database.value = ' app '
+    f.username.value = 'me'
+    f.password.value = 'pw'
+    f.authMode.value = 'none'
+    f.connType.value = 'replica'
+    f.replicaSetName.value = 'rs0'
+    f.useTls.value = true
+    f.tlsCertKeyFile.value = '/client.pem'
+
+    expect(f.formFields()).toMatchObject({
+      engine: 'postgresql',
+      database: 'app',
+      username: 'me',
+      password: 'pw',
+      connectionType: 'standalone',
+      replicaSetName: null,
+      authDb: null,
+      authMechanism: null,
+      options: {},
+      tlsCertKeyFile: null,
+    })
+  })
+
+  it('falls back to the engine\'s default port for a blank one', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('postgresql')
+    f.hosts.value = [{ host: 'db', port: '' }]
+    expect(f.formFields().hosts).toEqual([{ host: 'db', port: 5432 }])
+  })
+
+  it('seeds the engine and database when editing a PostgreSQL connection', () => {
+    const f = useConnectionForm(stored({ engine: 'postgresql', database: 'app', hosts: [{ host: 'pg', port: 5432 }] }))
+    expect(f.engine.value).toBe('postgresql')
+    expect(f.database.value).toBe('app')
+  })
+})
+
+describe('saving a new connection', () => {
+  it('broadcasts its engine and database, so an Edit before a refetch sees them', async () => {
+    invoke.mockReset()
+    invoke.mockResolvedValue('new-id')
+    const f = useConnectionForm(null)
+    f.setEngine('postgresql')
+    f.database.value = 'app'
+
+    const result = await f.save()
+
+    expect(result.conn).toMatchObject({ id: 'new-id', engine: 'postgresql', database: 'app' })
+    expect(tauriEmit).toHaveBeenCalledWith('connection-saved', result.conn)
   })
 })
 
@@ -196,6 +269,17 @@ describe('refusing an edit that would strand the sidebar', () => {
     const f = useConnectionForm(stored())
     f.connName.value = 'renamed'
     f.advancedOptions.value.socketTimeoutMS = '9000'
+
+    expect(await f.save()).not.toBe(null)
+    expect(f.blockedByLiveConnection.value).toBe(false)
+  })
+
+  it('allows renaming an open PostgreSQL connection', async () => {
+    // Stored PostgreSQL records carry no connection_type; that alone isn't a move.
+    sidebarShows('c1')
+    const pg = stored({ engine: 'postgresql', database: 'app', connection_type: undefined, hosts: [{ host: 'pg', port: 5432 }] })
+    const f = useConnectionForm(pg)
+    f.connName.value = 'renamed'
 
     expect(await f.save()).not.toBe(null)
     expect(f.blockedByLiveConnection.value).toBe(false)

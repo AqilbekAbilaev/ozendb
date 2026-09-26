@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { TAG_PRESETS } from '../../utils/tabColor.js'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
@@ -32,7 +32,7 @@ const activeTab = ref('server')
 
 const form = useConnectionForm(props.editConn)
 const {
-  connName, hosts, connType, replicaSetName, readPreference, isMultiHost,
+  connName, engine, database, hosts, connType, replicaSetName, readPreference, isMultiHost,
   addHost, removeHost,
   authMode, username, password, authDb,
   oidcEnvironment, oidcTokenResource, oidcNeedsResource,
@@ -44,10 +44,12 @@ const {
   status, isTesting, isSaving, blockedByLiveConnection,
   testConnection,
 } = form
+const isPg = computed(() => engine.value === 'postgresql')
 
-// Opens the form, pre-filled when the intro step parsed a connection string. `parsed`
-// is null when the user chose to configure the connection by hand.
-function startForm(parsed) {
+// Opens the form for the engine picked on the intro step, pre-filled when it parsed a
+// connection string. `parsed` is null when the user chose to configure it by hand.
+function startForm(parsed, pickedEngine) {
+  form.setEngine(pickedEngine)
   step.value = 'form'
   activeTab.value = 'server'
   if (parsed) form.applyParsed(parsed)
@@ -69,7 +71,7 @@ useMomentumScroll(bodyEl)
 </script>
 
 <template>
-  <ConnectionIntro v-if="step === 'intro'" @close="$emit('close')" @next="startForm" />
+  <ConnectionIntro v-if="step === 'intro'" :engine="engine" :engine-locked="isEditMode" @close="$emit('close')" @next="startForm" />
 
   <!-- ── Form step ──────────────────────────────────── -->
   <BaseModal v-else :title="isEditMode ? 'Edit Connection' : 'New Connection'" width="720px" max-width="94vw" height="600px" max-height="92vh" @close="$emit('close')">
@@ -78,7 +80,7 @@ useMomentumScroll(bodyEl)
       <div class="nc-top">
         <label class="nc-namelbl">Connection name</label>
         <BaseInput class="nc-name" v-model="connName" />
-        <BaseButton bordered @click="step = 'intro'">
+        <BaseButton v-if="!isPg" bordered @click="step = 'intro'">
           <BaseIcon name="uri" :size="15" /> From URI
         </BaseButton>
       </div>
@@ -97,7 +99,7 @@ useMomentumScroll(bodyEl)
 
         <!-- Server -->
         <div v-if="activeTab === 'server'" class="nc-form">
-          <FormField label="Connection type">
+          <FormField v-if="!isPg" label="Connection type">
             <SegmentedControl
               class="nc-seg"
               :model-value="connType"
@@ -105,33 +107,45 @@ useMomentumScroll(bodyEl)
               @update:model-value="connType = $event"
             />
           </FormField>
-          <FormField :label="connType === 'srv' ? 'Server (SRV hostname)' : (isMultiHost ? 'Server(s)' : 'Server')">
-            <BaseInput v-if="connType === 'srv'" class="nc-input" v-model="hosts[0].host" placeholder="cluster.example.com" />
+          <FormField :label="isPg ? 'Server' : connType === 'srv' ? 'Server (SRV hostname)' : (isMultiHost ? 'Server(s)' : 'Server')">
+            <BaseInput v-if="!isPg && connType === 'srv'" class="nc-input" v-model="hosts[0].host" placeholder="cluster.example.com" />
             <template v-else>
               <div v-for="(h, i) in hosts" :key="i" class="nc-inline nc-host-row">
                 <BaseInput class="nc-input" v-model="h.host" style="flex:3" placeholder="localhost" />
                 <span class="nc-colon">:</span>
                 <BaseInput class="nc-input" v-model="h.port" type="number" style="flex:1" />
-                <BaseButton v-if="isMultiHost && hosts.length > 1" icon="close" :icon-size="12" title="Remove host" @click="removeHost(i)" />
+                <BaseButton v-if="!isPg && isMultiHost && hosts.length > 1" icon="close" :icon-size="12" title="Remove host" @click="removeHost(i)" />
               </div>
-              <BaseButton v-if="isMultiHost" variant="ghost" size="sm" class="nc-host-add" @click="addHost">
+              <BaseButton v-if="!isPg && isMultiHost" variant="ghost" size="sm" class="nc-host-add" @click="addHost">
                 <BaseIcon name="plus" :size="12" /> Add host
               </BaseButton>
             </template>
           </FormField>
-          <FormField v-if="connType === 'replica'" label="Replica set name">
+          <FormField v-if="isPg" label="Database">
+            <BaseInput class="nc-input" v-model="database" placeholder="postgres" />
+          </FormField>
+          <FormField v-if="!isPg && connType === 'replica'" label="Replica set name">
             <BaseInput class="nc-input" v-model="replicaSetName" placeholder="myReplicaSet" />
           </FormField>
-          <FormField v-if="connType !== 'standalone'" label="Read preference">
+          <FormField v-if="!isPg && connType !== 'standalone'" label="Read preference">
             <BaseSelect class="nc-sel" v-model="readPreference" :options="READ_PREF_OPTIONS" />
           </FormField>
-          <div class="nc-hint">
-            OzenDB currently targets MongoDB.
-            PostgreSQL &amp; MySQL engines arrive in a future release.
-          </div>
         </div>
 
         <!-- Authentication -->
+        <div v-else-if="activeTab === 'auth' && isPg" class="nc-form">
+          <FormField label="User name">
+            <BaseInput class="nc-input" v-model="username" />
+          </FormField>
+          <FormField label="Password">
+            <BaseInput
+              class="nc-input"
+              type="password"
+              v-model="password"
+              :placeholder="isEditMode ? 'Leave blank to keep existing password' : ''"
+            />
+          </FormField>
+        </div>
         <div v-else-if="activeTab === 'auth'" class="nc-form">
           <FormField label="Authentication mode">
             <BaseSelect class="nc-sel" v-model="authMode" :options="AUTH_MODE_OPTIONS">
@@ -219,7 +233,7 @@ useMomentumScroll(bodyEl)
               </FormField>
             </template>
 
-            <div class="nc-hint">The MongoDB host/port (Server tab) are resolved from the SSH host. Standalone connections only — replica set / SRV over SSH aren't supported yet.</div>
+            <div class="nc-hint">The server host/port (Server tab) are resolved from the SSH host.<template v-if="!isPg"> Standalone connections only — replica set / SRV over SSH aren't supported yet.</template></div>
           </template>
         </div>
 
@@ -238,7 +252,7 @@ useMomentumScroll(bodyEl)
               </div>
             </FormField>
 
-            <FormField label="Client Certificate + Key (.pem)">
+            <FormField v-if="!isPg" label="Client Certificate + Key (.pem)">
               <div class="nc-file-row">
                 <BaseInput class="nc-input" v-model="tlsCertKeyFile" placeholder="Path to client certificate (optional)" />
                 <BaseButton bordered type="button" @click="pickTlsFile('cert')">Browse…</BaseButton>
@@ -255,11 +269,11 @@ useMomentumScroll(bodyEl)
 
         <!-- Advanced -->
         <div v-else-if="activeTab === 'advanced'" class="nc-form">
-          <div class="nc-hint nc-adv-intro">
+          <div v-if="!isPg" class="nc-hint nc-adv-intro">
             Optional MongoDB driver parameters. Leave a field empty to use the driver default.
           </div>
 
-          <template v-for="group in OPTION_GROUPS" :key="group.title">
+          <template v-for="group in (isPg ? [] : OPTION_GROUPS)" :key="group.title">
             <Disclosure
               class="nc-adv-group"
               :model-value="openGroups[group.title]"

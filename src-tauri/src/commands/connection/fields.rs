@@ -8,13 +8,11 @@ use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoCon
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionFields {
     pub name: String,
-    // Not yet sent by the connection editor (MongoDB is still the only engine it
-    // offers), so this defaults to absent rather than being a required field —
-    // `into_config` treats a missing/empty value as `"mongodb"`.
+    // Optional so a payload from before the editor offered engines still reads as
+    // MongoDB — `into_config` treats a missing/empty value as `"mongodb"`.
     #[serde(default)]
     pub engine: Option<String>,
-    // Not yet sent either (relational engines have no editor UI yet); see
-    // `PostgresConfig::database`'s doc comment for what it's for.
+    // PostgreSQL only; see `PostgresConfig::database`'s doc comment.
     #[serde(default)]
     pub database: Option<String>,
     pub hosts: Vec<HostEntry>,
@@ -43,9 +41,8 @@ pub struct ConnectionFields {
     pub ssh_passphrase: Option<String>,
 }
 
-/// Canonicalizes and validates a form-supplied `engine` value. `None`/empty means
-/// the connection editor hasn't offered a choice yet (true for every connection
-/// today) and defaults to `mongodb`; an explicit value must be a driver this app
+/// Canonicalizes and validates a form-supplied `engine` value. `None`/empty
+/// defaults to `mongodb`; an explicit value must be a driver this app
 /// actually knows how to dial. Unlike `ConnectionKind::from_str`'s permissive
 /// fallback — an unrecognized `connection_type` just picks a topology default —
 /// an unrecognized *engine* would silently pick the wrong driver, so this rejects

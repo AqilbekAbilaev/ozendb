@@ -11,6 +11,8 @@ import { OPTION_GROUPS, KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
 // "unknown" passthrough below).
 const DEDICATED_OPTION_KEYS = ['readPreference']
 
+const DEFAULT_PORTS = { mongodb: 27017, postgresql: 5432 }
+
 /**
  * One connection editor's fields and the two things you can do with them: test the
  * connection, and save it. Called once per dialog — the refs are per-instance.
@@ -24,15 +26,17 @@ export function useConnectionForm(editConn) {
   const isEditMode = !!editConn
 
   const connName = ref(isEditMode ? editConn.name : 'New Connection')
+  const engine   = ref(isEditMode ? (editConn.engine ?? 'mongodb') : 'mongodb')
+  const database = ref(isEditMode ? (editConn.database ?? '') : '')
 
   // Seed list — always at least one { host, port } row. In edit mode it comes from the
   // stored config (already a `hosts` array after backend migration).
   const hosts = ref(
     isEditMode && Array.isArray(editConn.hosts) && editConn.hosts.length
       ? editConn.hosts.map(h => ({ host: h.host, port: h.port }))
-      : [{ host: 'localhost', port: 27017 }]
+      : [{ host: 'localhost', port: DEFAULT_PORTS[engine.value] }]
   )
-  const connType       = ref(isEditMode ? editConn.connection_type : 'standalone')
+  const connType       = ref(isEditMode ? (editConn.connection_type ?? 'standalone') : 'standalone')
   const replicaSetName = ref(isEditMode ? (editConn.replica_set_name ?? '') : '')
 
   // Read preference lives on the Server tab (not Advanced) because it only makes sense
@@ -46,7 +50,15 @@ export function useConnectionForm(editConn) {
   // SRV are single-host.
   const isMultiHost = computed(() => connType.value === 'replica' || connType.value === 'sharded')
 
-  function addHost() { hosts.value.push({ host: '', port: 27017 }) }
+  function addHost() { hosts.value.push({ host: '', port: DEFAULT_PORTS[engine.value] }) }
+
+  // A port still at the old engine's default follows the switch; a typed one stays.
+  function setEngine(next) {
+    for (const h of hosts.value) {
+      if (Number(h.port) === DEFAULT_PORTS[engine.value]) h.port = DEFAULT_PORTS[next]
+    }
+    engine.value = next
+  }
   function removeHost(index) { if (hosts.value.length > 1) hosts.value.splice(index, 1) }
 
   // auth
@@ -230,9 +242,11 @@ export function useConnectionForm(editConn) {
   // The form as the backend takes it — shared by Save and Test Connection, so both
   // describe the same connection and the test can't pass on a URI Save wouldn't produce.
   function formFields() {
-    return {
+    const fields = {
       name:            connName.value.trim(),
-      hosts:           hosts.value.map(h => ({ host: h.host, port: Number(h.port) || 27017 })),
+      engine:          engine.value,
+      database:        null,
+      hosts:           hosts.value.map(h => ({ host: h.host, port: Number(h.port) || DEFAULT_PORTS[engine.value] })),
       connectionType:  connType.value,
       replicaSetName:  replicaSetName.value || null,
       options:         buildOptions(),
@@ -254,6 +268,20 @@ export function useConnectionForm(editConn) {
       sshPassphrase: (useSsh.value && sshAuth.value === 'key') ? (sshKeyPassphrase.value || null) : null,
       tag:             selectedTag.value !== 'none' ? selectedTag.value : null,
       readOnly:        readOnly.value,
+    }
+    if (engine.value !== 'postgresql') return fields
+    // PostgreSQL has no auth modes or driver options; its editor shows none of them.
+    return {
+      ...fields,
+      database:       database.value.trim() || null,
+      connectionType: 'standalone',
+      replicaSetName: null,
+      options:        {},
+      username:       username.value || null,
+      password:       password.value || null,
+      authDb:         null,
+      authMechanism:  null,
+      tlsCertKeyFile: null,
     }
   }
 
@@ -367,6 +395,8 @@ export function useConnectionForm(editConn) {
     const conn = {
       id:              id,
       name:            fields.name,
+      engine:          fields.engine,
+      database:        fields.database,
       hosts:           fields.hosts,
       connection_type: fields.connectionType,
       options:         fields.options,
@@ -379,7 +409,7 @@ export function useConnectionForm(editConn) {
   }
 
   return {
-    connName, hosts, connType, replicaSetName, readPreference, isMultiHost,
+    connName, engine, database, setEngine, hosts, connType, replicaSetName, readPreference, isMultiHost,
     addHost, removeHost,
     authMode, username, password, authDb,
     oidcEnvironment, oidcTokenResource, oidcNeedsResource,
