@@ -21,6 +21,10 @@ const APP_COMMANDS = [
   'move_connection_to_folder',
   // tags.js
   'get_node_tags', 'set_node_tag', 'clear_node_tags_under', 'set_connection_tag',
+  // connections.js
+  'test_connection', 'list_connections', 'save_connection', 'update_connection',
+  'delete_connection', 'disconnect', 'duplicate_connection',
+  'export_connections', 'import_connections',
   // connectionState.js
   'set_connection_open', 'update_last_accessed',
   // sshTrust.js

@@ -15,10 +15,7 @@ const MONGO_COMMANDS = [
   'list_saved_queries', 'save_query', 'delete_saved_query',
   'get_query_history', 'push_query_history', 'clear_query_history',
   // connections.js
-  'test_connection', 'test_ssh_connection', 'save_connection',
-  'update_connection', 'list_connections', 'delete_connection',
-  'disconnect', 'connection_uri', 'duplicate_connection',
-  'export_connections', 'import_connections',
+  'test_ssh_connection', 'connection_uri',
   // resources.js
   'list_databases', 'create_collection', 'create_database', 'create_view',
   'drop_database', 'drop_collection', 'rename_collection',

@@ -29,11 +29,11 @@ const { MENUS } = await import('../constants/contextMenus')
 const { contextMenu } = await import('../stores/contextMenu')
 const { treeSelection, setTreeSelection } = await import('../stores/connectionNavigation')
 
-vi.mock('../engines/mongodb/api/connections', () => ({
+vi.mock('../appApi/connections', () => ({
   disconnect: vi.fn(() => Promise.resolve()),
 }))
 
-const { disconnect } = await import('../engines/mongodb/api/connections')
+const { disconnect } = await import('../appApi/connections')
 vi.mock('../stores/connectionData', () => ({
   refreshConnectionResources: vi.fn(), clearConnectionResources: vi.fn(),
 }))

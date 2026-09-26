@@ -1,5 +1,5 @@
 import { computed, nextTick, ref } from 'vue'
-import { listConnections } from '../engines/mongodb/api/connections'
+import { listConnections } from '../appApi/connections'
 import {
   listFolders,
   createFolder,

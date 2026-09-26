@@ -17,7 +17,7 @@ vi.mock('../appApi/session', () => ({
 }))
 vi.mock('../stores/toast', () => ({ showToast: vi.fn() }))
 vi.mock('../appApi/errorLog', () => ({ recordFrontendError: vi.fn(() => Promise.resolve()) }))
-vi.mock('../engines/mongodb/api/connections', () => ({
+vi.mock('../appApi/connections', () => ({
   listConnections: vi.fn(() => Promise.resolve([
     { id: 'c1', name: 'Sales' },
     { id: 'c2', name: 'Analytics' },
@@ -27,7 +27,7 @@ vi.mock('../engines/mongodb/api/connections', () => ({
 const { getOpenTabs, setOpenTabs } = await import('../appApi/session')
 const { showToast } = await import('../stores/toast')
 const { recordFrontendError } = await import('../appApi/errorLog')
-const { listConnections } = await import('../engines/mongodb/api/connections')
+const { listConnections } = await import('../appApi/connections')
 
 const TARGET = (connId) => ({
   connectionId: connId,

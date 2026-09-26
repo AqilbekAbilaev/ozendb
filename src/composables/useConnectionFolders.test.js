@@ -10,13 +10,13 @@ vi.mock('../appApi/folders', () => ({
   deleteFolder: vi.fn(),
   moveConnectionToFolder: vi.fn(),
 }))
-vi.mock('../engines/mongodb/api/connections', () => ({
+vi.mock('../appApi/connections', () => ({
   listConnections: vi.fn(),
 }))
 
 const { useConnectionFolders } = await import('./useConnectionFolders')
 const api = await import('../appApi/folders')
-const connApi = await import('../engines/mongodb/api/connections')
+const connApi = await import('../appApi/connections')
 
 beforeEach(() => {
   vi.clearAllMocks()

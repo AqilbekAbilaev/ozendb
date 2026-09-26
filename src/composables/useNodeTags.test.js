@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../engines/mongodb/api/connections', () => ({ listConnections: vi.fn() }))
+vi.mock('../appApi/connections', () => ({ listConnections: vi.fn() }))
 vi.mock('../appApi/tags', () => ({
   getNodeTags: vi.fn(),
   setConnectionTag: vi.fn(),

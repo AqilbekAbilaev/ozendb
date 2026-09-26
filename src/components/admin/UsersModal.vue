@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { createUser, dropUser, listUsers, copyUsersToConnection } from '../../engines/mongodb/api/admin'
-import { listConnections } from '../../engines/mongodb/api/connections'
+import { listConnections } from '../../appApi/connections'
 import { errText } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import BaseIcon from '../base/BaseIcon.vue'

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { listConnections } from '../engines/mongodb/api/connections'
+import { listConnections } from '../appApi/connections'
 import { setConnectionOpen } from '../appApi/connectionState'
 import { clearConnectionResources } from './connectionData'
 import { applyConnectionUpdate } from '../utils/connectionList'

@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
-import { testConnection as testConnectionApi, testSshConnection, saveConnection, updateConnection } from '../engines/mongodb/api/connections'
+import { testConnection as testConnectionApi, saveConnection, updateConnection } from '../appApi/connections'
+import { testSshConnection } from '../engines/mongodb/api/connections'
 import { emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
