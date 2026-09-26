@@ -7,6 +7,7 @@ import FieldError from '../base/FieldError.vue'
 import SegmentedControl from '../base/SegmentedControl.vue'
 import { KNOWN_OPTION_KEYS, ENGINE_OPTIONS } from '../../data/connectionOptions.js'
 import { parseConnectionUri } from '../../utils/connectionUri.js'
+import { CONNECTION_EDITORS } from '../../engines/connectionEditor.js'
 
 const props = defineProps({
   engine: { type: String, default: 'mongodb' },
@@ -19,13 +20,13 @@ const mode      = ref('uri')
 const pastedUri = ref('')
 const uriError  = ref('')
 const engine    = ref(props.engine)
-const isPg      = computed(() => engine.value === 'postgresql')
-if (isPg.value) mode.value = 'manual'
+const supportsUri = computed(() => CONNECTION_EDITORS[engine.value].supportsUri)
+if (!supportsUri.value) mode.value = 'manual'
 
-// PostgreSQL connection strings aren't parsed yet, so it can only be configured by hand.
+// An engine without connection-string parsing can only be configured by hand.
 function pickEngine(next) {
   engine.value = next
-  mode.value = isPg.value ? 'manual' : 'uri'
+  mode.value = supportsUri.value ? 'uri' : 'manual'
   uriError.value = ''
 }
 
@@ -63,7 +64,7 @@ function goNext() {
         <SegmentedControl :model-value="engine" :options="ENGINE_OPTIONS" @update:model-value="pickEngine" />
       </div>
 
-      <p v-if="isPg" class="nci-lead">
+      <p v-if="!supportsUri" class="nci-lead">
         Pasting a PostgreSQL connection string isn't supported yet — configure the connection by hand.
       </p>
       <p v-else class="nci-lead">
@@ -71,7 +72,7 @@ function goNext() {
         you can paste it here and OzenDB will auto-configure your connection settings for you.
       </p>
 
-      <label class="nci-radio" :class="{ off: isPg }" @click="isPg || (mode = 'uri')">
+      <label class="nci-radio" :class="{ off: !supportsUri }" @click="supportsUri && (mode = 'uri')">
         <span class="radio" :class="{ on: mode === 'uri' }"></span>
         <span class="nci-radio-lbl">Paste your connection string (SRV or standard) here:</span>
       </label>

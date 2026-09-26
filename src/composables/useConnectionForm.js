@@ -223,10 +223,9 @@ export function useConnectionForm(editConn) {
 
   // A group starts expanded only if it already holds a set value, so existing
   // configuration is visible without the user expanding everything by hand.
-  const openGroups = ref({
-    ...Object.fromEntries(OPTION_GROUPS.map(group => [group.title, groupSetCount(group) > 0])),
-    Appearance: selectedTag.value !== 'none',
-  })
+  const openGroups = ref(
+    Object.fromEntries(OPTION_GROUPS.map(group => [group.title, groupSetCount(group) > 0]))
+  )
 
   function toggleGroup(title) {
     openGroups.value[title] = !openGroups.value[title]

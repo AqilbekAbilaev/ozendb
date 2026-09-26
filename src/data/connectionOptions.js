@@ -98,14 +98,6 @@ export const ENGINE_OPTIONS = [
   { value: 'postgresql', label: 'PostgreSQL' },
 ]
 
-export const TABS = [
-  ['server', 'Server'],
-  ['auth', 'Authentication'],
-  ['ssh', 'SSH Tunnel'],
-  ['ssl', 'SSL'],
-  ['advanced', 'Advanced'],
-]
-
 // `available: false` modes are shown disabled and badged "soon" rather than hidden,
 // so the list reads as the full set of what MongoDB supports.
 const AUTH_MODES = [
