@@ -118,7 +118,7 @@ export function useConnectionTree({ emit }) {
 
     if (!wasOpen) {
       try {
-        await ensureConnectionResources(id)
+        await ensureConnectionResources(id, conn.engine)
       } catch {
         if (connectionResourceErrors.value[id]) expandedConns.value[id] = false
       }
@@ -128,7 +128,7 @@ export function useConnectionTree({ emit }) {
   async function retryConnection(conn) {
     expandedConns.value[conn.id] = true
     try {
-      await refreshConnectionResources(conn.id)
+      await refreshConnectionResources(conn.id, conn.engine)
     } catch {
       if (connectionResourceErrors.value[conn.id]) expandedConns.value[conn.id] = false
     }

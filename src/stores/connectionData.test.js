@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listDatabases = vi.fn()
+const listSchemas = vi.fn()
 
 vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases }))
+vi.mock('../engines/postgresql/api/resources', () => ({ listSchemas }))
 
 const {
   connDatabases,
@@ -194,5 +196,34 @@ describe('connection resource state', () => {
     await initialRequest
 
     expect(connDatabases.value.a).toEqual([{ name: 'latest' }])
+  })
+})
+
+describe('engine-specific loading', () => {
+  it('loads a MongoDB connection\'s databases by default', async () => {
+    listDatabases.mockResolvedValue([{ name: 'app' }])
+    await ensureConnectionResources('a')
+    expect(listDatabases).toHaveBeenCalledWith('a')
+    expect(listSchemas).not.toHaveBeenCalled()
+  })
+
+  it('loads a PostgreSQL connection\'s schemas, and refreshes it the same way', async () => {
+    listSchemas.mockResolvedValue([{ name: 'public', system: false }])
+    await ensureConnectionResources('a', 'postgresql')
+    expect(connDatabases.value.a).toEqual([{ name: 'public', system: false }])
+
+    // Later refreshes come from callers that only know the id.
+    await refreshConnectionResources('a')
+    expect(listSchemas).toHaveBeenCalledTimes(2)
+    expect(listDatabases).not.toHaveBeenCalled()
+  })
+
+  it('forgets the engine when the connection is cleared', async () => {
+    listSchemas.mockResolvedValue([])
+    listDatabases.mockResolvedValue([])
+    await ensureConnectionResources('a', 'postgresql')
+    clearConnectionResources('a')
+    await ensureConnectionResources('a')
+    expect(listDatabases).toHaveBeenCalledWith('a')
   })
 })
