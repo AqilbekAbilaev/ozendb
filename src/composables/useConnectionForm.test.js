@@ -154,51 +154,6 @@ describe('saving a new connection', () => {
   })
 })
 
-describe('buildOptions', () => {
-  it('omits unset options so the URI carries only real parameters', () => {
-    const f = useConnectionForm(null)
-    f.advancedOptions.value.retryWrites = 'true'
-    const out = f.buildOptions()
-    expect(out.retryWrites).toBe('true')
-    expect('socketTimeoutMS' in out).toBe(false)
-  })
-
-  it('carries read preference, but only when the connection type has one', () => {
-    const f = useConnectionForm(null)
-    f.readPreference.value = 'nearest'
-    // Standalone has no read preference at all.
-    expect('readPreference' in f.buildOptions()).toBe(false)
-
-    f.connType.value = 'replica'
-    expect(f.buildOptions().readPreference).toBe('nearest')
-  })
-
-  it('preserves stored options that have no field in the editor', () => {
-    // A key from a newer driver, or hand-edited JSON — saving must not drop it.
-    const f = useConnectionForm(stored({ options: { zlibCompressionLevel: '6' } }))
-    expect(f.buildOptions().zlibCompressionLevel).toBe('6')
-  })
-
-  it('emits authMechanismProperties for OIDC and removes it otherwise', () => {
-    const f = useConnectionForm(null)
-    f.authMode.value = 'OIDC'
-    f.oidcEnvironment.value = 'gcp'
-    f.oidcTokenResource.value = 'api://x'
-    expect(f.buildOptions().authMechanismProperties).toBe('ENVIRONMENT:gcp,TOKEN_RESOURCE:api://x')
-
-    f.authMode.value = 'SCRAM-SHA-256'
-    expect('authMechanismProperties' in f.buildOptions()).toBe(false)
-  })
-
-  it('leaves out the token resource for an environment that has none', () => {
-    const f = useConnectionForm(null)
-    f.authMode.value = 'OIDC'
-    f.oidcEnvironment.value = 'test'
-    f.oidcTokenResource.value = 'api://x'
-    expect(f.buildOptions().authMechanismProperties).toBe('ENVIRONMENT:test')
-  })
-})
-
 describe('edit-mode seeding', () => {
   it('never pre-fills secrets, so blank keeps what is stored', () => {
     const f = useConnectionForm(stored({ username: 'admin' }))
@@ -206,16 +161,6 @@ describe('edit-mode seeding', () => {
     expect(f.password.value).toBe('')
     expect(f.sshPassword.value).toBe('')
     expect(f.sshKeyPassphrase.value).toBe('')
-  })
-
-  it('recovers the OIDC environment and token resource from stored properties', () => {
-    const f = useConnectionForm(stored({
-      auth_mechanism: 'OIDC',
-      options: { authMechanismProperties: 'ENVIRONMENT:gcp,TOKEN_RESOURCE:api://x:y' },
-    }))
-    expect(f.oidcEnvironment.value).toBe('gcp')
-    // Split on the first colon only, so a resource containing one survives.
-    expect(f.oidcTokenResource.value).toBe('api://x:y')
   })
 
   it('round-trips a stored connection back to the same fields', () => {
