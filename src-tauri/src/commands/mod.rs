@@ -200,6 +200,17 @@ impl AppContext {
         }
         self.pool.connect_postgres(&config).await
     }
+
+    /// Whether the connection is marked `read_only` — for a command that must
+    /// still be *usable* on one, unlike `client_for_write`/`pg_pool_for_write`'s
+    /// outright refusal, but needs to know so it can constrain itself (see
+    /// `run_pg_query`, which runs inside an explicitly read-only transaction
+    /// rather than skip the check). Unknown connections read as not read-only —
+    /// the caller's own `pg_pool`/`client` call already surfaces the real
+    /// "unknown connection" error.
+    pub fn is_read_only(&self, id: &str) -> bool {
+        self.storage.find(id).map(|c| c.read_only).unwrap_or(false)
+    }
 }
 
 #[derive(Serialize)]

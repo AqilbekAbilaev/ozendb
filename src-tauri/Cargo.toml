@@ -91,13 +91,11 @@ regex = "1"
 # `json` lets a query decode a value straight into `serde_json::Value` — how
 # run_pg_query/browse_pg_table read arbitrary Postgres rows without a per-type
 # decoder: each row is wrapped in `to_json()` server-side and decoded here,
-# rather than hand-matching every possible Postgres column type. `macros` isn't
-# used for its namesake `query!`/`query_as!` (compile-time-checked queries need a
-# live DB or an offline cache this project doesn't have) — it's the only feature
-# path to `Executor::describe`, used to get real column names before that
-# wrapping (`to_json`'s own object/array shape can't be trusted for that, see
-# `run_wrapped`'s doc comment). Pulls in `sqlx-macros`, unused otherwise.
-sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring", "json", "macros"] }
+# rather than hand-matching every possible Postgres column type. Real column
+# names come from `Executor::prepare` (public, ungated — unlike `describe`,
+# which is internal plumbing for the `query!`/`query_as!` macros and would need
+# the unused `macros` feature and its `sqlx-macros` dependency just to reach).
+sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring", "json"] }
 
 # keyring needs a per-platform backend feature; without one it silently uses an
 # in-memory mock store that loses every password when the app exits (which made

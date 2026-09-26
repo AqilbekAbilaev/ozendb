@@ -25,6 +25,8 @@ mod node_tags;
 mod operations;
 mod persist;
 #[cfg(test)]
+mod pg_command_integration_tests;
+#[cfg(test)]
 mod pg_integration_tests;
 mod pg_uri;
 mod pool;

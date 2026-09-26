@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use serde::{Deserialize, Serialize};
-use sqlx::{Column, Executor, SqlSafeStr};
+use sqlx::{Column, Executor, SqlSafeStr, Statement};
 use tauri::State;
 
 use super::{primary_key_columns, quote_ident, AppContext};
@@ -28,23 +28,16 @@ pub struct PgQueryResult {
     pub elapsed_ms: u64,
 }
 
-/// Wraps `inner_sql` — one subquery-able SELECT/CTE/VALUES expression — so every
-/// row comes back as a JSON array via Postgres's own `to_json`, sidestepping a
-/// per-Postgres-type Rust-side decoder entirely: whatever the query returns, the
-/// server already knows how to render as JSON. This is also why `run_pg_query`
-/// only supports queries, not arbitrary statements — the wrapper below is only
-/// valid SQL when `inner_sql` is something a `FROM` clause can wrap, which
-/// INSERT/UPDATE/DELETE/DDL are not.
-///
-/// Column names come from a separate `describe()` of `inner_sql` alone, not from
-/// the wrapped query or the decoded rows: `to_json` renders a row as a JSON
-/// *object*, whose keys silently collapse when two columns share a name (a join
-/// on `id`) or have none (`SELECT 1, 2`, both named `?column?`) — confirmed
-/// against a live server, losing a real column each time. The wrapper below
-/// works around this the same way: it aliases `inner_sql`'s columns positionally
-/// (`AS t(c0, c1, …)`, never by name) and returns `json_build_array(...)`, an
-/// array, not an object, so position — not a possibly-duplicate name — is what
-/// ties a decoded value back to `columns`.
+/// Column names and the `json_build_array(...)` wrapper SQL, built from a
+/// prepared statement's own reported columns — never from the wrapped query or
+/// the decoded rows: `to_json` renders a row as a JSON *object*, whose keys
+/// silently collapse when two columns share a name (a join on `id`) or have
+/// none (`SELECT 1, 2`, both named `?column?`) — confirmed against a live
+/// server, losing a real column each time. This works around it by aliasing
+/// `inner_sql`'s columns positionally (`AS t(c0, c1, …)`, never by name) and
+/// returning `json_build_array(...)`, an array, not an object, so position —
+/// not a possibly-duplicate name — is what ties a decoded value back to the
+/// returned column list.
 ///
 /// `NUMERIC` columns are cast to `text` before `to_json` sees them: Postgres
 /// renders `numeric` with its full, arbitrary precision, but this crate's
@@ -52,20 +45,17 @@ pub struct PgQueryResult {
 /// a bare JSON number would silently round it to the nearest `f64` — including a
 /// numeric primary key, which would then fail to match anything in
 /// `update_pg_row`. Sent as a JSON string instead, the exact text survives.
-async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResult, AppError> {
-    let described = match pool
-        .describe(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str())
-        .await
-    {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Postgres(e)),
-    };
-    let columns: Vec<String> = described.columns().iter().map(|c| c.name().to_string()).collect();
+///
+/// Pure (no I/O) so it only needs `stmt`, already fetched by whichever executor
+/// (`PgPool` or a transaction) the caller is using — see `run_wrapped`/
+/// `run_wrapped_read_only` below.
+fn wrap_for_json(stmt: &sqlx::postgres::PgStatement, inner_sql: &str) -> (Vec<String>, String) {
+    let columns: Vec<String> = stmt.columns().iter().map(|c| c.name().to_string()).collect();
     if columns.is_empty() {
-        return Ok(PgQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0 });
+        return (columns, String::new());
     }
 
-    let exprs: Vec<String> = described
+    let exprs: Vec<String> = stmt
         .columns()
         .iter()
         .enumerate()
@@ -90,9 +80,54 @@ async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResu
         aliases.join(", "),
         ROW_RESULT_CAP + 1,
     );
+    (columns, wrapped)
+}
+
+/// Turns the raw `json_build_array(...)` results into `PgQueryResult`'s
+/// rows-of-values shape and applies the truncation cap. Pure, shared by both
+/// `run_wrapped` and `run_wrapped_read_only`.
+fn rows_from_json(mut raw_rows: Vec<serde_json::Value>) -> (Vec<Vec<serde_json::Value>>, bool) {
+    let truncated = raw_rows.len() > ROW_RESULT_CAP as usize;
+    if truncated {
+        raw_rows.truncate(ROW_RESULT_CAP as usize);
+    }
+    // `json_build_array` always yields a JSON array; the fallback only guards
+    // against that guarantee somehow not holding, rather than panicking.
+    let rows = raw_rows
+        .into_iter()
+        .map(|row| match row {
+            serde_json::Value::Array(values) => values,
+            other => vec![other],
+        })
+        .collect();
+    (rows, truncated)
+}
+
+/// Wraps `inner_sql` — one subquery-able SELECT/CTE/VALUES expression — so every
+/// row comes back as a JSON array via Postgres's own `to_json` (see
+/// `wrap_for_json`), sidestepping a per-Postgres-type Rust-side decoder
+/// entirely: whatever the query returns, the server already knows how to render
+/// as JSON. This is also why `run_pg_query` only supports queries, not arbitrary
+/// statements — the wrapper is only valid SQL when `inner_sql` is something a
+/// `FROM` clause can wrap, which INSERT/UPDATE/DELETE/DDL are not.
+///
+/// Column names come from `Executor::prepare`, not `describe` — the latter is
+/// `#[cfg(feature = "offline")]` internal plumbing for the `query!`/`query_as!`
+/// macros (not meant to be called directly), and reaching it would mean
+/// depending on the unused `macros` feature. `prepare`'s `Statement::columns()`
+/// gives the same names and types without that.
+async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResult, AppError> {
+    let stmt = match pool.prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await {
+        Ok(val) => val,
+        Err(e) => return Err(AppError::Postgres(e)),
+    };
+    let (columns, wrapped) = wrap_for_json(&stmt, inner_sql);
+    if columns.is_empty() {
+        return Ok(PgQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0 });
+    }
 
     let started = std::time::Instant::now();
-    let mut raw_rows: Vec<serde_json::Value> =
+    let raw_rows: Vec<serde_json::Value> =
         match sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped))
             .fetch_all(pool)
             .await
@@ -101,30 +136,76 @@ async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResu
             Err(e) => return Err(AppError::Postgres(e)),
         };
     let elapsed_ms = started.elapsed().as_millis() as u64;
-
-    let truncated = raw_rows.len() > ROW_RESULT_CAP as usize;
-    if truncated {
-        raw_rows.truncate(ROW_RESULT_CAP as usize);
-    }
-    // `json_build_array` always yields a JSON array; the fallback only guards
-    // against that guarantee somehow not holding, rather than panicking.
-    let rows: Vec<Vec<serde_json::Value>> = raw_rows
-        .into_iter()
-        .map(|row| match row {
-            serde_json::Value::Array(values) => values,
-            other => vec![other],
-        })
-        .collect();
+    let (rows, truncated) = rows_from_json(raw_rows);
 
     Ok(PgQueryResult { columns, rows, truncated, elapsed_ms })
 }
 
-pub(crate) async fn run_query_impl(pool: &sqlx::PgPool, sql: &str) -> Result<PgQueryResult, AppError> {
+/// The `read_only`-enforced sibling of `run_wrapped`, for `run_pg_query` alone:
+/// runs `inner_sql` inside its own transaction that starts with `SET TRANSACTION
+/// READ ONLY`, then always rolls back (this path never writes, so there is
+/// nothing to commit). This is the real enforcement for arbitrary caller SQL —
+/// `pg_uri::options_for`'s `default_transaction_read_only` session default is
+/// only a *default*: a query can flip it off for the rest of the session with
+/// `set_config('default_transaction_read_only', 'off', false)` (confirmed live),
+/// but can't do the same to a transaction that already explicitly set itself
+/// read-only, and every call here starts a fresh one.
+async fn run_wrapped_read_only(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResult, AppError> {
+    let mut tx = match pool.begin().await {
+        Ok(val) => val,
+        Err(e) => return Err(AppError::Postgres(e)),
+    };
+    if let Err(e) = sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await {
+        let _ = tx.rollback().await;
+        return Err(AppError::Postgres(e));
+    }
+
+    let stmt = match (&mut *tx).prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await {
+        Ok(val) => val,
+        Err(e) => {
+            let _ = tx.rollback().await;
+            return Err(AppError::Postgres(e));
+        }
+    };
+    let (columns, wrapped) = wrap_for_json(&stmt, inner_sql);
+    if columns.is_empty() {
+        let _ = tx.rollback().await;
+        return Ok(PgQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0 });
+    }
+
+    let started = std::time::Instant::now();
+    let raw_rows: Vec<serde_json::Value> =
+        match sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped))
+            .fetch_all(&mut *tx)
+            .await
+        {
+            Ok(val) => val,
+            Err(e) => {
+                let _ = tx.rollback().await;
+                return Err(AppError::Postgres(e));
+            }
+        };
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let (rows, truncated) = rows_from_json(raw_rows);
+    let _ = tx.rollback().await;
+
+    Ok(PgQueryResult { columns, rows, truncated, elapsed_ms })
+}
+
+pub(crate) async fn run_query_impl(
+    pool: &sqlx::PgPool,
+    sql: &str,
+    read_only: bool,
+) -> Result<PgQueryResult, AppError> {
     let trimmed = sql.trim().trim_end_matches(';');
     if trimmed.is_empty() {
         return Err(AppError::Validation("Enter a query to run.".to_string()));
     }
-    run_wrapped(pool, trimmed).await
+    if read_only {
+        run_wrapped_read_only(pool, trimmed).await
+    } else {
+        run_wrapped(pool, trimmed).await
+    }
 }
 
 /// Runs arbitrary read-oriented SQL (a single SELECT, CTE, or VALUES expression)
@@ -133,13 +214,9 @@ pub(crate) async fn run_query_impl(pool: &sqlx::PgPool, sql: &str) -> Result<PgQ
 /// of v1's scope; see `run_wrapped`'s doc comment for why those fail with a
 /// Postgres syntax error here rather than running.
 ///
-/// This still reaches the driver through `pg_pool`, not `pg_pool_for_write` — a
-/// `read_only` connection can't skip this check by construction, but a wrapped
-/// subquery only rules out statements that can't live in a `FROM` clause, not a
-/// volatile function usable inside one (`nextval`, `setval`,
-/// `pg_terminate_backend`, …). The real enforcement is server-side: see
-/// `pg_uri::options_for`'s `default_transaction_read_only` for `read_only`
-/// connections, which `pg_pool` and `pg_pool_for_write` both dial through.
+/// Reaches the driver through `pg_pool`, not `pg_pool_for_write` — this command
+/// must still be usable on a `read_only` connection, just constrained rather
+/// than refused outright. See `run_wrapped_read_only` for how that's enforced.
 #[tauri::command]
 pub async fn run_pg_query(
     ctx: State<'_, AppContext>,
@@ -147,7 +224,8 @@ pub async fn run_pg_query(
     sql: String,
 ) -> Result<PgQueryResult, AppError> {
     let pool = ctx.pg_pool(&id).await?;
-    run_query_impl(&pool, &sql).await
+    let read_only = ctx.is_read_only(&id);
+    run_query_impl(&pool, &sql, read_only).await
 }
 
 pub(crate) async fn browse_table_impl(
@@ -184,8 +262,12 @@ pub(crate) async fn browse_table_impl(
 
     let mut inner = format!("SELECT * FROM {qualified}");
     if !order_columns.is_empty() {
+        // The direction applies to every column individually — `ORDER BY a, b
+        // DESC` (only `b` gets the suffix) is `a ASC, b DESC`, not "both
+        // descending" — confirmed against a live composite-key table.
         let direction = if descending { "DESC" } else { "ASC" };
-        inner.push_str(&format!(" ORDER BY {} {direction}", order_columns.join(", ")));
+        let ordered: Vec<String> = order_columns.iter().map(|c| format!("{c} {direction}")).collect();
+        inner.push_str(&format!(" ORDER BY {}", ordered.join(", ")));
     }
     inner.push_str(&format!(" LIMIT {effective_limit} OFFSET {effective_offset}"));
 
