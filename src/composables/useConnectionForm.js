@@ -263,7 +263,8 @@ export function useConnectionForm(editConn) {
         database:       database.value,
         connType:       connType.value,
         replicaSetName: replicaSetName.value,
-        options:        buildOptions(),
+        // A getter, so only an engine that reads options pays for building them.
+        get options() { return buildOptions() },
         authMode:       authMode.value,
         username:       username.value,
         password:       password.value,
