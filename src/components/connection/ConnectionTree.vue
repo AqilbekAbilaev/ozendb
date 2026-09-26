@@ -10,6 +10,7 @@ import { colorHex } from '../../utils/tabColor.js'
 import { connDatabases } from '../../stores/connectionData.js'
 import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
+import PostgresTreeNodes from '../../engines/postgresql/tree/PostgresTreeNodes.vue'
 
 const props = defineProps({
   width: { type: Number, default: 320 },
@@ -148,7 +149,12 @@ const { tip, ...statsTip } = useStatsTip()
         </div>
 
         <!-- Databases -->
-        <template v-if="expandedConns[conn.id] && connDatabases[conn.id]">
+        <PostgresTreeNodes
+          v-if="expandedConns[conn.id] && connDatabases[conn.id] && conn.engine === 'postgresql'"
+          :conn="conn"
+          :schemas="connDatabases[conn.id]"
+        />
+        <template v-else-if="expandedConns[conn.id] && connDatabases[conn.id]">
           <template v-for="db in connDatabases[conn.id]" :key="db.name">
             <!-- Database row -->
             <div
