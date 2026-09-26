@@ -37,7 +37,7 @@ const {
   testConnection,
 } = form
 const isPg = computed(() => engine.value === 'postgresql')
-const editor = CONNECTION_EDITORS.mongodb
+const editor = computed(() => CONNECTION_EDITORS[engine.value])
 
 // Opens the form for the engine picked on the intro step, pre-filled when it parsed a
 // connection string. `parsed` is null when the user chose to configure it by hand.
