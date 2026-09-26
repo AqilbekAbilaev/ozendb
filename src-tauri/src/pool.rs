@@ -221,29 +221,11 @@ impl ConnectionPool {
             self.tunnels.lock().await.remove(&config.id);
         }
 
-        let auth = match config.ssh_auth_method() {
-            SshAuthMethod::Key => SshAuth::Key {
-                path: config.ssh_key_file.clone().unwrap_or_default(),
-                passphrase: crate::keychain::get(&format!("{}::ssh-key-pass", config.id)),
-            },
-            SshAuthMethod::Password => SshAuth::Password(
-                crate::keychain::get(&format!("{}::ssh-pass", config.id)).unwrap_or_default(),
-            ),
-        };
-        // SSH tunnels forward a single host; multi-host seed lists over SSH are
-        // not supported, so the tunnel targets the first host of the list.
-        let (mongo_host, mongo_port) = match config.hosts.first() {
-            Some(entry) => (entry.host.clone(), entry.port),
-            None => (String::from("localhost"), default_port_for(config)),
-        };
-        let params = SshParams {
-            ssh_host: config.ssh_host.clone().unwrap_or_default(),
-            ssh_port: config.ssh_port,
-            ssh_user: config.ssh_user.clone().unwrap_or_default(),
-            auth: auth,
-            mongo_host: mongo_host,
-            mongo_port: mongo_port,
-        };
+        let params = tunnel_params(
+            config,
+            crate::keychain::get(&format!("{}::ssh-pass", config.id)),
+            crate::keychain::get(&format!("{}::ssh-key-pass", config.id)),
+        );
         let tunnel = match ssh::establish(
             params,
             Arc::clone(&self.known_hosts),
@@ -298,6 +280,37 @@ fn postgres_config(config: &ConnectionConfig) -> Result<&PostgresConfig, AppErro
     }
 }
 
+/// The tunnel a config describes, with its SSH secrets passed in rather than read
+/// here, so the pool (keychain) and Test Connection (the form) open the same tunnel.
+/// Only the secret the auth method uses is kept.
+pub(crate) fn tunnel_params(
+    config: &ConnectionConfig,
+    ssh_password: Option<String>,
+    ssh_passphrase: Option<String>,
+) -> SshParams {
+    let auth = match config.ssh_auth_method() {
+        SshAuthMethod::Key => SshAuth::Key {
+            path: config.ssh_key_file.clone().unwrap_or_default(),
+            passphrase: ssh_passphrase,
+        },
+        SshAuthMethod::Password => SshAuth::Password(ssh_password.unwrap_or_default()),
+    };
+    // SSH tunnels forward a single host; multi-host seed lists over SSH are
+    // not supported, so the tunnel targets the first host of the list.
+    let (mongo_host, mongo_port) = match config.hosts.first() {
+        Some(entry) => (entry.host.clone(), entry.port),
+        None => (String::from("localhost"), default_port_for(config)),
+    };
+    SshParams {
+        ssh_host: config.ssh_host.clone().unwrap_or_default(),
+        ssh_port: config.ssh_port,
+        ssh_user: config.ssh_user.clone().unwrap_or_default(),
+        auth,
+        mongo_host,
+        mongo_port,
+    }
+}
+
 /// The SSH tunnel's fallback port when `config.hosts` is empty — matches whichever
 /// driver this connection actually dials, since a Postgres connection defaulting to
 /// Mongo's 27017 (or vice versa) tunnels to the wrong service entirely.
@@ -320,8 +333,9 @@ fn default_port_for(config: &ConnectionConfig) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::{default_port_for, mongo_config, postgres_config};
-    use crate::storage::{ConnectionConfig, Engine, EngineConfig, MongoConfig, PostgresConfig};
+    use super::{default_port_for, mongo_config, postgres_config, tunnel_params};
+    use crate::ssh::SshAuth;
+    use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
 
     fn config(engine: Engine) -> ConnectionConfig {
         ConnectionConfig {
@@ -351,5 +365,42 @@ mod tests {
     fn default_port_for_matches_the_configs_own_engine() {
         assert_eq!(default_port_for(&config(Engine::Mongo)), 27017);
         assert_eq!(default_port_for(&config(Engine::Postgres)), 5432);
+    }
+
+    #[test]
+    fn tunnel_params_forwards_to_the_first_host_with_password_auth() {
+        let mut cfg = config(Engine::Postgres);
+        cfg.hosts = vec![
+            HostEntry { host: String::from("db1"), port: 6543 },
+            HostEntry { host: String::from("db2"), port: 6544 },
+        ];
+        cfg.ssh_host = Some(String::from("bastion"));
+        cfg.ssh_port = 2222;
+        cfg.ssh_user = Some(String::from("me"));
+        cfg.ssh_auth = Some(String::from("password"));
+
+        let params = tunnel_params(&cfg, Some(String::from("pw")), None);
+
+        assert_eq!((params.ssh_host.as_str(), params.ssh_port, params.ssh_user.as_str()), ("bastion", 2222, "me"));
+        assert_eq!((params.mongo_host.as_str(), params.mongo_port), ("db1", 6543));
+        assert!(matches!(params.auth, SshAuth::Password(ref pw) if pw == "pw"));
+    }
+
+    #[test]
+    fn tunnel_params_uses_the_key_file_and_passphrase_for_key_auth() {
+        let mut cfg = config(Engine::Mongo);
+        cfg.ssh_auth = Some(String::from("key"));
+        cfg.ssh_key_file = Some(String::from("/k"));
+
+        let params = tunnel_params(&cfg, Some(String::from("ignored")), Some(String::from("pp")));
+
+        assert!(matches!(params.auth, SshAuth::Key { ref path, ref passphrase }
+            if path == "/k" && passphrase.as_deref() == Some("pp")));
+    }
+
+    #[test]
+    fn tunnel_params_falls_back_to_the_engines_default_port_without_hosts() {
+        let params = tunnel_params(&config(Engine::Postgres), None, None);
+        assert_eq!((params.mongo_host.as_str(), params.mongo_port), ("localhost", 5432));
     }
 }

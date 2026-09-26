@@ -10,8 +10,12 @@ pub(super) async fn test_postgres_connection(
     config: &ConnectionConfig,
     postgres: &PostgresConfig,
     password: Option<&str>,
+    via: Option<u16>,
 ) -> Result<(), AppError> {
-    let options = pg_uri::build_options(config, postgres, password)?;
+    let options = match via {
+        Some(port) => pg_uri::build_options_to(config, postgres, password, "127.0.0.1", port)?,
+        None => pg_uri::build_options(config, postgres, password)?,
+    };
 
     match pg_uri::tcp_probe(&options).await {
         Ok(val) => val,
