@@ -4,35 +4,11 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
 import {
-  testSshConnection,
   connectionUri,
 } from './connections'
 
 beforeEach(() => {
   vi.clearAllMocks()
-})
-
-describe('testSshConnection', () => {
-  it('passes the ssh fields through to the test_ssh_connection payload', async () => {
-    invoke.mockResolvedValue(null)
-    const fields = {
-      sshHost:       'tunnel.example',
-      sshPort:       22,
-      sshUser:       'me',
-      sshAuth:       'password',
-      sshPassword:   'secret',
-      sshKeyFile:    null,
-      sshPassphrase: null,
-      mongoHost:     'localhost',
-      mongoPort:     27017,
-      username:      'admin',
-      password:      null,
-      authDb:        'admin',
-      authMechanism: 'SCRAM-SHA-256',
-    }
-    await testSshConnection(fields)
-    expect(invoke).toHaveBeenCalledWith('test_ssh_connection', fields)
-  })
 })
 
 describe('connectionUri', () => {

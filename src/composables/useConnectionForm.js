@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
 import { testConnection as testConnectionApi, saveConnection, updateConnection } from '../appApi/connections'
-import { testSshConnection } from '../engines/mongodb/api/connections'
 import { emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
@@ -282,31 +281,11 @@ export function useConnectionForm(editConn) {
     importedExtraOptions.value = parsed.extraOptions
   }
 
-  // A tunnelled connection is tested through a temporary tunnel, which the backend
-  // opens from the SSH fields directly rather than from a connection string.
   async function testConnection() {
     status.value = null
     isTesting.value = true
     try {
-      if (useSsh.value) {
-        await testSshConnection({
-          sshHost:       sshHost.value,
-          sshPort:       Number(sshPort.value) || 22,
-          sshUser:       sshUser.value,
-          sshAuth:       sshAuth.value,
-          sshPassword:   sshPassword.value || null,
-          sshKeyFile:    sshKeyFile.value || null,
-          sshPassphrase: sshKeyPassphrase.value || null,
-          mongoHost:     hosts.value[0].host,
-          mongoPort:     Number(hosts.value[0].port) || 27017,
-          username:      authMode.value !== 'none' ? (username.value || null) : null,
-          password:      authMode.value !== 'none' ? (password.value || null) : null,
-          authDb:        authMode.value !== 'none' ? (authDb.value || null) : null,
-          authMechanism: authMode.value,
-        })
-      } else {
-        await testConnectionApi(isEditMode ? editConn.id : null, formFields())
-      }
+      await testConnectionApi(isEditMode ? editConn.id : null, formFields())
       status.value = { type: 'success', message: 'Connected successfully.' }
     } catch (e) {
       status.value = { type: 'error', message: errText(e) }

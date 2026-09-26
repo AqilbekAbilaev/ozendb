@@ -351,15 +351,18 @@ describe('testConnection', () => {
     expect(f.status.value.message).toContain('boom')
   })
 
-  it('goes through the temporary tunnel when SSH is enabled', async () => {
+  it('sends an SSH connection through test_connection with its SSH fields', async () => {
     const f = useConnectionForm(null)
     f.useSsh.value = true
     f.sshHost.value = 'bastion'
 
     await f.testConnection()
 
-    expect(invoke).toHaveBeenCalledWith('test_ssh_connection', expect.anything())
-    expect(invoke).not.toHaveBeenCalledWith('test_connection', expect.anything())
+    expect(invoke).toHaveBeenCalledTimes(1)
+    expect(invoke).toHaveBeenCalledWith('test_connection', {
+      id: null,
+      fields: expect.objectContaining({ sshEnabled: true, sshHost: 'bastion' }),
+    })
     expect(f.status.value.type).toBe('success')
   })
 })

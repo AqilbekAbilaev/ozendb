@@ -92,7 +92,7 @@ pub fn run() {
             app.manage(ExportWatermarkStorage::new(data_dir.join("export_watermarks.json")));
             app.manage(CollectionHistoryStore::new(data_dir.join("collection_history.json")));
             // The host-key trust store is shared between the pool (real connect)
-            // and the test_ssh_connection command, so both honor the same TOFU
+            // and Test Connection's temporary tunnel, so both honor the same TOFU
             // record. Managed as an Arc so the pool can own a clone.
             let known_hosts = Arc::new(KnownHostsStore::new(data_dir.join("known_hosts.json")));
             app.manage(Arc::clone(&known_hosts));
@@ -171,7 +171,6 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             test_connection,
-            test_ssh_connection,
             respond_ssh_host_key,
             forget_ssh_host,
             save_connection,

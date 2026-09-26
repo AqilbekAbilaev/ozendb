@@ -11,7 +11,7 @@ use tauri::State;
 use uuid::Uuid;
 
 mod ssh;
-pub use ssh::{forget_ssh_host, respond_ssh_host_key, test_ssh_connection};
+pub use ssh::{forget_ssh_host, respond_ssh_host_key};
 use ssh::open_test_tunnel;
 
 mod postgres;
