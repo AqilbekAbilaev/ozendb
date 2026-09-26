@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { testConnection as testConnectionApi, saveConnection, updateConnection } from '../appApi/connections'
 import { emit as tauriEmit } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
@@ -6,7 +6,7 @@ import { errText } from '../utils/errors'
 import { connectionTargetChanged } from '../utils/connectionTarget.js'
 import { hasLoadedData } from '../stores/connectionData.js'
 import { BUILD_FIELDS } from '../engines/connectionFields.js'
-import { useMongoOptions } from '../engines/mongodb/connection/useMongoOptions.js'
+import { useMongoFields } from '../engines/mongodb/connection/useMongoFields.js'
 
 const DEFAULT_PORTS = { mongodb: 27017, postgresql: 5432 }
 
@@ -33,13 +33,6 @@ export function useConnectionForm(editConn) {
       ? editConn.hosts.map(h => ({ host: h.host, port: h.port }))
       : [{ host: 'localhost', port: DEFAULT_PORTS[engine.value] }]
   )
-  const connType       = ref(isEditMode ? (editConn.connection_type ?? 'standalone') : 'standalone')
-  const replicaSetName = ref(isEditMode ? (editConn.replica_set_name ?? '') : '')
-
-  // Only replica sets and sharded clusters use a multi-host seed list; standalone and
-  // SRV are single-host.
-  const isMultiHost = computed(() => connType.value === 'replica' || connType.value === 'sharded')
-
   function addHost() { hosts.value.push({ host: '', port: DEFAULT_PORTS[engine.value] }) }
 
   // A port still at the old engine's default follows the switch; a typed one stays.
@@ -52,30 +45,32 @@ export function useConnectionForm(editConn) {
   function removeHost(index) { if (hosts.value.length > 1) hosts.value.splice(index, 1) }
 
   // auth
-  const authMode = ref(isEditMode ? (editConn.auth_mechanism ?? 'SCRAM-SHA-256') : 'SCRAM-SHA-256')
   const username = ref(isEditMode ? (editConn.username ?? '') : '')
   const password = ref('')   // never pre-filled — empty means "keep existing"
-  const authDb   = ref(isEditMode ? (editConn.auth_db ?? 'admin') : 'admin')
 
-  const mongo = useMongoOptions(editConn, { connType, authMode })
+  const mongo = useMongoFields(editConn, { pickCertificate })
 
   // ssl
   const useTls               = ref(isEditMode ? !!editConn.tls : false)
   const tlsCaFile            = ref(isEditMode ? (editConn.tls_ca_file ?? '') : '')
-  const tlsCertKeyFile       = ref(isEditMode ? (editConn.tls_cert_key_file ?? '') : '')
   const tlsAllowInvalidCerts = ref(isEditMode ? !!editConn.tls_allow_invalid_certificates : false)
 
-  async function pickTlsFile(target) {
+  // The chosen certificate's path, or null when the picker was dismissed.
+  async function pickCertificate() {
     try {
       const picked = await openDialog({
         multiple: false,
         filters: [{ name: 'Certificate', extensions: ['pem', 'crt', 'cert', 'cer', 'key'] }],
       })
-      if (typeof picked === 'string') {
-        if (target === 'ca') tlsCaFile.value = picked
-        else tlsCertKeyFile.value = picked
-      }
-    } catch (_) {}
+      return typeof picked === 'string' ? picked : null
+    } catch (_) {
+      return null
+    }
+  }
+
+  async function pickTlsFile() {
+    const picked = await pickCertificate()
+    if (picked) tlsCaFile.value = picked
   }
 
   // ssh
@@ -130,16 +125,16 @@ export function useConnectionForm(editConn) {
       readOnly:        readOnly.value,
       ...BUILD_FIELDS[engine.value]({
         database:       database.value,
-        connType:       connType.value,
-        replicaSetName: replicaSetName.value,
+        connType:       mongo.connType.value,
+        replicaSetName: mongo.replicaSetName.value,
         // A getter, so only an engine that reads options pays for building them.
         get options() { return mongo.buildOptions() },
-        authMode:       authMode.value,
+        authMode:       mongo.authMode.value,
         username:       username.value,
         password:       password.value,
-        authDb:         authDb.value,
+        authDb:         mongo.authDb.value,
         useTls:         useTls.value,
-        tlsCertKeyFile: tlsCertKeyFile.value,
+        tlsCertKeyFile: mongo.tlsCertKeyFile.value,
       }),
     }
   }
@@ -153,14 +148,9 @@ export function useConnectionForm(editConn) {
     set(username, parsed.username)
     set(password, parsed.password)
     set(hosts, parsed.hosts)
-    set(connType, parsed.connectionType)
-    set(replicaSetName, parsed.replicaSetName)
-    set(authDb, parsed.authDb)
-    set(authMode, parsed.authMode)
     set(useTls, parsed.tls)
     set(tlsAllowInvalidCerts, parsed.tlsAllowInvalidCerts)
     set(tlsCaFile, parsed.tlsCaFile)
-    set(tlsCertKeyFile, parsed.tlsCertKeyFile)
     mongo.applyParsed(parsed)
   }
 
@@ -264,10 +254,10 @@ export function useConnectionForm(editConn) {
   }
 
   return {
-    isEditMode, connName, engine, database, setEngine, hosts, connType, replicaSetName, isMultiHost,
+    isEditMode, connName, engine, database, setEngine, hosts,
     addHost, removeHost,
-    authMode, username, password, authDb,
-    useTls, tlsCaFile, tlsCertKeyFile, tlsAllowInvalidCerts, pickTlsFile,
+    username, password,
+    useTls, tlsCaFile, tlsAllowInvalidCerts, pickTlsFile,
     useSsh, sshHost, sshPort, sshUser, sshAuth, sshPassword, sshKeyFile,
     sshKeyPassphrase, pickSshKey,
     selectedTag, readOnly,

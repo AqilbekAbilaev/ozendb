@@ -6,16 +6,32 @@ import { OPTION_GROUPS, KNOWN_OPTION_KEYS } from '../../../data/connectionOption
 const DEDICATED_OPTION_KEYS = ['readPreference']
 
 /**
- * MongoDB's connection options: the Advanced tab's catalog, read preference and OIDC,
- * and the options map they build. Part of one connection editor, so the refs are
- * per-instance.
+ * MongoDB's half of a connection editor: topology, auth mode, the client certificate,
+ * the Advanced tab's options, read preference and OIDC, and the options map they
+ * build. Part of one editor, so the refs are per-instance.
  *
  * @param {Object|null} editConn - the connection being edited, or null when creating.
- * @param {{ connType: import('vue').Ref, authMode: import('vue').Ref }} form - the two
- *   form fields that decide which options apply.
+ * @param {{ pickCertificate: () => Promise<string|null> }} form - the editor's file picker.
  */
-export function useMongoOptions(editConn, { connType, authMode }) {
+export function useMongoFields(editConn, { pickCertificate }) {
   const isEditMode = !!editConn
+
+  const connType       = ref(isEditMode ? (editConn.connection_type ?? 'standalone') : 'standalone')
+  const replicaSetName = ref(isEditMode ? (editConn.replica_set_name ?? '') : '')
+
+  // Only replica sets and sharded clusters use a multi-host seed list; standalone and
+  // SRV are single-host.
+  const isMultiHost = computed(() => connType.value === 'replica' || connType.value === 'sharded')
+
+  const authMode = ref(isEditMode ? (editConn.auth_mechanism ?? 'SCRAM-SHA-256') : 'SCRAM-SHA-256')
+  const authDb   = ref(isEditMode ? (editConn.auth_db ?? 'admin') : 'admin')
+
+  const tlsCertKeyFile = ref(isEditMode ? (editConn.tls_cert_key_file ?? '') : '')
+
+  async function pickClientCert() {
+    const picked = await pickCertificate()
+    if (picked) tlsCertKeyFile.value = picked
+  }
 
   // Read preference lives on the Server tab (not Advanced) because it only makes sense
   // for replica sets / sharded / SRV. '' means unset → driver default (primary). Stored
@@ -146,9 +162,14 @@ export function useMongoOptions(editConn, { connType, authMode }) {
     openGroups.value[title] = !openGroups.value[title]
   }
 
-  // The parts of a parsed connection string these options own.
+  // MongoDB's part of a parsed connection string.
   function applyParsed(parsed) {
     const set = (field, value) => { if (value !== null) field.value = value }
+    set(connType, parsed.connectionType)
+    set(replicaSetName, parsed.replicaSetName)
+    set(authMode, parsed.authMode)
+    set(authDb, parsed.authDb)
+    set(tlsCertKeyFile, parsed.tlsCertKeyFile)
     set(readPreference, parsed.readPreference)
     set(oidcEnvironment, parsed.oidcEnvironment)
     set(oidcTokenResource, parsed.oidcTokenResource)
@@ -157,6 +178,7 @@ export function useMongoOptions(editConn, { connType, authMode }) {
   }
 
   return {
+    connType, replicaSetName, isMultiHost, authMode, authDb, tlsCertKeyFile, pickClientCert,
     readPreference, oidcEnvironment, oidcTokenResource, oidcNeedsResource,
     advancedOptions, optionVisible, optionDisabled, groupSetCount, openGroups, toggleGroup,
     buildOptions, applyParsed,
