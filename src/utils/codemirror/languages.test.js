@@ -12,6 +12,10 @@ describe('languageExtension', () => {
     expect(ext).toBeTruthy()
   })
 
+  it('highlights SQL with the PostgreSQL dialect rather than the JS fallback', () => {
+    expect(languageExtension('sql').name).toBe('sql')
+  })
+
   it('falls back for an unknown id', () => {
     expect(languageExtension('brainfuck-9000')).toBeTruthy()
   })

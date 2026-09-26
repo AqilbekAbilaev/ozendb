@@ -232,3 +232,10 @@ export function openPostgresTable({ connectionId, connectionName, database, sche
   tabs.value.push(tab)
   activateTab(tab.id)
 }
+
+// A SQL editor against a PostgreSQL connection's database; a new tab every time.
+export function openPostgresQuery({ connectionId, connectionName, database }) {
+  const tab = newWorkspace('postgresql.query', { target: { connectionId, connectionName, database } })
+  tabs.value.push(tab)
+  activateTab(tab.id)
+}

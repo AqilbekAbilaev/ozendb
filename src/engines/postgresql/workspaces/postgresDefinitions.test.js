@@ -26,3 +26,20 @@ describe('postgresql.table_browse', () => {
     expect(def.duplicate(tab)).toEqual(def.create({ target }))
   })
 })
+
+describe('postgresql.query', () => {
+  const def = byType['postgresql.query']
+  const db = { connectionId: 'c1', connectionName: 'local', database: 'app' }
+
+  it('opens an empty editor against the connection\'s database', () => {
+    const created = def.create({ target: db })
+    expect(created.title).toBe('SQL: app')
+    expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }] })
+    expect(created.fields).toEqual({ kind: 'pgQuery', ...db, sql: '', result: null, error: null, running: false })
+  })
+
+  it('duplicates the SQL but not the result', () => {
+    const tab = { ...def.create({ target: db }).fields, sql: 'SELECT 1', result: { rows: [[1]] }, error: 'x' }
+    expect(def.duplicate(tab).fields).toMatchObject({ sql: 'SELECT 1', result: null, error: null, running: false })
+  })
+})
