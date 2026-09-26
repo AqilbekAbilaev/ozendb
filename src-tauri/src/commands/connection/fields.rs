@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
+use crate::storage::{ConnectionConfig, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
 
 /// The connection editor's form, exactly as the frontend sends it. `save_connection`
 /// and `update_connection` take the same payload; the fields the editor doesn't own
@@ -8,23 +8,12 @@ use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoCon
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionFields {
     pub name: String,
-    // Optional so a payload from before the editor offered engines still reads as
-    // MongoDB — `into_config` treats a missing/empty value as `"mongodb"`.
-    #[serde(default)]
-    pub engine: Option<String>,
-    // PostgreSQL only; see `PostgresConfig::database`'s doc comment.
-    #[serde(default)]
-    pub database: Option<String>,
+    #[serde(flatten)]
+    pub engine: EngineFields,
     pub hosts: Vec<HostEntry>,
-    pub connection_type: String,
-    pub replica_set_name: Option<String>,
     pub username: Option<String>,
-    pub auth_db: Option<String>,
-    pub auth_mechanism: Option<String>,
-    pub options: std::collections::BTreeMap<String, String>,
     pub tls: bool,
     pub tls_ca_file: Option<String>,
-    pub tls_cert_key_file: Option<String>,
     pub tls_allow_invalid_certificates: bool,
     pub ssh_enabled: bool,
     pub ssh_host: Option<String>,
@@ -41,29 +30,40 @@ pub struct ConnectionFields {
     pub ssh_passphrase: Option<String>,
 }
 
-/// Canonicalizes and validates a form-supplied `engine` value. `None`/empty
-/// defaults to `mongodb`; an explicit value must be a driver this app
-/// actually knows how to dial. Unlike `ConnectionKind::from_str`'s permissive
-/// fallback — an unrecognized `connection_type` just picks a topology default —
-/// an unrecognized *engine* would silently pick the wrong driver, so this rejects
-/// rather than guesses.
-fn resolve_engine(raw: Option<&str>) -> Result<Engine, AppError> {
-    match raw.filter(|s| !s.is_empty()) {
-        None | Some("mongodb") => Ok(Engine::Mongo),
-        Some("postgresql") | Some("postgres") => Ok(Engine::Postgres),
-        Some(other) => Err(AppError::Validation(format!("Unknown connection engine \"{other}\"."))),
-    }
+/// Each driver's own form fields, picked by the payload's `engine` key. A missing or
+/// unknown engine fails to deserialize rather than defaulting to a driver.
+#[derive(serde::Deserialize)]
+#[serde(tag = "engine")]
+pub enum EngineFields {
+    #[serde(rename = "mongodb")]
+    Mongo(MongoFields),
+    #[serde(rename = "postgresql", alias = "postgres")]
+    Postgres(PostgresFields),
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MongoFields {
+    pub connection_type: String,
+    pub replica_set_name: Option<String>,
+    pub auth_db: Option<String>,
+    pub auth_mechanism: Option<String>,
+    pub options: std::collections::BTreeMap<String, String>,
+    pub tls_cert_key_file: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PostgresFields {
+    #[serde(default)]
+    pub database: Option<String>,
 }
 
 impl ConnectionFields {
     /// The stored config this form describes. `folder_id`/`last_accessed`/`open`
-    /// come from the caller either way (new: invented; edit: preserved).
-    /// `existing` likewise decides which *driver* this is — never the form's
-    /// `engine`, even once the editor sends one. An edit can change a driver's
-    /// settings, never which driver they belong to. Deliberate, and pinned by
-    /// `into_config_ignores_a_form_supplied_engine_when_editing` in
-    /// `commands/connection.test.rs`: don't delete that test without deciding, on
-    /// purpose, to let edits switch engines.
+    /// come from the caller either way (new: invented; edit: preserved). An edit can
+    /// change a driver's settings, never which driver they belong to: a form for a
+    /// different engine than `existing` is refused.
     pub(super) fn into_config(
         self,
         id: String,
@@ -72,29 +72,31 @@ impl ConnectionFields {
         last_accessed: Option<String>,
         open: bool,
     ) -> Result<ConnectionConfig, AppError> {
-        let engine = match existing {
-            Some(record) => record.engine_kind(),
-            None => resolve_engine(self.engine.as_deref())?,
-        };
-        let engine = match engine {
-            Engine::Mongo => EngineConfig::Mongo(MongoConfig {
-                connection_type: self.connection_type,
-                replica_set_name: self.replica_set_name,
-                auth_db: self.auth_db,
-                auth_mechanism: self.auth_mechanism,
-                options: self.options,
-                tls_cert_key_file: self.tls_cert_key_file,
-            }),
-            // The editor has no database field yet, so a `None` from the form keeps
-            // whatever the record already had rather than blanking it; once the
-            // editor does send one, the form wins like every other setting.
-            Engine::Postgres => EngineConfig::Postgres(PostgresConfig {
-                database: self.database.or_else(|| {
-                    existing
-                        .and_then(|record| record.engine.as_postgres())
-                        .and_then(|postgres| postgres.database.clone())
-                }),
-            }),
+        let engine = match (self.engine, existing.map(|record| &record.engine)) {
+            (EngineFields::Mongo(mongo), None | Some(EngineConfig::Mongo(_))) => {
+                EngineConfig::Mongo(MongoConfig {
+                    connection_type: mongo.connection_type,
+                    replica_set_name: mongo.replica_set_name,
+                    auth_db: mongo.auth_db,
+                    auth_mechanism: mongo.auth_mechanism,
+                    options: mongo.options,
+                    tls_cert_key_file: mongo.tls_cert_key_file,
+                })
+            }
+            // A blank database keeps whatever the record already had.
+            (EngineFields::Postgres(postgres), stored @ (None | Some(EngineConfig::Postgres(_)))) => {
+                let stored_database = stored
+                    .and_then(|config| config.as_postgres())
+                    .and_then(|config| config.database.clone());
+                EngineConfig::Postgres(PostgresConfig {
+                    database: postgres.database.or(stored_database),
+                })
+            }
+            _ => {
+                return Err(AppError::Validation(
+                    "A saved connection can't change engine.".to_string(),
+                ))
+            }
         };
         Ok(ConnectionConfig {
             id: id,

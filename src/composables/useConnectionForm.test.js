@@ -86,7 +86,7 @@ describe('engine', () => {
   it('starts a new connection as MongoDB', () => {
     const fields = useConnectionForm(null).formFields()
     expect(fields.engine).toBe('mongodb')
-    expect(fields.database).toBe(null)
+    expect(fields).not.toHaveProperty('database')
   })
 
   it('moves a default port to the new engine\'s default and keeps a typed one', () => {
@@ -111,18 +111,11 @@ describe('engine', () => {
     f.useTls.value = true
     f.tlsCertKeyFile.value = '/client.pem'
 
-    expect(f.formFields()).toMatchObject({
-      engine: 'postgresql',
-      database: 'app',
-      username: 'me',
-      password: 'pw',
-      connectionType: 'standalone',
-      replicaSetName: null,
-      authDb: null,
-      authMechanism: null,
-      options: {},
-      tlsCertKeyFile: null,
-    })
+    const fields = f.formFields()
+    expect(fields).toMatchObject({ engine: 'postgresql', database: 'app', username: 'me', password: 'pw' })
+    for (const key of ['connectionType', 'replicaSetName', 'authDb', 'authMechanism', 'options', 'tlsCertKeyFile']) {
+      expect(fields, key).not.toHaveProperty(key)
+    }
   })
 
   it('falls back to the engine\'s default port for a blank one', () => {

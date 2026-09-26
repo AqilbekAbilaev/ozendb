@@ -1,4 +1,5 @@
 use super::*;
+use super::fields::{EngineFields, MongoFields, PostgresFields};
 use crate::storage::{Engine, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
 
 // A config with no credentials and no SSH — the baseline each test tweaks.
@@ -16,21 +17,21 @@ fn config() -> ConnectionConfig {
 fn fields() -> ConnectionFields {
     ConnectionFields {
         name: String::from("prod"),
-        engine: None,
-        database: Some(String::from("appdb")),
+        engine: EngineFields::Mongo(MongoFields {
+            connection_type: String::from("replica"),
+            replica_set_name: Some(String::from("rs0")),
+            auth_db: Some(String::from("authdb")),
+            auth_mechanism: Some(String::from("X509")),
+            options: std::collections::BTreeMap::from([(
+                String::from("retryWrites"),
+                String::from("true"),
+            )]),
+            tls_cert_key_file: Some(String::from("/cert.pem")),
+        }),
         hosts: vec![HostEntry { host: String::from("db1"), port: 27018 }],
-        connection_type: String::from("replica"),
-        replica_set_name: Some(String::from("rs0")),
         username: Some(String::from("admin")),
-        auth_db: Some(String::from("authdb")),
-        auth_mechanism: Some(String::from("X509")),
-        options: std::collections::BTreeMap::from([(
-            String::from("retryWrites"),
-            String::from("true"),
-        )]),
         tls: true,
         tls_ca_file: Some(String::from("/ca.pem")),
-        tls_cert_key_file: Some(String::from("/cert.pem")),
         tls_allow_invalid_certificates: true,
         ssh_enabled: true,
         ssh_host: Some(String::from("bastion")),
@@ -57,9 +58,8 @@ fn into_config_carries_every_editable_field() {
     assert_eq!(c.tls_ca_file.as_deref(), Some("/ca.pem"));
     assert_eq!(c.tls_allow_invalid_certificates, true);
 
-    // The form's MongoDB half. `database` is deliberately absent: it is a Postgres
-    // setting, and a MongoDB connection no longer has anywhere to put it.
-    let mongo = c.engine.as_mongo().expect("form with no engine builds a MongoDB connection");
+    // The form's MongoDB half.
+    let mongo = c.engine.as_mongo().expect("MongoDB fields build a MongoDB connection");
     assert_eq!(mongo.connection_type, "replica");
     assert_eq!(mongo.replica_set_name.as_deref(), Some("rs0"));
     assert_eq!(mongo.auth_db.as_deref(), Some("authdb"));
@@ -76,84 +76,77 @@ fn into_config_carries_every_editable_field() {
     assert_eq!(c.read_only, true);
 }
 
-#[test]
-fn into_config_defaults_engine_to_mongodb_when_absent() {
-    // The connection editor doesn't send `engine` yet (MongoDB is the only engine
-    // it offers), so an absent or blank value must not become an empty string.
-    let c = fields().into_config(String::from("c1"), None, None, None, true).unwrap();
-    assert_eq!(c.engine_kind(), Engine::Mongo);
+fn postgres_fields(database: Option<&str>) -> ConnectionFields {
+    ConnectionFields {
+        engine: EngineFields::Postgres(PostgresFields { database: database.map(String::from) }),
+        ..fields()
+    }
+}
+
+// The payload `formFields()` sends, minus the engine's own keys.
+const SHARED_JSON: &str = r#""name": "prod",
+    "hosts": [{"host": "db1", "port": 5432}],
+    "username": "me", "password": "pw",
+    "tls": false, "tlsCaFile": null, "tlsAllowInvalidCertificates": false,
+    "sshEnabled": false, "sshHost": null, "sshPort": 22, "sshUser": null,
+    "sshAuth": null, "sshKeyFile": null, "sshPassword": null, "sshPassphrase": null,
+    "tag": null, "readOnly": false"#;
+
+fn parse(engine_keys: &str) -> Result<ConnectionFields, serde_json::Error> {
+    serde_json::from_str(&format!("{{ {SHARED_JSON}, {engine_keys} }}"))
 }
 
 #[test]
-fn into_config_honors_an_explicit_engine() {
-    let mut f = fields();
-    f.engine = Some(String::from("postgresql"));
-    let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
+fn postgres_fields_build_a_postgres_connection_with_its_database() {
+    let c = postgres_fields(Some("appdb")).into_config(String::from("c1"), None, None, None, true).unwrap();
     assert_eq!(c.engine_kind(), Engine::Postgres);
+    assert_eq!(c.engine.as_postgres().and_then(|p| p.database.as_deref()), Some("appdb"));
 }
 
 #[test]
-fn into_config_accepts_postgres_as_a_synonym_for_postgresql() {
-    // "postgres" is the spelling sqlx, libpq and the connection-string scheme all
-    // use; it must canonicalize to the same stored value as "postgresql" rather
-    // than silently falling through to the MongoDB default.
-    let mut f = fields();
-    f.engine = Some(String::from("postgres"));
-    let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
-    assert_eq!(c.engine_kind(), Engine::Postgres);
+fn a_postgres_payload_needs_no_mongodb_keys() {
+    let f = parse(r#""engine": "postgresql", "database": "appdb""#).unwrap();
+    assert!(matches!(f.engine, EngineFields::Postgres(ref p) if p.database.as_deref() == Some("appdb")));
 }
 
 #[test]
-fn into_config_rejects_an_unknown_engine_instead_of_guessing_mongodb() {
-    // A garbled or unsupported engine value must be a loud error, not a silent
-    // MongoDB default — a silent default would dial the wrong driver entirely.
-    let mut f = fields();
-    f.engine = Some(String::from("mysql"));
-    let err = f.into_config(String::from("c1"), None, None, None, true).unwrap_err();
-    assert_eq!(err.code(), "validation");
+fn postgres_is_accepted_as_a_synonym_for_postgresql() {
+    // "postgres" is the spelling sqlx, libpq and the connection-string scheme all use.
+    let f = parse(r#""engine": "postgres", "database": null"#).unwrap();
+    assert!(matches!(f.engine, EngineFields::Postgres(_)));
 }
 
 #[test]
-fn into_config_preserves_engine_and_database_from_the_existing_record_on_update() {
-    // The edit dialog doesn't carry `engine`/`database` any more than it carries
-    // folder_id/last_accessed/open — an edit must not silently re-point a saved
-    // Postgres connection at the MongoDB driver just because the form is blank.
+fn a_payload_without_a_known_engine_is_rejected() {
+    // A missing or unsupported engine must be a loud error, not a silent MongoDB
+    // default — a silent default would dial the wrong driver entirely.
+    assert!(parse(r#""engine": "mysql""#).is_err());
+    assert!(parse(r#""connectionType": "standalone", "options": {}"#).is_err());
+}
+
+#[test]
+fn a_blank_database_keeps_the_existing_one_on_update() {
     let mut existing = config();
     existing.engine = EngineConfig::Postgres(PostgresConfig {
         database: Some(String::from("appdb")),
     });
 
-    let mut edited_fields = fields();
-    edited_fields.engine = None; // the editor still can't send this
-    let c = edited_fields
+    let c = postgres_fields(None)
         .into_config(String::from("c1"), Some(&existing), None, None, true)
         .unwrap();
 
-    assert_eq!(c.engine_kind(), Engine::Postgres);
-    assert_eq!(
-        c.engine.as_postgres().and_then(|p| p.database.as_deref()),
-        Some("appdb")
-    );
+    assert_eq!(c.engine.as_postgres().and_then(|p| p.database.as_deref()), Some("appdb"));
 }
 
 #[test]
-fn into_config_ignores_a_form_supplied_engine_when_editing() {
-    // Pinning test, not an incidental assertion — see the doc comment on
-    // `into_config` in fields.rs. Today the editor never sends `fields.engine` on
-    // an edit, so this can't happen in practice; once a picker exists and starts
-    // sending one, this test starts failing on purpose, so switching a connection's
-    // engine on edit becomes a deliberate change to this function rather than a
-    // side effect of the picker landing. If you're here because that's exactly
-    // what you want: update this test's expectation, don't delete it.
+fn an_edit_cannot_switch_a_connection_to_another_engine() {
+    // The editor locks the engine on edit; a form for a different engine than the
+    // saved record is refused rather than silently applied or ignored.
     let existing = config(); // MongoDB by default
-
-    let mut edited_fields = fields();
-    edited_fields.engine = Some(String::from("postgresql"));
-    let c = edited_fields
+    let err = postgres_fields(Some("appdb"))
         .into_config(String::from("c1"), Some(&existing), None, None, true)
-        .unwrap();
-
-    assert_eq!(c.engine_kind(), Engine::Mongo, "existing record wins over the form, even though the form now supplies one");
+        .unwrap_err();
+    assert_eq!(err.code(), "validation");
 }
 
 #[test]
@@ -273,6 +266,7 @@ fn the_frontends_payload_deserializes_with_its_secrets() {
     // secret silently arrives as None and never reaches the keychain.
     let json = r#"{
         "name": "prod",
+        "engine": "mongodb",
         "hosts": [{"host": "db1", "port": 27017}],
         "connectionType": "standalone",
         "replicaSetName": null,

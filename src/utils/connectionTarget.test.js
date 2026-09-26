@@ -68,6 +68,8 @@ describe('connectionTargetChanged', () => {
     // Stored PostgreSQL connections carry no `connection_type`; the form sends 'standalone'.
     const pg = stored({ engine: 'postgresql', connection_type: undefined, database: 'app' })
     expect(connectionTargetChanged(pg, form({ database: 'app' }))).toBe(false)
+    // …and a PostgreSQL form sends no connection type at all.
+    expect(connectionTargetChanged(pg, form({ database: 'app', connectionType: undefined }))).toBe(false)
   })
 
   it('sees a different PostgreSQL database', () => {

@@ -17,7 +17,6 @@ const values = (over = {}) => ({
 describe('buildMongoFields', () => {
   it('sends the topology, options, credentials and client certificate', () => {
     expect(buildMongoFields(values())).toEqual({
-      database: null,
       connectionType: 'replica',
       replicaSetName: 'rs0',
       options: { retryWrites: 'true' },
