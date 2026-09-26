@@ -25,6 +25,8 @@ mod node_tags;
 mod operations;
 mod persist;
 #[cfg(test)]
+mod pg_command_integration_tests;
+#[cfg(test)]
 mod pg_integration_tests;
 mod pg_uri;
 mod pool;
@@ -182,6 +184,14 @@ pub fn run() {
             update_last_accessed,
             open_document_window,
             list_databases,
+            list_pg_databases,
+            list_pg_schemas,
+            list_pg_tables,
+            list_pg_columns,
+            run_pg_query,
+            browse_pg_table,
+            count_pg_table,
+            update_pg_row,
             create_collection,
             drop_database,
             drop_collection,

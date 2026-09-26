@@ -1,4 +1,8 @@
-//! Integration tests against a live PostgreSQL.
+//! Integration tests against a live PostgreSQL for the connect path itself
+//! (`pg_uri`/`ConnectionPool::connect_postgres`) — the `commands::postgres::*`
+//! command layer (schema browsing, query, row edit) has its own tests in
+//! `pg_command_integration_tests.rs`, which shares this file's `test_config`/
+//! `pool` helpers.
 //!
 //! These are skipped unless `OZENDB_TEST_POSTGRES` is set (to a `host` or
 //! `host:port`). When set, they exercise the real connect-options + driver path
@@ -20,8 +24,10 @@ use sqlx::{Connection, Row};
 /// A `ConnectionConfig` pointing at the test server, or `None` when the env var
 /// is unset (so the caller skips). Username/password come from their own env vars
 /// (mirroring how libpq/psql read `PGUSER`/`PGPASSWORD`) since a throwaway test
-/// server still needs to authenticate as someone.
-fn test_config() -> Option<ConnectionConfig> {
+/// server still needs to authenticate as someone. `pub(crate)`: shared with
+/// `pg_command_integration_tests.rs`, split out once this file grew past the
+/// size limit — both cover the same live server, just different command layers.
+pub(crate) fn test_config() -> Option<ConnectionConfig> {
     let target = match std::env::var("OZENDB_TEST_POSTGRES") {
         Ok(val) => val,
         Err(_) => return None,
@@ -50,21 +56,34 @@ fn test_config() -> Option<ConnectionConfig> {
     })
 }
 
-/// Connect the way `ConnectionPool::connect_postgres` builds its options, then hand
-/// them straight to the driver — bypassing `ConnectionPool` itself the same way
-/// `integration_tests.rs`'s Mongo `connect()` does (a real `ConnectionPool` needs a
-/// live Tauri `AppHandle`, which a plain test can't build).
-async fn connect(config: &ConnectionConfig) -> sqlx::PgConnection {
+fn options(config: &ConnectionConfig) -> sqlx::postgres::PgConnectOptions {
     let password = std::env::var("OZENDB_TEST_POSTGRES_PASSWORD").ok();
-    let options = match pg_uri::build_options(
+    match pg_uri::build_options(
         config,
         config.engine.as_postgres().expect("the integration config is Postgres"),
         password.as_deref(),
     ) {
         Ok(val) => val,
         Err(e) => panic!("could not build connect options: {}", e),
-    };
-    match sqlx::PgConnection::connect_with(&options).await {
+    }
+}
+
+/// Connect the way `ConnectionPool::connect_postgres` builds its options, then hand
+/// them straight to the driver — bypassing `ConnectionPool` itself the same way
+/// `integration_tests.rs`'s Mongo `connect()` does (a real `ConnectionPool` needs a
+/// live Tauri `AppHandle`, which a plain test can't build).
+async fn connect(config: &ConnectionConfig) -> sqlx::PgConnection {
+    match sqlx::PgConnection::connect_with(&options(config)).await {
+        Ok(val) => val,
+        Err(e) => panic!("could not connect to test Postgres: {}", e),
+    }
+}
+
+/// The pooled sibling of `connect`, for the postgres command `*_impl` functions,
+/// which all take a `&PgPool` — same options, same bypass-`ConnectionPool`
+/// reason. `pub(crate)`: see `test_config`'s doc comment.
+pub(crate) async fn pool(config: &ConnectionConfig) -> sqlx::PgPool {
+    match sqlx::PgPool::connect_with(options(config)).await {
         Ok(val) => val,
         Err(e) => panic!("could not connect to test Postgres: {}", e),
     }
