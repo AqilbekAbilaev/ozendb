@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { operatorsFor, rowsFromBoxes, boxesFromRows } from './builderRows.js'
+import { operatorsFor, rowsFromBoxes, boxesFromRows, rowsFromParts, partsFromRows } from './builderRows.js'
 
 describe('operatorsFor', () => {
   it('offers comparisons for numbers, contains for text, and null checks for every column', () => {
@@ -36,5 +36,25 @@ describe('rows and boxes', () => {
   it('round-trips a row through its box text', () => {
     const rows = [{ column: 'id', op: 'eq', value: '7' }, { column: 'name', op: 'ne', value: 'x' }]
     expect(rowsFromBoxes(boxesFromRows(rows, kinds), kinds)).toEqual(rows)
+  })
+})
+
+describe('rows with paused conditions', () => {
+  const kinds = { id: 'num', name: 'str' }
+
+  it('lists applied rows, then paused ones marked off', () => {
+    expect(rowsFromParts({ id: '>1' }, { name: 'ad' }, kinds)).toEqual([
+      { column: 'id', op: 'gt', value: '1', on: true },
+      { column: 'name', op: 'contains', value: 'ad', on: false },
+    ])
+  })
+
+  it('shows a column once, as applied, when the grid filled a paused one', () => {
+    expect(rowsFromParts({ name: 'x' }, { name: 'ad' }, kinds)).toEqual([{ column: 'name', op: 'contains', value: 'x', on: true }])
+  })
+
+  it('splits rows back into box text and paused text', () => {
+    const rows = [{ column: 'id', op: 'gt', value: '1', on: false }, { column: 'name', op: 'contains', value: 'ad', on: true }]
+    expect(partsFromRows(rows, kinds)).toEqual({ texts: { name: 'ad' }, paused: { id: '>1' } })
   })
 })
