@@ -9,6 +9,7 @@ import { runSql, explainSql } from './runSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
 import { useBuilderPauses } from './builderPauses.js'
+import { tableErrorText } from './tableError.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -154,7 +155,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
       log(true, `SELECT ${page.rows.length}`, page.elapsedMs)
     } catch (e) {
       if (mine !== generation) return
-      error.value = errMessage(e)
+      error.value = tableErrorText(e)
       log(false, error.value)
       rows.value = []
     } finally {

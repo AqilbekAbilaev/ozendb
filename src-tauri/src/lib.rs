@@ -37,6 +37,8 @@ mod pg_statement_integration_tests;
 #[cfg(test)]
 mod pg_transaction_integration_tests;
 #[cfg(test)]
+mod pg_error_integration_tests;
+#[cfg(test)]
 mod pg_integration_tests;
 mod pg_uri;
 mod pool;

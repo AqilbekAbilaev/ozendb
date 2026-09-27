@@ -532,3 +532,12 @@ describe('review fixes', () => {
     expect(t.canEdit('name')).toBe(false)
   })
 })
+
+describe('a table that is gone or unreadable', () => {
+  it('says so, rather than showing only the server\'s line', async () => {
+    browseTable.mockRejectedValue({ code: 'missing', message: 'relation "public.users" does not exist' })
+    const t = usePostgresTable(target)
+    await t.load()
+    expect(t.error.value).toMatch(/^This table can't be found/)
+  })
+})
