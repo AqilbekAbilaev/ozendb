@@ -49,6 +49,23 @@ fn reads_hand_written_sql_the_way_postgres_would() {
 }
 
 #[test]
+fn reads_back_starts_with_and_any_of() {
+    let got = read("SELECT * FROM users WHERE \"code\"::text ILIKE '5\\_%' AND \"mcc\" IN ('5411', '5812') AND n IN (1, -2)").unwrap();
+    assert_eq!(
+        got.filters,
+        vec![
+            f("code", FilterOp::StartsWith, Some("5_")),
+            f("mcc", FilterOp::In, Some("5411, 5812")),
+            f("n", FilterOp::In, Some("1, -2")),
+        ]
+    );
+    // A listed value holding a comma would read back as two.
+    assert!(read("SELECT * FROM users WHERE a IN ('x,y')").is_err());
+    assert!(read("SELECT * FROM users WHERE a NOT IN ('x')").is_err());
+    assert!(read("SELECT * FROM users WHERE a ILIKE '%'").is_err());
+}
+
+#[test]
 fn reads_a_plain_column_list_as_the_columns_to_show() {
     let got = read("SELECT \"id\", Name FROM users").unwrap();
     assert_eq!(got.columns, vec!["id", "name"]);

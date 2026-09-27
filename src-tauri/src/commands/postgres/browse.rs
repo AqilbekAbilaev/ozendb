@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use tauri::State;
 
 use super::query::{column_types, run_wrapped, PgQueryResult, ROW_RESULT_CAP};
+use super::array_literal::array_literal;
 use super::{primary_key_columns, quote_ident, AppContext};
 
 /// Default page size for `browse_pg_table` when the caller sends a non-positive
@@ -20,6 +21,9 @@ pub enum FilterOp {
     Lt,
     Lte,
     Contains,
+    StartsWith,
+    /// Any of a comma-separated list.
+    In,
     IsNull,
     NotNull,
 }
@@ -110,43 +114,51 @@ fn where_clause(filters: &[ColumnFilter], types: &[BTreeMap<String, String>]) ->
             return Err(AppError::Validation(format!("Unknown column \"{}\".", f.column)));
         };
         let column = column_sql(f.table, &f.column, types.len())?;
-        let comparison = match f.op {
-            FilterOp::IsNull => {
-                conditions.push(format!("{column} IS NULL"));
-                continue;
-            }
-            FilterOp::NotNull => {
-                conditions.push(format!("{column} IS NOT NULL"));
-                continue;
-            }
-            FilterOp::Contains => None,
-            FilterOp::Eq => Some("="),
-            FilterOp::Ne => Some("<>"),
-            FilterOp::Gt => Some(">"),
-            FilterOp::Gte => Some(">="),
-            FilterOp::Lt => Some("<"),
-            FilterOp::Lte => Some("<="),
+        let check = match f.op {
+            FilterOp::IsNull => Some("IS NULL"),
+            FilterOp::NotNull => Some("IS NOT NULL"),
+            _ => None,
         };
+        if let Some(check) = check {
+            conditions.push(format!("{column} {check}"));
+            continue;
+        }
         let Some(value) = &f.value else {
             return Err(AppError::Validation(format!("The filter on \"{}\" needs a value.", f.column)));
         };
         let n = binds.len() + 1;
-        match comparison {
-            Some(op) => {
-                binds.push(value.clone());
-                conditions.push(format!("{column} {op} ${n}::{pg_type}"));
-            }
-            None => {
-                // ILIKE's default escape character is a backslash.
-                binds.push(value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
-                conditions.push(format!("{column}::text ILIKE '%' || ${n} || '%'"));
-            }
-        }
+        // ILIKE's default escape character is a backslash.
+        let like = || value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+        let compare = |symbol: &str| (value.clone(), format!("{column} {symbol} ${n}::{pg_type}"));
+        let (bind, condition) = match f.op {
+            FilterOp::Contains => (like(), format!("{column}::text ILIKE '%' || ${n} || '%'")),
+            FilterOp::StartsWith => (like(), format!("{column}::text ILIKE ${n} || '%'")),
+            FilterOp::In => (listed(value, &f.column)?, format!("{column} = ANY(${n}::{pg_type}[])")),
+            FilterOp::Eq => compare("="),
+            FilterOp::Ne => compare("<>"),
+            FilterOp::Gt => compare(">"),
+            FilterOp::Gte => compare(">="),
+            FilterOp::Lt => compare("<"),
+            FilterOp::Lte => compare("<="),
+            FilterOp::IsNull | FilterOp::NotNull => continue,
+        };
+        binds.push(bind);
+        conditions.push(condition);
     }
     if conditions.is_empty() {
         return Ok((String::new(), binds));
     }
     Ok((format!(" WHERE {}", conditions.join(" AND ")), binds))
+}
+
+/// An any-of filter's comma-separated values as an array literal, each trimmed.
+fn listed(value: &str, column: &str) -> Result<String, AppError> {
+    let items: Vec<serde_json::Value> =
+        value.split(',').map(str::trim).filter(|v| !v.is_empty()).map(|v| serde_json::Value::String(v.to_string())).collect();
+    if items.is_empty() {
+        return Err(AppError::Validation(format!("The filter on \"{column}\" needs at least one value.")));
+    }
+    Ok(array_literal(&items))
 }
 
 /// The FROM and WHERE of a browse, and the WHERE's bound values. Column types are

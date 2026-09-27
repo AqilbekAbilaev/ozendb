@@ -34,6 +34,26 @@ describe('parseFilter', () => {
   })
 })
 
+describe('starts with and any of', () => {
+  it('reads ^ as starts with, whatever the column', () => {
+    expect(parseFilter('^EVOS', 'str')).toEqual({ op: 'startsWith', value: 'EVOS' })
+    expect(parseFilter('^ 54', 'num')).toEqual({ op: 'startsWith', value: '54' })
+    expect(parseFilter('^', 'str')).toBe(null)
+  })
+
+  it('reads a comma list as any of wherever the box would match exactly', () => {
+    expect(parseFilter('1, 2', 'num')).toEqual({ op: 'in', value: '1, 2' })
+    expect(parseFilter('=1,2', 'num')).toEqual({ op: 'in', value: '1,2' })
+    expect(parseFilter('=Tashkent, Samarkand', 'str')).toEqual({ op: 'in', value: 'Tashkent, Samarkand' })
+    expect(parseFilter('true, false', 'bool')).toEqual({ op: 'in', value: 'true, false' })
+  })
+
+  it('keeps a comma in a text search as part of what it contains', () => {
+    expect(parseFilter('Tashkent, Uzbekistan', 'str')).toEqual({ op: 'contains', value: 'Tashkent, Uzbekistan' })
+    expect(parseFilter('>1,2', 'num')).toEqual({ op: 'gt', value: '1,2' })
+  })
+})
+
 describe('filterBoxText', () => {
   it('writes a filter as the text that types it back', () => {
     const cases = [
@@ -45,6 +65,9 @@ describe('filterBoxText', () => {
       [{ op: 'ne', value: 'x' }, 'str', '!=x'],
       [{ op: 'isNull' }, 'num', 'null'],
       [{ op: 'notNull' }, 'str', '!null'],
+      [{ op: 'startsWith', value: 'EVOS' }, 'str', '^EVOS'],
+      [{ op: 'in', value: '5411, 5812' }, 'num', '5411, 5812'],
+      [{ op: 'in', value: 'a,b' }, 'str', '=a,b'],
     ]
     for (const [filter, kind, text] of cases) {
       expect(filterBoxText(filter, kind)).toBe(text)

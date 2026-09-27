@@ -47,6 +47,22 @@ fn contains_matches_the_text_form_with_wildcards_escaped() {
 }
 
 #[test]
+fn starts_with_matches_the_start_of_the_text_form() {
+    let (sql, binds) = where_clause(&[filter("name", FilterOp::StartsWith, Some("5_"))], &[types()]).unwrap();
+    assert_eq!(sql, " WHERE \"t0\".\"name\"::text ILIKE $1 || '%'");
+    assert_eq!(binds, vec!["5\\_"]);
+}
+
+#[test]
+fn any_of_binds_the_listed_values_as_an_array_of_the_column_type() {
+    let (sql, binds) = where_clause(&[filter("qty", FilterOp::In, Some(" 5, 7,, \"x\" "))], &[types()]).unwrap();
+    assert_eq!(sql, " WHERE \"t0\".\"qty\" = ANY($1::integer[])");
+    assert_eq!(binds, vec![r#"{"5","7","\"x\""}"#]);
+    let empty = where_clause(&[filter("qty", FilterOp::In, Some(" , "))], &[types()]);
+    assert!(matches!(empty, Err(AppError::Validation(_))));
+}
+
+#[test]
 fn null_checks_take_no_value_and_filters_combine_with_and() {
     let (sql, binds) = where_clause(
         &[filter("at", FilterOp::IsNull, None), filter("qty", FilterOp::Ne, Some("0")), filter("name", FilterOp::NotNull, None)],

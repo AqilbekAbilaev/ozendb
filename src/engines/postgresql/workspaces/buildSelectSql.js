@@ -7,11 +7,15 @@ const ident = (name) => `"${name.replaceAll('"', '""')}"`
 const literal = (text) => `'${text.replaceAll("'", "''")}'`
 // ILIKE's default escape character is a backslash.
 const likeEscape = (text) => text.replace(/[\\%_]/g, '\\$&')
+// An any-of filter's values, as the backend splits them.
+const listItems = (value) => value.split(',').map(v => v.trim()).filter(Boolean)
 
 function condition(column, { op, value }) {
   if (op === 'isNull') return `${column} IS NULL`
   if (op === 'notNull') return `${column} IS NOT NULL`
   if (op === 'contains') return `${column}::text ILIKE ${literal(`%${likeEscape(value)}%`)}`
+  if (op === 'startsWith') return `${column}::text ILIKE ${literal(`${likeEscape(value)}%`)}`
+  if (op === 'in') return `${column} IN (${listItems(value).map(literal).join(', ')})`
   return `${column} ${OPERATORS[op]} ${literal(value)}`
 }
 

@@ -6,17 +6,18 @@ import { parseFilter, filterBoxText } from './parseFilter.js'
 const LABELS = {
   contains: 'contains', eq: 'is', ne: 'is not', gt: 'greater than', gte: 'at least',
   lt: 'less than', lte: 'at most', isNull: 'is NULL', notNull: 'is not NULL',
+  startsWith: 'starts with', in: 'is any of',
 }
 const COMPARE = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte']
 const BY_KIND = {
-  num: COMPARE,
-  date: ['contains', ...COMPARE],
+  num: [...COMPARE, 'in'],
+  date: ['contains', ...COMPARE, 'in'],
   bool: ['eq'],
 }
 
 // The operators a column of cellKind `kind` can take, as `{ op, label }`.
 export function operatorsFor(kind) {
-  return [...(BY_KIND[kind] ?? ['contains', 'eq', 'ne']), 'isNull', 'notNull'].map(op => ({ op, label: LABELS[op] }))
+  return [...(BY_KIND[kind] ?? ['contains', 'startsWith', 'eq', 'ne', 'in']), 'isNull', 'notNull'].map(op => ({ op, label: LABELS[op] }))
 }
 
 export function rowsFromBoxes(texts, kinds) {
