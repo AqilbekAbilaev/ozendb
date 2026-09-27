@@ -113,6 +113,12 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const prevPage = () => goTo(offset.value - limit.value)
 
 
+  function setSort(column, desc) {
+    orderBy.value = column
+    descending.value = desc
+    return goTo(0)
+  }
+
   function sortBy(column) {
     descending.value = orderBy.value === column ? !descending.value : false
     orderBy.value = column
@@ -121,6 +127,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
 
   function setFilterText(column, text) {
     filterText.value = { ...filterText.value, [column]: text }
+  }
+
+  function replaceFilterText(texts) {
+    filterText.value = texts
   }
 
   // A new filter changes the row count, so it is re-read along with page one. The
@@ -229,6 +239,6 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   return {
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
-    setFilterText, applyFilters, clearFilters, canEdit, editText, saveCell,
+    setFilterText, replaceFilterText, setSort, applyFilters, clearFilters, canEdit, editText, saveCell,
   }
 }

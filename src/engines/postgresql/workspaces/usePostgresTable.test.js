@@ -122,6 +122,25 @@ describe('filtering', () => {
   })
 })
 
+describe('query builder', () => {
+  it('replaces every filter box at once without applying them', async () => {
+    const t = await loaded()
+    t.setFilterText('name', 'ad')
+    t.replaceFilterText({ id: '>1' })
+    expect(t.filterText.value).toEqual({ id: '>1' })
+    expect(browseTable).toHaveBeenCalledTimes(1)
+  })
+
+  it('sorts by a chosen column and direction, or not at all, from page one', async () => {
+    const t = await loaded()
+    await t.nextPage()
+    await t.setSort('name', true)
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: 'name', descending: true, offset: 0 }))
+    await t.setSort(null, false)
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: null, descending: false }))
+  })
+})
+
 describe('limit, messages and server details', () => {
   it('applies a new limit with the filters, restarting from the first row', async () => {
     const t = await loaded({ pageSize: 100 })
