@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, shallowRef, watch, computed } from 'vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
 import { usePostgresTable } from './usePostgresTable.js'
@@ -23,18 +24,25 @@ watch(() => props.activeTab.id, () => {
 const range = computed(() => {
   const { offset, rows, total } = t.value
   if (!rows.length) return '0 rows'
-  return `${offset + 1}–${offset + rows.length} of ${total ?? '?'}`
+  return `${offset + 1}–${offset + rows.length} of ${total ?? '?'} rows`
 })
 </script>
 
 <template>
   <div class="pg-table">
-    <div class="pg-bar">
-      <span class="pg-name">{{ activeTab.schema }}.{{ activeTab.table }}</span>
+    <div class="pg-crumbs">
+      <BaseIcon name="connect" :size="15" class="c-ic" />
+      <span>{{ activeTab.connectionName }}</span>
+      <BaseIcon name="caret" :size="11" class="c-ic" />
+      <BaseIcon name="dbSmall" :size="15" class="c-ic" />
+      <span>{{ activeTab.database }}</span>
+      <BaseIcon name="caret" :size="11" class="c-ic" />
+      <BaseIcon name="folder" :size="15" class="c-ic" />
+      <span>{{ activeTab.schema }}</span>
+      <BaseIcon name="caret" :size="11" class="c-ic" />
+      <BaseIcon name="collSmall" :size="15" class="c-ic" />
+      <span class="pg-name">{{ activeTab.table }}</span>
       <span class="spacer"></span>
-      <span class="pg-range">{{ range }}</span>
-      <BaseButton icon="prev" :disabled="!t.hasPrev || t.loading" title="Previous page" @click="t.prevPage" />
-      <BaseButton icon="next" :disabled="!t.hasNext || t.loading" title="Next page" @click="t.nextPage" />
       <BaseButton icon="refresh" :disabled="t.loading" title="Refresh" @click="t.refresh" />
     </div>
 
@@ -57,18 +65,28 @@ const range = computed(() => {
       @sort="t.sortBy"
       @save="t.saveCell"
     />
+
+    <div class="pg-footer">
+      <span>{{ range }}</span>
+      <span v-if="t.elapsedMs != null" class="fitem"><BaseIcon name="clock" :size="14" /> {{ t.elapsedMs }} ms</span>
+      <span class="spacer"></span>
+      <BaseButton icon="prev" :disabled="!t.hasPrev || t.loading" title="Previous page" @click="t.prevPage" />
+      <BaseButton icon="next" :disabled="!t.hasNext || t.loading" title="Next page" @click="t.nextPage" />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .pg-table { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.pg-bar {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 10px; border-bottom: 1px solid var(--border);
-  background: var(--bg-toolbar);
+.pg-crumbs, .pg-footer {
+  display: flex; align-items: center; gap: 7px; flex: none;
+  padding: 4px 10px 4px 14px; font-size: 12.5px; color: var(--text-dim);
 }
-.pg-name { font-weight: 600; color: var(--text); }
-.pg-range { color: var(--text-dim); font-size: 12px; margin-right: 4px; }
+.pg-crumbs { border-bottom: 1px solid var(--border); }
+.pg-footer { gap: 16px; font-size: 12px; border-top: 1px solid var(--border); }
+.c-ic { color: var(--text-faint); }
+.pg-name { color: var(--text); }
+.fitem { display: flex; align-items: center; gap: 6px; }
 .spacer { flex: 1; }
 .pg-edit-error {
   padding: 6px 10px; font-size: 12.5px;
