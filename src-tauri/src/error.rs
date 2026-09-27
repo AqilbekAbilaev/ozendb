@@ -182,6 +182,8 @@ fn postgres_code(e: &sqlx::Error) -> &'static str {
         // classes; every other database-rejected statement is a `command` error.
         sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
             Some("28000") | Some("28P01") => "auth",
+            // query_canceled: the user's Cancel, or the statement timeout.
+            Some("57014") => "cancelled",
             _ => "command",
         },
         sqlx::Error::Tls(_) => "tls",
@@ -197,6 +199,13 @@ fn postgres_code(e: &sqlx::Error) -> &'static str {
 /// already the useful part; every other error kind already Displays as a sentence.
 fn postgres_message(e: &sqlx::Error) -> String {
     match e {
+        sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("57014") => {
+            if db_err.message().contains("statement timeout") {
+                String::from("The query ran past its time limit and was stopped.")
+            } else {
+                String::from("The query was cancelled.")
+            }
+        }
         sqlx::Error::Database(db_err) => db_err.message().to_string(),
         _ => e.to_string(),
     }
