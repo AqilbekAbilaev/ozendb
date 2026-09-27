@@ -5,7 +5,7 @@ import { errMessage } from '../../../utils/errors'
 import { formatCell, cellKind } from './formatCell.js'
 import { parseFilter, filterBoxText } from './parseFilter.js'
 import { buildSelectSql, aliases } from './buildSelectSql.js'
-import { runSql } from './runSql.js'
+import { runSql, explainSql } from './runSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
 
@@ -46,6 +46,9 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   const filterRefusal = ref(null)
   const sqlState = reactive({ connectionId: target.connectionId, sql: initial.sql ?? '', result: null, error: null, running: false })
   let builtSql = null
+  // Filter mode's Explain: the plan for currentSql, kept like SQL mode's result.
+  const explainState = reactive({ connectionId: target.connectionId, plan: null, planError: null, explaining: false })
+  const explain = () => explainSql(explainState, currentSql.value)
   // The browsed table's column metadata (type, primary key), fetched once, and its
   // joins, each `{ key, schema, table, kind, column, equals, columns }`: matched where
   // its `column` equals the column keyed `equals`, with its own columns' metadata. A
@@ -364,7 +367,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   }
 
   return {
-    snapshot,
+    snapshot, explainState, explain,
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin,

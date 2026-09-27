@@ -1,4 +1,4 @@
-import { runQuery, cancelQuery } from '../api/queries'
+import { runQuery, cancelQuery, explainQuery } from '../api/queries'
 import { errMessage } from '../../../utils/errors'
 
 // Runs a query tab's SQL — or `sql`, a selection of it — and keeps the outcome on the
@@ -26,4 +26,18 @@ export async function runSql(tab, sql = tab.sql) {
 // The run then ends with a "cancelled" error, handled like any other.
 export function cancelSql(tab) {
   if (tab.runId) return cancelQuery(tab.connectionId, tab.runId)
+}
+
+// Explains the tab's SQL — or `sql` — keeping the plan (or why there isn't one) on it.
+export async function explainSql(tab, sql = tab.sql) {
+  tab.explaining = true
+  tab.planError = null
+  try {
+    tab.plan = await explainQuery(tab.connectionId, sql)
+  } catch (e) {
+    tab.plan = null
+    tab.planError = errMessage(e)
+  } finally {
+    tab.explaining = false
+  }
 }

@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const runQuery = vi.fn()
 const cancelQuery = vi.fn()
-vi.mock('../api/queries', () => ({ runQuery, cancelQuery }))
+const explainQuery = vi.fn()
+vi.mock('../api/queries', () => ({ runQuery, cancelQuery, explainQuery }))
 
-const { runSql, cancelSql } = await import('./runSql.js')
+const { runSql, cancelSql, explainSql } = await import('./runSql.js')
 
 const tab = (over = {}) => ({ connectionId: 'c1', sql: 'SELECT 1', result: null, error: null, running: false, ...over })
 
@@ -66,5 +67,17 @@ describe('runSql', () => {
   it('ignores a run while one is in flight', async () => {
     await runSql(tab({ running: true }))
     expect(runQuery).not.toHaveBeenCalled()
+  })
+
+  it('keeps a plan on the tab, or the reason there isn\'t one', async () => {
+    const t = tab({ plan: 'old' })
+    explainQuery.mockResolvedValueOnce([{ Plan: {} }])
+    await explainSql(t, 'SELECT 2')
+    expect(explainQuery).toHaveBeenCalledWith('c1', 'SELECT 2')
+    expect(t).toMatchObject({ plan: [{ Plan: {} }], planError: null, explaining: false })
+
+    explainQuery.mockRejectedValueOnce({ code: 'command', message: 'syntax error' })
+    await explainSql(t)
+    expect(t).toMatchObject({ plan: null, planError: 'syntax error', explaining: false })
   })
 })

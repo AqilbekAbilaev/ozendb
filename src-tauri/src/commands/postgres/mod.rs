@@ -7,6 +7,7 @@ pub mod query;
 pub mod browse;
 pub mod read_select;
 pub mod cancel;
+pub mod explain;
 mod array_literal;
 
 pub use schema::*;
@@ -14,6 +15,7 @@ pub use query::*;
 pub use browse::*;
 pub use read_select::*;
 pub use cancel::*;
+pub use explain::*;
 
 /// Double-quotes a Postgres identifier (schema/table/column name), escaping any
 /// embedded `"` by doubling it — the standard Postgres quoted-identifier rule.

@@ -11,7 +11,8 @@ import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
 import PostgresMessages from './PostgresMessages.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
-import { runSql, cancelSql } from './runSql.js'
+import { runSql, cancelSql, explainSql } from './runSql.js'
+import PostgresPlan from './PostgresPlan.vue'
 
 // A SQL editor with its toolbar, results and status line. `state` holds
 // `{ connectionId, sql, result, error, running, messages? }` and is written in place —
@@ -36,6 +37,11 @@ function run(sql) {
   return runSql(props.state, sql)
 }
 
+function explain() {
+  rtab.value = 'Explain'
+  return explainSql(props.state)
+}
+
 function runSelection() {
   const { state } = editor.value.getView()
   const { from, to } = state.selection.main
@@ -57,7 +63,7 @@ const editorExtensions = [
 const rtabs = computed(() => [
   { value: 'Result', label: 'Result', count: props.state.result?.rows.length },
   { value: 'Messages', label: 'Messages', count: props.state.messages?.length },
-  { value: 'Explain', label: 'Explain', disabled: true, title: SOON },
+  { value: 'Explain', label: 'Explain' },
 ])
 
 const summary = computed(() => {
@@ -77,7 +83,7 @@ const summary = computed(() => {
         {{ state.running ? 'Running…' : 'Run' }} <span class="kbd">⌘↵</span>
       </BaseButton>
       <BaseButton variant="ghost" icon="run" :disabled="state.running" title="Run the selected text" @click="runSelection">Run selection</BaseButton>
-      <BaseButton variant="ghost" icon="exScan" disabled :title="SOON">Explain</BaseButton>
+      <BaseButton variant="ghost" icon="exScan" :disabled="state.explaining || !state.sql.trim()" title="Show how PostgreSQL runs this query" @click="explain">Explain</BaseButton>
       <BaseButton variant="ghost" icon="close" :disabled="!state.running" title="Stop the running query" @click="cancelSql(state)">Cancel</BaseButton>
       <span class="qsep"></span>
       <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" disabled :title="SOON">Format</BaseButton>
@@ -102,6 +108,7 @@ const summary = computed(() => {
     </div>
     <div class="pg-results">
       <PostgresMessages v-if="rtab === 'Messages'" :messages="state.messages ?? []" />
+      <PostgresPlan v-else-if="rtab === 'Explain'" :plan="state.plan ?? null" :error="state.planError ?? null" :explaining="!!state.explaining" />
       <StateMessage v-else-if="state.error" mode="error" :message="state.error" />
       <StateMessage v-else-if="state.running && !state.result" mode="loading" />
       <template v-else-if="state.result">

@@ -8,6 +8,12 @@ export function runQuery(connectionId, sql, runId = null) {
   return invoke('run_pg_query', { id: connectionId, sql, runId })
 }
 
+// The plan PostgreSQL chose, with real timings: EXPLAIN (ANALYZE, FORMAT JSON)'s array,
+// run in a transaction that's rolled back.
+export function explainQuery(connectionId, sql) {
+  return invoke('explain_pg_query', { id: connectionId, sql })
+}
+
 export function cancelQuery(connectionId, runId) {
   return invoke('cancel_pg_query', { id: connectionId, runId })
 }
