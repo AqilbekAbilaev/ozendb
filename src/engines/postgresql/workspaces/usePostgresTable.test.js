@@ -5,7 +5,8 @@ const countTable = vi.fn()
 const updateRow = vi.fn()
 const listColumns = vi.fn()
 const runQuery = vi.fn()
-vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow, runQuery }))
+const readTableSelect = vi.fn()
+vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow, runQuery, readTableSelect }))
 vi.mock('../api/resources', () => ({ listColumns }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
@@ -140,21 +141,66 @@ describe('SQL mode', () => {
     expect(t.sqlState.sql).toContain('ORDER BY "id" ASC')
   })
 
-  it('goes back to the filters only while the SQL is still the one they built', async () => {
+  it('goes straight back to the filters while the SQL is the one they built', async () => {
     const t = await loaded()
-    expect(t.canUseFilters.value).toBe(true)
     await t.toSql()
-    const built = t.sqlState.sql
-
-    t.sqlState.sql = built.replace('LIMIT 100', 'LIMIT 5')
-    expect(t.canUseFilters.value).toBe(false)
-    t.toFilters()
-    expect(t.mode.value).toBe('sql')
-
-    t.sqlState.sql = built
-    expect(t.canUseFilters.value).toBe(true)
-    t.toFilters()
+    await t.toFilters()
     expect(t.mode.value).toBe('filter')
+    expect(readTableSelect).not.toHaveBeenCalled()
+  })
+
+  it('reads edited SQL back into the filter boxes, sort and page', async () => {
+    const t = await loaded({ pageSize: 100 })
+    await t.toSql()
+    t.sqlState.sql = 'edited'
+    readTableSelect.mockResolvedValue({
+      filters: [{ column: 'name', op: 'contains', value: 'ad' }, { column: 'id', op: 'gte', value: '2' }],
+      orderBy: ['name'], descending: true, limit: 100, offset: 100,
+    })
+
+    await t.toFilters()
+    expect(readTableSelect).toHaveBeenCalledWith(target, 'edited')
+    expect(t.mode.value).toBe('filter')
+    expect(t.filterText.value).toEqual({ name: 'ad', id: '>=2' })
+    const filters = [{ column: 'name', op: 'contains', value: 'ad' }, { column: 'id', op: 'gte', value: '2' }]
+    expect(browseTable).toHaveBeenLastCalledWith(target, { filters, orderBy: 'name', descending: true, limit: 100, offset: 100 })
+    expect(countTable).toHaveBeenLastCalledWith(target, filters)
+  })
+
+  it('stays in SQL with the reason when the grid could not show that SQL', async () => {
+    const t = await loaded({ pageSize: 100 })
+    await t.toSql()
+    t.sqlState.sql = 'edited'
+    const read = { filters: [], orderBy: [], descending: false, limit: 100, offset: 0 }
+
+    readTableSelect.mockRejectedValue({ code: 'sql', message: 'only SELECT * can be shown as filters' })
+    await t.toFilters()
+    expect(t.filterRefusal.value).toBe('only SELECT * can be shown as filters')
+
+    readTableSelect.mockResolvedValue({ ...read, limit: 5 })
+    await t.toFilters()
+    expect(t.filterRefusal.value).toMatch(/LIMIT 100/)
+
+    readTableSelect.mockResolvedValue({ ...read, filters: [{ column: 'id', op: 'contains', value: '4' }] })
+    await t.toFilters()
+    expect(t.filterRefusal.value).toMatch(/"id"/)
+
+    readTableSelect.mockResolvedValue({ ...read, orderBy: ['name', 'meta'] })
+    await t.toFilters()
+    expect(t.filterRefusal.value).toMatch(/one column/)
+
+    expect(t.mode.value).toBe('sql')
+    await t.toSql()
+    expect(t.filterRefusal.value).toBe(null)
+  })
+
+  it('treats ORDER BY the primary key as no sort, as browsing does', async () => {
+    const t = await loaded()
+    await t.toSql()
+    t.sqlState.sql = 'edited'
+    readTableSelect.mockResolvedValue({ filters: [], orderBy: ['id'], descending: false, limit: 100, offset: 0 })
+    await t.toFilters()
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: null }))
   })
 })
 

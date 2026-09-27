@@ -23,15 +23,7 @@ watch(() => props.activeTab.id, () => {
   t.value.load()
 }, { immediate: true })
 
-const modes = computed(() => [
-  {
-    value: 'filter',
-    label: 'Filter',
-    disabled: !t.value.canUseFilters,
-    title: t.value.canUseFilters ? '' : 'The SQL was edited, so it no longer matches the filters',
-  },
-  { value: 'sql', label: 'SQL' },
-])
+const MODES = [{ value: 'filter', label: 'Filter' }, { value: 'sql', label: 'SQL' }]
 
 function switchMode(mode) {
   if (mode === t.value.mode) return
@@ -67,10 +59,13 @@ const range = computed(() => {
         </BaseButton>
         <BaseButton icon="refresh" :disabled="t.loading" title="Refresh" @click="t.refresh" />
       </template>
-      <SegmentedControl :model-value="t.mode" :options="modes" @update:model-value="switchMode" />
+      <SegmentedControl :model-value="t.mode" :options="MODES" @update:model-value="switchMode" />
     </div>
 
-    <PostgresSqlPanel v-if="t.mode === 'sql'" :state="t.sqlState" />
+    <template v-if="t.mode === 'sql'">
+      <div v-if="t.filterRefusal" class="pg-edit-error">Can't show this as filters: {{ t.filterRefusal }}</div>
+      <PostgresSqlPanel :state="t.sqlState" />
+    </template>
     <template v-else>
       <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
       <!-- Once the grid has columns, a failure (usually a filter value the column's type

@@ -9,7 +9,7 @@ const POSTGRES_COMMANDS = [
   // resources.js
   'list_pg_schemas', 'list_pg_tables', 'list_pg_columns',
   // queries.js
-  'run_pg_query', 'browse_pg_table', 'count_pg_table', 'update_pg_row',
+  'run_pg_query', 'browse_pg_table', 'count_pg_table', 'update_pg_row', 'read_pg_table_select',
 ]
 
 function walk(dir, files = []) {

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { runQuery, browseTable, countTable, updateRow } from './queries'
+import { runQuery, browseTable, countTable, updateRow, readTableSelect } from './queries'
 
 const table = { connectionId: 'c1', schema: 'public', table: 'users' }
 
@@ -42,6 +42,11 @@ describe('PostgreSQL queries', () => {
     await countTable(table, filters)
     expect(invoke).toHaveBeenCalledWith('browse_pg_table', expect.objectContaining({ filters }))
     expect(invoke).toHaveBeenCalledWith('count_pg_table', expect.objectContaining({ filters }))
+  })
+
+  it('reads a table tab\'s SQL back as filters for that table', async () => {
+    await readTableSelect(table, 'SELECT * FROM users')
+    expect(invoke).toHaveBeenCalledWith('read_pg_table_select', { sql: 'SELECT * FROM users', schema: 'public', table: 'users' })
   })
 
   it('updates one row, identified by its key columns', async () => {
