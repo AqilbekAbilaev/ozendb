@@ -38,7 +38,7 @@ async function loaded(options) {
 describe('loading', () => {
   it('fetches the first page, the row count and the columns', async () => {
     const t = await loaded({ pageSize: 100 })
-    expect(browseTable).toHaveBeenCalledWith(target, { orderBy: null, descending: false, limit: 100, offset: 0 })
+    expect(browseTable).toHaveBeenCalledWith(target, { filters: [], orderBy: null, descending: false, limit: 100, offset: 0 })
     expect(t.columns.value).toEqual(['id', 'name', 'tags', 'meta'])
     expect(t.rows.value).toHaveLength(2)
     expect(t.total.value).toBe(250)
@@ -78,9 +78,44 @@ describe('paging and sorting', () => {
     await t.nextPage()
 
     await t.sortBy('name')
-    expect(browseTable).toHaveBeenLastCalledWith(target, { orderBy: 'name', descending: false, limit: 100, offset: 0 })
+    expect(browseTable).toHaveBeenLastCalledWith(target, { filters: [], orderBy: 'name', descending: false, limit: 100, offset: 0 })
     await t.sortBy('name')
     expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: 'name', descending: true }))
+  })
+})
+
+describe('filtering', () => {
+  it('applies the typed boxes, read by column type, to the page and a fresh count', async () => {
+    const t = await loaded({ pageSize: 100 })
+    await t.nextPage()
+    t.setFilterText('id', '>1')
+    t.setFilterText('name', 'ad')
+    t.setFilterText('meta', '  ')
+    expect(browseTable).toHaveBeenCalledTimes(2)
+
+    await t.applyFilters()
+    const filters = [{ column: 'id', op: 'gt', value: '1' }, { column: 'name', op: 'contains', value: 'ad' }]
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ filters, offset: 0 }))
+    expect(countTable).toHaveBeenLastCalledWith(target, filters)
+    expect(t.activeFilters.value).toBe(2)
+  })
+
+  it('keeps applying the same filters while paging and sorting', async () => {
+    const t = await loaded()
+    t.setFilterText('id', '1')
+    await t.applyFilters()
+    await t.sortBy('name')
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ filters: [{ column: 'id', op: 'eq', value: '1' }] }))
+  })
+
+  it('clears every box and reloads the whole table', async () => {
+    const t = await loaded()
+    t.setFilterText('name', 'ad')
+    await t.applyFilters()
+    await t.clearFilters()
+    expect(t.filterText.value).toEqual({})
+    expect(t.activeFilters.value).toBe(0)
+    expect(countTable).toHaveBeenLastCalledWith(target, [])
   })
 })
 

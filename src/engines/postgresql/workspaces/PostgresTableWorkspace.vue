@@ -43,14 +43,20 @@ const range = computed(() => {
       <BaseIcon name="collSmall" :size="15" class="c-ic" />
       <span class="pg-name">{{ activeTab.table }}</span>
       <span class="spacer"></span>
+      <BaseButton v-if="t.activeFilters" icon="close" title="Show every row again" @click="t.clearFilters">
+        Clear filters ({{ t.activeFilters }})
+      </BaseButton>
       <BaseButton icon="refresh" :disabled="t.loading" title="Refresh" @click="t.refresh" />
     </div>
 
     <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
+    <!-- Once the grid has columns, a failure (usually a filter value the column's type
+         can't read) keeps it on screen, so the filter can be corrected in place. -->
+    <div v-if="t.error && t.columns.length" class="pg-edit-error">{{ t.error }}</div>
 
-    <StateMessage v-if="t.error" mode="error" :message="t.error" retryable @retry="t.load" />
-    <StateMessage v-else-if="t.loading && !t.rows.length" mode="loading" />
-    <StateMessage v-else-if="!t.rows.length" mode="empty" label="This table has no rows" />
+    <StateMessage v-if="t.error && !t.columns.length" mode="error" :message="t.error" retryable @retry="t.load" />
+    <StateMessage v-else-if="t.loading && !t.columns.length" mode="loading" />
+    <StateMessage v-else-if="!t.rows.length && !t.activeFilters && !t.error" mode="empty" label="This table has no rows" />
     <PostgresResultGrid
       v-else
       :columns="t.columns"
@@ -62,8 +68,11 @@ const range = computed(() => {
       sortable
       :can-edit="t.canEdit"
       :edit-text="t.editText"
+      :filter-text="t.filterText"
       @sort="t.sortBy"
       @save="t.saveCell"
+      @filter-text="t.setFilterText"
+      @apply-filters="t.applyFilters"
     />
 
     <div class="pg-footer">

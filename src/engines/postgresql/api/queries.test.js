@@ -22,7 +22,7 @@ describe('PostgreSQL queries', () => {
     await browseTable(table, { limit: 50, offset: 100 })
     expect(invoke).toHaveBeenCalledWith('browse_pg_table', {
       id: 'c1', schema: 'public', table: 'users',
-      orderBy: null, descending: false, limit: 50, offset: 100,
+      filters: [], orderBy: null, descending: false, limit: 50, offset: 100,
     })
   })
 
@@ -33,7 +33,15 @@ describe('PostgreSQL queries', () => {
 
   it('counts the rows of a table', async () => {
     await countTable(table)
-    expect(invoke).toHaveBeenCalledWith('count_pg_table', { id: 'c1', schema: 'public', table: 'users' })
+    expect(invoke).toHaveBeenCalledWith('count_pg_table', { id: 'c1', schema: 'public', table: 'users', filters: [] })
+  })
+
+  it('passes column filters to both the page and the count', async () => {
+    const filters = [{ column: 'age', op: 'gt', value: '30' }]
+    await browseTable(table, { filters, limit: 50, offset: 0 })
+    await countTable(table, filters)
+    expect(invoke).toHaveBeenCalledWith('browse_pg_table', expect.objectContaining({ filters }))
+    expect(invoke).toHaveBeenCalledWith('count_pg_table', expect.objectContaining({ filters }))
   })
 
   it('updates one row, identified by its key columns', async () => {

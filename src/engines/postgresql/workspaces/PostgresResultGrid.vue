@@ -14,10 +14,14 @@ const props = defineProps({
   orderBy:    { type: String,   default: null },
   descending: { type: Boolean,  default: false },
   sortable:   { type: Boolean,  default: false },
+  // The table tab's per-column filter boxes; typing reports the text, Enter applies.
+  filterText: { type: Object,   default: null },
   canEdit:    { type: Function, default: () => false },
   editText:   { type: Function, default: (column, value) => (value === null ? '' : formatCell(value)) },
 })
-const emit = defineEmits(['sort', 'save'])
+const emit = defineEmits(['sort', 'save', 'filter-text', 'apply-filters'])
+
+const PLACEHOLDERS = { num: 'e.g. >100', date: 'e.g. 2026-09', bool: 'true / false' }
 
 const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType)))
 
@@ -60,10 +64,25 @@ function commit() {
               <span v-if="sortable && orderBy === column" class="dir">{{ descending ? '▼' : '▲' }}</span>
             </span>
             <span v-if="columnInfo[column]" class="th-type">{{ columnInfo[column].dataType }}</span>
+            <input
+              v-if="filterText"
+              class="th-filter"
+              :class="{ on: filterText[column]?.trim() }"
+              :value="filterText[column] ?? ''"
+              :placeholder="PLACEHOLDERS[kinds[c]] ?? 'contains…'"
+              spellcheck="false"
+              @click.stop
+              @input="emit('filter-text', column, $event.target.value)"
+              @keydown.enter="emit('apply-filters')"
+            >
           </th>
         </tr>
       </thead>
       <tbody>
+        <tr v-if="filterText && !rows.length" class="no-rows">
+          <td></td>
+          <td :colspan="columns.length">No rows match these filters</td>
+        </tr>
         <tr v-for="(row, r) in rows" :key="r">
           <td class="rownum">{{ rowOffset + r + 1 }}</td>
           <td
@@ -116,6 +135,16 @@ th.sortable:hover { color: var(--text); }
 .th-type { display: block; font-weight: 400; font-size: 10.5px; color: var(--text-faint); margin-top: 1px; }
 .pk { color: var(--warn); flex: none; }
 .dir { font-size: 9px; }
+.th-filter {
+  display: block; width: 100%; min-width: 92px; box-sizing: border-box;
+  margin-top: 5px; height: 22px; padding: 0 7px;
+  background: var(--bg-input); color: var(--text);
+  border: 1px solid var(--border-soft); border-radius: 4px;
+  font: 400 11.5px var(--mono); outline: none;
+}
+.th-filter::placeholder { color: var(--text-faint); }
+.th-filter:focus, .th-filter.on { border-color: var(--accent); }
+.no-rows td { padding: 18px 12px; color: var(--text-faint); font-style: italic; }
 .rownum {
   position: sticky; left: 0; z-index: 1;
   min-width: 40px; text-align: right;

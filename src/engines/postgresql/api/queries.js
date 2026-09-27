@@ -7,12 +7,13 @@ export function runQuery(connectionId, sql) {
   return invoke('run_pg_query', { id: connectionId, sql })
 }
 
-export function browseTable({ connectionId, schema, table }, { orderBy = null, descending = false, limit, offset }) {
-  return invoke('browse_pg_table', { id: connectionId, schema, table, orderBy, descending, limit, offset })
+// `filters` are `{ column, op, value }`; every one must hold.
+export function browseTable({ connectionId, schema, table }, { filters = [], orderBy = null, descending = false, limit, offset }) {
+  return invoke('browse_pg_table', { id: connectionId, schema, table, filters, orderBy, descending, limit, offset })
 }
 
-export function countTable({ connectionId, schema, table }) {
-  return invoke('count_pg_table', { id: connectionId, schema, table })
+export function countTable({ connectionId, schema, table }, filters = []) {
+  return invoke('count_pg_table', { id: connectionId, schema, table, filters })
 }
 
 // `where` holds the row's primary-key columns and their original values.
