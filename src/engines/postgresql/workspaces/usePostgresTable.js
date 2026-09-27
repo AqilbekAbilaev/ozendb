@@ -320,8 +320,9 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     return asJson(column) ? JSON.stringify(value) : formatCell(value)
   }
 
+  // `text` null is the editor's Set NULL, never text to parse.
   function parseInput(column, text) {
-    if (!asJson(column)) return text
+    if (text === null || !asJson(column)) return text
     const isArray = columnInfo.value[column].dataType.endsWith('[]')
     let value
     try {

@@ -452,6 +452,16 @@ describe('editing', () => {
     expect(await t.saveCell(0, 'tags', 'x')).toBe(false)
   })
 
+  it('sets a cell to NULL when asked for NULL rather than for text', async () => {
+    updateRow.mockResolvedValue(1)
+    const t = await loaded()
+    for (const [column, at] of [['name', 1], ['tags', 2], ['meta', 3]]) {
+      expect(await t.saveCell(0, column, null), column).toBe(true)
+      expect(updateRow).toHaveBeenLastCalledWith(target, [{ column, value: null }], [{ column: 'id', value: 1 }])
+      expect(t.rows.value[0][at], column).toBe(null)
+    }
+  })
+
   it('reports a row that changed or vanished since it was loaded', async () => {
     updateRow.mockResolvedValue(0)
     const t = await loaded()
