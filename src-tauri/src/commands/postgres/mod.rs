@@ -6,6 +6,7 @@ pub mod schema;
 pub mod query;
 pub mod browse;
 pub mod read_select;
+mod array_literal;
 
 pub use schema::*;
 pub use query::*;
