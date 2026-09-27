@@ -35,6 +35,8 @@ mod pg_explain_integration_tests;
 #[cfg(test)]
 mod pg_statement_integration_tests;
 #[cfg(test)]
+mod pg_transaction_integration_tests;
+#[cfg(test)]
 mod pg_integration_tests;
 mod pg_uri;
 mod pool;
@@ -95,6 +97,7 @@ pub fn run() {
             app.manage(HistoryStorage::new(data_dir.join("history.json")));
             app.manage(SavedQueryStorage::new(data_dir.join("saved_queries.json")));
             app.manage(PgQueryLibraryStore::new(data_dir.join("pg_queries.json")));
+            app.manage(commands::PgTransactions::default());
             app.manage(DefaultQueryStorage::new(data_dir.join("default_queries.json")));
             app.manage(SettingsStorage::new(data_dir.join("settings.json")));
             app.manage(TabStorage::new(data_dir.join("tabs.json")));
@@ -209,6 +212,9 @@ pub fn run() {
             save_pg_query,
             delete_pg_saved,
             format_pg_sql,
+            begin_pg_transaction,
+            commit_pg_transaction,
+            rollback_pg_transaction,
             browse_pg_table,
             count_pg_table,
             read_pg_table_select,
