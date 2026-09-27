@@ -2,7 +2,8 @@ import { ref, computed } from 'vue'
 import { browseTable, countTable, updateRow } from '../api/queries'
 import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
-import { formatCell } from './formatCell.js'
+import { formatCell, cellKind } from './formatCell.js'
+import { parseFilter } from './parseFilter.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -21,6 +22,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const loading = ref(false)
   const error = ref(null)
   const editError = ref(null)
+  // What each header box holds, by column, and the filters last applied from them:
+  // typing edits the boxes, and only applying reloads.
+  const filterText = ref({})
+  const filters = ref([])
   // Column metadata (type, primary key) by name, fetched once.
   const columnInfo = ref({})
   // Only the latest load may write back: a sort clicked while a page is loading
@@ -30,6 +35,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const keyColumns = computed(() =>
     Object.values(columnInfo.value).filter(c => c.isPrimaryKey).map(c => c.name))
   const hasPrev = computed(() => offset.value > 0)
+  const activeFilters = computed(() => filters.value.length)
   const hasNext = computed(() => total.value != null && offset.value + pageSize < total.value)
 
   async function load() {
@@ -38,8 +44,8 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     error.value = null
     try {
       const [page, count, info] = await Promise.all([
-        browseTable(target, { orderBy: orderBy.value, descending: descending.value, limit: pageSize, offset: offset.value }),
-        total.value == null ? countTable(target) : total.value,
+        browseTable(target, { filters: filters.value, orderBy: orderBy.value, descending: descending.value, limit: pageSize, offset: offset.value }),
+        total.value == null ? countTable(target, filters.value) : total.value,
         Object.keys(columnInfo.value).length ? null : listColumns(target),
       ])
       if (mine !== generation) return
@@ -74,6 +80,25 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     descending.value = orderBy.value === column ? !descending.value : false
     orderBy.value = column
     return goTo(0)
+  }
+
+  function setFilterText(column, text) {
+    filterText.value = { ...filterText.value, [column]: text }
+  }
+
+  // A new filter changes the row count, so it is re-read along with page one.
+  function applyFilters() {
+    filters.value = Object.entries(filterText.value).flatMap(([column, text]) => {
+      const parsed = parseFilter(text, cellKind(columnInfo.value[column]?.dataType))
+      return parsed ? [{ column, ...parsed }] : []
+    })
+    total.value = null
+    return goTo(0)
+  }
+
+  function clearFilters() {
+    filterText.value = {}
+    return applyFilters()
   }
 
   // Arrays aren't editable yet: their text form (`{a,b}`) isn't what the grid shows.
@@ -120,6 +145,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
 
   return {
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
-    hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy, canEdit, editText, saveCell,
+    filterText, activeFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
+    setFilterText, applyFilters, clearFilters, canEdit, editText, saveCell,
   }
 }
