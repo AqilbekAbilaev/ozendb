@@ -50,10 +50,22 @@ export function tabColorName(tab, tagOverrides) {
   } else if (tab.kind === 'shell') {
     keys.push(`${tab.connectionId}/${tab.dbName}`)
     keys.push(tab.connectionId)
+  } else if (tab.kind === 'pgTable' || tab.kind === 'pgQuery') {
+    // PostgreSQL nodes below the connection have no colours of their own yet.
+    keys.push(tab.connectionId)
   }
   for (const key of keys) {
     const name = tagOverrides ? tagOverrides[key] : null
     if (name && name !== 'none') return name
   }
   return null
+}
+
+// The colour a tree node sets itself: its override (keyed by the node's path) wins,
+// otherwise its stored tag (connections only). Null when it has none or it's 'none';
+// the tree then shows the nearest coloured ancestor's.
+export function nodeTagName(tagOverrides, key, fallbackTag = null) {
+  const override = tagOverrides[key]
+  const name = override !== undefined ? override : fallbackTag
+  return name && name !== 'none' ? name : null
 }

@@ -6,7 +6,7 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
 import StatsTip from './StatsTip.vue'
 import { useStatsTip } from '../../composables/useStatsTip'
-import { colorHex } from '../../utils/tabColor.js'
+import { colorHex, nodeTagName } from '../../utils/tabColor.js'
 import { connDatabases } from '../../stores/connectionData.js'
 import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
@@ -26,14 +26,7 @@ const {
   openCollection, collectionKey,
 } = useConnectionTree({ emit })
 
-// The colour name explicitly set on a node — its override (keyed by the node's
-// full path) wins, otherwise the persisted fallback tag (connections only).
-// Returns null when the node has no colour of its own (untagged or 'none').
-function nodeTag(key, fallbackTag) {
-  const override = tagOverrides.value[key]
-  const name = override !== undefined ? override : (fallbackTag || null)
-  return name && name !== 'none' ? name : null
-}
+const nodeTag = (key, fallbackTag) => nodeTagName(tagOverrides.value, key, fallbackTag)
 
 // Effective colours cascade down the tree: a node shows its own colour if it has
 // one, otherwise it inherits the nearest coloured ancestor's. Colouring a parent
