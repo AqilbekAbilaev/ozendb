@@ -188,3 +188,34 @@ async fn joins_add_related_columns_and_filter_sort_and_count_across_them() {
 
     sqlx::query("DROP SCHEMA ozendb_it_join CASCADE").execute(&pool).await.unwrap();
 }
+
+#[tokio::test]
+async fn numeric_arrays_and_numeric_domains_keep_their_exact_digits() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    let exact = "12345678901234567890.123456789";
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_numeric CASCADE",
+        "CREATE SCHEMA ozendb_it_numeric",
+        "CREATE DOMAIN ozendb_it_numeric.money_amount AS numeric(40, 9)",
+        "CREATE TABLE ozendb_it_numeric.t (id INT PRIMARY KEY, n numeric, na numeric[], d ozendb_it_numeric.money_amount)",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+    let insert = format!("INSERT INTO ozendb_it_numeric.t VALUES (1, {exact}, ARRAY[{exact}, 1.5], {exact})");
+    sqlx::query(sqlx::AssertSqlSafe(insert)).execute(&pool).await.unwrap();
+
+    let page = browse_table_impl(&pool, "ozendb_it_numeric", "t", &[], &[], None, false, 10, 0).await.unwrap();
+    let row = &page.rows[0];
+    assert_eq!(row[1], serde_json::json!(exact));
+    assert_eq!(row[2], serde_json::json!([exact, "1.5"]));
+    assert_eq!(row[3], serde_json::json!("12345678901234567890.123456789"));
+
+    sqlx::query("DROP SCHEMA ozendb_it_numeric CASCADE").execute(&pool).await.unwrap();
+}

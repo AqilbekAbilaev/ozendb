@@ -35,7 +35,7 @@ pub struct PgQueryResult {
 /// not a possibly-duplicate name — is what ties a decoded value back to the
 /// returned column list.
 ///
-/// `NUMERIC` columns are cast to `text` before `to_json` sees them: Postgres
+/// `NUMERIC` columns — and numeric arrays and domains — are cast to text before `to_json`: Postgres
 /// renders `numeric` with its full, arbitrary precision, but this crate's
 /// `serde_json` is built without `arbitrary_precision`, so decoding that back as
 /// a bare JSON number would silently round it to the nearest `f64` — including a
@@ -45,6 +45,18 @@ pub struct PgQueryResult {
 /// Pure (no I/O) so it only needs `stmt`, already fetched by whichever executor
 /// (`PgPool` or a transaction) the caller is using — see `run_wrapped`/
 /// `run_wrapped_read_only` below.
+/// The text type a column is cast to before `to_json`, if it would otherwise lose
+/// digits: `numeric`, an array of it, or a domain over either (see `wrap_for_json`).
+fn text_cast(type_info: &sqlx::postgres::PgTypeInfo) -> Option<&'static str> {
+    use sqlx::postgres::PgTypeKind;
+    match type_info.kind() {
+        PgTypeKind::Domain(base) => text_cast(base),
+        PgTypeKind::Array(element) => text_cast(element).map(|_| "text[]"),
+        _ if type_info.to_string().eq_ignore_ascii_case("numeric") => Some("text"),
+        _ => None,
+    }
+}
+
 fn wrap_for_json(stmt: &sqlx::postgres::PgStatement, inner_sql: &str) -> (Vec<String>, String) {
     let columns: Vec<String> = stmt.columns().iter().map(|c| c.name().to_string()).collect();
     if columns.is_empty() {
@@ -57,10 +69,9 @@ fn wrap_for_json(stmt: &sqlx::postgres::PgStatement, inner_sql: &str) -> (Vec<St
         .enumerate()
         .map(|(i, col)| {
             let alias = format!("c{i}");
-            if col.type_info().to_string().eq_ignore_ascii_case("numeric") {
-                format!("to_json((t.{alias})::text)")
-            } else {
-                format!("to_json(t.{alias})")
+            match text_cast(col.type_info()) {
+                Some(cast) => format!("to_json((t.{alias})::{cast})"),
+                None => format!("to_json(t.{alias})"),
             }
         })
         .collect();
