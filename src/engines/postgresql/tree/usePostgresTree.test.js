@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const listTables = vi.fn()
-vi.mock('../api/resources', () => ({ listTables }))
+const listColumns = vi.fn()
+const listForeignKeys = vi.fn()
+vi.mock('../api/resources', () => ({ listTables, listColumns, listForeignKeys }))
 
 const { usePostgresTree, visibleSchemas, isOpenTable } = await import('./usePostgresTree.js')
 
@@ -78,6 +80,28 @@ describe('usePostgresTree', () => {
     expect(t.showSystem.value).toBe(false)
     t.toggleSystem()
     expect(t.showSystem.value).toBe(true)
+  })
+
+  it('loads a table\'s columns the first time it opens, marking keys and where they point', async () => {
+    listColumns.mockResolvedValue([
+      { name: 'id', dataType: 'integer', isPrimaryKey: true, nullable: false },
+      { name: 'region_id', dataType: 'integer', isPrimaryKey: false, nullable: true },
+    ])
+    listForeignKeys.mockResolvedValue([
+      { fromSchema: 'public', fromTable: 'merchants', fromColumn: 'region_id', toSchema: 'public', toTable: 'regions', toColumn: 'id' },
+      { fromSchema: 'billing', fromTable: 'payments', fromColumn: 'merchant_id', toSchema: 'public', toTable: 'merchants', toColumn: 'id' },
+    ])
+    const t = usePostgresTree('c1')
+    await t.toggleTable('public', 'merchants')
+    expect(listColumns).toHaveBeenCalledWith({ connectionId: 'c1', schema: 'public', table: 'merchants' })
+    expect(t.isTableOpen('public', 'merchants')).toBe(true)
+    expect(t.columnsOf('public', 'merchants')).toEqual([
+      { name: 'id', dataType: 'integer', primaryKey: true, references: null, nullable: false },
+      { name: 'region_id', dataType: 'integer', primaryKey: false, references: 'regions.id', nullable: true },
+    ])
+    await t.toggleTable('public', 'merchants')
+    await t.toggleTable('public', 'merchants')
+    expect(listColumns).toHaveBeenCalledTimes(1)
   })
 
   it('toggles the database row', () => {
