@@ -22,6 +22,14 @@ import { resourceFromLegacyTab, legacyTargetFromResource } from './legacyResourc
 // How many segments each gated level needs.
 const DEPTH = { connection: 0, database: 1, collection: 2 }
 
+// Every item behind the connection/database/collection gates is a MongoDB action, so
+// only a MongoDB selection or tab counts toward them — a PostgreSQL one names no
+// resource here, and an action can never be handed one. No engine means MongoDB (a
+// selection or tab from before engines existed).
+function mongoResource(source, ref) {
+  return (source?.engine ?? 'mongodb') === 'mongodb' ? ref : null
+}
+
 // -1 for "names no resource", so every comparison below is false for it.
 function depth(ref) {
   return ref ? ref.segments.length : -1
@@ -35,8 +43,8 @@ function depth(ref) {
 //   indexSelected  whether an index row is selected in the open Indexes dialog
 export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false) {
   const tab = activeTab || null
-  const tabDepth = depth(resourceFromLegacyTab(tab))
-  const selDepth = depth(treeSelection?.resource)
+  const tabDepth = depth(mongoResource(tab, resourceFromLegacyTab(tab)))
+  const selDepth = depth(mongoResource(treeSelection, treeSelection?.resource))
   const reaches = (level) => tabDepth >= DEPTH[level] || selDepth >= DEPTH[level]
 
   // Document/field selection is a property of the ACTIVE collection tab's results
@@ -80,8 +88,8 @@ function nodeFrom(source, ref) {
 export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null) {
   const sel = treeSelection || null
   const tab = activeTab || null
-  const selRef = sel?.resource ?? null
-  const tabRef = resourceFromLegacyTab(tab)
+  const selRef = mongoResource(sel, sel?.resource ?? null)
+  const tabRef = mongoResource(tab, resourceFromLegacyTab(tab))
   const needed = DEPTH[requiredLevel] ?? DEPTH.connection
 
   if (depth(selRef) >= needed) return nodeFrom(sel, selRef)

@@ -104,6 +104,7 @@ export function useConnectionTree({ emit }) {
     setSelection({
       connectionId: conn.id,
       connectionName: conn.name,
+      engine: conn.engine,
       dbName: null,
       collectionName: null,
       kind: 'connection',
@@ -139,6 +140,7 @@ export function useConnectionTree({ emit }) {
     setSelection({
       connectionId: conn.id,
       connectionName: conn.name,
+      engine: conn.engine,
       dbName: dbName,
       collectionName: null,
       kind: 'database',
@@ -153,6 +155,7 @@ export function useConnectionTree({ emit }) {
     setSelection({
       connectionId: conn.id,
       connectionName: conn.name,
+      engine: conn.engine,
       dbName: db.name,
       collectionName: collName,
       kind: 'collection',
