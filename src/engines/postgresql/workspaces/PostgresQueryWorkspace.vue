@@ -50,7 +50,7 @@ const summary = computed(() => {
       <StateMessage v-else-if="activeTab.running && !activeTab.result" mode="loading" />
       <template v-else-if="activeTab.result">
         <div class="pg-summary">{{ summary }}</div>
-        <StateMessage v-if="!activeTab.result.columns.length" mode="empty" label="The query returned no rows" />
+        <StateMessage v-if="!activeTab.result.rows.length" mode="empty" label="The query returned no rows" />
         <PostgresResultGrid v-else :columns="activeTab.result.columns" :rows="activeTab.result.rows" />
       </template>
       <StateMessage v-else mode="empty" label="Run a query to see its results" />

@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { browseTable, countTable, updateRow } from '../api/queries'
 import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
+import { formatCell } from './formatCell.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -9,7 +10,7 @@ const JSON_TYPES = ['json', 'jsonb']
  * One table-browse tab's state: a page of rows, the row count, sorting, and editing a
  * cell by the row's primary key. `target` is `{ connectionId, schema, table }`.
  */
-export function usePostgresTable(target, { pageSize = 100 } = {}) {
+export function usePostgresTable(target, { pageSize = 100, readOnly = false } = {}) {
   const columns = ref([])
   const rows = ref([])
   const total = ref(null)
@@ -21,6 +22,9 @@ export function usePostgresTable(target, { pageSize = 100 } = {}) {
   const editError = ref(null)
   // Column metadata (type, primary key) by name, fetched once.
   const columnInfo = ref({})
+  // Only the latest load may write back: a sort clicked while a page is loading
+  // must not be overwritten by that older page.
+  let generation = 0
 
   const keyColumns = computed(() =>
     Object.values(columnInfo.value).filter(c => c.isPrimaryKey).map(c => c.name))
@@ -28,6 +32,7 @@ export function usePostgresTable(target, { pageSize = 100 } = {}) {
   const hasNext = computed(() => total.value != null && offset.value + pageSize < total.value)
 
   async function load() {
+    const mine = ++generation
     loading.value = true
     error.value = null
     try {
@@ -36,16 +41,24 @@ export function usePostgresTable(target, { pageSize = 100 } = {}) {
         total.value == null ? countTable(target) : total.value,
         Object.keys(columnInfo.value).length ? null : listColumns(target),
       ])
+      if (mine !== generation) return
       columns.value = page.columns
       rows.value = page.rows
       total.value = count
       if (info) columnInfo.value = Object.fromEntries(info.map(c => [c.name, c]))
     } catch (e) {
+      if (mine !== generation) return
       error.value = errMessage(e)
       rows.value = []
     } finally {
-      loading.value = false
+      if (mine === generation) loading.value = false
     }
+  }
+
+  // Paging keeps the count; Refresh re-reads it, since rows may have changed elsewhere.
+  function refresh() {
+    total.value = null
+    return load()
   }
 
   function goTo(nextOffset) {
@@ -64,7 +77,14 @@ export function usePostgresTable(target, { pageSize = 100 } = {}) {
   // Arrays aren't editable yet: their text form (`{a,b}`) isn't what the grid shows.
   function canEdit(column) {
     const info = columnInfo.value[column]
-    return keyColumns.value.length > 0 && !!info && !info.dataType.endsWith('[]')
+    return !readOnly && keyColumns.value.length > 0 && !!info && !info.dataType.endsWith('[]')
+  }
+
+  // The editor's starting text: JSON columns as JSON (so a string keeps its quotes and
+  // saving it unchanged parses back), everything else as displayed, NULL as empty.
+  function editText(column, value) {
+    if (JSON_TYPES.includes(columnInfo.value[column]?.dataType)) return value === null ? '' : JSON.stringify(value)
+    return value === null ? '' : formatCell(value)
   }
 
   function parseInput(column, text) {
@@ -98,6 +118,6 @@ export function usePostgresTable(target, { pageSize = 100 } = {}) {
 
   return {
     columns, rows, total, offset, orderBy, descending, loading, error, editError,
-    hasPrev, hasNext, load, nextPage, prevPage, sortBy, canEdit, saveCell,
+    hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy, canEdit, editText, saveCell,
   }
 }
