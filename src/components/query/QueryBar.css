@@ -1,6 +1,5 @@
 .ic { color: var(--text-dim); }
 .drop { color: var(--text-faint); }
-.mode-toggle { margin-right: 6px; }
 .qparse-error { padding: 4px 12px 6px; flex: none; }
 .qfields { padding: 6px 12px 8px; display: grid; grid-template-columns: auto 1fr auto 1fr auto; gap: 6px 12px; align-items: center; border-bottom: 1px solid var(--border); flex: none; }
 .qinput { background: var(--bg-input); border: 1px solid var(--border-soft); border-radius: 6px; padding: 0 10px; font-family: var(--mono); font-size: 12.5px; display: flex; align-items: center; gap: 8px; min-width: 0; }

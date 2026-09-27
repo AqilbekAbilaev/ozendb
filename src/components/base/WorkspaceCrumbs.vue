@@ -20,8 +20,6 @@ defineProps({
       <BaseIcon v-if="item.icon" :name="item.icon" :size="15" class="c-ic" />
       <span :class="{ last: i === items.length - 1 }">{{ item.label }}</span>
     </template>
-    <span class="spacer"></span>
-    <slot />
   </div>
 </template>
 
@@ -33,5 +31,4 @@ defineProps({
 }
 .c-ic { color: var(--text-faint); flex: none; }
 .last { color: var(--text); }
-.spacer { flex: 1; }
 </style>

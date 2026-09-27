@@ -11,6 +11,7 @@ import PostgresResultGrid from './PostgresResultGrid.vue'
 import PostgresSqlPanel from './PostgresSqlPanel.vue'
 import PostgresTableFooter from './PostgresTableFooter.vue'
 import PostgresTableHeader from './PostgresTableHeader.vue'
+import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { usePostgresTable } from './usePostgresTable.js'
 import { openConnections } from '../../../stores/openConnections'
 import { showToast } from '../../../stores/toast'
@@ -35,6 +36,7 @@ watch(() => props.activeTab.id, () => {
 }, { immediate: true })
 
 const SOON = 'Coming soon'
+const MODES = [{ value: 'filter', label: 'Filter' }, { value: 'sql', label: 'SQL' }]
 const rtabs = computed(() => [
   { value: 'Result', label: 'Result', count: t.value.rows.length },
   { value: 'Query Code', label: 'Query Code' },
@@ -57,14 +59,19 @@ function copySql() {
 
 <template>
   <div class="pg-table">
-    <PostgresTableHeader :active-tab="activeTab" :mode="t.mode" @mode="switchMode" />
+    <PostgresTableHeader :active-tab="activeTab" />
 
     <template v-if="t.mode === 'sql'">
       <div v-if="t.filterRefusal" class="pg-edit-error">Can't show this as filters: {{ t.filterRefusal }}</div>
-      <PostgresSqlPanel :state="t.sqlState" :server="t.server" />
+      <PostgresSqlPanel :state="t.sqlState" :server="t.server">
+        <template #toolbar-start>
+          <SegmentedControl class="mode-toggle" :model-value="t.mode" :options="MODES" @update:model-value="switchMode" />
+        </template>
+      </PostgresSqlPanel>
     </template>
     <template v-else>
       <div class="qbar">
+        <SegmentedControl class="mode-toggle" :model-value="t.mode" :options="MODES" @update:model-value="switchMode" />
         <BaseButton variant="ghost" icon="run" class="run" :disabled="t.loading" title="Apply the filters and limit (Enter)" @click="run">{{ t.loading ? 'Running…' : 'Run' }}</BaseButton>
         <BaseButton variant="ghost" icon="exScan" disabled :title="SOON">Explain</BaseButton>
         <span class="qsep"></span>
