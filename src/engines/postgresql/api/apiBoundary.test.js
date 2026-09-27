@@ -7,7 +7,7 @@ import { join } from 'node:path'
 // may only be invoked from inside src/engines/postgresql/api/.
 const POSTGRES_COMMANDS = [
   // resources.js
-  'list_pg_schemas', 'list_pg_tables', 'list_pg_columns',
+  'list_pg_schemas', 'list_pg_tables', 'list_pg_columns', 'list_pg_foreign_keys',
   // queries.js
   'run_pg_query', 'browse_pg_table', 'count_pg_table', 'update_pg_row', 'read_pg_table_select',
 ]

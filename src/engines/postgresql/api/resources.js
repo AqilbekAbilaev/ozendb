@@ -14,3 +14,9 @@ export function listTables({ connectionId, schema }) {
 export function listColumns({ connectionId, schema, table }) {
   return invoke('list_pg_columns', { id: connectionId, schema, table })
 }
+
+// Single-column foreign keys with the table on either side, as
+// `{ fromSchema, fromTable, fromColumn, toSchema, toTable, toColumn }`.
+export function listForeignKeys({ connectionId, schema, table }) {
+  return invoke('list_pg_foreign_keys', { id: connectionId, schema, table })
+}
