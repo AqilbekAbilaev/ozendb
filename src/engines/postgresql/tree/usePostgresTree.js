@@ -3,9 +3,9 @@ import { listTables } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 
 // PostgreSQL's own schemas (pg_catalog, information_schema, …) are in every database
-// and aren't what anyone is browsing for.
-export function visibleSchemas(schemas) {
-  return schemas.filter(schema => !schema.system)
+// and aren't what anyone is usually browsing for — hidden unless asked for.
+export function visibleSchemas(schemas, showSystem = false) {
+  return showSystem ? schemas : schemas.filter(schema => !schema.system)
 }
 
 /**
@@ -14,10 +14,15 @@ export function visibleSchemas(schemas) {
  */
 export function usePostgresTree(connectionId) {
   const databaseOpen = ref(false)
+  const showSystem = ref(false)
   const openSchemas = ref({})   // schema → boolean
   const tables = ref({})        // schema → PgTableInfo[]
   const loading = ref({})       // schema → boolean
   const errors = ref({})        // schema → message
+
+  function toggleSystem() {
+    showSystem.value = !showSystem.value
+  }
 
   function toggleDatabase() {
     databaseOpen.value = !databaseOpen.value
@@ -50,7 +55,7 @@ export function usePostgresTree(connectionId) {
     }
   }
 
-  return { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, toggleSchema, reloadTables }
+  return { databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables }
 }
 
 // Whether `tab` (the active one) is browsing this table — the row the tree highlights.

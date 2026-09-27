@@ -12,6 +12,11 @@ describe('visibleSchemas', () => {
     const schemas = [{ name: 'pg_catalog', system: true }, { name: 'public', system: false }]
     expect(visibleSchemas(schemas)).toEqual([{ name: 'public', system: false }])
   })
+
+  it('shows them too when asked', () => {
+    const schemas = [{ name: 'pg_catalog', system: true }, { name: 'public', system: false }]
+    expect(visibleSchemas(schemas, true)).toEqual(schemas)
+  })
 })
 
 describe('isOpenTable', () => {
@@ -66,6 +71,13 @@ describe('usePostgresTree', () => {
     expect(t.tables.value.public).toHaveLength(2)
     expect(t.tables.value.audit).toBeUndefined()
     expect(t.openSchemas.value.public).toBe(true)
+  })
+
+  it('toggles showing the system schemas, hidden at first', () => {
+    const t = usePostgresTree('c1')
+    expect(t.showSystem.value).toBe(false)
+    t.toggleSystem()
+    expect(t.showSystem.value).toBe(true)
   })
 
   it('toggles the database row', () => {
