@@ -15,7 +15,7 @@ const props = defineProps({
   schemas: { type: Array, required: true },
 })
 
-const { databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables } =
+const { toggleTable, isTableOpen, columnsOf, databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables } =
   usePostgresTree(props.conn.id)
 // A refresh brings a new schema list; the open schemas' tables are re-read with it.
 watch(() => props.schemas, reloadTables)
@@ -104,29 +104,51 @@ function openTable(schema, table) {
       </div>
 
       <template v-if="openSchemas[schema.name]">
-        <div
-          v-for="table in tables[schema.name]"
-          :key="table.name"
-          class="tnode"
-          :class="{
-            'ctx-sel': ctxSel('table', schema.name, table.name),
-            sel: isOpenTable(activeTab, conn.id, schema.name, table.name),
-            tagged: !!color,
-          }"
-          :style="tagStyle"
-          style="padding-left: 66px"
-          @dblclick="openTable(schema.name, table.name)"
-          @contextmenu.prevent="onContext($event, 'table', table.name, { schema: schema.name, table: table.name })"
-        >
-          <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
-          <span class="ti"><BaseIcon name="table" :size="15" /></span>
-          <span class="tt">{{ table.name }}</span>
-          <span
-            v-if="table.estimatedRows != null"
-            class="cnt"
-            :title="`About ${table.estimatedRows.toLocaleString()} rows (PostgreSQL's estimate)`"
-          >{{ formatCompact(table.estimatedRows) }}</span>
-        </div>
+        <template v-for="table in tables[schema.name]" :key="table.name">
+          <div
+            class="tnode"
+            :class="{
+              'ctx-sel': ctxSel('table', schema.name, table.name),
+              sel: isOpenTable(activeTab, conn.id, schema.name, table.name),
+              tagged: !!color,
+            }"
+            :style="tagStyle"
+            style="padding-left: 66px"
+            @dblclick="openTable(schema.name, table.name)"
+            @contextmenu.prevent="onContext($event, 'table', table.name, { schema: schema.name, table: table.name })"
+          >
+            <span class="tw" @click.stop="toggleTable(schema.name, table.name)">
+              <BaseIcon :name="isTableOpen(schema.name, table.name) ? 'caretDown' : 'caret'" :size="12" />
+            </span>
+            <span class="ti"><BaseIcon name="table" :size="15" /></span>
+            <span class="tt">{{ table.name }}</span>
+            <span
+              v-if="table.estimatedRows != null"
+              class="cnt"
+              :title="`About ${table.estimatedRows.toLocaleString()} rows (PostgreSQL's estimate)`"
+            >{{ formatCompact(table.estimatedRows) }}</span>
+          </div>
+          <template v-if="isTableOpen(schema.name, table.name)">
+            <div class="tnode" style="padding-left: 81px">
+              <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
+              <span class="ti"><BaseIcon name="folder" :size="15" /></span>
+              <span class="tt">Columns</span>
+              <span class="cnt">({{ columnsOf(schema.name, table.name)?.length ?? '…' }})</span>
+            </div>
+            <div
+              v-for="col in columnsOf(schema.name, table.name) ?? []"
+              :key="col.name"
+              class="tnode col-node"
+              style="padding-left: 111px"
+            >
+              <span class="ti" :class="{ pk: col.primaryKey, fk: col.references }">
+                <BaseIcon :name="col.primaryKey ? 'key' : col.references ? 'uri' : 'textType'" :size="13" />
+              </span>
+              <span class="tt">{{ col.name }}</span>
+              <span class="tmeta">{{ col.dataType }}<template v-if="col.primaryKey"> · PK</template><template v-if="col.references"> → {{ col.references }}</template><template v-if="!col.nullable && !col.primaryKey"> · not null</template></span>
+            </div>
+          </template>
+        </template>
       </template>
     </template>
   </template>
@@ -142,6 +164,10 @@ function openTable(schema, table) {
   color: var(--text-dim); opacity: 0; cursor: pointer;
 }
 .row-action.push { margin-left: auto; }
+.col-node { cursor: default; }
+.ti.pk { color: var(--warn); }
+.ti.fk { color: var(--link); }
+.tmeta { margin-left: 6px; font: 11px var(--mono); color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; }
 .tnode:hover .row-action, .row-action.on { opacity: 1; }
 .row-action:hover { color: var(--text); }
 </style>
