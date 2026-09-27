@@ -64,7 +64,7 @@ function copySql() {
       <PostgresSqlPanel :state="t.sqlState" :server="t.server" />
     </template>
     <template v-else>
-      <div class="pg-toolbar">
+      <div class="qbar">
         <BaseButton variant="ghost" icon="run" class="run" :disabled="t.loading" title="Apply the filters and limit (Enter)" @click="run">Run</BaseButton>
         <BaseButton variant="ghost" icon="exScan" disabled :title="SOON">Explain</BaseButton>
         <span class="qsep"></span>
@@ -75,8 +75,8 @@ function copySql() {
         <BaseButton v-if="t.activeFilters" variant="ghost" icon="close" title="Show every row again" @click="t.clearFilters">
           Clear ({{ t.activeFilters }})
         </BaseButton>
-        <span class="spacer"></span>
-        <span class="lbl">Limit</span>
+        <span class="qbar-spacer"></span>
+        <span class="qlabel limit">Limit</span>
         <NumberStepper v-model="limitDraft" :min="1" @enter="run" />
         <BaseButton bordered icon="aggregate" :active="builderOpen" title="Visual Query Builder" @click="builderOpen = !builderOpen">Query Builder</BaseButton>
       </div>
@@ -152,14 +152,8 @@ function copySql() {
 
 <style scoped>
 .pg-table { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.pg-toolbar {
-  display: flex; align-items: center; gap: 2px; flex: none;
-  padding: 3px 10px; border-bottom: 1px solid var(--border);
-}
-.pg-toolbar .run :deep(svg) { color: var(--green); }
-.qsep { width: 1px; height: 18px; margin: 0 6px; background: var(--border-soft); }
-.lbl { margin-right: 6px; font-size: 12px; color: var(--text-dim); }
-.pg-toolbar > .lbl + * { margin-right: 8px; }
+.limit { margin-right: 6px; }
+.limit + * { margin-right: 8px; }
 .spacer { flex: 1; }
 .pg-body { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .rtabs { display: flex; flex: none; border-bottom: 1px solid var(--border); }
@@ -175,3 +169,4 @@ function copySql() {
   color: var(--danger-text); background: var(--danger-bg);
 }
 </style>
+<style scoped src="../../../components/workspace/WorkspaceToolbar.css"></style>
