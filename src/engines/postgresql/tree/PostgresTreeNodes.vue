@@ -1,7 +1,8 @@
 <script setup>
 import { computed, watch } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
-import { usePostgresTree, visibleSchemas } from './usePostgresTree.js'
+import { usePostgresTree, visibleSchemas, isOpenTable } from './usePostgresTree.js'
+import { activeTab } from '../../../stores/tabs'
 import { openPostgresTable, openPostgresQuery } from '../../../stores/tabCreators'
 import { contextMenu, contextActiveNodeKey, pgNodeKey } from '../../../stores/contextMenu'
 import { PG_MENUS } from './contextMenus.js'
@@ -98,14 +99,18 @@ function openTable(schema, table) {
           v-for="table in tables[schema.name]"
           :key="table.name"
           class="tnode"
-          :class="{ 'ctx-sel': ctxSel('table', schema.name, table.name), tagged: !!color }"
+          :class="{
+            'ctx-sel': ctxSel('table', schema.name, table.name),
+            sel: isOpenTable(activeTab, conn.id, schema.name, table.name),
+            tagged: !!color,
+          }"
           :style="tagStyle"
           style="padding-left: 66px"
           @dblclick="openTable(schema.name, table.name)"
           @contextmenu.prevent="onContext($event, 'table', table.name, { schema: schema.name, table: table.name })"
         >
           <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
-          <span class="ti"><BaseIcon name="collSmall" :size="15" /></span>
+          <span class="ti"><BaseIcon name="table" :size="15" /></span>
           <span class="tt">{{ table.name }}</span>
         </div>
       </template>

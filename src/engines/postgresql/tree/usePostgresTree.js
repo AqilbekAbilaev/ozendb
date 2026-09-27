@@ -52,3 +52,8 @@ export function usePostgresTree(connectionId) {
 
   return { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, toggleSchema, reloadTables }
 }
+
+// Whether `tab` (the active one) is browsing this table — the row the tree highlights.
+export function isOpenTable(tab, connectionId, schema, table) {
+  return tab?.type === 'postgresql.table_browse' && tab.connectionId === connectionId && tab.schema === schema && tab.table === table
+}
