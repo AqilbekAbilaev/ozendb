@@ -6,6 +6,7 @@ import { formatCell, cellKind } from './formatCell.js'
 import { parseFilter, filterBoxText } from './parseFilter.js'
 import { buildSelectSql } from './buildSelectSql.js'
 import { runSql } from './runSql.js'
+import { columnRefs } from './columnRefs.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -42,28 +43,36 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const filterRefusal = ref(null)
   const sqlState = reactive({ connectionId: target.connectionId, sql: '', result: null, error: null, running: false })
   let builtSql = null
-  // Column metadata (type, primary key) by name, fetched once.
-  const columnInfo = ref({})
+  // Each table's column metadata (type, primary key), the browsed table's first and
+  // fetched once. Filters, sort, shown columns and edits name a column by its key
+  // (see columnRefs.js).
+  const tableColumns = ref([])
+  const refs = computed(() => columnRefs(tableColumns.value.map((columns, i) => ({ key: i ? `j${i}` : '', columns }))))
+  const refByKey = computed(() => Object.fromEntries(refs.value.map(r => [r.key, r])))
+  const columnInfo = computed(() => Object.fromEntries(refs.value.map(r => [r.key, r.info])))
+  const columnOf = (key) => ({ table: refByKey.value[key].table, column: refByKey.value[key].name })
   // Only the latest load may write back: a sort clicked while a page is loading
   // must not be overwritten by that older page.
   let generation = 0
 
-  const keyColumns = computed(() =>
-    Object.values(columnInfo.value).filter(c => c.isPrimaryKey).map(c => c.name))
+  const keyColumns = computed(() => (tableColumns.value[0] ?? []).filter(c => c.isPrimaryKey).map(c => c.name))
   const hasPrev = computed(() => offset.value > 0)
   const activeFilters = computed(() => filters.value.length)
   const hasNext = computed(() => total.value != null && offset.value + limit.value < total.value)
+  // Rows arrive in `refs` order, so a key's position is its value's place in a row.
+  const keys = computed(() => (refs.value.length ? refs.value.map(r => r.key) : columns.value))
+  const at = (key) => keys.value.indexOf(key)
   const view = computed(() => {
-    if (!shownColumns.value.length) return { columns: columns.value, rows: rows.value }
-    const at = shownColumns.value.map(c => columns.value.indexOf(c))
-    return { columns: shownColumns.value, rows: rows.value.map(row => at.map(i => row[i])) }
+    if (!shownColumns.value.length) return { columns: keys.value, rows: rows.value }
+    const positions = shownColumns.value.map(at)
+    return { columns: shownColumns.value, rows: rows.value.map(row => positions.map(i => row[i])) }
   })
   const currentSql = computed(() => buildSelectSql({
     schema: target.schema,
     table: target.table,
-    columns: shownColumns.value,
+    columns: shownColumns.value.map(key => refByKey.value[key].name),
     filters: filters.value,
-    orderBy: orderBy.value ? [orderBy.value] : keyColumns.value,
+    orderBy: orderBy.value ? [refByKey.value[orderBy.value].name] : keyColumns.value,
     descending: descending.value,
     limit: limit.value,
     offset: offset.value,
@@ -87,16 +96,19 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     if (!server.value && mine === 1) loadServer()
     try {
       const [page, count, info] = await Promise.all([
-        browseTable(target, { filters: filters.value, orderBy: orderBy.value, descending: descending.value, limit: limit.value, offset: offset.value }),
-        total.value == null ? countTable(target, filters.value) : total.value,
-        Object.keys(columnInfo.value).length ? null : listColumns(target),
+        browseTable(target, {
+          joins: [], filters: filters.value, orderBy: orderBy.value && columnOf(orderBy.value),
+          descending: descending.value, limit: limit.value, offset: offset.value,
+        }),
+        total.value == null ? countTable(target, filters.value, []) : total.value,
+        tableColumns.value.length ? null : listColumns(target),
       ])
       if (mine !== generation) return
       columns.value = page.columns
       rows.value = page.rows
       elapsedMs.value = page.elapsedMs
       total.value = count
-      if (info) columnInfo.value = Object.fromEntries(info.map(c => [c.name, c]))
+      if (info) tableColumns.value = [info]
       log(true, `SELECT ${page.rows.length}`, page.elapsedMs)
     } catch (e) {
       if (mine !== generation) return
@@ -150,9 +162,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   // Limit box applies with the filters, as Run does both.
   function applyFilters(rowsPerPage = limit.value) {
     limit.value = rowsPerPage
-    filters.value = Object.entries(filterText.value).flatMap(([column, text]) => {
-      const parsed = parseFilter(text, cellKind(columnInfo.value[column]?.dataType))
-      return parsed ? [{ column, ...parsed }] : []
+    filters.value = Object.entries(filterText.value).flatMap(([key, text]) => {
+      const ref = refByKey.value[key]
+      const parsed = ref && parseFilter(text, cellKind(ref.info.dataType))
+      return parsed ? [{ ...columnOf(key), ...parsed }] : []
     })
     total.value = null
     return goTo(0)
@@ -198,7 +211,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
       texts[f.column] = text
     }
     filterText.value = texts
-    filters.value = read
+    filters.value = read.map(f => ({ ...f, table: 0 }))
     shownColumns.value = shown
     orderBy.value = byKey ? null : order[0] ?? null
     descending.value = desc
@@ -208,10 +221,11 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     return null
   }
 
-  // Arrays aren't editable yet: their text form (`{a,b}`) isn't what the grid shows.
-  function canEdit(column) {
-    const info = columnInfo.value[column]
-    return !readOnly && keyColumns.value.length > 0 && !!info && !info.dataType.endsWith('[]')
+  // Only the browsed table's own cells are editable, by its primary key. Arrays aren't
+  // editable yet: their text form (`{a,b}`) isn't what the grid shows.
+  function canEdit(key) {
+    const ref = refByKey.value[key]
+    return !readOnly && keyColumns.value.length > 0 && ref?.table === 0 && !ref.info.dataType.endsWith('[]')
   }
 
   // The editor's starting text: JSON columns as JSON (so a string keeps its quotes and
@@ -230,19 +244,19 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     }
   }
 
-  async function saveCell(rowIndex, column, text) {
+  async function saveCell(rowIndex, key, text) {
     editError.value = null
     const row = rows.value[rowIndex]
-    const at = (name) => columns.value.indexOf(name)
     try {
-      const value = parseInput(column, text)
-      const where = keyColumns.value.map(key => ({ column: key, value: row[at(key)] }))
-      const updated = await updateRow(target, [{ column, value }], where)
+      const value = parseInput(key, text)
+      // The browsed table's columns are keyed by their bare names.
+      const where = keyColumns.value.map(name => ({ column: name, value: row[at(name)] }))
+      const updated = await updateRow(target, [{ column: refByKey.value[key].name, value }], where)
       if (updated !== 1) {
         editError.value = 'That row changed or was deleted since it was loaded. Refresh and try again.'
         return false
       }
-      row[at(column)] = value
+      row[at(key)] = value
       return true
     } catch (e) {
       editError.value = errMessage(e)

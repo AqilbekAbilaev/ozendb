@@ -41,7 +41,7 @@ async function loaded(options) {
 describe('loading', () => {
   it('fetches the first page, the row count and the columns', async () => {
     const t = await loaded({ pageSize: 100 })
-    expect(browseTable).toHaveBeenCalledWith(target, { filters: [], orderBy: null, descending: false, limit: 100, offset: 0 })
+    expect(browseTable).toHaveBeenCalledWith(target, { joins: [], filters: [], orderBy: null, descending: false, limit: 100, offset: 0 })
     expect(t.columns.value).toEqual(['id', 'name', 'tags', 'meta'])
     expect(t.rows.value).toHaveLength(2)
     expect(t.total.value).toBe(250)
@@ -81,9 +81,9 @@ describe('paging and sorting', () => {
     await t.nextPage()
 
     await t.sortBy('name')
-    expect(browseTable).toHaveBeenLastCalledWith(target, { filters: [], orderBy: 'name', descending: false, limit: 100, offset: 0 })
+    expect(browseTable).toHaveBeenLastCalledWith(target, { joins: [], filters: [], orderBy: { table: 0, column: 'name' }, descending: false, limit: 100, offset: 0 })
     await t.sortBy('name')
-    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: 'name', descending: true }))
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: { table: 0, column: 'name' }, descending: true }))
   })
 })
 
@@ -97,9 +97,9 @@ describe('filtering', () => {
     expect(browseTable).toHaveBeenCalledTimes(2)
 
     await t.applyFilters()
-    const filters = [{ column: 'id', op: 'gt', value: '1' }, { column: 'name', op: 'contains', value: 'ad' }]
+    const filters = [{ table: 0, column: 'id', op: 'gt', value: '1' }, { table: 0, column: 'name', op: 'contains', value: 'ad' }]
     expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ filters, offset: 0 }))
-    expect(countTable).toHaveBeenLastCalledWith(target, filters)
+    expect(countTable).toHaveBeenLastCalledWith(target, filters, [])
     expect(t.activeFilters.value).toBe(2)
   })
 
@@ -108,7 +108,7 @@ describe('filtering', () => {
     t.setFilterText('id', '1')
     await t.applyFilters()
     await t.sortBy('name')
-    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ filters: [{ column: 'id', op: 'eq', value: '1' }] }))
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ filters: [{ table: 0, column: 'id', op: 'eq', value: '1' }] }))
   })
 
   it('clears every box and reloads the whole table', async () => {
@@ -118,7 +118,7 @@ describe('filtering', () => {
     await t.clearFilters()
     expect(t.filterText.value).toEqual({})
     expect(t.activeFilters.value).toBe(0)
-    expect(countTable).toHaveBeenLastCalledWith(target, [])
+    expect(countTable).toHaveBeenLastCalledWith(target, [], [])
   })
 })
 
@@ -135,7 +135,7 @@ describe('query builder', () => {
     const t = await loaded()
     await t.nextPage()
     await t.setSort('name', true)
-    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: 'name', descending: true, offset: 0 }))
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: { table: 0, column: 'name' }, descending: true, offset: 0 }))
     await t.setSort(null, false)
     expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: null, descending: false }))
   })
@@ -255,9 +255,9 @@ describe('SQL mode', () => {
     expect(readTableSelect).toHaveBeenCalledWith(target, 'edited')
     expect(t.mode.value).toBe('filter')
     expect(t.filterText.value).toEqual({ name: 'ad', id: '>=2' })
-    const filters = [{ column: 'name', op: 'contains', value: 'ad' }, { column: 'id', op: 'gte', value: '2' }]
-    expect(browseTable).toHaveBeenLastCalledWith(target, { filters, orderBy: 'name', descending: true, limit: 100, offset: 100 })
-    expect(countTable).toHaveBeenLastCalledWith(target, filters)
+    const filters = [{ table: 0, column: 'name', op: 'contains', value: 'ad' }, { table: 0, column: 'id', op: 'gte', value: '2' }]
+    expect(browseTable).toHaveBeenLastCalledWith(target, { joins: [], filters, orderBy: { table: 0, column: 'name' }, descending: true, limit: 100, offset: 100 })
+    expect(countTable).toHaveBeenLastCalledWith(target, filters, [])
   })
 
   it('stays in SQL with the reason when the grid could not show that SQL', async () => {

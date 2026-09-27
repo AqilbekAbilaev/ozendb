@@ -7,13 +7,20 @@ export function runQuery(connectionId, sql) {
   return invoke('run_pg_query', { id: connectionId, sql })
 }
 
-// `filters` are `{ column, op, value }`; every one must hold.
-export function browseTable({ connectionId, schema, table }, { filters = [], orderBy = null, descending = false, limit, offset }) {
-  return invoke('browse_pg_table', { id: connectionId, schema, table, filters, orderBy, descending, limit, offset })
+// A column is named by `table` — 0 for the browsed table, 1 and on for `joins` in
+// order — and its name. `filters` are `{ table, column, op, value }`, all of which
+// must hold; `joins` are `{ schema, table, kind: 'left'|'inner', column, equals:
+// { table, column } }`; `orderBy` is `{ table, column }` or null.
+export function browseTable({ connectionId, schema, table }, { joins = [], filters = [], orderBy = null, descending = false, limit, offset }) {
+  return invoke('browse_pg_table', {
+    id: connectionId, schema, table, joins, filters,
+    orderBy: orderBy?.column ?? null, orderTable: orderBy?.table ?? 0,
+    descending, limit, offset,
+  })
 }
 
-export function countTable({ connectionId, schema, table }, filters = []) {
-  return invoke('count_pg_table', { id: connectionId, schema, table, filters })
+export function countTable({ connectionId, schema, table }, filters = [], joins = []) {
+  return invoke('count_pg_table', { id: connectionId, schema, table, joins, filters })
 }
 
 // `where` holds the row's primary-key columns and their original values.
