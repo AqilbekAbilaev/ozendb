@@ -46,6 +46,13 @@ function commit() {
   editing.value = null
   if (text !== seed) emit('save', row, column, text)
 }
+
+// Saves a real NULL — not the empty text or the word "NULL" typed into the box.
+function setNull() {
+  const { row, column } = editing.value
+  editing.value = null
+  emit('save', row, column, null)
+}
 </script>
 
 <template>
@@ -95,15 +102,24 @@ function commit() {
             :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c]) }]"
             @dblclick="startEdit(r, columns[c], value)"
           >
-            <input
-              v-if="editing && editing.row === r && editing.column === columns[c]"
-              ref="input"
-              v-model="editing.text"
-              class="pg-edit"
-              @keydown.enter="commit"
-              @keydown.esc.prevent="editing = null"
-              @blur="commit"
-            >
+            <span v-if="editing && editing.row === r && editing.column === columns[c]" class="pg-editing">
+              <input
+                ref="input"
+                v-model="editing.text"
+                class="pg-edit"
+                @keydown.enter="commit"
+                @keydown.esc.prevent="editing = null"
+                @blur="commit"
+              >
+              <!-- mousedown.prevent keeps the input focused, so its blur doesn't save the text first. -->
+              <button
+                v-if="columnInfo[columns[c]]?.nullable"
+                class="pg-null"
+                title="Set to NULL"
+                @mousedown.prevent
+                @click="setNull"
+              >NULL</button>
+            </span>
             <template v-else>{{ formatCell(value) }}</template>
           </td>
         </tr>
@@ -169,6 +185,13 @@ td.bool { color: var(--warn); font-family: var(--mono); }
 td.str  { color: var(--cell-str-green); }
 td.date { color: var(--text-dim); font-family: var(--mono); }
 td.editable { cursor: text; }
+.pg-editing { display: flex; align-items: center; gap: 4px; }
+.pg-null {
+  flex: none; padding: 1px 6px; border-radius: 3px; cursor: pointer;
+  background: var(--bg-input); color: var(--text-faint); border: 1px solid var(--border-soft);
+  font: italic 11px var(--mono);
+}
+.pg-null:hover { color: var(--text); border-color: var(--accent); }
 .pg-edit {
   width: 100%; min-width: 120px;
   background: var(--bg-input); color: var(--text);
