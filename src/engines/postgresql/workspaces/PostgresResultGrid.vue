@@ -11,23 +11,28 @@ const props = defineProps({
   descending: { type: Boolean,  default: false },
   sortable:   { type: Boolean,  default: false },
   canEdit:    { type: Function, default: () => false },
+  editText:   { type: Function, default: (column, value) => (value === null ? '' : formatCell(value)) },
 })
 const emit = defineEmits(['sort', 'save'])
 
-const editing = ref(null)   // { row, column, text }
+const editing = ref(null)   // { row, column, text, seed }
 const input = ref(null)
 
 async function startEdit(rowIndex, column, value) {
   if (!props.canEdit(column)) return
-  editing.value = { row: rowIndex, column, text: value === null ? '' : formatCell(value) }
+  const seed = props.editText(column, value)
+  editing.value = { row: rowIndex, column, text: seed, seed }
   await nextTick()
   input.value?.[0]?.focus()
 }
 
+// Enter and leaving the cell both save; Escape clears `editing` first, so the blur
+// that follows its removal finds nothing to save. An unchanged value isn't saved.
 function commit() {
-  const { row, column, text } = editing.value
+  if (!editing.value) return
+  const { row, column, text, seed } = editing.value
   editing.value = null
-  emit('save', row, column, text)
+  if (text !== seed) emit('save', row, column, text)
 }
 </script>
 
@@ -62,7 +67,7 @@ function commit() {
               class="pg-edit"
               @keydown.enter="commit"
               @keydown.esc.prevent="editing = null"
-              @blur="editing = null"
+              @blur="commit"
             >
             <template v-else>{{ formatCell(value) }}</template>
           </td>

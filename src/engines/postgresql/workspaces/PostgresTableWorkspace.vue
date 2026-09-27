@@ -4,6 +4,7 @@ import BaseButton from '../../../components/base/BaseButton.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
 import { usePostgresTable } from './usePostgresTable.js'
+import { openConnections } from '../../../stores/openConnections'
 
 const props = defineProps({
   activeTab: { type: Object, required: true },
@@ -14,7 +15,8 @@ const props = defineProps({
 const t = shallowRef(null)
 watch(() => props.activeTab.id, () => {
   const { connectionId, schema, table } = props.activeTab
-  t.value = reactive(usePostgresTable({ connectionId, schema, table }))
+  const readOnly = !!openConnections.value.find(c => c.id === connectionId)?.read_only
+  t.value = reactive(usePostgresTable({ connectionId, schema, table }, { readOnly }))
   t.value.load()
 }, { immediate: true })
 
@@ -33,7 +35,7 @@ const range = computed(() => {
       <span class="pg-range">{{ range }}</span>
       <BaseButton icon="prev" :disabled="!t.hasPrev || t.loading" title="Previous page" @click="t.prevPage" />
       <BaseButton icon="next" :disabled="!t.hasNext || t.loading" title="Next page" @click="t.nextPage" />
-      <BaseButton icon="refresh" :disabled="t.loading" title="Refresh" @click="t.load" />
+      <BaseButton icon="refresh" :disabled="t.loading" title="Refresh" @click="t.refresh" />
     </div>
 
     <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
@@ -49,6 +51,7 @@ const range = computed(() => {
       :descending="t.descending"
       sortable
       :can-edit="t.canEdit"
+      :edit-text="t.editText"
       @sort="t.sortBy"
       @save="t.saveCell"
     />

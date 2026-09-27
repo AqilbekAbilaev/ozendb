@@ -118,3 +118,43 @@ describe('editing', () => {
     expect(t.rows.value[0][1]).toBe('Ada')
   })
 })
+
+describe('review fixes', () => {
+  it('ignores a page that arrives after a newer request (sort while paging)', async () => {
+    const t = await loaded({ pageSize: 100 })
+    let finishOld
+    browseTable.mockImplementationOnce(() => new Promise(r => { finishOld = r }))
+    const old = t.nextPage()
+    browseTable.mockResolvedValueOnce({ columns: ['id'], rows: [[99]], truncated: false, elapsedMs: 1 })
+    await t.sortBy('id')
+
+    finishOld({ columns: ['id'], rows: [[201]], truncated: false, elapsedMs: 1 })
+    await old
+    expect(t.rows.value).toEqual([[99]])
+    expect(t.offset.value).toBe(0)
+    expect(t.loading.value).toBe(false)
+  })
+
+  it('recounts the rows on refresh, but not when paging', async () => {
+    const t = await loaded()
+    await t.nextPage()
+    expect(countTable).toHaveBeenCalledTimes(1)
+    countTable.mockResolvedValue(3)
+    await t.refresh()
+    expect(countTable).toHaveBeenCalledTimes(2)
+    expect(t.total.value).toBe(3)
+  })
+
+  it('seeds a JSON cell\'s editor with JSON text, so saving it unchanged round-trips', async () => {
+    const t = await loaded()
+    expect(t.editText('meta', 'hello')).toBe('"hello"')
+    expect(t.editText('meta', { x: 1 })).toBe('{"x":1}')
+    expect(t.editText('name', 'Ada')).toBe('Ada')
+    expect(t.editText('name', null)).toBe('')
+  })
+
+  it('edits nothing on a read-only connection', async () => {
+    const t = await loaded({ readOnly: true })
+    expect(t.canEdit('name')).toBe(false)
+  })
+})
