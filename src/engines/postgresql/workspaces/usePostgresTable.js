@@ -8,6 +8,7 @@ import { buildSelectSql, aliases } from './buildSelectSql.js'
 import { runSql, explainSql } from './runSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
+import { useBuilderPauses } from './builderPauses.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -76,6 +77,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     [{ key: '', schema: target.schema, table: target.table }, ...joins.value],
     foreignKeys.value,
   ))
+  const pauses = useBuilderPauses({ shownColumns, orderBy, descending, setShownColumns, setSort })
   // Only the latest load may write back: a sort clicked while a page is loading
   // must not be overwritten by that older page.
   let generation = 0
@@ -209,6 +211,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     filterText.value = Object.fromEntries(Object.entries(filterText.value).filter(([k]) => !dropped.has(k)))
     shownColumns.value = shownColumns.value.filter(k => !dropped.has(k))
     if (dropped.has(orderBy.value)) orderBy.value = null
+    pauses.forget(dropped)
     return reload()
   }
 
@@ -372,7 +375,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   }
 
   return {
-    snapshot, explainState, explain,
+    snapshot, explainState, explain, pauses,
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, openSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin,

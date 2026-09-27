@@ -36,3 +36,18 @@ export function boxesFromRows(rows, kinds) {
   }
   return texts
 }
+
+// The same, with paused conditions (see builderPauses.js): each row carries `on`, and
+// paused ones come after the applied ones. A column the grid has filled since shows once.
+export function rowsFromParts(texts, paused, kinds) {
+  const on = rowsFromBoxes(texts, kinds).map(r => ({ ...r, on: true }))
+  const off = rowsFromBoxes(paused, kinds).filter(r => !texts[r.column]?.trim()).map(r => ({ ...r, on: false }))
+  return [...on, ...off]
+}
+
+export function partsFromRows(rows, kinds) {
+  return {
+    texts: boxesFromRows(rows.filter(r => r.on), kinds),
+    paused: boxesFromRows(rows.filter(r => !r.on), kinds),
+  }
+}

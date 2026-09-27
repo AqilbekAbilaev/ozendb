@@ -13,6 +13,7 @@ import PostgresResultGrid from './PostgresResultGrid.vue'
 import PostgresSqlPanel from './PostgresSqlPanel.vue'
 import PostgresTableFooter from './PostgresTableFooter.vue'
 import PostgresTableHeader from './PostgresTableHeader.vue'
+import Resizer from '../../../components/base/Resizer.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { usePostgresTable } from './usePostgresTable.js'
 import { tableSession } from './tableSessions.js'
@@ -29,6 +30,7 @@ const t = shallowRef(null)
 const limitDraft = ref(0)
 const rtab = ref('Result')
 const builderOpen = ref(false)
+const builderWidth = ref(360)
 const library = ref(null)   // which view of the query library is open, if any
 // Each tab keeps its state for as long as it's open (see tableSessions), so coming
 // back to it shows it as it was; only a tab seen for the first time loads.
@@ -103,8 +105,59 @@ function copySql() {
       </div>
 
       <div class="pg-body">
+        <div class="pg-main">
+          <div class="rtabs">
+            <TabStrip v-model="rtab" :options="rtabs" />
+          </div>
+
+          <template v-if="rtab === 'Result'">
+            <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
+            <!-- Once the grid has columns, a failure (usually a filter value the column's type
+                 can't read) keeps it on screen, so the filter can be corrected in place. -->
+            <div v-if="t.error && t.columns.length" class="pg-edit-error">{{ t.error }}</div>
+
+            <StateMessage v-if="t.error && !t.columns.length" mode="error" :message="t.error" retryable @retry="t.load" />
+            <StateMessage v-else-if="t.loading && !t.columns.length" mode="loading" />
+            <StateMessage v-else-if="!t.rows.length && !t.activeFilters && !t.error" mode="empty" label="This table has no rows" />
+            <PostgresResultGrid
+              v-else
+              :columns="t.view.columns"
+              :rows="t.view.rows"
+              :column-info="t.columnInfo"
+              :row-offset="t.offset"
+              :order-by="t.orderBy"
+              :descending="t.descending"
+              sortable
+              :can-edit="t.canEdit"
+              :edit-text="t.editText"
+              :filter-text="t.filterText"
+              @sort="t.sortBy"
+              @save="t.saveCell"
+              @filter-text="t.setFilterText"
+              @apply-filters="run"
+            />
+          </template>
+          <div v-else-if="rtab === 'Query Code'" class="qcode">
+            <div class="qcode-bar">
+              <span>Generated from the column filters</span>
+              <span class="spacer"></span>
+              <BaseButton variant="ghost" icon="copy" @click="copySql">Copy</BaseButton>
+              <BaseButton variant="primary" icon="sql" @click="switchMode('sql')">Open in SQL editor</BaseButton>
+            </div>
+            <CodeEditor :model-value="t.currentSql" readonly language="sql" class="qcode-sql" />
+          </div>
+          <PostgresPlan
+            v-else-if="rtab === 'Explain'"
+            :plan="t.explainState.plan"
+            :error="t.explainState.planError"
+            :explaining="t.explainState.explaining"
+          />
+          <PostgresMessages v-else :messages="t.messages" />
+        </div>
+        <Resizer v-if="builderOpen && t.columns.length" v-model="builderWidth" axis="x" invert :min="280" :max="760" />
         <PostgresQueryBuilder
           v-if="builderOpen && t.columns.length"
+          :style="{ width: builderWidth + 'px' }"
           :table="activeTab.table"
           :columns="t.keys"
           :column-info="t.columnInfo"
@@ -115,61 +168,16 @@ function copySql() {
           :joins="t.joins"
           :join-offers="t.joinOffers"
           :table-names="t.tableNames"
+          :pauses="t.pauses"
           @filter-text="t.replaceFilterText"
           @columns="t.setShownColumns"
           @add-join="t.addJoin"
           @join-kind="t.setJoinKind"
           @remove-join="t.removeJoin"
           @sort="t.setSort"
-          @close="builderOpen = false"
+          @paused-text="t.pauses.conditions = $event"
+          @apply="run"
         />
-        <div class="rtabs">
-          <TabStrip v-model="rtab" :options="rtabs" />
-        </div>
-
-        <template v-if="rtab === 'Result'">
-          <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
-          <!-- Once the grid has columns, a failure (usually a filter value the column's type
-               can't read) keeps it on screen, so the filter can be corrected in place. -->
-          <div v-if="t.error && t.columns.length" class="pg-edit-error">{{ t.error }}</div>
-
-          <StateMessage v-if="t.error && !t.columns.length" mode="error" :message="t.error" retryable @retry="t.load" />
-          <StateMessage v-else-if="t.loading && !t.columns.length" mode="loading" />
-          <StateMessage v-else-if="!t.rows.length && !t.activeFilters && !t.error" mode="empty" label="This table has no rows" />
-          <PostgresResultGrid
-            v-else
-            :columns="t.view.columns"
-            :rows="t.view.rows"
-            :column-info="t.columnInfo"
-            :row-offset="t.offset"
-            :order-by="t.orderBy"
-            :descending="t.descending"
-            sortable
-            :can-edit="t.canEdit"
-            :edit-text="t.editText"
-            :filter-text="t.filterText"
-            @sort="t.sortBy"
-            @save="t.saveCell"
-            @filter-text="t.setFilterText"
-            @apply-filters="run"
-          />
-        </template>
-        <div v-else-if="rtab === 'Query Code'" class="qcode">
-          <div class="qcode-bar">
-            <span>Generated from the column filters</span>
-            <span class="spacer"></span>
-            <BaseButton variant="ghost" icon="copy" @click="copySql">Copy</BaseButton>
-            <BaseButton variant="primary" icon="sql" @click="switchMode('sql')">Open in SQL editor</BaseButton>
-          </div>
-          <CodeEditor :model-value="t.currentSql" readonly language="sql" class="qcode-sql" />
-        </div>
-        <PostgresPlan
-          v-else-if="rtab === 'Explain'"
-          :plan="t.explainState.plan"
-          :error="t.explainState.planError"
-          :explaining="t.explainState.explaining"
-        />
-        <PostgresMessages v-else :messages="t.messages" />
       </div>
 
       <PostgresTableFooter :t="t" />
@@ -190,7 +198,8 @@ function copySql() {
 .limit { margin-right: 6px; }
 .limit + * { margin-right: 8px; }
 .spacer { flex: 1; }
-.pg-body { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.pg-body { display: flex; flex: 1; min-height: 0; }
+.pg-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .rtabs { display: flex; flex: none; border-bottom: 1px solid var(--border); }
 .qcode { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .qcode-bar {

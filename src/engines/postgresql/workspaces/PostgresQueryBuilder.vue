@@ -7,11 +7,12 @@ import BaseInput from '../../../components/base/BaseInput.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { cellKind } from './formatCell.js'
-import { operatorsFor, rowsFromBoxes, boxesFromRows } from './builderRows.js'
+import { operatorsFor, rowsFromParts, partsFromRows } from './builderRows.js'
 
 // The table tab's Query Builder: its joins, the filter boxes as a list of conditions,
-// the shown columns, and the sort. Conditions edit the boxes (Run applies them, as
-// typing in a box does); joins, columns and sort apply at once.
+// the shown columns, and the sort. Changes apply at once, except a value being typed,
+// which applies on Enter as in the grid's boxes. The checkboxes switch a condition or
+// a whole section off without losing it (`pauses`, see builderPauses.js).
 const props = defineProps({
   table:      { type: String, required: true },
   columns:    { type: Array,  required: true },
@@ -26,8 +27,9 @@ const props = defineProps({
   joins:      { type: Array,  default: () => [] },
   joinOffers: { type: Array,  default: () => [] },
   tableNames: { type: Array,  default: () => [] },
+  pauses:     { type: Object, required: true },
 })
-const emit = defineEmits(['filter-text', 'sort', 'columns', 'add-join', 'join-kind', 'remove-join', 'close'])
+const emit = defineEmits(['filter-text', 'sort', 'columns', 'add-join', 'join-kind', 'remove-join', 'paused-text', 'apply'])
 
 // A column as the SQL names it: `name`, or `table.name` once the tab joins others.
 function label(key) {
@@ -46,23 +48,30 @@ const kinds = computed(() => Object.fromEntries(props.columns.map(c => [c, cellK
 // Rows are kept here rather than derived, so a condition still missing its value
 // survives; they're re-read only when the boxes change from outside the panel.
 const rows = ref([])
-let sent = null
-watch(() => props.filterText, (texts) => {
-  if (toRaw(texts) !== sent) rows.value = rowsFromBoxes(texts, kinds.value)
+let sent = {}
+watch(() => [props.filterText, props.pauses.conditions], ([texts, paused]) => {
+  if (toRaw(texts) !== sent.texts || toRaw(paused) !== sent.paused) rows.value = rowsFromParts(texts, paused, kinds.value)
 }, { immediate: true })
 
-function commit(next) {
+function commit(next, apply = true) {
   rows.value = next
-  sent = boxesFromRows(next, kinds.value)
-  emit('filter-text', sent)
+  sent = partsFromRows(next, kinds.value)
+  emit('filter-text', sent.texts)
+  emit('paused-text', sent.paused)
+  if (apply) emit('apply')
 }
-const update = (i, patch) => commit(rows.value.map((r, j) => (j === i ? { ...r, ...patch } : r)))
+const update = (i, patch, apply) => commit(rows.value.map((r, j) => (j === i ? { ...r, ...patch } : r)), apply)
 const remove = (i) => commit(rows.value.filter((_, j) => j !== i))
+
+const whereOn = computed(() => !rows.value.length || rows.value.some(r => r.on))
+function toggleWhere() {
+  if (rows.value.length) commit(rows.value.map(r => ({ ...r, on: !whereOn.value })))
+}
 
 const used = computed(() => rows.value.map(r => r.column))
 function add() {
   const column = props.columns.find(c => !used.value.includes(c))
-  if (column) commit([...rows.value, { column, op: operatorsFor(kinds.value[column])[0].op, value: '' }])
+  if (column) commit([...rows.value, { column, op: operatorsFor(kinds.value[column])[0].op, value: '', on: true }], false)
 }
 function pickColumn(i, column) {
   update(i, { column, op: operatorsFor(kinds.value[column])[0].op, value: '' })
@@ -83,20 +92,22 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
 </script>
 
 <template>
-  <aside class="pvq">
-    <section>
-      <header>Tables<button class="pvq-close" title="Close" @click="emit('close')"><BaseIcon name="close" :size="12" /></button></header>
-      <div class="body">
+  <aside class="vqb">
+    <div class="vqb-section">
+      <div class="vqb-head">Tables</div>
+      <div class="vqb-body stack">
         <div class="pvq-base"><BaseIcon name="table" :size="14" /><b>{{ table }}</b><span class="tag">main table</span></div>
         <div v-for="(j, i) in joins" :key="j.key" class="cond join">
-          <div class="line">
+          <div class="cond-line">
             <BaseIcon name="table" :size="14" class="ti" />
             <b class="grow">{{ joinName(i) }}</b>
-            <BaseButton variant="ghost" icon="trash" size="sm" title="Remove join" @click="emit('remove-join', j.key)" />
+            <BaseButton icon="trash" size="sm" :icon-size="18" title="Remove join" @click="emit('remove-join', j.key)" />
           </div>
-          <BaseSelect :model-value="j.kind" :options="kindOptions" @update:model-value="emit('join-kind', j.key, $event)" />
-          <div class="line on"><span class="onl">where</span><span class="onv">{{ joinName(i) }}.{{ j.column }}</span></div>
-          <div class="line on"><span class="onl">equals</span><span class="onv">{{ label(j.equals) }}</span></div>
+          <div class="cond-line">
+            <BaseSelect class="grow" size="sm" :model-value="j.kind" :options="kindOptions" @update:model-value="emit('join-kind', j.key, $event)" />
+          </div>
+          <div class="cond-line"><span class="onl">where</span><span class="pill grow onv">{{ joinName(i) }}.{{ j.column }}</span></div>
+          <div class="cond-line"><span class="onl">equals</span><span class="pill grow onv">{{ label(j.equals) }}</span></div>
         </div>
         <BaseSelect
           v-if="joinOffers.length"
@@ -107,38 +118,54 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
         />
         <div v-else class="empty">No{{ joins.length ? ' more' : '' }} related tables.</div>
       </div>
-    </section>
+    </div>
 
-    <section>
-      <header>Where</header>
-      <div class="body">
+    <div class="vqb-section">
+      <div class="vqb-head">
+        Where
+        <span class="cb" :class="{ on: whereOn }" title="Apply these conditions" @click="toggleWhere">
+          <BaseIcon v-if="whereOn" name="check" :size="12" />
+        </span>
+      </div>
+      <div class="vqb-body stack">
         <div class="hint">Show rows that match <b>all</b> of these:</div>
         <div v-if="!rows.length" class="empty">No conditions — all rows are shown.</div>
-        <div v-for="(r, i) in rows" :key="i" class="cond">
-          <div class="line">
-            <BaseSelect class="grow strong" :model-value="r.column" :options="columnOptions(r.column)" @update:model-value="pickColumn(i, $event)" />
-            <BaseButton variant="ghost" icon="trash" size="sm" title="Remove" @click="remove(i)" />
+        <div v-for="(r, i) in rows" :key="i" class="cond" :class="{ off: !r.on }">
+          <div class="cond-line">
+            <BaseSelect class="grow" size="sm" :model-value="r.column" :options="columnOptions(r.column)" @update:model-value="pickColumn(i, $event)" />
+            <BaseSelect class="op" size="sm" :model-value="r.op" :options="opOptions(r.column)" @update:model-value="update(i, { op: $event })" />
+            <BaseButton icon="trash" size="sm" :icon-size="18" title="Remove" @click="remove(i)" />
           </div>
-          <div class="line">
-            <BaseSelect class="op" :model-value="r.op" :options="opOptions(r.column)" @update:model-value="update(i, { op: $event })" />
+          <div class="cond-line">
+            <span class="pill type-pill" :title="columnInfo[r.column]?.dataType">{{ columnInfo[r.column]?.dataType }}</span>
             <BaseInput
               v-if="needsValue(r.op)"
-              class="grow val"
+              class="pill grow cond-val"
               :model-value="r.value"
-              placeholder="value"
+              placeholder="value, then Enter"
               spellcheck="false"
-              @update:model-value="update(i, { value: $event })"
+              @update:model-value="update(i, { value: $event }, false)"
+              @enter="emit('apply')"
             />
+            <span v-else class="grow"></span>
+            <span class="cb sm" :class="{ on: r.on }" title="Apply this condition" @click="update(i, { on: !r.on })">
+              <BaseIcon v-if="r.on" name="check" :size="11" />
+            </span>
           </div>
         </div>
         <button class="add" :disabled="used.length === columns.length" @click="add"><BaseIcon name="plus" :size="13" /> Add condition</button>
-        <div v-if="rows.length" class="hint run-hint">Press Run to apply.</div>
       </div>
-    </section>
+    </div>
 
-    <section>
-      <header>Columns<span class="count">{{ shownColumns.length ? `${shownColumns.length} of ${columns.length}` : 'all' }}</span></header>
-      <div class="body cols">
+    <div class="vqb-section">
+      <div class="vqb-head">
+        Columns
+        <span class="cb" :class="{ on: pauses.columnsOn }" title="Show only the ticked columns" @click="pauses.toggleColumns()">
+          <BaseIcon v-if="pauses.columnsOn" name="check" :size="12" />
+        </span>
+      </div>
+      <div class="vqb-body stack cols" :class="{ off: !pauses.columnsOn }">
+        <div class="count">{{ shownColumns.length ? `${shownColumns.length} of ${columns.length} shown` : 'All shown' }}</div>
         <template v-for="(c, i) in columns" :key="c">
           <div v-if="joins.length && columnInfo[c]?.tableLabel !== columnInfo[columns[i - 1]]?.tableLabel" class="grp">
             {{ columnInfo[c]?.tableLabel }}
@@ -151,11 +178,16 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
         </template>
         <button v-if="shownColumns.length" class="link" @click="emit('columns', [])">Show all columns</button>
       </div>
-    </section>
+    </div>
 
-    <section>
-      <header>Order by</header>
-      <div class="body">
+    <div class="vqb-section">
+      <div class="vqb-head">
+        Order by
+        <span class="cb" :class="{ on: pauses.sortOn }" title="Sort the rows" @click="pauses.toggleSort()">
+          <BaseIcon v-if="pauses.sortOn" name="check" :size="12" />
+        </span>
+      </div>
+      <div class="vqb-body stack" :class="{ off: !pauses.sortOn }">
         <BaseSelect :model-value="orderBy ?? ''" :options="sortOptions" @update:model-value="emit('sort', $event || null, descending)" />
         <SegmentedControl
           v-if="orderBy"
@@ -166,58 +198,36 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
           @update:model-value="emit('sort', orderBy, $event === 'desc')"
         />
       </div>
-    </section>
+    </div>
   </aside>
 </template>
 
 <style scoped>
-.pvq {
-  position: absolute; top: 0; right: 0; bottom: 0; z-index: 40; width: 320px;
-  display: flex; flex-direction: column; overflow-y: auto;
-  background: var(--bg-panel); border-left: 1px solid var(--border);
-  box-shadow: -10px 0 28px rgba(0, 0, 0, .28);
-}
-section { border-bottom: 1px solid var(--border); }
-header {
-  display: flex; align-items: center; height: 29px; padding: 0 12px;
-  font-size: 13px; font-weight: 600; color: var(--text);
-  background: var(--bg-panel-2); border-bottom: 1px solid var(--border);
-}
-.pvq-close {
-  margin-left: auto; width: 22px; height: 22px; display: grid; place-items: center;
-  background: none; border: 0; border-radius: 5px; color: var(--text-faint); cursor: pointer;
-}
-.pvq-close:hover { background: var(--bg-hover); color: var(--text); }
-.body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.stack .cond { margin-bottom: 0; }
+.off { opacity: .5; }
 .pvq-base { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text); }
 .pvq-base svg { color: var(--text-faint); }
 .tag { margin-left: auto; font-size: 11px; color: var(--text-faint); }
 .hint { font-size: 12px; color: var(--text-dim); }
-.run-hint { color: var(--text-faint); }
 .empty { font-size: 12px; font-style: italic; color: var(--text-faint); }
-.cond { display: flex; flex-direction: column; gap: 6px; padding-left: 10px; border-left: 2px solid var(--accent); }
-.line { display: flex; align-items: center; gap: 6px; }
 .grow { flex: 1; min-width: 0; }
-.op { flex: none; width: 124px; }
-.val { font-family: var(--mono); }
+.op { flex: none; width: 112px; }
+.type-pill { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
 .add {
   display: flex; align-items: center; justify-content: center; gap: 6px; height: 30px;
   background: none; border: 1px dashed var(--border-soft); border-radius: 6px;
-  color: var(--link); font-size: 12.5px; cursor: pointer;
+  color: var(--text-faint); font-size: 12px; cursor: pointer;
 }
-.add:hover:not(:disabled) { border-color: var(--link); background: var(--bg-hover); }
+.add:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .add:disabled { opacity: .4; cursor: default; }
-.dir { align-self: stretch; }
-.join { border-left-color: var(--purple); }
+.join { border-left: 2px solid var(--purple); }
+.join b { font-size: 12.5px; color: var(--text); }
 .ti { color: var(--text-faint); flex: none; }
-.on .onl { flex: none; width: 44px; font-size: 11.5px; color: var(--text-faint); }
-.on .onv {
-  flex: 1; min-width: 0; padding: 5px 9px; border-radius: 6px;
-  background: var(--bg-input); border: 1px solid var(--border-soft);
-  font: 12px var(--mono); color: var(--text); overflow: hidden; text-overflow: ellipsis;
-}
+.onl { flex: none; width: 44px; font-size: 11.5px; color: var(--text-faint); }
+.onv { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grp { padding: 8px 4px 3px; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
-.count { margin-left: auto; font-size: 11.5px; font-weight: 400; color: var(--text-faint); }
+.count { font-size: 11.5px; color: var(--text-faint); }
 .cols { gap: 2px; }
 .colrow {
   display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 5px;
@@ -227,5 +237,7 @@ header {
 .dim { color: var(--text-faint); }
 .type { margin-left: auto; font: 11px var(--mono); color: var(--text-faint); }
 .link { align-self: flex-start; padding: 0 4px; background: none; border: 0; color: var(--link); font-size: 12px; cursor: pointer; }
+.dir { align-self: stretch; }
 .dir :deep(button) { flex: 1; justify-content: center; }
 </style>
+<style scoped src="../../../components/query/QueryBuilderPanel.css"></style>
