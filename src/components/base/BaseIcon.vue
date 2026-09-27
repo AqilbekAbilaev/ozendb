@@ -32,6 +32,7 @@ const PATHS = {
   prev:       '<path d="M15 6l-7 6 7 6z"/>',
   next:       '<path d="M9 6l7 6-7 6z"/>',
   last:       '<path d="M6 6l7 6-7 6zM18 6v12"/>',
+  key:        '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/>',
   lock:       '<rect x="5" y="11" width="14" height="9" rx="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   plus:       '<path d="M12 5v14M5 12h14"/>',
   trash:      '<path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13"/>',

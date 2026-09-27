@@ -47,6 +47,8 @@ const range = computed(() => {
       v-else
       :columns="t.columns"
       :rows="t.rows"
+      :column-info="t.columnInfo"
+      :row-offset="t.offset"
       :order-by="t.orderBy"
       :descending="t.descending"
       sortable
