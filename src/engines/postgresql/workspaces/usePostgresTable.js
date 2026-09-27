@@ -15,35 +15,36 @@ const JSON_TYPES = ['json', 'jsonb']
  * One table-browse tab's state: a page of rows, the row count, sorting, and editing a
  * cell by the row's primary key. `target` is `{ connectionId, schema, table }`.
  */
-export function usePostgresTable(target, { pageSize = 100, readOnly = false } = {}) {
+// `initial` is a snapshot() to start from — a tab restored after a restart.
+export function usePostgresTable(target, { pageSize = 100, readOnly = false, initial = {} } = {}) {
   const columns = ref([])
   const rows = ref([])
   const total = ref(null)
   const elapsedMs = ref(null)
   const offset = ref(0)
-  const limit = ref(pageSize)
+  const limit = ref(initial.limit ?? pageSize)
   // One entry per load, newest last: `{ at, ok, text, ms }`.
   const messages = ref([])
   // `{ version, encoding }` for the footer, read once; stays null if it can't be.
   const server = ref(null)
-  const orderBy = ref(null)
-  const descending = ref(false)
+  const orderBy = ref(initial.orderBy ?? null)
+  const descending = ref(initial.descending ?? false)
   const loading = ref(false)
   const error = ref(null)
   const editError = ref(null)
   // What each header box holds, by column, and the filters last applied from them:
   // typing edits the boxes, and only applying reloads.
-  const filterText = ref({})
+  const filterText = ref(initial.filterText ?? {})
   // Applied filters as `{ key, op, value }`; sent with each column's table position.
-  const filters = ref([])
+  const filters = ref(initial.filters ?? [])
   // The columns the grid shows, in order; empty shows them all. Rows are still read
   // whole, so a hidden primary key can identify a row for editing.
-  const shownColumns = ref([])
+  const shownColumns = ref(initial.shownColumns ?? [])
   // SQL mode: an editor seeded with the SQL the filters amount to. Going back reads
   // edited SQL into the boxes, or says why they can't show it.
-  const mode = ref('filter')
+  const mode = ref(initial.mode ?? 'filter')
   const filterRefusal = ref(null)
-  const sqlState = reactive({ connectionId: target.connectionId, sql: '', result: null, error: null, running: false })
+  const sqlState = reactive({ connectionId: target.connectionId, sql: initial.sql ?? '', result: null, error: null, running: false })
   let builtSql = null
   // The browsed table's column metadata (type, primary key), fetched once, and its
   // joins, each `{ key, schema, table, kind, column, equals, columns }`: matched where
@@ -52,8 +53,8 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   // they were. Filters, sort, shown columns and edits name a column by its key (see
   // columnRefs.js).
   const mainColumns = ref(null)
-  const joins = ref([])
-  let joinCount = 0
+  const joins = ref(initial.joins ?? [])
+  let joinCount = Math.max(0, ...joins.value.map(j => Number(j.key.slice(1))))
   // Foreign keys by `schema.table`, fetched as each table enters the tab.
   const foreignKeys = ref({})
   const refs = computed(() => columnRefs(mainColumns.value
@@ -126,20 +127,25 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
       loadForeignKeys(target)
     }
     try {
-      const [page, count, info] = await Promise.all([
+      // Filters, sort and joins name columns by key, which needs the table's columns:
+      // a restored tab has them before it has ever loaded.
+      if (!mainColumns.value) {
+        const info = await listColumns(target)
+        if (mine !== generation) return
+        mainColumns.value = info
+      }
+      const [page, count] = await Promise.all([
         browseTable(target, {
           joins: wireJoins.value, filters: wireFilters.value, orderBy: orderBy.value && columnOf(orderBy.value),
           descending: descending.value, limit: limit.value, offset: offset.value,
         }),
         total.value == null ? countTable(target, wireFilters.value, wireJoins.value) : total.value,
-        mainColumns.value ? null : listColumns(target),
       ])
       if (mine !== generation) return
       columns.value = page.columns
       rows.value = page.rows
       elapsedMs.value = page.elapsedMs
       total.value = count
-      if (info) mainColumns.value = info
       log(true, `SELECT ${page.rows.length}`, page.elapsedMs)
     } catch (e) {
       if (mine !== generation) return
@@ -337,7 +343,17 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     }
   }
 
+  // What a restart brings back: the tab's settings, never its rows or results.
+  function snapshot() {
+    return {
+      mode: mode.value, sql: sqlState.sql, limit: limit.value,
+      filterText: filterText.value, filters: filters.value, shownColumns: shownColumns.value,
+      orderBy: orderBy.value, descending: descending.value, joins: joins.value,
+    }
+  }
+
   return {
+    snapshot,
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin,

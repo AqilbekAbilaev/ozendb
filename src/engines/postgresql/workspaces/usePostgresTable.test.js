@@ -247,6 +247,43 @@ describe('joins', () => {
   })
 })
 
+describe('snapshot and restore', () => {
+  it('snapshots the settings a restart should bring back, and starts again from them', async () => {
+    const t = await loaded()
+    t.setFilterText('name', 'ad')
+    await t.applyFilters(25)
+    await t.sortBy('name')
+    t.setShownColumns(['name', 'id'])
+    listColumns.mockResolvedValue([{ name: 'id', dataType: 'integer', isPrimaryKey: true }])
+    await t.addJoin({ schema: 'public', table: 'regions', column: 'id', equals: 'id' })
+    const snap = JSON.parse(JSON.stringify(t.snapshot()))
+
+    browseTable.mockClear()
+    listColumns.mockResolvedValue(COLUMNS)
+    const again = usePostgresTable(target, { initial: snap })
+    await again.load()
+    expect(again.filterText.value).toEqual({ name: 'ad' })
+    expect(again.limit.value).toBe(25)
+    expect(again.shownColumns.value).toEqual(['name', 'id'])
+    expect(again.joins.value.map(j => j.key)).toEqual(['j1'])
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({
+      limit: 25, orderBy: { table: 0, column: 'name' },
+      filters: [{ table: 0, column: 'name', op: 'contains', value: 'ad' }],
+      joins: [expect.objectContaining({ table: 'regions' })],
+    }))
+  })
+
+  it('brings SQL mode back with its SQL, and keys new joins after the restored ones', async () => {
+    const t = usePostgresTable(target, { initial: { mode: 'sql', sql: 'SELECT 1', joins: [{ key: 'j3', schema: 'public', table: 'r', kind: 'left', column: 'id', equals: 'id', columns: [] }] } })
+    await t.load()
+    expect(t.mode.value).toBe('sql')
+    expect(t.sqlState.sql).toBe('SELECT 1')
+    listColumns.mockResolvedValue([])
+    await t.addJoin({ schema: 'public', table: 's', column: 'id', equals: 'id' })
+    expect(t.joins.value.map(j => j.key)).toEqual(['j3', 'j4'])
+  })
+})
+
 describe('limit, messages and server details', () => {
   it('applies a new limit with the filters, restarting from the first row', async () => {
     const t = await loaded({ pageSize: 100 })

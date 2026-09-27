@@ -340,3 +340,39 @@ describe('sessionRestoreNotice', () => {
     expect(n.log).toContain('unreadable kind/mode: x/y')
   })
 })
+
+describe('PostgreSQL tabs across a restart', () => {
+  const tableTarget = {
+    connectionId: 'p1',
+    segments: [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }],
+  }
+  const view = { mode: 'filter', sql: '', limit: 25, filterText: { name: 'ad' }, filters: [{ key: 'name', op: 'contains', value: 'ad' }], shownColumns: [], orderBy: 'name', descending: true, joins: [] }
+
+  it('brings a table tab back on the same table, with its settings to start from', () => {
+    const v2 = { id: 't1', type: 'postgresql.table_browse', engine: 'postgresql', title: 'merchants', color: 'green', target: tableTarget, state: { view } }
+    const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
+    expect(restored).toMatchObject({
+      id: 't1', type: 'postgresql.table_browse', title: 'merchants', color: 'green', target: tableTarget,
+      kind: 'pgTable', connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
+      restoredView: view,
+    })
+  })
+
+  it('brings a SQL tab back with its query text but no result', () => {
+    const target = { connectionId: 'p1', segments: [{ kind: 'database', name: 'payments' }] }
+    const v2 = { id: 'q1', type: 'postgresql.query', engine: 'postgresql', title: 'SQL: payments', color: null, target, state: { sql: 'SELECT 1' } }
+    const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
+    expect(restored).toMatchObject({ id: 'q1', type: 'postgresql.query', kind: 'pgQuery', database: 'payments', sql: 'SELECT 1', result: null, target })
+  })
+
+  it('saves what the tabs need, and keeps them through a load', () => {
+    const table = getWorkspaceDefinition('postgresql.table_browse')
+    const query = getWorkspaceDefinition('postgresql.query')
+    expect(query.serialize({ sql: 'SELECT 2', result: { rows: [] } })).toEqual({ sql: 'SELECT 2' })
+    expect(table.serialize({ id: 'never-opened', restoredView: view })).toEqual({ view })
+    const raw = { schemaVersion: 2, activeTabId: 't1', tabs: [{ id: 't1', type: 'postgresql.table_browse', title: 'merchants', target: tableTarget, state: { view } }] }
+    const result = migrateSession(raw, { connections: new Set(['p1']) })
+    expect(result.ok).toBe(true)
+    expect(result.session.tabs).toHaveLength(1)
+  })
+})
