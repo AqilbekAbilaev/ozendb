@@ -184,6 +184,10 @@ fn postgres_code(e: &sqlx::Error) -> &'static str {
             Some("28000") | Some("28P01") => "auth",
             // query_canceled: the user's Cancel, or the statement timeout.
             Some("57014") => "cancelled",
+            // insufficient_privilege, and undefined_table / invalid_schema_name: the
+            // frontend words these for the table they name (a dropped or unreadable tab).
+            Some("42501") => "forbidden",
+            Some("42P01") | Some("3F000") => "missing",
             _ => "command",
         },
         sqlx::Error::Tls(_) => "tls",

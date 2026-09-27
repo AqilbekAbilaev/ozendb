@@ -103,6 +103,10 @@ function openTable(schema, table) {
         <span class="err-retry" @click.stop="toggleSchema(schema.name)">Retry</span>
       </div>
 
+      <!-- information_schema lists only what the role may see, so empty can mean either. -->
+      <div v-if="openSchemas[schema.name] && tables[schema.name]?.length === 0" class="tnode" style="padding-left: 66px">
+        <span class="tt" style="color:var(--text-faint);font-size:11.5px;font-style:italic">No tables or views you can read</span>
+      </div>
       <template v-if="openSchemas[schema.name]">
         <template v-for="table in tables[schema.name]" :key="table.name">
           <div
