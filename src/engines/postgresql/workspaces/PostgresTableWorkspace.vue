@@ -90,7 +90,9 @@ function copySql() {
           :filter-text="t.filterText"
           :order-by="t.orderBy"
           :descending="t.descending"
+          :shown-columns="t.shownColumns"
           @filter-text="t.replaceFilterText"
+          @columns="t.setShownColumns"
           @sort="t.setSort"
           @close="builderOpen = false"
         />
@@ -109,8 +111,8 @@ function copySql() {
           <StateMessage v-else-if="!t.rows.length && !t.activeFilters && !t.error" mode="empty" label="This table has no rows" />
           <PostgresResultGrid
             v-else
-            :columns="t.columns"
-            :rows="t.rows"
+            :columns="t.view.columns"
+            :rows="t.view.rows"
             :column-info="t.columnInfo"
             :row-offset="t.offset"
             :order-by="t.orderBy"

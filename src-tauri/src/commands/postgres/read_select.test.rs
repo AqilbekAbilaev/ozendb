@@ -49,11 +49,20 @@ fn reads_hand_written_sql_the_way_postgres_would() {
 }
 
 #[test]
+fn reads_a_plain_column_list_as_the_columns_to_show() {
+    let got = read("SELECT \"id\", Name FROM users").unwrap();
+    assert_eq!(got.columns, vec!["id", "name"]);
+    assert!(read("SELECT * FROM users").unwrap().columns.is_empty());
+}
+
+#[test]
 fn refuses_what_the_filter_boxes_cannot_show() {
     for sql in [
         "SELECT * FROM public.orders",
         "SELECT * FROM other.users",
-        "SELECT id FROM users",
+        "SELECT id, * FROM users",
+        "SELECT id AS key FROM users",
+        "SELECT lower(name) FROM users",
         "SELECT * FROM users u",
         "SELECT * FROM users JOIN orders ON true",
         "SELECT * FROM users WHERE a = 1 OR b = 2",

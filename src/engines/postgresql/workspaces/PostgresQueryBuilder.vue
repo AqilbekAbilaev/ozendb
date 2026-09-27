@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, toRaw } from 'vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseCheckbox from '../../../components/base/BaseCheckbox.vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import BaseInput from '../../../components/base/BaseInput.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
@@ -8,9 +9,9 @@ import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { cellKind } from './formatCell.js'
 import { operatorsFor, rowsFromBoxes, boxesFromRows } from './builderRows.js'
 
-// The table tab's Query Builder: the filter boxes as a list of conditions, and the
-// sort. Conditions edit the boxes (Run applies them, as typing in a box does); the
-// sort applies at once, as clicking a header does.
+// The table tab's Query Builder: the filter boxes as a list of conditions, the shown
+// columns, and the sort. Conditions edit the boxes (Run applies them, as typing in a
+// box does); columns and sort apply at once, as clicking a header does.
 const props = defineProps({
   table:      { type: String, required: true },
   columns:    { type: Array,  required: true },
@@ -18,8 +19,10 @@ const props = defineProps({
   filterText: { type: Object, required: true },
   orderBy:    { type: String, default: null },
   descending: { type: Boolean, default: false },
+  // Empty shows every column.
+  shownColumns: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['filter-text', 'sort', 'close'])
+const emit = defineEmits(['filter-text', 'sort', 'columns', 'close'])
 
 const kinds = computed(() => Object.fromEntries(props.columns.map(c => [c, cellKind(props.columnInfo[c]?.dataType)])))
 
@@ -51,6 +54,12 @@ function pickColumn(i, column) {
 const columnOptions = (current) => props.columns.map(c => ({ value: c, label: c, disabled: c !== current && used.value.includes(c) }))
 const opOptions = (column) => operatorsFor(kinds.value[column]).map(o => ({ value: o.op, label: o.label }))
 const needsValue = (op) => op !== 'isNull' && op !== 'notNull'
+
+// Ticking keeps the table's own column order; ticking none shows them all.
+function toggleColumn(column) {
+  const shown = props.shownColumns
+  emit('columns', props.columns.filter(c => (c === column) !== shown.includes(c)))
+}
 
 const sortOptions = computed(() => [{ value: '', label: 'No sorting' }, ...props.columns.map(c => ({ value: c, label: c }))])
 const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', label: '↓ Descending' }]
@@ -90,6 +99,18 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
         </div>
         <button class="add" :disabled="used.length === columns.length" @click="add"><BaseIcon name="plus" :size="13" /> Add condition</button>
         <div v-if="rows.length" class="hint run-hint">Press Run to apply.</div>
+      </div>
+    </section>
+
+    <section>
+      <header>Columns<span class="count">{{ shownColumns.length ? `${shownColumns.length} of ${columns.length}` : 'all' }}</span></header>
+      <div class="body cols">
+        <label v-for="c in columns" :key="c" class="colrow">
+          <BaseCheckbox :model-value="shownColumns.includes(c)" @update:model-value="toggleColumn(c)" />
+          <span :class="{ dim: shownColumns.length && !shownColumns.includes(c) }">{{ c }}</span>
+          <span class="type">{{ columnInfo[c]?.dataType }}</span>
+        </label>
+        <button v-if="shownColumns.length" class="link" @click="emit('columns', [])">Show all columns</button>
       </div>
     </section>
 
@@ -148,5 +169,15 @@ header {
 .add:hover:not(:disabled) { border-color: var(--link); background: var(--bg-hover); }
 .add:disabled { opacity: .4; cursor: default; }
 .dir { align-self: stretch; }
+.count { margin-left: auto; font-size: 11.5px; font-weight: 400; color: var(--text-faint); }
+.cols { gap: 2px; }
+.colrow {
+  display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 5px;
+  font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.colrow:hover { background: var(--bg-hover); }
+.dim { color: var(--text-faint); }
+.type { margin-left: auto; font: 11px var(--mono); color: var(--text-faint); }
+.link { align-self: flex-start; padding: 0 4px; background: none; border: 0; color: var(--link); font-size: 12px; cursor: pointer; }
 .dir :deep(button) { flex: 1; justify-content: center; }
 </style>
