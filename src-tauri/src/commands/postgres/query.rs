@@ -112,7 +112,8 @@ fn rows_from_json(mut raw_rows: Vec<serde_json::Value>) -> (Vec<Vec<serde_json::
 /// macros (not meant to be called directly), and reaching it would mean
 /// depending on the unused `macros` feature. `prepare`'s `Statement::columns()`
 /// gives the same names and types without that.
-pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResult, AppError> {
+/// `binds` fill `inner_sql`'s `$n` placeholders, in order.
+pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[String]) -> Result<PgQueryResult, AppError> {
     let stmt = match pool.prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
@@ -123,14 +124,14 @@ pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str) -> Result<
     }
 
     let started = std::time::Instant::now();
-    let raw_rows: Vec<serde_json::Value> =
-        match sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped))
-            .fetch_all(pool)
-            .await
-        {
-            Ok(val) => val,
-            Err(e) => return Err(AppError::Postgres(e)),
-        };
+    let mut query = sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped));
+    for bind in binds {
+        query = query.bind(bind);
+    }
+    let raw_rows: Vec<serde_json::Value> = match query.fetch_all(pool).await {
+        Ok(val) => val,
+        Err(e) => return Err(AppError::Postgres(e)),
+    };
     let elapsed_ms = started.elapsed().as_millis() as u64;
     let (rows, truncated) = rows_from_json(raw_rows);
 
@@ -200,7 +201,7 @@ pub(crate) async fn run_query_impl(
     if read_only {
         run_wrapped_read_only(pool, trimmed).await
     } else {
-        run_wrapped(pool, trimmed).await
+        run_wrapped(pool, trimmed, &[]).await
     }
 }
 
@@ -264,7 +265,7 @@ fn stringify_param(value: &serde_json::Value, pg_type: &str) -> Option<String> {
     }
 }
 
-async fn column_types(
+pub(super) async fn column_types(
     pool: &sqlx::PgPool,
     schema: &str,
     table: &str,

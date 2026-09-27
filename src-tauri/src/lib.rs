@@ -27,6 +27,8 @@ mod persist;
 #[cfg(test)]
 mod pg_command_integration_tests;
 #[cfg(test)]
+mod pg_browse_integration_tests;
+#[cfg(test)]
 mod pg_integration_tests;
 mod pg_uri;
 mod pool;
