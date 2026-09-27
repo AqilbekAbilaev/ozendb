@@ -6,7 +6,7 @@ fn read(sql: &str) -> Result<TableSelect, String> {
 }
 
 fn f(column: &str, op: FilterOp, value: Option<&str>) -> ColumnFilter {
-    ColumnFilter { column: column.to_string(), op, value: value.map(str::to_string) }
+    ColumnFilter { table: 0, column: column.to_string(), op, value: value.map(str::to_string) }
 }
 
 #[test]
