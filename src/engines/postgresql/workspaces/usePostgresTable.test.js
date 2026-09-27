@@ -4,7 +4,8 @@ const browseTable = vi.fn()
 const countTable = vi.fn()
 const updateRow = vi.fn()
 const listColumns = vi.fn()
-vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow }))
+const runQuery = vi.fn()
+vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow, runQuery }))
 vi.mock('../api/resources', () => ({ listColumns }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
@@ -116,6 +117,44 @@ describe('filtering', () => {
     expect(t.filterText.value).toEqual({})
     expect(t.activeFilters.value).toBe(0)
     expect(countTable).toHaveBeenLastCalledWith(target, [])
+  })
+})
+
+describe('SQL mode', () => {
+  it('opens on the SQL for the current filters, sort and page, already run', async () => {
+    const t = await loaded({ pageSize: 100 })
+    t.setFilterText('id', '>1')
+    await t.applyFilters()
+    await t.sortBy('name')
+    await t.nextPage()
+
+    await t.toSql()
+    expect(t.mode.value).toBe('sql')
+    expect(t.sqlState.sql).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC\nLIMIT 100 OFFSET 100;')
+    expect(runQuery).toHaveBeenCalledWith('c1', t.sqlState.sql)
+  })
+
+  it('orders by the primary key when nothing is sorted, as browsing does', async () => {
+    const t = await loaded()
+    await t.toSql()
+    expect(t.sqlState.sql).toContain('ORDER BY "id" ASC')
+  })
+
+  it('goes back to the filters only while the SQL is still the one they built', async () => {
+    const t = await loaded()
+    expect(t.canUseFilters.value).toBe(true)
+    await t.toSql()
+    const built = t.sqlState.sql
+
+    t.sqlState.sql = built.replace('LIMIT 100', 'LIMIT 5')
+    expect(t.canUseFilters.value).toBe(false)
+    t.toFilters()
+    expect(t.mode.value).toBe('sql')
+
+    t.sqlState.sql = built
+    expect(t.canUseFilters.value).toBe(true)
+    t.toFilters()
+    expect(t.mode.value).toBe('filter')
   })
 })
 

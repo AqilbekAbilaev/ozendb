@@ -1,9 +1,11 @@
-import { ref, computed } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { browseTable, countTable, updateRow } from '../api/queries'
 import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 import { formatCell, cellKind } from './formatCell.js'
 import { parseFilter } from './parseFilter.js'
+import { buildSelectSql } from './buildSelectSql.js'
+import { runSql } from './runSql.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -26,6 +28,11 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   // typing edits the boxes, and only applying reloads.
   const filterText = ref({})
   const filters = ref([])
+  // SQL mode: an editor seeded with the SQL the filters amount to. It can hand back
+  // to the filters only while that SQL is untouched, since nothing reads SQL back.
+  const mode = ref('filter')
+  const sqlState = reactive({ connectionId: target.connectionId, sql: '', result: null, error: null, running: false })
+  let builtSql = null
   // Column metadata (type, primary key) by name, fetched once.
   const columnInfo = ref({})
   // Only the latest load may write back: a sort clicked while a page is loading
@@ -35,6 +42,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const keyColumns = computed(() =>
     Object.values(columnInfo.value).filter(c => c.isPrimaryKey).map(c => c.name))
   const hasPrev = computed(() => offset.value > 0)
+  const canUseFilters = computed(() => mode.value === 'filter' || sqlState.sql === builtSql)
   const activeFilters = computed(() => filters.value.length)
   const hasNext = computed(() => total.value != null && offset.value + pageSize < total.value)
 
@@ -101,6 +109,25 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     return applyFilters()
   }
 
+  function toSql() {
+    builtSql = buildSelectSql({
+      schema: target.schema,
+      table: target.table,
+      filters: filters.value,
+      orderBy: orderBy.value ? [orderBy.value] : keyColumns.value,
+      descending: descending.value,
+      limit: pageSize,
+      offset: offset.value,
+    })
+    sqlState.sql = builtSql
+    mode.value = 'sql'
+    return runSql(sqlState)
+  }
+
+  function toFilters() {
+    if (canUseFilters.value) mode.value = 'filter'
+  }
+
   // Arrays aren't editable yet: their text form (`{a,b}`) isn't what the grid shows.
   function canEdit(column) {
     const info = columnInfo.value[column]
@@ -145,7 +172,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
 
   return {
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
-    filterText, activeFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
+    filterText, activeFilters, mode, sqlState, canUseFilters, toSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     setFilterText, applyFilters, clearFilters, canEdit, editText, saveCell,
   }
 }
