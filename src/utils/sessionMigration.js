@@ -177,6 +177,12 @@ const LEGACY_KEYS = {
   'mongodb.import':         { kind: 'import' },
   'mongodb.export':         { kind: 'export' },
   'mongodb.current_operations': { kind: 'currentOps' },
+  // PostgreSQL targets are deeper than MongoDB's, so each names its own levels.
+  'postgresql.table_browse': {
+    kind: 'pgTable',
+    identity: ([db, schema, table]) => ({ database: db.name, schema: schema.name, table: table.name }),
+  },
+  'postgresql.query': { kind: 'pgQuery', identity: ([db]) => ({ database: db.name }) },
 }
 
 // The v2 → legacy bridge. Restore hooks (Work 6) consume the flat legacy shape and
@@ -190,12 +196,14 @@ export function toLegacyRecord(v2, connectionName = null) {
   const coll = v2.target.segments[1]
   // Every workspace kind now takes the long spelling, so there is one projection
   // rather than a per-type flag choosing between two (audit §8).
-  const identity = {
-    connectionId: v2.target.connectionId,
-    connectionName: connectionName,
-    dbName: db ? db.name : null,
-    collectionName: coll ? coll.name : null,
-  }
+  const identity = conf.identity
+    ? { connectionId: v2.target.connectionId, connectionName, ...conf.identity(v2.target.segments) }
+    : {
+        connectionId: v2.target.connectionId,
+        connectionName: connectionName,
+        dbName: db ? db.name : null,
+        collectionName: coll ? coll.name : null,
+      }
   return {
     id: v2.id,
     kind: conf.kind,

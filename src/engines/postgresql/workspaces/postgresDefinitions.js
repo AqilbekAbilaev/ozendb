@@ -1,8 +1,10 @@
-// PostgreSQL workspace definitions. Tabs aren't restored after a restart yet: the
-// session restore bridge only knows MongoDB's tab kinds.
+// PostgreSQL workspace definitions. A table tab's settings live in its tableSession
+// while it's open; they're saved as `view`, and a restored tab starts from them
+// (`restoredView`). Rows and results are never saved — they load again.
 import PostgresTableWorkspace from './PostgresTableWorkspace.vue'
 import PostgresQueryWorkspace from './PostgresQueryWorkspace.vue'
 import { createResourceRef } from '../../../utils/resourceRef'
+import { peekTableSession, dropTableSession } from './tableSessions.js'
 
 function tableWorkspace({ connectionId, connectionName, database, schema, table }) {
   return {
@@ -32,6 +34,16 @@ export const postgresDefinitions = [
     component: PostgresTableWorkspace,
     create: (ctx) => tableWorkspace(ctx.target),
     duplicate: (workspace) => tableWorkspace(workspace),
+    // A tab restored but never opened has no session yet; its restored view stands.
+    serialize: (workspace) => {
+      const view = peekTableSession(workspace.id)?.snapshot() ?? workspace.restoredView
+      return view ? { view: JSON.parse(JSON.stringify(view)) } : {}
+    },
+    restore: (saved) => {
+      const restored = tableWorkspace(saved)
+      return { ...restored, fields: { ...restored.fields, restoredView: saved.view ?? null } }
+    },
+    dispose: (workspace) => dropTableSession(workspace.id),
   },
   {
     type: 'postgresql.query',
@@ -39,5 +51,7 @@ export const postgresDefinitions = [
     component: PostgresQueryWorkspace,
     create: (ctx) => queryWorkspace(ctx.target),
     duplicate: (workspace) => queryWorkspace(workspace),
+    serialize: (workspace) => ({ sql: workspace.sql }),
+    restore: (saved) => queryWorkspace(saved),
   },
 ]

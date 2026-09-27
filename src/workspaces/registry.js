@@ -84,6 +84,8 @@ export function workspaceTypeForSaved(saved) {
     case 'schema':   return 'mongodb.schema'
     case 'search':   return 'mongodb.search'
     case 'currentOps': return 'mongodb.current_operations'
+    case 'pgTable':  return 'postgresql.table_browse'
+    case 'pgQuery':  return 'postgresql.query'
     default:         return null
   }
 }
