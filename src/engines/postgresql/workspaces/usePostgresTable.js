@@ -14,6 +14,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const columns = ref([])
   const rows = ref([])
   const total = ref(null)
+  const elapsedMs = ref(null)
   const offset = ref(0)
   const orderBy = ref(null)
   const descending = ref(false)
@@ -44,6 +45,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
       if (mine !== generation) return
       columns.value = page.columns
       rows.value = page.rows
+      elapsedMs.value = page.elapsedMs
       total.value = count
       if (info) columnInfo.value = Object.fromEntries(info.map(c => [c.name, c]))
     } catch (e) {
@@ -117,7 +119,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   }
 
   return {
-    columns, columnInfo, rows, total, offset, orderBy, descending, loading, error, editError,
+    columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy, canEdit, editText, saveCell,
   }
 }

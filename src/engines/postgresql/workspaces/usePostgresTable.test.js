@@ -45,6 +45,11 @@ describe('loading', () => {
     expect(t.error.value).toBe(null)
   })
 
+  it('keeps how long the page took, for the footer', async () => {
+    const t = await loaded()
+    expect(t.elapsedMs.value).toBe(3)
+  })
+
   it('keeps the error and no rows when the page fails to load', async () => {
     browseTable.mockRejectedValue({ code: 'postgres', message: 'permission denied for table users' })
     const t = await loaded()
