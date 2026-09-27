@@ -9,6 +9,10 @@ pub(crate) const DEFAULT_PORT: u16 = 5432;
 /// password fetched separately from the OS keychain — the same split `uri::build_uri`
 /// uses for MongoDB. Structured options rather than a connection string, since
 /// `PgConnectOptions` already handles its own escaping.
+/// Five minutes: long enough for real analysis, short enough that a forgotten
+/// cross join doesn't hold a connection all afternoon.
+const STATEMENT_TIMEOUT_MS: &str = "300000";
+
 pub fn build_options(config: &ConnectionConfig, postgres: &PostgresConfig, password: Option<&str>) -> Result<PgConnectOptions, AppError> {
     let (host, port) = match config.hosts.first() {
         Some(entry) => (entry.host.clone(), entry.port),
@@ -107,6 +111,9 @@ fn options_for(
     // SELECT (`nextval`, `setval`, `pg_terminate_backend`, …). Every session on
     // this connection starts its (implicit or explicit) transaction read-only,
     // so the server itself rejects any write attempt, guessed-around or not.
+    // Every statement is capped server-side, so a runaway query stops even where the
+    // UI has no Cancel (the table browse and count). Milliseconds.
+    options = options.options([("statement_timeout", STATEMENT_TIMEOUT_MS)]);
     if config.read_only {
         options = options.options([("default_transaction_read_only", "on")]);
     }

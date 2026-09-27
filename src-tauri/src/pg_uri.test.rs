@@ -113,9 +113,17 @@ fn build_options_allows_invalid_certs_only_when_explicitly_opted_in() {
 }
 
 #[test]
+fn build_options_caps_every_statement_at_five_minutes() {
+    // A runaway query is stopped by the server itself, whichever command ran it —
+    // the table browse and count have no Cancel button of their own.
+    let options = build_options(&base_config(), &base_postgres(), None).unwrap();
+    assert_eq!(options.get_options(), Some("-c statement_timeout=300000"));
+}
+
+#[test]
 fn build_options_leaves_the_session_writable_by_default() {
     let options = build_options(&base_config(), &base_postgres(), None).unwrap();
-    assert_eq!(options.get_options(), None);
+    assert!(!options.get_options().unwrap_or_default().contains("default_transaction_read_only"));
 }
 
 #[test]
@@ -127,7 +135,7 @@ fn build_options_enforces_read_only_at_the_session_level() {
     let mut config = base_config();
     config.read_only = true;
     let options = build_options(&config, &base_postgres(), None).unwrap();
-    assert_eq!(options.get_options(), Some("-c default_transaction_read_only=on"));
+    assert_eq!(options.get_options(), Some("-c statement_timeout=300000 -c default_transaction_read_only=on"));
 }
 
 #[test]
