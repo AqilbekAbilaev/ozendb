@@ -1,5 +1,5 @@
 import { ref, reactive, computed } from 'vue'
-import { browseTable, countTable, updateRow, readTableSelect } from '../api/queries'
+import { browseTable, countTable, updateRow, readTableSelect, runQuery } from '../api/queries'
 import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 import { formatCell, cellKind } from './formatCell.js'
@@ -19,6 +19,11 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const total = ref(null)
   const elapsedMs = ref(null)
   const offset = ref(0)
+  const limit = ref(pageSize)
+  // One entry per load, newest last: `{ at, ok, text, ms }`.
+  const messages = ref([])
+  // `{ version, encoding }` for the footer, read once; stays null if it can't be.
+  const server = ref(null)
   const orderBy = ref(null)
   const descending = ref(false)
   const loading = ref(false)
@@ -44,15 +49,36 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     Object.values(columnInfo.value).filter(c => c.isPrimaryKey).map(c => c.name))
   const hasPrev = computed(() => offset.value > 0)
   const activeFilters = computed(() => filters.value.length)
-  const hasNext = computed(() => total.value != null && offset.value + pageSize < total.value)
+  const hasNext = computed(() => total.value != null && offset.value + limit.value < total.value)
+  const currentSql = computed(() => buildSelectSql({
+    schema: target.schema,
+    table: target.table,
+    filters: filters.value,
+    orderBy: orderBy.value ? [orderBy.value] : keyColumns.value,
+    descending: descending.value,
+    limit: limit.value,
+    offset: offset.value,
+  }))
+
+  function log(ok, text, ms) {
+    messages.value = [...messages.value, { at: new Date(), ok, text, ms }]
+  }
+
+  function loadServer() {
+    const sql = "SELECT current_setting('server_version'), current_setting('server_encoding')"
+    runQuery(target.connectionId, sql)
+      .then(({ rows: [[version, encoding]] }) => { server.value = { version, encoding } })
+      .catch(() => {})
+  }
 
   async function load() {
     const mine = ++generation
     loading.value = true
     error.value = null
+    if (!server.value && mine === 1) loadServer()
     try {
       const [page, count, info] = await Promise.all([
-        browseTable(target, { filters: filters.value, orderBy: orderBy.value, descending: descending.value, limit: pageSize, offset: offset.value }),
+        browseTable(target, { filters: filters.value, orderBy: orderBy.value, descending: descending.value, limit: limit.value, offset: offset.value }),
         total.value == null ? countTable(target, filters.value) : total.value,
         Object.keys(columnInfo.value).length ? null : listColumns(target),
       ])
@@ -62,9 +88,11 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
       elapsedMs.value = page.elapsedMs
       total.value = count
       if (info) columnInfo.value = Object.fromEntries(info.map(c => [c.name, c]))
+      log(true, `SELECT ${page.rows.length}`, page.elapsedMs)
     } catch (e) {
       if (mine !== generation) return
       error.value = errMessage(e)
+      log(false, error.value)
       rows.value = []
     } finally {
       if (mine === generation) loading.value = false
@@ -81,8 +109,9 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     offset.value = Math.max(0, nextOffset)
     return load()
   }
-  const nextPage = () => goTo(offset.value + pageSize)
-  const prevPage = () => goTo(offset.value - pageSize)
+  const nextPage = () => goTo(offset.value + limit.value)
+  const prevPage = () => goTo(offset.value - limit.value)
+
 
   function sortBy(column) {
     descending.value = orderBy.value === column ? !descending.value : false
@@ -94,8 +123,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     filterText.value = { ...filterText.value, [column]: text }
   }
 
-  // A new filter changes the row count, so it is re-read along with page one.
-  function applyFilters() {
+  // A new filter changes the row count, so it is re-read along with page one. The
+  // Limit box applies with the filters, as Run does both.
+  function applyFilters(rowsPerPage = limit.value) {
+    limit.value = rowsPerPage
     filters.value = Object.entries(filterText.value).flatMap(([column, text]) => {
       const parsed = parseFilter(text, cellKind(columnInfo.value[column]?.dataType))
       return parsed ? [{ column, ...parsed }] : []
@@ -110,15 +141,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   }
 
   function toSql() {
-    builtSql = buildSelectSql({
-      schema: target.schema,
-      table: target.table,
-      filters: filters.value,
-      orderBy: orderBy.value ? [orderBy.value] : keyColumns.value,
-      descending: descending.value,
-      limit: pageSize,
-      offset: offset.value,
-    })
+    builtSql = currentSql.value
     sqlState.sql = builtSql
     filterRefusal.value = null
     mode.value = 'sql'
@@ -140,8 +163,8 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
 
   // Takes SQL read back by the backend as the grid's filters, sort and page, or
   // returns why the grid can't show it.
-  function adopt({ filters: read, orderBy: order, descending: desc, limit, offset: at }) {
-    if (limit !== pageSize) return `the filter view shows ${pageSize} rows a page, so it needs LIMIT ${pageSize}.`
+  function adopt({ filters: read, orderBy: order, descending: desc, limit: rowsPerPage, offset: at }) {
+    if (rowsPerPage == null) return 'the filter view shows a page at a time, so it needs a LIMIT.'
     const keys = keyColumns.value
     const byKey = order.length === keys.length && order.every((c, i) => c === keys[i])
     if (order.length > 1 && !byKey) return 'the filter view sorts by one column at a time.'
@@ -155,6 +178,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     filters.value = read
     orderBy.value = byKey ? null : order[0] ?? null
     descending.value = desc
+    limit.value = rowsPerPage
     total.value = null
     goTo(at)
     return null
@@ -204,7 +228,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
 
   return {
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
-    filterText, activeFilters, mode, sqlState, filterRefusal, toSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
+    filterText, activeFilters, mode, sqlState, filterRefusal, toSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     setFilterText, applyFilters, clearFilters, canEdit, editText, saveCell,
   }
 }

@@ -4,7 +4,7 @@
 // tab <button>s so feature code carries none.
 defineProps({
   modelValue: { type: [String, Number], default: '' },
-  // [{ value, label }]
+  // [{ value, label, count?, disabled?, title? }]
   options: { type: Array, default: () => [] },
   // Disable the whole strip (e.g. while an alternate editor is active).
   disabled: { type: Boolean, default: false },
@@ -19,9 +19,10 @@ const emit = defineEmits(['update:modelValue'])
       :key="opt.value"
       class="tab"
       :class="{ active: modelValue === opt.value }"
-      :disabled="disabled"
+      :disabled="disabled || opt.disabled"
+      :title="opt.title"
       @click="emit('update:modelValue', opt.value)"
-    >{{ opt.label }}</button>
+    >{{ opt.label }}<span v-if="opt.count != null" class="count">{{ opt.count }}</span></button>
   </div>
 </template>
 
@@ -38,4 +39,8 @@ const emit = defineEmits(['update:modelValue'])
 }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 .tab:disabled { color: var(--text-faint); cursor: default; }
+.count {
+  margin-left: 7px; padding: 0 6px; border-radius: 8px;
+  font-size: 11px; color: var(--text-faint); background: var(--bg-active);
+}
 </style>
