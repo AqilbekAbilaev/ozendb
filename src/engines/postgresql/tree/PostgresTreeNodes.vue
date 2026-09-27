@@ -3,7 +3,7 @@ import { computed, watch } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import { usePostgresTree, visibleSchemas } from './usePostgresTree.js'
 import { openPostgresTable, openPostgresQuery } from '../../../stores/tabCreators'
-import { contextMenu } from '../../../stores/contextMenu'
+import { contextMenu, contextActiveNodeKey, pgNodeKey } from '../../../stores/contextMenu'
 import { PG_MENUS } from './contextMenus.js'
 
 const props = defineProps({
@@ -21,6 +21,9 @@ const database = computed(() => props.conn.database || 'postgres')
 function openQuery() {
   openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: database.value })
 }
+
+// The row whose right-click menu is open stays highlighted, as MongoDB's rows do.
+const ctxSel = (level, schema, table) => contextActiveNodeKey.value === pgNodeKey(level, { connId: props.conn.id, schema, table })
 
 // Right-click on a row: `level` picks its menu, `extra` names the schema/table under it.
 function onContext(e, level, label, extra = {}) {
@@ -41,7 +44,13 @@ function openTable(schema, table) {
 
 <template>
   <!-- A connection is bound to one database; it's the only one there is to browse. -->
-  <div class="tnode" style="padding-left: 21px" @click="toggleDatabase" @contextmenu.prevent="onContext($event, 'database', database)">
+  <div
+    class="tnode"
+    :class="{ 'ctx-sel': ctxSel('database') }"
+    style="padding-left: 21px"
+    @click="toggleDatabase"
+    @contextmenu.prevent="onContext($event, 'database', database)"
+  >
     <span class="tw"><BaseIcon :name="databaseOpen ? 'caretDown' : 'caret'" :size="12" /></span>
     <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
     <span class="tt">{{ database }}</span>
@@ -55,6 +64,7 @@ function openTable(schema, table) {
     <template v-for="schema in shown" :key="schema.name">
       <div
         class="tnode"
+        :class="{ 'ctx-sel': ctxSel('schema', schema.name) }"
         style="padding-left: 36px"
         @click="toggleSchema(schema.name)"
         @contextmenu.prevent="onContext($event, 'schema', schema.name, { schema: schema.name })"
@@ -79,6 +89,7 @@ function openTable(schema, table) {
           v-for="table in tables[schema.name]"
           :key="table.name"
           class="tnode"
+          :class="{ 'ctx-sel': ctxSel('table', schema.name, table.name) }"
           style="padding-left: 66px"
           @dblclick="openTable(schema.name, table.name)"
           @contextmenu.prevent="onContext($event, 'table', table.name, { schema: schema.name, table: table.name })"
