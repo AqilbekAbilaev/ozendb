@@ -106,6 +106,16 @@ it('records a resource ref for a selected connection', () => {
   s.stop()
 })
 
+// The native menu gates MongoDB actions on the selection, so it must know the engine.
+it('records the selected connection\'s engine', () => {
+  const emit = vi.fn()
+  const s = effectScope()
+  const t = s.run(() => useConnectionTree({ emit }))
+  t.selectConnection({ id: 'p', name: 'PG', engine: 'postgresql' })
+  expect(treeSelection.value).toEqual(expect.objectContaining({ connectionId: 'p', engine: 'postgresql' }))
+  s.stop()
+})
+
 it('records a resource ref for a selected database', () => {
   const emit = vi.fn()
   const s = effectScope()

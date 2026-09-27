@@ -9,8 +9,8 @@ import { resourceFromTreeSelection } from './legacyResourceRef'
 
 // Selections are built exactly the way useConnectionTree builds them, so these
 // fixtures cannot drift from the payload the menu actually receives at runtime.
-function selection(connectionId, connectionName, dbName, collectionName, kind) {
-  const sel = { connectionId, connectionName, dbName, collectionName, kind }
+function selection(connectionId, connectionName, dbName, collectionName, kind, engine = 'mongodb') {
+  const sel = { connectionId, connectionName, dbName, collectionName, kind, engine }
   return { ...sel, resource: resourceFromTreeSelection(sel) }
 }
 
@@ -140,6 +140,39 @@ describe('deriveMenuContext', () => {
     const ctx = deriveMenuContext({ id: 't4', kind: 'not-a-registered-kind', connId: 'c1' }, null, 0)
     expect(ctx.hasConnection).toBe(false)
     expect(ctx.anyConnection).toBe(false)
+  })
+})
+
+// Every item behind the Connection / Database / Collection gates is a MongoDB action,
+// so a PostgreSQL selection or tab must never light one up or be handed to one.
+describe('PostgreSQL never reaches the MongoDB gates', () => {
+  const pgConnection = selection('p1', 'Payments PG', null, null, 'connection', 'postgresql')
+  const pgTableTab = {
+    id: 't9', kind: 'pgTable', engine: 'postgresql',
+    connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
+  }
+
+  it('a PostgreSQL connection selected in the sidebar enables no connection item', () => {
+    const ctx = deriveMenuContext(quickstart, pgConnection, 1)
+    expect([ctx.hasConnection, ctx.hasDatabase, ctx.hasCollection]).toEqual([false, false, false])
+    // Refresh still works on every open connection, whatever its engine.
+    expect(ctx.anyConnection).toBe(true)
+  })
+
+  it('a PostgreSQL tab enables none of them either', () => {
+    const ctx = deriveMenuContext(pgTableTab, pgConnection, 1)
+    expect([ctx.hasConnection, ctx.hasDatabase, ctx.hasCollection]).toEqual([false, false, false])
+  })
+
+  it('a MongoDB tab still counts while a PostgreSQL connection is selected', () => {
+    const ctx = deriveMenuContext(collectionTab, pgConnection, 2)
+    expect([ctx.hasConnection, ctx.hasDatabase, ctx.hasCollection]).toEqual([true, true, true])
+    expect(resolveMenuTarget(collectionTab, pgConnection, 'connection')).toMatchObject({ connectionId: 'c1' })
+  })
+
+  it('never hands a PostgreSQL connection to an action — ⌘L finds no database to open a shell on', () => {
+    expect(resolveMenuTarget(quickstart, pgConnection, 'connection')).toBe(null)
+    expect(resolveMenuTarget(pgTableTab, pgConnection, 'database')).toBe(null)
   })
 })
 
