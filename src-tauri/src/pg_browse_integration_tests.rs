@@ -2,7 +2,7 @@
 //! `count_table_impl` with filters). Shares `pg_integration_tests.rs`'s helpers
 //! and skip behaviour; see its module doc comment for how to run these.
 
-use crate::commands::{browse_table_impl, count_table_impl, ColumnFilter, FilterOp};
+use crate::commands::{browse_table_impl, count_table_impl, list_foreign_keys_impl, ColumnFilter, FilterOp};
 use crate::pg_integration_tests::{pool, test_config};
 
 fn filter(column: &str, op: FilterOp, value: Option<&str>) -> ColumnFilter {
@@ -63,4 +63,48 @@ async fn filters_narrow_both_the_page_and_the_count() {
     assert!(browse_table_impl(&pool, "ozendb_it_filter", "t", &bad, None, false, 100, 0).await.is_err());
 
     sqlx::query("DROP SCHEMA ozendb_it_filter CASCADE").execute(&pool).await.unwrap();
+}
+
+#[tokio::test]
+async fn lists_single_column_foreign_keys_in_both_directions() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_fk CASCADE",
+        "DROP SCHEMA IF EXISTS ozendb_it_fk_other CASCADE",
+        "CREATE SCHEMA ozendb_it_fk",
+        "CREATE SCHEMA ozendb_it_fk_other",
+        "CREATE TABLE ozendb_it_fk.regions (id INT PRIMARY KEY, name TEXT)",
+        "CREATE TABLE ozendb_it_fk.merchants (id INT PRIMARY KEY, region_id INT REFERENCES ozendb_it_fk.regions (id))",
+        "CREATE TABLE ozendb_it_fk_other.payments (id INT PRIMARY KEY, merchant_id INT REFERENCES ozendb_it_fk.merchants (id))",
+        "CREATE TABLE ozendb_it_fk.pairs (a INT, b INT, PRIMARY KEY (a, b))",
+        "CREATE TABLE ozendb_it_fk.pair_refs (a INT, b INT, FOREIGN KEY (a, b) REFERENCES ozendb_it_fk.pairs (a, b))",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+
+    let keys = list_foreign_keys_impl(&pool, "ozendb_it_fk", "merchants").await.unwrap();
+    let described: Vec<String> = keys
+        .iter()
+        .map(|k| format!("{}.{}.{} -> {}.{}.{}", k.from_schema, k.from_table, k.from_column, k.to_schema, k.to_table, k.to_column))
+        .collect();
+    assert_eq!(
+        described,
+        vec![
+            "ozendb_it_fk.merchants.region_id -> ozendb_it_fk.regions.id",
+            "ozendb_it_fk_other.payments.merchant_id -> ozendb_it_fk.merchants.id",
+        ]
+    );
+    // A key over several columns isn't offered.
+    assert!(list_foreign_keys_impl(&pool, "ozendb_it_fk", "pairs").await.unwrap().is_empty());
+
+    for stmt in ["DROP SCHEMA ozendb_it_fk_other CASCADE", "DROP SCHEMA ozendb_it_fk CASCADE"] {
+        sqlx::query(stmt).execute(&pool).await.unwrap();
+    }
 }

@@ -189,6 +189,7 @@ pub fn run() {
             list_pg_schemas,
             list_pg_tables,
             list_pg_columns,
+            list_pg_foreign_keys,
             run_pg_query,
             browse_pg_table,
             count_pg_table,

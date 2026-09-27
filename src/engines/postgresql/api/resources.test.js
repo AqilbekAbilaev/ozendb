@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { listSchemas, listTables, listColumns } from './resources'
+import { listSchemas, listTables, listColumns, listForeignKeys } from './resources'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -24,5 +24,10 @@ describe('PostgreSQL resources', () => {
   it('lists the columns of a table', async () => {
     await listColumns({ connectionId: 'c1', schema: 'public', table: 'users' })
     expect(invoke).toHaveBeenCalledWith('list_pg_columns', { id: 'c1', schema: 'public', table: 'users' })
+  })
+
+  it('lists the foreign keys linking a table to others', async () => {
+    await listForeignKeys({ connectionId: 'c1', schema: 'public', table: 'users' })
+    expect(invoke).toHaveBeenCalledWith('list_pg_foreign_keys', { id: 'c1', schema: 'public', table: 'users' })
   })
 })
