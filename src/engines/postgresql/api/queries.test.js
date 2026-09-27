@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { runQuery, browseTable, countTable, updateRow, readTableSelect } from './queries'
+import { runQuery, cancelQuery, browseTable, countTable, updateRow, readTableSelect } from './queries'
 
 const table = { connectionId: 'c1', schema: 'public', table: 'users' }
 
@@ -15,7 +15,14 @@ beforeEach(() => {
 describe('PostgreSQL queries', () => {
   it('runs SQL against a connection', async () => {
     await runQuery('c1', 'SELECT 1')
-    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT 1' })
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT 1', runId: null })
+  })
+
+  it('names a run so it can be cancelled, and cancels it by that name', async () => {
+    await runQuery('c1', 'SELECT pg_sleep(9)', 'run-1')
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT pg_sleep(9)', runId: 'run-1' })
+    await cancelQuery('c1', 'run-1')
+    expect(invoke).toHaveBeenCalledWith('cancel_pg_query', { id: 'c1', runId: 'run-1' })
   })
 
   it('browses a page of a table, unordered by default', async () => {

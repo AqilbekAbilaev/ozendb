@@ -337,7 +337,7 @@ describe('SQL mode', () => {
     await t.toSql()
     expect(t.mode.value).toBe('sql')
     expect(t.sqlState.sql).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC\nLIMIT 100 OFFSET 100;')
-    expect(runQuery).toHaveBeenCalledWith('c1', t.sqlState.sql)
+    expect(runQuery).toHaveBeenCalledWith('c1', t.sqlState.sql, expect.any(String))
   })
 
   it('orders by the primary key when nothing is sorted, as browsing does', async () => {

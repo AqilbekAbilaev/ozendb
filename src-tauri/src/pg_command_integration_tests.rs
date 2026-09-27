@@ -7,7 +7,7 @@
 
 use crate::commands::{
     browse_table_impl, count_table_impl, list_columns_impl, list_databases_impl, list_schemas_impl,
-    list_tables_impl, run_query_impl, update_row_impl, ColumnRef, ColumnValue,
+    list_tables_impl, run_query_as, update_row_impl, ColumnRef, ColumnValue,
 };
 use crate::pg_integration_tests::{pool, test_config};
 
@@ -59,7 +59,7 @@ async fn postgres_commands_round_trip() {
     assert_eq!(by_name["qty"].data_type, "integer");
 
     // run_pg_query — arbitrary read SQL comes back as rows-of-arrays, in column order.
-    let result = run_query_impl(&pool, "SELECT id, name, qty FROM ozendb_it.widgets ORDER BY id", false)
+    let result = run_query_as(&pool, "SELECT id, name, qty FROM ozendb_it.widgets ORDER BY id", false, None)
         .await
         .unwrap();
     assert_eq!(result.columns, vec!["id", "name", "qty"]);
@@ -89,7 +89,7 @@ async fn postgres_commands_round_trip() {
     .await
     .unwrap();
     assert_eq!(affected, 1);
-    let verify = run_query_impl(&pool, "SELECT qty FROM ozendb_it.widgets WHERE id = 1", false)
+    let verify = run_query_as(&pool, "SELECT qty FROM ozendb_it.widgets WHERE id = 1", false, None)
         .await
         .unwrap();
     assert_eq!(verify.rows[0][0], serde_json::json!(99));
@@ -128,7 +128,7 @@ async fn duplicate_and_unnamed_columns_are_not_dropped() {
     };
     let pool = pool(&config).await;
 
-    let anonymous = run_query_impl(&pool, "SELECT 1, 2", false).await.unwrap();
+    let anonymous = run_query_as(&pool, "SELECT 1, 2", false, None).await.unwrap();
     assert_eq!(anonymous.columns.len(), 2);
     assert_eq!(anonymous.rows[0], vec![serde_json::json!(1), serde_json::json!(2)]);
 
@@ -142,10 +142,11 @@ async fn duplicate_and_unnamed_columns_are_not_dropped() {
     ] {
         sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
     }
-    let joined = run_query_impl(
+    let joined = run_query_as(
         &pool,
         "SELECT a.id, b.id FROM ozendb_it_dup.a AS a, ozendb_it_dup.b AS b",
         false,
+        None,
     )
     .await
     .unwrap();
@@ -168,7 +169,7 @@ async fn a_trailing_line_comment_does_not_break_the_wrapper() {
         }
     };
     let pool = pool(&config).await;
-    let result = run_query_impl(&pool, "SELECT 1 AS a -- trailing comment", false).await.unwrap();
+    let result = run_query_as(&pool, "SELECT 1 AS a -- trailing comment", false, None).await.unwrap();
     assert_eq!(result.rows[0], vec![serde_json::json!(1)]);
 }
 
@@ -187,7 +188,7 @@ async fn numeric_precision_survives_the_round_trip() {
         }
     };
     let pool = pool(&config).await;
-    let result = run_query_impl(&pool, "SELECT 12345678901234567890.123456789::numeric", false).await.unwrap();
+    let result = run_query_as(&pool, "SELECT 12345678901234567890.123456789::numeric", false, None).await.unwrap();
     assert_eq!(result.rows[0][0], serde_json::json!("12345678901234567890.123456789"));
 }
 
@@ -231,7 +232,7 @@ async fn char_length_and_json_string_values_survive_an_edit() {
     .unwrap();
     assert_eq!(affected, 1);
 
-    let verify = run_query_impl(&pool, "SELECT tag, payload FROM ozendb_it_types.t WHERE id = 1", false)
+    let verify = run_query_as(&pool, "SELECT tag, payload FROM ozendb_it_types.t WHERE id = 1", false, None)
         .await
         .unwrap();
     // CHAR(10) space-pads short values, so trim before comparing the content.
@@ -341,7 +342,7 @@ async fn a_read_only_connection_is_enforced_per_transaction_not_just_by_session_
     // inside a SELECT, so wrapping arbitrary SQL in a subquery (which stops
     // statements that can't live in a FROM clause) never touches it:
     //
-    // 1. `run_query_impl(.., read_only: false)` on a `read_only` connection used
+    // 1. `run_query_as(.., read_only: false, ..)` on a `read_only` connection used
     //    to be the *only* enforcement, and there wasn't one — `run_pg_query`
     //    always called it that way regardless of the connection's own flag.
     // 2. Even with the session-level `default_transaction_read_only=on` default
@@ -371,21 +372,22 @@ async fn a_read_only_connection_is_enforced_per_transaction_not_just_by_session_
 
     // A server-rejected statement classifies as "command" (see postgres_code),
     // not "postgres" — the point of these assertions is that it's rejected at all.
-    let err = run_query_impl(&read_only_pool, "SELECT nextval('ozendb_it_seq')", true).await.unwrap_err();
+    let err = run_query_as(&read_only_pool, "SELECT nextval('ozendb_it_seq')", true, None).await.unwrap_err();
     assert_eq!(err.code(), "command", "the server itself must refuse the write");
 
     // The set_config bypass: even after this runs (successfully — it's a config
     // change, not a write Postgres itself objects to), the *next* call must still
     // be refused, because it starts its own fresh read-only transaction rather
     // than trusting whatever the session default now says.
-    let _ = run_query_impl(
+    let _ = run_query_as(
         &read_only_pool,
         "SELECT set_config('default_transaction_read_only', 'off', false)",
         true,
+        None,
     )
     .await
     .unwrap();
-    let err = run_query_impl(&read_only_pool, "SELECT nextval('ozendb_it_seq')", true).await.unwrap_err();
+    let err = run_query_as(&read_only_pool, "SELECT nextval('ozendb_it_seq')", true, None).await.unwrap_err();
     assert_eq!(err.code(), "command", "a prior set_config must not leave a later call writable");
 
     sqlx::query("DROP SEQUENCE ozendb_it_seq").execute(&setup_pool).await.unwrap();

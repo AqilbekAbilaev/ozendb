@@ -11,7 +11,7 @@ import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
 import PostgresMessages from './PostgresMessages.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
-import { runSql } from './runSql.js'
+import { runSql, cancelSql } from './runSql.js'
 
 // A SQL editor with its toolbar, results and status line. `state` holds
 // `{ connectionId, sql, result, error, running, messages? }` and is written in place —
@@ -78,7 +78,7 @@ const summary = computed(() => {
       </BaseButton>
       <BaseButton variant="ghost" icon="run" :disabled="state.running" title="Run the selected text" @click="runSelection">Run selection</BaseButton>
       <BaseButton variant="ghost" icon="exScan" disabled :title="SOON">Explain</BaseButton>
-      <BaseButton variant="ghost" icon="close" disabled :title="SOON">Cancel</BaseButton>
+      <BaseButton variant="ghost" icon="close" :disabled="!state.running" title="Stop the running query" @click="cancelSql(state)">Cancel</BaseButton>
       <span class="qsep"></span>
       <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" disabled :title="SOON">Format</BaseButton>
       <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" disabled :title="SOON" />
