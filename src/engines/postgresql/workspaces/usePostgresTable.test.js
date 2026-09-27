@@ -410,9 +410,9 @@ describe('SQL mode', () => {
 })
 
 describe('editing', () => {
-  it('only edits tables with a primary key, and never array columns', async () => {
+  it('only edits tables with a primary key', async () => {
     const t = await loaded()
-    expect(['id', 'name', 'tags', 'meta'].map(t.canEdit)).toEqual([true, true, false, true])
+    expect(['id', 'name', 'tags', 'meta'].map(t.canEdit)).toEqual([true, true, true, true])
 
     listColumns.mockResolvedValue(COLUMNS.map(c => ({ ...c, isPrimaryKey: false })))
     const keyless = await loaded()
@@ -437,6 +437,19 @@ describe('editing', () => {
 
     expect(await t.saveCell(0, 'meta', '{broken')).toBe(false)
     expect(t.editError.value).toMatch(/JSON/)
+  })
+
+  it('edits an array column as the JSON list the grid shows', async () => {
+    updateRow.mockResolvedValue(1)
+    const t = await loaded()
+    expect(t.editText('tags', ['a', 'b c'])).toBe('["a","b c"]')
+
+    expect(await t.saveCell(0, 'tags', '["x", null]')).toBe(true)
+    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'tags', value: ['x', null] }], [{ column: 'id', value: 1 }])
+
+    expect(await t.saveCell(0, 'tags', '{"a": 1}')).toBe(false)
+    expect(t.editError.value).toMatch(/list/)
+    expect(await t.saveCell(0, 'tags', 'x')).toBe(false)
   })
 
   it('reports a row that changed or vanished since it was loaded', async () => {

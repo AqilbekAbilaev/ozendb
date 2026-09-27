@@ -13,9 +13,9 @@ const JSON_TYPES = ['json', 'jsonb']
 
 /**
  * One table-browse tab's state: a page of rows, the row count, sorting, and editing a
- * cell by the row's primary key. `target` is `{ connectionId, schema, table }`.
+ * cell by the row's primary key. `target` is `{ connectionId, schema, table }`;
+ * `initial` is a snapshot() to start from — a tab restored after a restart.
  */
-// `initial` is a snapshot() to start from — a tab restored after a restart.
 export function usePostgresTable(target, { pageSize = 100, readOnly = false, initial = {} } = {}) {
   const columns = ref([])
   const rows = ref([])
@@ -304,23 +304,33 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   // editable yet: their text form (`{a,b}`) isn't what the grid shows.
   function canEdit(key) {
     const ref = refByKey.value[key]
-    return !readOnly && keyColumns.value.length > 0 && ref?.table === 0 && !ref.info.dataType.endsWith('[]')
+    return !readOnly && keyColumns.value.length > 0 && ref?.table === 0
   }
 
-  // The editor's starting text: JSON columns as JSON (so a string keeps its quotes and
-  // saving it unchanged parses back), everything else as displayed, NULL as empty.
+  // JSON and array columns are edited as JSON — arrays as the list the grid shows.
+  const asJson = (column) => {
+    const type = columnInfo.value[column]?.dataType ?? ''
+    return JSON_TYPES.includes(type) || type.endsWith('[]')
+  }
+
+  // The editor's starting text: JSON (so a string keeps its quotes and saving it
+  // unchanged parses back) where asJson, everything else as displayed, NULL as empty.
   function editText(column, value) {
-    if (JSON_TYPES.includes(columnInfo.value[column]?.dataType)) return value === null ? '' : JSON.stringify(value)
-    return value === null ? '' : formatCell(value)
+    if (value === null) return ''
+    return asJson(column) ? JSON.stringify(value) : formatCell(value)
   }
 
   function parseInput(column, text) {
-    if (!JSON_TYPES.includes(columnInfo.value[column].dataType)) return text
+    if (!asJson(column)) return text
+    const isArray = columnInfo.value[column].dataType.endsWith('[]')
+    let value
     try {
-      return JSON.parse(text)
+      value = JSON.parse(text)
     } catch {
-      throw new Error(`"${column}" holds JSON, and that isn't valid JSON.`)
+      throw new Error(`"${column}" holds ${isArray ? 'a list' : 'JSON'}, and that isn't valid JSON.`)
     }
+    if (isArray && !Array.isArray(value)) throw new Error(`"${column}" holds a list: write it like ["a", "b"].`)
+    return value
   }
 
   async function saveCell(rowIndex, key, text) {

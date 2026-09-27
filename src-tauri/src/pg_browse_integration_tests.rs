@@ -3,7 +3,8 @@
 //! and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{
-    browse_table_impl, count_table_impl, list_foreign_keys_impl, ColumnFilter, ColumnRef, FilterOp, JoinKind, TableJoin,
+    browse_table_impl, count_table_impl, list_foreign_keys_impl, update_row_impl, ColumnFilter, ColumnRef, ColumnValue,
+    FilterOp, JoinKind, TableJoin,
 };
 use crate::pg_integration_tests::{pool, test_config};
 
@@ -218,4 +219,38 @@ async fn numeric_arrays_and_numeric_domains_keep_their_exact_digits() {
     assert_eq!(row[3], serde_json::json!("12345678901234567890.123456789"));
 
     sqlx::query("DROP SCHEMA ozendb_it_numeric CASCADE").execute(&pool).await.unwrap();
+}
+
+#[tokio::test]
+async fn edits_array_cells_and_sets_cells_to_null() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_arrays CASCADE",
+        "CREATE SCHEMA ozendb_it_arrays",
+        "CREATE TABLE ozendb_it_arrays.t (id INT PRIMARY KEY, tags text[], grid int[][], note text)",
+        "INSERT INTO ozendb_it_arrays.t VALUES (1, NULL, NULL, 'hi')",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+    let set = |column: &str, value: serde_json::Value| vec![ColumnValue { column: column.to_string(), value }];
+    let key = || vec![ColumnValue { column: String::from("id"), value: serde_json::json!(1) }];
+
+    let tricky = serde_json::json!(["a b", "c\"d", "{x,y}", "NULL", null]);
+    assert_eq!(update_row_impl(&pool, "ozendb_it_arrays", "t", &set("tags", tricky.clone()), &key()).await.unwrap(), 1);
+    assert_eq!(update_row_impl(&pool, "ozendb_it_arrays", "t", &set("grid", serde_json::json!([[1, 2], [3, 4]])), &key()).await.unwrap(), 1);
+    assert_eq!(update_row_impl(&pool, "ozendb_it_arrays", "t", &set("note", serde_json::Value::Null), &key()).await.unwrap(), 1);
+
+    let page = browse_table_impl(&pool, "ozendb_it_arrays", "t", &[], &[], None, false, 10, 0).await.unwrap();
+    assert_eq!(page.rows[0][1], tricky, "every element comes back exactly, the string \"NULL\" included");
+    assert_eq!(page.rows[0][2], serde_json::json!([[1, 2], [3, 4]]));
+    assert_eq!(page.rows[0][3], serde_json::Value::Null);
+
+    sqlx::query("DROP SCHEMA ozendb_it_arrays CASCADE").execute(&pool).await.unwrap();
 }

@@ -18,7 +18,7 @@ fn stringify_renders_null_as_a_real_sql_null() {
 #[test]
 fn stringify_renders_containers_as_json_text() {
     assert_eq!(stringify_param(&json!({"a": 1}), "jsonb"), Some(String::from("{\"a\":1}")));
-    assert_eq!(stringify_param(&json!([1, 2]), "integer[]"), Some(String::from("[1,2]")));
+
 }
 
 #[test]
@@ -30,4 +30,14 @@ fn stringify_always_quotes_json_and_jsonb_strings() {
     assert_eq!(stringify_param(&json!("hi"), "json"), Some(String::from("\"hi\"")));
     assert_eq!(stringify_param(&json!("hi"), "jsonb"), Some(String::from("\"hi\"")));
     assert_eq!(stringify_param(&json!(42), "jsonb"), Some(String::from("42")));
+}
+
+#[test]
+fn stringify_renders_arrays_as_postgres_array_literals() {
+    assert_eq!(stringify_param(&json!([1, 2.5]), "numeric[]"), Some(String::from("{1,2.5}")));
+    assert_eq!(stringify_param(&json!(["a b", "c\"d", "e\\f", null]), "text[]"), Some(String::from(r#"{"a b","c\"d","e\\f",NULL}"#)));
+    assert_eq!(stringify_param(&json!([[1, 2], [3, 4]]), "integer[]"), Some(String::from("{{1,2},{3,4}}")));
+    assert_eq!(stringify_param(&json!([true]), "boolean[]"), Some(String::from("{true}")));
+    assert_eq!(stringify_param(&json!([{"a": 1}]), "jsonb[]"), Some(String::from(r#"{"{\"a\":1}"}"#)));
+    assert_eq!(stringify_param(&json!([]), "text[]"), Some(String::from("{}")));
 }

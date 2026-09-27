@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Column, Executor, SqlSafeStr, Statement};
 use tauri::State;
 
-use super::{primary_key_columns, quote_ident, AppContext};
+use super::{array_literal::array_literal, primary_key_columns, quote_ident, AppContext};
 
 /// Cap on rows returned by an arbitrary or browse query — the Postgres sibling of
 /// `AGG_RESULT_CAP` for Mongo's `run_aggregate`. Requested as `<cap>+1` so
@@ -254,10 +254,8 @@ fn stringify_param(value: &serde_json::Value, pg_type: &str) -> Option<String> {
         serde_json::Value::Bool(b) => Some(b.to_string()),
         serde_json::Value::Number(n) => Some(n.to_string()),
         serde_json::Value::String(s) => Some(s.clone()),
-        // Not generally valid for a real Postgres ARRAY column (whose input
-        // syntax is `{a,b}`, not JSON) — but is exactly what an enum or a
-        // composite type's text input expects for its sub-fields, and is at
-        // least explicit, reviewable behavior rather than a silent truncation.
+        serde_json::Value::Array(items) if pg_type.ends_with("[]") => Some(array_literal(items)),
+        // Anything else structured goes as its JSON text rather than being truncated.
         serde_json::Value::Array(_) | serde_json::Value::Object(_) => Some(value.to_string()),
     }
 }
