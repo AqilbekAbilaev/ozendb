@@ -93,9 +93,10 @@ export const KNOWN_OPTION_KEYS = OPTION_GROUPS.flatMap(g => g.options.map(o => o
 
 // The editor's tabs, and the fixed choice lists its selects offer. Constants rather
 // than form state, so they live with the option catalog instead of in the dialog.
+// `badge` is the short tag the connection tree shows in place of an icon.
 export const ENGINE_OPTIONS = [
-  { value: 'mongodb', label: 'MongoDB' },
-  { value: 'postgresql', label: 'PostgreSQL' },
+  { value: 'mongodb', label: 'MongoDB', badge: 'MDB' },
+  { value: 'postgresql', label: 'PostgreSQL', badge: 'PG' },
 ]
 
 // `available: false` modes are shown disabled and badged "soon" rather than hidden,

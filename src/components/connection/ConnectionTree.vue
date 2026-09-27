@@ -11,6 +11,7 @@ import { connDatabases } from '../../stores/connectionData.js'
 import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
 import PostgresTreeNodes from '../../engines/postgresql/tree/PostgresTreeNodes.vue'
+import EngineBadge from '../base/EngineBadge.vue'
 
 const props = defineProps({
   width: { type: Number, default: 320 },
@@ -118,7 +119,7 @@ const { tip, ...statsTip } = useStatsTip()
           <span class="tw">
             <BaseIcon :name="expandedConns[conn.id] ? 'caretDown' : 'caret'" :size="12" />
           </span>
-          <span class="ti"><BaseIcon name="connect" :size="15" /></span>
+          <EngineBadge :engine="conn.engine" />
           <span class="tt">{{ conn.name }}</span>
           <span
             v-if="conn.read_only"
