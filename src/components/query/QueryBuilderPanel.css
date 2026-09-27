@@ -1,0 +1,96 @@
+/* The Query Builder panel's chrome, shared by MongoDB's and PostgreSQL's builders so
+   they look alike: sections with a centred header and an on/off checkbox, condition
+   cards, pill inputs. Each builder's own content stays in its component. The host
+   sets the width (a Resizer beside the grid). */
+.vqb {
+  flex: none;
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.vqb-section { border-bottom: 1px solid var(--border); position: relative; }
+
+.vqb-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-panel-2);
+  user-select: none;
+}
+
+.vqb-head .cb { position: absolute; right: 10px; }
+
+.vqb-body { padding: 10px; }
+
+.cb {
+  width: 17px; height: 17px;
+  border-radius: 4px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-input);
+  display: grid;
+  place-items: center;
+  flex: none;
+  cursor: pointer;
+}
+
+.cb.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.cb.sm { width: 15px; height: 15px; border-radius: 3px; }
+
+.cond {
+  margin-bottom: 8px;
+  background: var(--bg-panel-2);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.cond-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.cond-line:last-child { margin-bottom: 0; }
+
+.pill,
+.base-input.pill {
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 12px;
+  padding: 4px 7px;
+  outline: none;
+  min-width: 0;
+}
+
+.pill:focus,
+.base-input.pill:focus { border-color: var(--accent); }
+
+.pill.grow,
+.base-input.pill.grow  { flex: 1; }
+
+.type-pill  {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--bg-panel);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.cond-val,
+.base-input.cond-val   { font-family: var(--mono); }
+
+.op-select { min-width: 0; }
+
+.op-select.grow { flex: 1; }

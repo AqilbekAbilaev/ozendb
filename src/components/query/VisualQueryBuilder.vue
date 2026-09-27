@@ -282,16 +282,6 @@ function removeSortField(id) {
 </template>
 
 <style scoped>
-.vqb {
-  /* width is set inline by ResultsPanel (resizable); default 360px */
-  flex: none;
-  background: var(--bg-panel);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
-}
-.vqb-section { border-bottom: 1px solid var(--border); position: relative; }
 .vqb-section.drop-target { background: rgba(59, 130, 246, .08); }
 .vqb-section.drop-target::after {
   content: '';
@@ -301,22 +291,6 @@ function removeSortField(id) {
   pointer-events: none;
   z-index: 5;
 }
-
-.vqb-head {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  padding: 9px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  background: var(--bg-panel-2);
-  user-select: none;
-}
-.vqb-head .cb { position: absolute; right: 10px; }
-
-.vqb-body { padding: 10px; }
 
 .vqb-row1 {
   display: flex;
@@ -341,19 +315,6 @@ function removeSortField(id) {
 }
 .vqb-select:hover { border-color: var(--accent); }
 
-.cb {
-  width: 17px; height: 17px;
-  border-radius: 4px;
-  border: 1px solid var(--border-soft);
-  background: var(--bg-input);
-  display: grid;
-  place-items: center;
-  flex: none;
-  cursor: pointer;
-}
-.cb.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.cb.sm { width: 15px; height: 15px; border-radius: 3px; }
-
 .dropzone {
   border: 1px dashed var(--border-soft);
   border-radius: 6px;
@@ -369,50 +330,8 @@ function removeSortField(id) {
 }
 .dropzone:hover  { border-color: var(--accent); color: var(--accent); }
 
-.cond {
-  margin-bottom: 8px;
-  background: var(--bg-panel-2);
-  border-radius: 6px;
-  padding: 6px 8px;
-}
-.cond-line {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 4px;
-}
-.cond-line:last-child { margin-bottom: 0; }
-
-.pill,
-.base-input.pill {
-  border: 1px solid var(--border-soft);
-  border-radius: 5px;
-  background: var(--bg-input);
-  color: var(--text);
-  font-size: 12px;
-  padding: 4px 7px;
-  outline: none;
-  min-width: 0;
-}
-.pill:focus,
-.base-input.pill:focus { border-color: var(--accent); }
-.pill.grow,
-.base-input.pill.grow  { flex: 1; }
 .cond-field,
 .base-input.cond-field { width: 90px; flex: none; }
-.type-pill  {
-  flex: none;
-  font-size: 11px;
-  color: var(--text-faint);
-  background: var(--bg-panel);
-  white-space: nowrap;
-  cursor: default;
-}
-.cond-val,
-.base-input.cond-val   { font-family: var(--mono); }
-
-.op-select { min-width: 0; }
-.op-select.grow { flex: 1; }
 
 .sp-row {
   display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
@@ -431,3 +350,4 @@ function removeSortField(id) {
   padding: 5px 8px; min-width: 0;
 }
 </style>
+<style scoped src="./QueryBuilderPanel.css"></style>
