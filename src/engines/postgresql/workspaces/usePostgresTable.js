@@ -255,11 +255,16 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   }
 
   function toSql() {
+    openSql(currentSql.value)
+    return runSql(sqlState)
+  }
+
+  // Not run: SQL loaded from the library may change data.
+  function openSql(sql) {
     builtSql = currentSql.value
-    sqlState.sql = builtSql
+    sqlState.sql = sql
     filterRefusal.value = null
     mode.value = 'sql'
-    return runSql(sqlState)
   }
 
   async function toFilters() {
@@ -369,7 +374,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   return {
     snapshot, explainState, explain,
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
-    filterText, activeFilters, mode, sqlState, filterRefusal, toSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
+    filterText, activeFilters, mode, sqlState, filterRefusal, toSql, openSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin,
     setFilterText, replaceFilterText, setSort, shownColumns, setShownColumns, view, applyFilters, clearFilters, canEdit, editText, saveCell,
   }

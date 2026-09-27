@@ -4,12 +4,17 @@ const runQuery = vi.fn()
 const cancelQuery = vi.fn()
 const explainQuery = vi.fn()
 vi.mock('../api/queries', () => ({ runQuery, cancelQuery, explainQuery }))
+const pushHistory = vi.fn()
+vi.mock('../api/library', () => ({ pushHistory }))
 
 const { runSql, cancelSql, explainSql } = await import('./runSql.js')
 
 const tab = (over = {}) => ({ connectionId: 'c1', sql: 'SELECT 1', result: null, error: null, running: false, ...over })
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => {
+  vi.resetAllMocks()
+  pushHistory.mockResolvedValue(null)
+})
 
 describe('runSql', () => {
   it('keeps the result on the tab', async () => {
@@ -21,6 +26,16 @@ describe('runSql', () => {
 
     expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 1', expect.any(String))
     expect(t).toMatchObject({ result, error: null, running: false })
+  })
+
+  it('adds the SQL it ran to the connection\'s history, but not a failed run', async () => {
+    runQuery.mockResolvedValueOnce({ columns: [], rows: [], truncated: false, elapsedMs: 1 })
+    await runSql(tab(), 'SELECT 2')
+    expect(pushHistory).toHaveBeenCalledWith('c1', 'SELECT 2')
+
+    runQuery.mockRejectedValueOnce({ code: 'command', message: 'nope' })
+    await runSql(tab())
+    expect(pushHistory).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the error, and drops the previous result', async () => {

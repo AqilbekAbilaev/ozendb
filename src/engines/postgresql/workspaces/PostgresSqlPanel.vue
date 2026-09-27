@@ -13,6 +13,7 @@ import PostgresMessages from './PostgresMessages.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
 import { runSql, cancelSql, explainSql } from './runSql.js'
 import PostgresPlan from './PostgresPlan.vue'
+import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
 
 // A SQL editor with its toolbar, results and status line. `state` holds
 // `{ connectionId, sql, result, error, running, messages? }` and is written in place —
@@ -31,6 +32,7 @@ const editor = ref(null)
 const editorHeight = ref(180)
 const rtab = ref('Result')
 const cursor = ref({ line: 1, col: 1 })
+const library = ref(null)   // which view of the query library is open, if any
 
 function run(sql) {
   rtab.value = 'Result'
@@ -87,8 +89,8 @@ const summary = computed(() => {
       <BaseButton variant="ghost" icon="close" :disabled="!state.running" title="Stop the running query" @click="cancelSql(state)">Cancel</BaseButton>
       <span class="qsep"></span>
       <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" disabled :title="SOON">Format</BaseButton>
-      <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" disabled :title="SOON" />
-      <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" disabled :title="SOON" />
+      <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
+      <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save or open a saved query" @click="library = 'saved'" />
       <span class="qsep"></span>
       <SegmentedControl model-value="auto" :options="TXN" variant="subtle" />
     </div>
@@ -117,6 +119,15 @@ const summary = computed(() => {
       </template>
       <StateMessage v-else mode="empty" label="Run a query to see its results (⌘↵)" />
     </div>
+
+    <PostgresQueryLibrary
+      v-if="library"
+      :connection-id="state.connectionId"
+      :sql="state.sql"
+      :view="library"
+      @load="sql => state.sql = sql"
+      @close="library = null"
+    />
 
     <div class="pg-footer">
       <span>{{ summary }}</span>

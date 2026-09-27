@@ -7,6 +7,7 @@ import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
 import PostgresMessages from './PostgresMessages.vue'
 import PostgresPlan from './PostgresPlan.vue'
+import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
 import PostgresQueryBuilder from './PostgresQueryBuilder.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
 import PostgresSqlPanel from './PostgresSqlPanel.vue'
@@ -28,6 +29,7 @@ const t = shallowRef(null)
 const limitDraft = ref(0)
 const rtab = ref('Result')
 const builderOpen = ref(false)
+const library = ref(null)   // which view of the query library is open, if any
 // Each tab keeps its state for as long as it's open (see tableSessions), so coming
 // back to it shows it as it was; only a tab seen for the first time loads.
 watch(() => props.activeTab.id, (id) => {
@@ -43,7 +45,6 @@ watch(() => props.activeTab.id, (id) => {
   if (fresh) t.value.load()
 }, { immediate: true })
 
-const SOON = 'Coming soon'
 const MODES = [{ value: 'filter', label: 'Filter' }, { value: 'sql', label: 'SQL' }]
 const rtabs = computed(() => [
   { value: 'Result', label: 'Result', count: t.value.rows.length },
@@ -88,9 +89,9 @@ function copySql() {
         <BaseButton variant="ghost" icon="run" class="run" :disabled="t.loading" title="Apply the filters and limit (Enter)" @click="run">{{ t.loading ? 'Running…' : 'Run' }}</BaseButton>
         <BaseButton variant="ghost" icon="exScan" :disabled="t.explainState.explaining" title="Show how PostgreSQL runs these filters" @click="explain">Explain</BaseButton>
         <span class="qsep"></span>
-        <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" disabled :title="SOON" />
-        <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" disabled :title="SOON" />
-        <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" disabled :title="SOON" />
+        <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" title="Open a saved query" @click="library = 'saved'" />
+        <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save these filters' SQL" @click="library = 'saved'" />
+        <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
         <BaseButton variant="ghost" icon="copy" class="qbar-hide-md" title="Copy SQL" @click="copySql" />
         <BaseButton v-if="t.activeFilters" variant="ghost" icon="close" title="Show every row again" @click="t.clearFilters">
           Clear ({{ t.activeFilters }})
@@ -172,6 +173,14 @@ function copySql() {
       </div>
 
       <PostgresTableFooter :t="t" />
+      <PostgresQueryLibrary
+        v-if="library"
+        :connection-id="activeTab.connectionId"
+        :sql="t.currentSql"
+        :view="library"
+        @load="t.openSql"
+        @close="library = null"
+      />
     </template>
   </div>
 </template>

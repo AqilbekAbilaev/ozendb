@@ -10,6 +10,7 @@ const readTableSelect = vi.fn()
 const explainQuery = vi.fn()
 vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow, runQuery, readTableSelect, explainQuery }))
 vi.mock('../api/resources', () => ({ listColumns, listForeignKeys }))
+vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
 
@@ -349,6 +350,15 @@ describe('SQL mode', () => {
     expect(t.mode.value).toBe('sql')
     expect(t.sqlState.sql).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC\nLIMIT 100 OFFSET 100;')
     expect(runQuery).toHaveBeenCalledWith('c1', t.sqlState.sql, expect.any(String))
+  })
+
+  it('opens given SQL — a saved or earlier query — without running it', async () => {
+    const t = await loaded()
+    runQuery.mockClear()
+    t.openSql('DELETE FROM users')
+    expect(t.mode.value).toBe('sql')
+    expect(t.sqlState.sql).toBe('DELETE FROM users')
+    expect(runQuery).not.toHaveBeenCalled()
   })
 
   it('orders by the primary key when nothing is sorted, as browsing does', async () => {
