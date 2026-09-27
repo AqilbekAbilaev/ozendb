@@ -3,11 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const runQuery = vi.fn()
 const cancelQuery = vi.fn()
 const explainQuery = vi.fn()
-vi.mock('../api/queries', () => ({ runQuery, cancelQuery, explainQuery }))
+const formatQuery = vi.fn()
+vi.mock('../api/queries', () => ({ runQuery, cancelQuery, explainQuery, formatQuery }))
 const pushHistory = vi.fn()
 vi.mock('../api/library', () => ({ pushHistory }))
 
-const { runSql, cancelSql, explainSql } = await import('./runSql.js')
+const { runSql, cancelSql, explainSql, formatSql } = await import('./runSql.js')
 
 const tab = (over = {}) => ({ connectionId: 'c1', sql: 'SELECT 1', result: null, error: null, running: false, ...over })
 
@@ -94,5 +95,22 @@ describe('runSql', () => {
     explainQuery.mockRejectedValueOnce({ code: 'command', message: 'syntax error' })
     await explainSql(t)
     expect(t).toMatchObject({ plan: null, planError: 'syntax error', explaining: false })
+  })
+})
+
+describe('formatSql', () => {
+  it('replaces the SQL with its formatted form', async () => {
+    formatQuery.mockResolvedValue('SELECT\n  1;')
+    const t = tab({ sql: 'select 1' })
+    expect(await formatSql(t)).toBeNull()
+    expect(formatQuery).toHaveBeenCalledWith('select 1')
+    expect(t.sql).toBe('SELECT\n  1;')
+  })
+
+  it('leaves SQL it cannot format as typed, and says why', async () => {
+    formatQuery.mockRejectedValue({ code: 'sql', message: 'SQL with comments isn\'t formatted' })
+    const t = tab({ sql: 'select 1 -- x' })
+    expect(await formatSql(t)).toBe('SQL with comments isn\'t formatted')
+    expect(t.sql).toBe('select 1 -- x')
   })
 })

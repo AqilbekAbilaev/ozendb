@@ -14,6 +14,12 @@ export function explainQuery(connectionId, sql) {
   return invoke('explain_pg_query', { id: connectionId, sql })
 }
 
+// The SQL laid out one clause per line; refused (with why) for SQL it can't read or
+// that has comments, which formatting would drop.
+export function formatQuery(sql) {
+  return invoke('format_pg_sql', { sql })
+}
+
 export function cancelQuery(connectionId, runId) {
   return invoke('cancel_pg_query', { id: connectionId, runId })
 }

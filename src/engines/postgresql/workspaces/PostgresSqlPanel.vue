@@ -11,7 +11,8 @@ import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
 import PostgresMessages from './PostgresMessages.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
-import { runSql, cancelSql, explainSql } from './runSql.js'
+import { runSql, cancelSql, explainSql, formatSql } from './runSql.js'
+import { showToast } from '../../../stores/toast'
 import PostgresPlan from './PostgresPlan.vue'
 import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
 
@@ -42,6 +43,11 @@ function run(sql) {
 function explain() {
   rtab.value = 'Explain'
   return explainSql(props.state)
+}
+
+async function format() {
+  const reason = await formatSql(props.state)
+  if (reason) showToast(reason)
 }
 
 function runSelection() {
@@ -88,7 +94,7 @@ const summary = computed(() => {
       <BaseButton variant="ghost" icon="exScan" :disabled="state.explaining || !state.sql.trim()" title="Show how PostgreSQL runs this query" @click="explain">Explain</BaseButton>
       <BaseButton variant="ghost" icon="close" :disabled="!state.running" title="Stop the running query" @click="cancelSql(state)">Cancel</BaseButton>
       <span class="qsep"></span>
-      <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" disabled :title="SOON">Format</BaseButton>
+      <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" :disabled="state.running || !state.sql.trim()" title="Lay the SQL out one clause per line" @click="format">Format</BaseButton>
       <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
       <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save or open a saved query" @click="library = 'saved'" />
       <span class="qsep"></span>

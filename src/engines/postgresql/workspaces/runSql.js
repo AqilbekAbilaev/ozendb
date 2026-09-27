@@ -1,4 +1,4 @@
-import { runQuery, cancelQuery, explainQuery } from '../api/queries'
+import { runQuery, cancelQuery, explainQuery, formatQuery } from '../api/queries'
 import { pushHistory } from '../api/library'
 import { errMessage } from '../../../utils/errors'
 
@@ -42,5 +42,16 @@ export async function explainSql(tab, sql = tab.sql) {
     tab.planError = errMessage(e)
   } finally {
     tab.explaining = false
+  }
+}
+
+// Formats the tab's SQL in place. SQL that can't be formatted stays as typed, and the
+// reason is returned.
+export async function formatSql(tab) {
+  try {
+    tab.sql = await formatQuery(tab.sql)
+    return null
+  } catch (e) {
+    return errMessage(e)
   }
 }
