@@ -284,3 +284,43 @@ async fn lists_tables_with_the_planner_row_estimate_when_there_is_one() {
 
     sqlx::query("DROP SCHEMA ozendb_it_estimate CASCADE").execute(&pool).await.unwrap();
 }
+
+#[tokio::test]
+async fn starts_with_and_any_of_work_on_real_column_types() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_ops CASCADE",
+        "CREATE SCHEMA ozendb_it_ops",
+        "CREATE TYPE ozendb_it_ops.status AS ENUM ('active', 'blocked', 'closed')",
+        "CREATE TABLE ozendb_it_ops.t (id INT PRIMARY KEY, name TEXT, mcc SMALLINT, status ozendb_it_ops.status)",
+        "INSERT INTO ozendb_it_ops.t VALUES (1, 'EVOS', 5411, 'active'), (2, 'evos 2', 5812, 'blocked'), (3, 'Korzinka', 5411, 'closed'), (4, '5_off', 7011, 'active')",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+    let ids = |filters: Vec<ColumnFilter>| {
+        let pool = pool.clone();
+        async move {
+            let page = browse_table_impl(&pool, "ozendb_it_ops", "t", &[], &filters, Some(&by("id")), false, 100, 0).await.unwrap();
+            let count = count_table_impl(&pool, "ozendb_it_ops", "t", &[], &filters).await.unwrap();
+            let ids: Vec<i64> = page.rows.iter().map(|r| r[0].as_i64().unwrap()).collect();
+            assert_eq!(count, ids.len() as i64);
+            ids
+        }
+    };
+
+    assert_eq!(ids(vec![filter("name", FilterOp::StartsWith, Some("evos"))]).await, vec![1, 2]);
+    assert_eq!(ids(vec![filter("name", FilterOp::StartsWith, Some("5_"))]).await, vec![4]);
+    assert_eq!(ids(vec![filter("mcc", FilterOp::StartsWith, Some("54"))]).await, vec![1, 3]);
+    assert_eq!(ids(vec![filter("mcc", FilterOp::In, Some("5812, 7011"))]).await, vec![2, 4]);
+    assert_eq!(ids(vec![filter("status", FilterOp::In, Some("blocked,closed"))]).await, vec![2, 3]);
+    assert_eq!(ids(vec![filter("name", FilterOp::In, Some("EVOS, Korzinka"))]).await, vec![1, 3]);
+
+    sqlx::query("DROP SCHEMA ozendb_it_ops CASCADE").execute(&pool).await.unwrap();
+}

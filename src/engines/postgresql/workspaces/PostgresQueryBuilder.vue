@@ -142,7 +142,7 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
               v-if="needsValue(r.op)"
               class="pill grow cond-val"
               :model-value="r.value"
-              placeholder="value, then Enter"
+              :placeholder="r.op === 'in' ? 'a, b, c, then Enter' : 'value, then Enter'"
               spellcheck="false"
               @update:model-value="update(i, { value: $event }, false)"
               @enter="emit('apply')"

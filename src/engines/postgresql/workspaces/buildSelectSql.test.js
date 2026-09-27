@@ -16,6 +16,8 @@ describe('buildSelectSql', () => {
       { column: 'email', op: 'isNull' },
       { column: 'role', op: 'ne', value: 'admin' },
       { column: 'ok', op: 'notNull' },
+      { column: 'code', op: 'startsWith', value: '5_' },
+      { column: 'mcc', op: 'in', value: '5411, 5812,' },
     ]
     expect(buildSelectSql({ ...base, filters })).toBe([
       'SELECT *',
@@ -25,6 +27,8 @@ describe('buildSelectSql', () => {
       '  AND "email" IS NULL',
       '  AND "role" <> \'admin\'',
       '  AND "ok" IS NOT NULL',
+      '  AND "code"::text ILIKE \'5\\_%\'',
+      '  AND "mcc" IN (\'5411\', \'5812\')',
       'LIMIT 100;',
     ].join('\n'))
   })

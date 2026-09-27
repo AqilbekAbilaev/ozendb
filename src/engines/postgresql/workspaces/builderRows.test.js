@@ -4,11 +4,11 @@ import { operatorsFor, rowsFromBoxes, boxesFromRows, rowsFromParts, partsFromRow
 describe('operatorsFor', () => {
   it('offers comparisons for numbers, contains for text, and null checks for every column', () => {
     const ops = (kind) => operatorsFor(kind).map(o => o.op)
-    expect(ops('num')).toEqual(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'isNull', 'notNull'])
-    expect(ops('date')).toEqual(['contains', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'isNull', 'notNull'])
-    expect(ops('str')).toEqual(['contains', 'eq', 'ne', 'isNull', 'notNull'])
+    expect(ops('num')).toEqual(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'isNull', 'notNull'])
+    expect(ops('date')).toEqual(['contains', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'isNull', 'notNull'])
+    expect(ops('str')).toEqual(['contains', 'startsWith', 'eq', 'ne', 'in', 'isNull', 'notNull'])
     expect(ops('bool')).toEqual(['eq', 'isNull', 'notNull'])
-    expect(ops(null)).toEqual(['contains', 'eq', 'ne', 'isNull', 'notNull'])
+    expect(ops(null)).toEqual(['contains', 'startsWith', 'eq', 'ne', 'in', 'isNull', 'notNull'])
   })
 })
 

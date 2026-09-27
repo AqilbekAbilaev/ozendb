@@ -50,23 +50,41 @@ fn literal(expr: &Expr) -> Result<String, String> {
     }
 }
 
-/// `'%text%'` with `\` escapes, back to `text` — refused if it holds a real wildcard.
-fn contains_text(pattern: &Expr) -> Result<String, String> {
+/// An ILIKE pattern back to its filter: `'%text%'` is contains, `'text%'` starts with,
+/// with `\` escapes undone — refused if it holds any other wildcard.
+fn like_filter(pattern: &Expr) -> Result<(FilterOp, String), String> {
+    // Each character, and whether it's a wildcard (an unescaped `%` or `_`).
+    let mut tokens = Vec::new();
     let quoted = literal(pattern)?;
-    let inner = match quoted.strip_prefix('%').and_then(|rest| rest.strip_suffix('%')) {
-        Some(inner) => inner,
-        None => return Err("only an ILIKE '%…%' match can be a contains filter".to_string()),
-    };
-    let mut out = String::new();
-    let mut chars = inner.chars();
+    let mut chars = quoted.chars();
     while let Some(c) = chars.next() {
         match c {
-            '\\' => out.extend(chars.next()),
-            '%' | '_' => return Err("a wildcard inside ILIKE can't be a contains filter".to_string()),
-            c => out.push(c),
+            '\\' => tokens.extend(chars.next().map(|c| (c, false))),
+            c => tokens.push((c, c == '%' || c == '_')),
         }
     }
-    Ok(out)
+    let refused = || "only an ILIKE '%…%' or '…%' match can be a filter".to_string();
+    let Some((&('%', true), body)) = tokens.split_last() else { return Err(refused()) };
+    let (op, body) = match body.split_first() {
+        Some((&('%', true), inner)) => (FilterOp::Contains, inner),
+        _ => (FilterOp::StartsWith, body),
+    };
+    if body.is_empty() {
+        return Err(refused());
+    }
+    if body.iter().any(|&(_, wild)| wild) {
+        return Err("a wildcard inside ILIKE can't be a filter".to_string());
+    }
+    Ok((op, body.iter().map(|&(c, _)| c).collect()))
+}
+
+/// `IN (…)` back to an any-of filter's comma-separated text.
+fn listed(list: &[Expr]) -> Result<String, String> {
+    let values = list.iter().map(literal).collect::<Result<Vec<_>, _>>()?;
+    if values.iter().any(|v| v.contains(',')) {
+        return Err("a value holding a comma can't be one of an any-of filter's".to_string());
+    }
+    Ok(values.join(", "))
 }
 
 fn condition(expr: &Expr) -> Result<ColumnFilter, String> {
@@ -80,8 +98,10 @@ fn condition(expr: &Expr) -> Result<ColumnFilter, String> {
                 Expr::Cast { expr, data_type: DataType::Text, .. } => expr.as_ref(),
                 other => other,
             };
-            with_value(col, FilterOp::Contains, contains_text(pattern)?)
+            let (op, text) = like_filter(pattern)?;
+            with_value(col, op, text)
         }
+        Expr::InList { expr, list, negated: false } => with_value(expr, FilterOp::In, listed(list)?),
         Expr::BinaryOp { left, op, right } => {
             let op = match op {
                 BinaryOperator::Eq => FilterOp::Eq,
