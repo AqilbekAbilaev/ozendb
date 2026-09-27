@@ -22,18 +22,18 @@ describe('PostgreSQL queries', () => {
     await browseTable(table, { limit: 50, offset: 100 })
     expect(invoke).toHaveBeenCalledWith('browse_pg_table', {
       id: 'c1', schema: 'public', table: 'users',
-      filters: [], orderBy: null, descending: false, limit: 50, offset: 100,
+      joins: [], filters: [], orderBy: null, orderTable: 0, descending: false, limit: 50, offset: 100,
     })
   })
 
   it('passes a sort column and direction through', async () => {
-    await browseTable(table, { orderBy: 'name', descending: true, limit: 50, offset: 0 })
-    expect(invoke).toHaveBeenCalledWith('browse_pg_table', expect.objectContaining({ orderBy: 'name', descending: true }))
+    await browseTable(table, { orderBy: { table: 1, column: 'name' }, descending: true, limit: 50, offset: 0 })
+    expect(invoke).toHaveBeenCalledWith('browse_pg_table', expect.objectContaining({ orderBy: 'name', orderTable: 1, descending: true }))
   })
 
   it('counts the rows of a table', async () => {
     await countTable(table)
-    expect(invoke).toHaveBeenCalledWith('count_pg_table', { id: 'c1', schema: 'public', table: 'users', filters: [] })
+    expect(invoke).toHaveBeenCalledWith('count_pg_table', { id: 'c1', schema: 'public', table: 'users', joins: [], filters: [] })
   })
 
   it('passes column filters to both the page and the count', async () => {
