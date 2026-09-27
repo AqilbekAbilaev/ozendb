@@ -5,6 +5,14 @@ import PostgresTableWorkspace from './PostgresTableWorkspace.vue'
 import PostgresQueryWorkspace from './PostgresQueryWorkspace.vue'
 import { createResourceRef } from '../../../utils/resourceRef'
 import { peekTableSession, dropTableSession } from './tableSessions.js'
+import { abandonTransaction } from './runSql.js'
+import { showToast } from '../../../stores/toast'
+
+// A closing tab can't ask first (closes are synchronous), so the safe side wins:
+// its open transaction is rolled back, and a message says so.
+async function rollBackOnClose(state) {
+  if (state && await abandonTransaction(state)) showToast('The closed tab had a transaction open; it was rolled back.')
+}
 
 function tableWorkspace({ connectionId, connectionName, database, schema, table }) {
   return {
@@ -43,7 +51,11 @@ export const postgresDefinitions = [
       const restored = tableWorkspace(saved)
       return { ...restored, fields: { ...restored.fields, restoredView: saved.view ?? null } }
     },
-    dispose: (workspace) => dropTableSession(workspace.id),
+    dispose: (workspace) => {
+      const state = peekTableSession(workspace.id)?.sqlState
+      dropTableSession(workspace.id)
+      return rollBackOnClose(state)
+    },
   },
   {
     type: 'postgresql.query',
@@ -53,5 +65,6 @@ export const postgresDefinitions = [
     duplicate: (workspace) => queryWorkspace(workspace),
     serialize: (workspace) => ({ sql: workspace.sql }),
     restore: (saved) => queryWorkspace(saved),
+    dispose: (workspace) => rollBackOnClose(workspace),
   },
 ]

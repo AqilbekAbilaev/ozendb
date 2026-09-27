@@ -3,9 +3,24 @@
 
 import { invoke } from '@tauri-apps/api/core'
 
-// `runId` names the run so cancelQuery can stop it while it's in flight.
-export function runQuery(connectionId, sql, runId = null) {
-  return invoke('run_pg_query', { id: connectionId, sql, runId })
+// `runId` names the run so cancelQuery can stop it while it's in flight; `txId` runs it
+// in a transaction held open by beginTransaction.
+export function runQuery(connectionId, sql, runId = null, txId = null) {
+  return invoke('run_pg_query', { id: connectionId, sql, runId, txId })
+}
+
+// Manual mode: a transaction held open on its own connection, under an id the caller
+// picks, until committed or rolled back.
+export function beginTransaction(connectionId, txId) {
+  return invoke('begin_pg_transaction', { id: connectionId, txId })
+}
+
+export function commitTransaction(txId) {
+  return invoke('commit_pg_transaction', { txId })
+}
+
+export function rollbackTransaction(txId) {
+  return invoke('rollback_pg_transaction', { txId })
 }
 
 // The plan PostgreSQL chose, with real timings: EXPLAIN (ANALYZE, FORMAT JSON)'s array,

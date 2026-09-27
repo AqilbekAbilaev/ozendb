@@ -11,7 +11,7 @@ import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
 import PostgresMessages from './PostgresMessages.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
-import { runSql, cancelSql, explainSql, formatSql, outcome } from './runSql.js'
+import { runSql, cancelSql, explainSql, formatSql, outcome, endTransaction } from './runSql.js'
 import { showToast } from '../../../stores/toast'
 import PostgresPlan from './PostgresPlan.vue'
 import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
@@ -26,8 +26,15 @@ const props = defineProps({
   server: { type: Object, default: null },
 })
 
-const SOON = 'Coming soon'
-const TXN = [{ value: 'auto', label: 'Auto-commit' }, { value: 'manual', label: 'Manual', disabled: true, title: SOON }]
+// Manual: runs go into one transaction, begun by the first of them, until Commit or
+// Rollback. The switch holds still while one is open.
+const txnOptions = computed(() => {
+  const title = props.state.txId ? 'Commit or roll back first' : undefined
+  return [
+    { value: 'auto', label: 'Auto-commit', disabled: !!props.state.txId, title },
+    { value: 'manual', label: 'Manual', disabled: !!props.state.txId, title },
+  ]
+})
 
 const editor = ref(null)
 const editorHeight = ref(180)
@@ -99,7 +106,11 @@ const summary = computed(() => {
       <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
       <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save or open a saved query" @click="library = 'saved'" />
       <span class="qsep"></span>
-      <SegmentedControl model-value="auto" :options="TXN" variant="subtle" />
+      <SegmentedControl :model-value="state.txn ?? 'auto'" :options="txnOptions" variant="subtle" @update:model-value="state.txn = $event" />
+      <template v-if="state.txn === 'manual'">
+        <BaseButton variant="ghost" icon="check" :disabled="!state.txId || state.running" title="Make this transaction's changes permanent" @click="endTransaction(state, true)">Commit</BaseButton>
+        <BaseButton variant="ghost" icon="undo" :disabled="!state.txId || state.running" title="Undo everything since the transaction began" @click="endTransaction(state, false)">Rollback</BaseButton>
+      </template>
     </div>
 
     <CodeEditor
@@ -140,7 +151,8 @@ const summary = computed(() => {
     <div class="pg-footer">
       <span>{{ summary }}</span>
       <span v-if="state.result" class="fitem"><BaseIcon name="clock" :size="14" /> {{ state.result.elapsedMs }} ms</span>
-      <span>Auto-commit</span>
+      <span v-if="state.txId" class="fitem txn-open">● Transaction open</span>
+      <span v-else>{{ state.txn === 'manual' ? 'Manual' : 'Auto-commit' }}</span>
       <span class="spacer"></span>
       <span>Ln {{ cursor.line }}, Col {{ cursor.col }}</span>
       <template v-if="server">
@@ -162,6 +174,7 @@ const summary = computed(() => {
   border-top: 1px solid var(--border); background: var(--bg-panel);
 }
 .fitem { display: flex; align-items: center; gap: 6px; }
+.txn-open { color: var(--warn); }
 .spacer { flex: 1; }
 </style>
 <style scoped src="../../../components/workspace/WorkspaceToolbar.css"></style>
