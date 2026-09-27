@@ -1,12 +1,13 @@
 import { ref, reactive, computed } from 'vue'
 import { browseTable, countTable, updateRow, readTableSelect, runQuery } from '../api/queries'
-import { listColumns } from '../api/resources'
+import { listColumns, listForeignKeys } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 import { formatCell, cellKind } from './formatCell.js'
 import { parseFilter, filterBoxText } from './parseFilter.js'
-import { buildSelectSql } from './buildSelectSql.js'
+import { buildSelectSql, aliases } from './buildSelectSql.js'
 import { runSql } from './runSql.js'
 import { columnRefs } from './columnRefs.js'
+import { joinOffers as offersFor } from './joinOffers.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -33,6 +34,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   // What each header box holds, by column, and the filters last applied from them:
   // typing edits the boxes, and only applying reloads.
   const filterText = ref({})
+  // Applied filters as `{ key, op, value }`; sent with each column's table position.
   const filters = ref([])
   // The columns the grid shows, in order; empty shows them all. Rows are still read
   // whole, so a hidden primary key can identify a row for editing.
@@ -43,19 +45,38 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const filterRefusal = ref(null)
   const sqlState = reactive({ connectionId: target.connectionId, sql: '', result: null, error: null, running: false })
   let builtSql = null
-  // Each table's column metadata (type, primary key), the browsed table's first and
-  // fetched once. Filters, sort, shown columns and edits name a column by its key
-  // (see columnRefs.js).
-  const tableColumns = ref([])
-  const refs = computed(() => columnRefs(tableColumns.value.map((columns, i) => ({ key: i ? `j${i}` : '', columns }))))
+  // The browsed table's column metadata (type, primary key), fetched once, and its
+  // joins, each `{ key, schema, table, kind, column, equals, columns }`: matched where
+  // its `column` equals the column keyed `equals`, with its own columns' metadata. A
+  // join's key never changes, so removing one leaves the others' columns keyed as
+  // they were. Filters, sort, shown columns and edits name a column by its key (see
+  // columnRefs.js).
+  const mainColumns = ref(null)
+  const joins = ref([])
+  let joinCount = 0
+  // Foreign keys by `schema.table`, fetched as each table enters the tab.
+  const foreignKeys = ref({})
+  const refs = computed(() => columnRefs(mainColumns.value
+    ? [{ key: '', columns: mainColumns.value }, ...joins.value.map(j => ({ key: j.key, columns: j.columns }))]
+    : []))
   const refByKey = computed(() => Object.fromEntries(refs.value.map(r => [r.key, r])))
-  const columnInfo = computed(() => Object.fromEntries(refs.value.map(r => [r.key, r.info])))
+  const tableNames = computed(() => aliases([target.table, ...joins.value.map(j => j.table)]))
+  // With joins, each column's info also names its table, as the SQL does.
+  const columnInfo = computed(() => Object.fromEntries(refs.value.map(r =>
+    [r.key, joins.value.length ? { ...r.info, tableLabel: tableNames.value[r.table] } : r.info])))
   const columnOf = (key) => ({ table: refByKey.value[key].table, column: refByKey.value[key].name })
+  const wireFilters = computed(() => filters.value.map(({ key, ...filter }) => ({ ...columnOf(key), ...filter })))
+  const wireJoins = computed(() => joins.value.map(({ schema, table, kind, column, equals }) =>
+    ({ schema, table, kind, column, equals: columnOf(equals) })))
+  const joinOffers = computed(() => offersFor(
+    [{ key: '', schema: target.schema, table: target.table }, ...joins.value],
+    foreignKeys.value,
+  ))
   // Only the latest load may write back: a sort clicked while a page is loading
   // must not be overwritten by that older page.
   let generation = 0
 
-  const keyColumns = computed(() => (tableColumns.value[0] ?? []).filter(c => c.isPrimaryKey).map(c => c.name))
+  const keyColumns = computed(() => (mainColumns.value ?? []).filter(c => c.isPrimaryKey).map(c => c.name))
   const hasPrev = computed(() => offset.value > 0)
   const activeFilters = computed(() => filters.value.length)
   const hasNext = computed(() => total.value != null && offset.value + limit.value < total.value)
@@ -70,9 +91,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const currentSql = computed(() => buildSelectSql({
     schema: target.schema,
     table: target.table,
-    columns: shownColumns.value.map(key => refByKey.value[key].name),
-    filters: filters.value,
-    orderBy: orderBy.value ? [refByKey.value[orderBy.value].name] : keyColumns.value,
+    joins: wireJoins.value,
+    columns: shownColumns.value.map(columnOf),
+    filters: wireFilters.value,
+    orderBy: orderBy.value ? [columnOf(orderBy.value)] : keyColumns.value.map(column => ({ table: 0, column })),
     descending: descending.value,
     limit: limit.value,
     offset: offset.value,
@@ -89,26 +111,35 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
       .catch(() => {})
   }
 
+  function loadForeignKeys({ schema, table }) {
+    listForeignKeys({ connectionId: target.connectionId, schema, table })
+      .then(list => { foreignKeys.value = { ...foreignKeys.value, [`${schema}.${table}`]: list } })
+      .catch(() => {})
+  }
+
   async function load() {
     const mine = ++generation
     loading.value = true
     error.value = null
-    if (!server.value && mine === 1) loadServer()
+    if (mine === 1) {
+      loadServer()
+      loadForeignKeys(target)
+    }
     try {
       const [page, count, info] = await Promise.all([
         browseTable(target, {
-          joins: [], filters: filters.value, orderBy: orderBy.value && columnOf(orderBy.value),
+          joins: wireJoins.value, filters: wireFilters.value, orderBy: orderBy.value && columnOf(orderBy.value),
           descending: descending.value, limit: limit.value, offset: offset.value,
         }),
-        total.value == null ? countTable(target, filters.value, []) : total.value,
-        tableColumns.value.length ? null : listColumns(target),
+        total.value == null ? countTable(target, wireFilters.value, wireJoins.value) : total.value,
+        mainColumns.value ? null : listColumns(target),
       ])
       if (mine !== generation) return
       columns.value = page.columns
       rows.value = page.rows
       elapsedMs.value = page.elapsedMs
       total.value = count
-      if (info) tableColumns.value = [info]
+      if (info) mainColumns.value = info
       log(true, `SELECT ${page.rows.length}`, page.elapsedMs)
     } catch (e) {
       if (mine !== generation) return
@@ -133,6 +164,44 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const nextPage = () => goTo(offset.value + limit.value)
   const prevPage = () => goTo(offset.value - limit.value)
 
+
+  // A new join changes the rows and their count, so both are re-read from page one.
+  function reload() {
+    total.value = null
+    return goTo(0)
+  }
+
+  async function addJoin({ schema, table, column, equals }) {
+    try {
+      const columns = await listColumns({ connectionId: target.connectionId, schema, table })
+      joins.value = [...joins.value, { key: `j${++joinCount}`, schema, table, kind: 'left', column, equals, columns }]
+    } catch (e) {
+      error.value = errMessage(e)
+      return
+    }
+    loadForeignKeys({ schema, table })
+    return reload()
+  }
+
+  function setJoinKind(key, kind) {
+    joins.value = joins.value.map(j => (j.key === key ? { ...j, kind } : j))
+    return reload()
+  }
+
+  // Removes the join and any join matched on its columns, with everything that
+  // names their columns.
+  function removeJoin(key) {
+    const gone = new Set([key])
+    const ownerOf = (columnKey) => joins.value[refByKey.value[columnKey].table - 1]?.key
+    for (const j of joins.value) if (gone.has(ownerOf(j.equals))) gone.add(j.key)
+    const dropped = new Set(refs.value.filter(r => r.table && gone.has(joins.value[r.table - 1].key)).map(r => r.key))
+    joins.value = joins.value.filter(j => !gone.has(j.key))
+    filters.value = filters.value.filter(f => !dropped.has(f.key))
+    filterText.value = Object.fromEntries(Object.entries(filterText.value).filter(([k]) => !dropped.has(k)))
+    shownColumns.value = shownColumns.value.filter(k => !dropped.has(k))
+    if (dropped.has(orderBy.value)) orderBy.value = null
+    return reload()
+  }
 
   function setSort(column, desc) {
     orderBy.value = column
@@ -165,7 +234,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     filters.value = Object.entries(filterText.value).flatMap(([key, text]) => {
       const ref = refByKey.value[key]
       const parsed = ref && parseFilter(text, cellKind(ref.info.dataType))
-      return parsed ? [{ ...columnOf(key), ...parsed }] : []
+      return parsed ? [{ key, ...parsed }] : []
     })
     total.value = null
     return goTo(0)
@@ -186,6 +255,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
 
   async function toFilters() {
     filterRefusal.value = null
+    if (sqlState.sql !== builtSql && joins.value.length) {
+      filterRefusal.value = 'SQL with joins can\'t be read back into the filters yet.'
+      return
+    }
     if (sqlState.sql !== builtSql) {
       try {
         filterRefusal.value = adopt(await readTableSelect(target, sqlState.sql))
@@ -211,7 +284,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
       texts[f.column] = text
     }
     filterText.value = texts
-    filters.value = read.map(f => ({ ...f, table: 0 }))
+    filters.value = read.map(({ column, op, value }) => ({ key: column, op, value }))
     shownColumns.value = shown
     orderBy.value = byKey ? null : order[0] ?? null
     descending.value = desc
@@ -267,6 +340,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   return {
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
+    keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin,
     setFilterText, replaceFilterText, setSort, shownColumns, setShownColumns, view, applyFilters, clearFilters, canEdit, editText, saveCell,
   }
 }

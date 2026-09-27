@@ -9,9 +9,9 @@ import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { cellKind } from './formatCell.js'
 import { operatorsFor, rowsFromBoxes, boxesFromRows } from './builderRows.js'
 
-// The table tab's Query Builder: the filter boxes as a list of conditions, the shown
-// columns, and the sort. Conditions edit the boxes (Run applies them, as typing in a
-// box does); columns and sort apply at once, as clicking a header does.
+// The table tab's Query Builder: its joins, the filter boxes as a list of conditions,
+// the shown columns, and the sort. Conditions edit the boxes (Run applies them, as
+// typing in a box does); joins, columns and sort apply at once.
 const props = defineProps({
   table:      { type: String, required: true },
   columns:    { type: Array,  required: true },
@@ -21,8 +21,25 @@ const props = defineProps({
   descending: { type: Boolean, default: false },
   // Empty shows every column.
   shownColumns: { type: Array, default: () => [] },
+  // The tab's joins and the ones it could add, as usePostgresTable keeps them, and
+  // each table's name in the query (the browsed table's first).
+  joins:      { type: Array,  default: () => [] },
+  joinOffers: { type: Array,  default: () => [] },
+  tableNames: { type: Array,  default: () => [] },
 })
-const emit = defineEmits(['filter-text', 'sort', 'columns', 'close'])
+const emit = defineEmits(['filter-text', 'sort', 'columns', 'add-join', 'join-kind', 'remove-join', 'close'])
+
+// A column as the SQL names it: `name`, or `table.name` once the tab joins others.
+function label(key) {
+  const info = props.columnInfo[key]
+  return info?.tableLabel ? `${info.tableLabel}.${info.name}` : info?.name ?? key
+}
+const joinName = (i) => props.tableNames[i + 1]
+const kindOptions = computed(() => [
+  { value: 'left', label: `Keep all ${props.table}, even without a match` },
+  { value: 'inner', label: 'Only rows that have a match' },
+])
+const offerOptions = computed(() => props.joinOffers.map((o, i) => ({ value: i, label: o.label })))
 
 const kinds = computed(() => Object.fromEntries(props.columns.map(c => [c, cellKind(props.columnInfo[c]?.dataType)])))
 
@@ -51,7 +68,7 @@ function pickColumn(i, column) {
   update(i, { column, op: operatorsFor(kinds.value[column])[0].op, value: '' })
 }
 
-const columnOptions = (current) => props.columns.map(c => ({ value: c, label: c, disabled: c !== current && used.value.includes(c) }))
+const columnOptions = (current) => props.columns.map(c => ({ value: c, label: label(c), disabled: c !== current && used.value.includes(c) }))
 const opOptions = (column) => operatorsFor(kinds.value[column]).map(o => ({ value: o.op, label: o.label }))
 const needsValue = (op) => op !== 'isNull' && op !== 'notNull'
 
@@ -61,7 +78,7 @@ function toggleColumn(column) {
   emit('columns', props.columns.filter(c => (c === column) !== shown.includes(c)))
 }
 
-const sortOptions = computed(() => [{ value: '', label: 'No sorting' }, ...props.columns.map(c => ({ value: c, label: c }))])
+const sortOptions = computed(() => [{ value: '', label: 'No sorting' }, ...props.columns.map(c => ({ value: c, label: label(c) }))])
 const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', label: '↓ Descending' }]
 </script>
 
@@ -71,7 +88,24 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
       <header>Tables<button class="pvq-close" title="Close" @click="emit('close')"><BaseIcon name="close" :size="12" /></button></header>
       <div class="body">
         <div class="pvq-base"><BaseIcon name="table" :size="14" /><b>{{ table }}</b><span class="tag">main table</span></div>
-        <BaseSelect :model-value="''" :options="[]" placeholder="+ Join a related table… (coming soon)" disabled />
+        <div v-for="(j, i) in joins" :key="j.key" class="cond join">
+          <div class="line">
+            <BaseIcon name="table" :size="14" class="ti" />
+            <b class="grow">{{ joinName(i) }}</b>
+            <BaseButton variant="ghost" icon="trash" size="sm" title="Remove join" @click="emit('remove-join', j.key)" />
+          </div>
+          <BaseSelect :model-value="j.kind" :options="kindOptions" @update:model-value="emit('join-kind', j.key, $event)" />
+          <div class="line on"><span class="onl">where</span><span class="onv">{{ joinName(i) }}.{{ j.column }}</span></div>
+          <div class="line on"><span class="onl">equals</span><span class="onv">{{ label(j.equals) }}</span></div>
+        </div>
+        <BaseSelect
+          v-if="joinOffers.length"
+          :model-value="''"
+          :options="offerOptions"
+          placeholder="+ Join a related table…"
+          @update:model-value="emit('add-join', joinOffers[$event])"
+        />
+        <div v-else class="empty">No{{ joins.length ? ' more' : '' }} related tables.</div>
       </div>
     </section>
 
@@ -105,11 +139,16 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
     <section>
       <header>Columns<span class="count">{{ shownColumns.length ? `${shownColumns.length} of ${columns.length}` : 'all' }}</span></header>
       <div class="body cols">
-        <label v-for="c in columns" :key="c" class="colrow">
-          <BaseCheckbox :model-value="shownColumns.includes(c)" @update:model-value="toggleColumn(c)" />
-          <span :class="{ dim: shownColumns.length && !shownColumns.includes(c) }">{{ c }}</span>
-          <span class="type">{{ columnInfo[c]?.dataType }}</span>
-        </label>
+        <template v-for="(c, i) in columns" :key="c">
+          <div v-if="joins.length && columnInfo[c]?.tableLabel !== columnInfo[columns[i - 1]]?.tableLabel" class="grp">
+            {{ columnInfo[c]?.tableLabel }}
+          </div>
+          <label class="colrow">
+            <BaseCheckbox :model-value="shownColumns.includes(c)" @update:model-value="toggleColumn(c)" />
+            <span :class="{ dim: shownColumns.length && !shownColumns.includes(c) }">{{ columnInfo[c]?.name ?? c }}</span>
+            <span class="type">{{ columnInfo[c]?.dataType }}</span>
+          </label>
+        </template>
         <button v-if="shownColumns.length" class="link" @click="emit('columns', [])">Show all columns</button>
       </div>
     </section>
@@ -169,6 +208,15 @@ header {
 .add:hover:not(:disabled) { border-color: var(--link); background: var(--bg-hover); }
 .add:disabled { opacity: .4; cursor: default; }
 .dir { align-self: stretch; }
+.join { border-left-color: var(--purple); }
+.ti { color: var(--text-faint); flex: none; }
+.on .onl { flex: none; width: 44px; font-size: 11.5px; color: var(--text-faint); }
+.on .onv {
+  flex: 1; min-width: 0; padding: 5px 9px; border-radius: 6px;
+  background: var(--bg-input); border: 1px solid var(--border-soft);
+  font: 12px var(--mono); color: var(--text); overflow: hidden; text-overflow: ellipsis;
+}
+.grp { padding: 8px 4px 3px; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
 .count { margin-left: auto; font-size: 11.5px; font-weight: 400; color: var(--text-faint); }
 .cols { gap: 2px; }
 .colrow {

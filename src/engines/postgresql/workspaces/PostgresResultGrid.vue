@@ -3,7 +3,8 @@ import { ref, computed, nextTick } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import { formatCell, cellKind } from './formatCell.js'
 
-// Rows arrive as arrays aligned to `columns`, so a repeated column name stays its own
+// Rows arrive as arrays aligned to `columns` — keys, which `columnInfo` names (with
+// their table, when the tab joins others) — so a repeated column name stays its own
 // column. Sorting and editing are opt-in: the query tab shows results read-only, and
 // without `columnInfo` (types, primary keys), since a query's columns aren't a table's.
 const props = defineProps({
@@ -63,7 +64,7 @@ function commit() {
           >
             <span class="th-name">
               <BaseIcon v-if="columnInfo[column]?.isPrimaryKey" name="key" :size="12" class="pk" />
-              {{ column }}
+              <span><span v-if="columnInfo[column]?.tableLabel" class="th-tbl">{{ columnInfo[column].tableLabel }}.</span>{{ columnInfo[column]?.name ?? column }}</span>
               <span v-if="sortable && orderBy === column" class="dir">{{ descending ? '▼' : '▲' }}</span>
             </span>
             <span v-if="columnInfo[column]" class="th-type">{{ columnInfo[column].dataType }}</span>
@@ -135,6 +136,7 @@ th {
 }
 th.sortable { cursor: pointer; }
 .th-name { display: flex; align-items: center; gap: 5px; }
+.th-tbl { font-weight: 400; color: var(--text-faint); }
 .th-type { display: block; margin-top: 1px; font: 400 10.5px var(--mono); color: var(--text-faint); }
 .pk { color: var(--warn); flex: none; }
 .dir { color: var(--accent); font-size: 9px; }
