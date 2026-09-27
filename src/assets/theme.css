@@ -28,6 +28,10 @@
   --danger-text:   #e0706a;   /* error/danger message text */
   --danger-bg:     #3a1a1a;   /* error-callout background */
   --on-accent:     #ffffff;   /* text/glyph on filled accent/danger fills */
+  --eng-mongodb-bg:       #2d5c43;   /* connection-tree engine badges */
+  --eng-mongodb-text:     #cdebd8;
+  --eng-postgresql-bg:    #2e4f78;
+  --eng-postgresql-text:  #d3e2f5;
   --bg-menu:       #2b2d31;   /* context / dropdown / cell menus */
   --bg-field:      #2a2c30;   /* raised input-like fields (query bar) */
   --success-bg:     #1a3a1a;  /* success callout (connection test) */
@@ -79,6 +83,10 @@
   --danger-text:   #c0392b;
   --danger-bg:     #fbeae8;
   --on-accent:     #ffffff;   /* text/glyph on filled accent/danger fills */
+  --eng-mongodb-bg:       #d6efe0;
+  --eng-mongodb-text:     #1f5a3a;
+  --eng-postgresql-bg:    #dbe7f6;
+  --eng-postgresql-text:  #23497a;
   --bg-menu:       #ffffff;
   --bg-field:      #ffffff;
   --success-bg:     #e6f4ea;
