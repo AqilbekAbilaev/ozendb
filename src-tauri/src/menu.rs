@@ -441,7 +441,7 @@ mod tests {
 
     fn gate_of_opt(id: &str) -> Option<Gate> {
         match spec_of(id) {
-            Some(Spec::Action { gate: gate, .. }) => gate,
+            Some(Spec::Action { gate, .. }) => gate,
             _ => None,
         }
     }
