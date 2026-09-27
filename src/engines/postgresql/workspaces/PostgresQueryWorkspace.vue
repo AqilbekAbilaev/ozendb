@@ -1,25 +1,18 @@
 <script setup>
-import EngineBadge from '../../../components/base/EngineBadge.vue'
+import { computed } from 'vue'
+import WorkspaceCrumbs from '../../../components/base/WorkspaceCrumbs.vue'
 import PostgresSqlPanel from './PostgresSqlPanel.vue'
+import { crumbSegments } from '../../../utils/crumbSegments'
 
-defineProps({
+const props = defineProps({
   activeTab: { type: Object, required: true },
 })
+
+const items = computed(() => crumbSegments({ connection: props.activeTab.connectionName, target: props.activeTab.target }))
 </script>
 
 <template>
   <PostgresSqlPanel :state="activeTab">
-    <div class="pg-crumbs">
-      <EngineBadge engine="postgresql" />
-      <span class="pg-name">{{ activeTab.connectionName }} · {{ activeTab.database }}</span>
-    </div>
+    <WorkspaceCrumbs engine="postgresql" :items="items" />
   </PostgresSqlPanel>
 </template>
-
-<style scoped>
-.pg-crumbs {
-  display: flex; align-items: center; gap: 7px; flex: none; min-height: 34px;
-  padding: 4px 14px; font-size: 12.5px; border-bottom: 1px solid var(--border);
-}
-.pg-name { color: var(--text); }
-</style>
