@@ -6,6 +6,7 @@ import NumberStepper from '../../../components/base/NumberStepper.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
 import PostgresMessages from './PostgresMessages.vue'
+import PostgresPlan from './PostgresPlan.vue'
 import PostgresQueryBuilder from './PostgresQueryBuilder.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
 import PostgresSqlPanel from './PostgresSqlPanel.vue'
@@ -48,7 +49,7 @@ const rtabs = computed(() => [
   { value: 'Result', label: 'Result', count: t.value.rows.length },
   { value: 'Query Code', label: 'Query Code' },
   { value: 'Messages', label: 'Messages', count: t.value.messages.length },
-  { value: 'Explain', label: 'Explain', disabled: true, title: SOON },
+  { value: 'Explain', label: 'Explain' },
 ])
 
 const run = () => t.value.applyFilters(limitDraft.value)
@@ -57,6 +58,11 @@ function switchMode(mode) {
   if (mode === t.value.mode) return
   if (mode === 'sql') t.value.toSql()
   else t.value.toFilters()
+}
+
+function explain() {
+  rtab.value = 'Explain'
+  return t.value.explain()
 }
 
 function copySql() {
@@ -80,7 +86,7 @@ function copySql() {
       <div class="qbar">
         <SegmentedControl class="mode-toggle" :model-value="t.mode" :options="MODES" @update:model-value="switchMode" />
         <BaseButton variant="ghost" icon="run" class="run" :disabled="t.loading" title="Apply the filters and limit (Enter)" @click="run">{{ t.loading ? 'Running…' : 'Run' }}</BaseButton>
-        <BaseButton variant="ghost" icon="exScan" disabled :title="SOON">Explain</BaseButton>
+        <BaseButton variant="ghost" icon="exScan" :disabled="t.explainState.explaining" title="Show how PostgreSQL runs these filters" @click="explain">Explain</BaseButton>
         <span class="qsep"></span>
         <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" disabled :title="SOON" />
         <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" disabled :title="SOON" />
@@ -156,6 +162,12 @@ function copySql() {
           </div>
           <CodeEditor :model-value="t.currentSql" readonly language="sql" class="qcode-sql" />
         </div>
+        <PostgresPlan
+          v-else-if="rtab === 'Explain'"
+          :plan="t.explainState.plan"
+          :error="t.explainState.planError"
+          :explaining="t.explainState.explaining"
+        />
         <PostgresMessages v-else :messages="t.messages" />
       </div>
 

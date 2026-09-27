@@ -7,7 +7,8 @@ const listColumns = vi.fn()
 const listForeignKeys = vi.fn()
 const runQuery = vi.fn()
 const readTableSelect = vi.fn()
-vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow, runQuery, readTableSelect }))
+const explainQuery = vi.fn()
+vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow, runQuery, readTableSelect, explainQuery }))
 vi.mock('../api/resources', () => ({ listColumns, listForeignKeys }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
@@ -244,6 +245,16 @@ describe('joins', () => {
     expect(readTableSelect).not.toHaveBeenCalled()
     expect(t.filterRefusal.value).toMatch(/join/)
     expect(t.mode.value).toBe('sql')
+  })
+})
+
+describe('explain', () => {
+  it('explains the SQL the filters, sort and page amount to', async () => {
+    explainQuery.mockResolvedValue([{ Plan: {} }])
+    const t = await loaded()
+    await t.explain()
+    expect(explainQuery).toHaveBeenCalledWith('c1', t.currentSql.value)
+    expect(t.explainState.plan).toEqual([{ Plan: {} }])
   })
 })
 

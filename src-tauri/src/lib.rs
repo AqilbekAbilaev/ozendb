@@ -31,6 +31,8 @@ mod pg_browse_integration_tests;
 #[cfg(test)]
 mod pg_cancel_integration_tests;
 #[cfg(test)]
+mod pg_explain_integration_tests;
+#[cfg(test)]
 mod pg_integration_tests;
 mod pg_uri;
 mod pool;
@@ -194,6 +196,7 @@ pub fn run() {
             list_pg_foreign_keys,
             run_pg_query,
             cancel_pg_query,
+            explain_pg_query,
             browse_pg_table,
             count_pg_table,
             read_pg_table_select,
