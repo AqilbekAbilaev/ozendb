@@ -14,11 +14,11 @@ const props = defineProps({
   schemas: { type: Array, required: true },
 })
 
-const { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, toggleSchema, reloadTables } =
+const { databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables } =
   usePostgresTree(props.conn.id)
 // A refresh brings a new schema list; the open schemas' tables are re-read with it.
 watch(() => props.schemas, reloadTables)
-const shown = computed(() => visibleSchemas(props.schemas))
+const shown = computed(() => visibleSchemas(props.schemas, showSystem.value))
 const database = computed(() => props.conn.database || 'postgres')
 
 function openQuery() {
@@ -64,6 +64,14 @@ function openTable(schema, table) {
     <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
     <span class="tt">{{ database }}</span>
     <span v-if="shown.length" class="cnt">({{ shown.length }})</span>
+    <span
+      class="row-action push"
+      :class="{ on: showSystem }"
+      :title="showSystem ? 'Hide PostgreSQL\'s own schemas' : 'Show PostgreSQL\'s own schemas'"
+      @click.stop="toggleSystem"
+    >
+      <BaseIcon :name="showSystem ? 'eye' : 'eyeOff'" :size="14" />
+    </span>
     <span class="row-action" title="New SQL query" @click.stop="openQuery">
       <BaseIcon name="sql" :size="14" />
     </span>
@@ -124,9 +132,10 @@ function openTable(schema, table) {
 
 <style scoped>
 .row-action {
-  margin-left: auto; padding: 0 4px;
+  padding: 0 4px;
   color: var(--text-dim); opacity: 0; cursor: pointer;
 }
-.tnode:hover .row-action { opacity: 1; }
+.row-action.push { margin-left: auto; }
+.tnode:hover .row-action, .row-action.on { opacity: 1; }
 .row-action:hover { color: var(--text); }
 </style>
