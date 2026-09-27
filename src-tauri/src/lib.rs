@@ -192,6 +192,7 @@ pub fn run() {
             run_pg_query,
             browse_pg_table,
             count_pg_table,
+            read_pg_table_select,
             update_pg_row,
             create_collection,
             drop_database,

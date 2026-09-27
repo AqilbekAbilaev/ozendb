@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tauri::State;
 
@@ -10,7 +10,7 @@ use super::{primary_key_columns, quote_ident, AppContext};
 /// `limit` — mirrors `find_documents`' `FIND_LIMIT_FALLBACK`.
 const BROWSE_LIMIT_FALLBACK: i64 = 100;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FilterOp {
     Eq,
@@ -26,11 +26,11 @@ pub enum FilterOp {
 
 /// One condition on a browsed table's column. `value` is text, cast to the
 /// column's own type by the server, so `qty > 9` compares numbers, not strings.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct ColumnFilter {
     pub column: String,
     pub op: FilterOp,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
 }
 

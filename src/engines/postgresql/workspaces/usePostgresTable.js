@@ -1,9 +1,9 @@
 import { ref, reactive, computed } from 'vue'
-import { browseTable, countTable, updateRow } from '../api/queries'
+import { browseTable, countTable, updateRow, readTableSelect } from '../api/queries'
 import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 import { formatCell, cellKind } from './formatCell.js'
-import { parseFilter } from './parseFilter.js'
+import { parseFilter, filterBoxText } from './parseFilter.js'
 import { buildSelectSql } from './buildSelectSql.js'
 import { runSql } from './runSql.js'
 
@@ -28,9 +28,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   // typing edits the boxes, and only applying reloads.
   const filterText = ref({})
   const filters = ref([])
-  // SQL mode: an editor seeded with the SQL the filters amount to. It can hand back
-  // to the filters only while that SQL is untouched, since nothing reads SQL back.
+  // SQL mode: an editor seeded with the SQL the filters amount to. Going back reads
+  // edited SQL into the boxes, or says why they can't show it.
   const mode = ref('filter')
+  const filterRefusal = ref(null)
   const sqlState = reactive({ connectionId: target.connectionId, sql: '', result: null, error: null, running: false })
   let builtSql = null
   // Column metadata (type, primary key) by name, fetched once.
@@ -42,7 +43,6 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const keyColumns = computed(() =>
     Object.values(columnInfo.value).filter(c => c.isPrimaryKey).map(c => c.name))
   const hasPrev = computed(() => offset.value > 0)
-  const canUseFilters = computed(() => mode.value === 'filter' || sqlState.sql === builtSql)
   const activeFilters = computed(() => filters.value.length)
   const hasNext = computed(() => total.value != null && offset.value + pageSize < total.value)
 
@@ -120,12 +120,44 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
       offset: offset.value,
     })
     sqlState.sql = builtSql
+    filterRefusal.value = null
     mode.value = 'sql'
     return runSql(sqlState)
   }
 
-  function toFilters() {
-    if (canUseFilters.value) mode.value = 'filter'
+  async function toFilters() {
+    filterRefusal.value = null
+    if (sqlState.sql !== builtSql) {
+      try {
+        filterRefusal.value = adopt(await readTableSelect(target, sqlState.sql))
+      } catch (e) {
+        filterRefusal.value = errMessage(e)
+      }
+      if (filterRefusal.value) return
+    }
+    mode.value = 'filter'
+  }
+
+  // Takes SQL read back by the backend as the grid's filters, sort and page, or
+  // returns why the grid can't show it.
+  function adopt({ filters: read, orderBy: order, descending: desc, limit, offset: at }) {
+    if (limit !== pageSize) return `the filter view shows ${pageSize} rows a page, so it needs LIMIT ${pageSize}.`
+    const keys = keyColumns.value
+    const byKey = order.length === keys.length && order.every((c, i) => c === keys[i])
+    if (order.length > 1 && !byKey) return 'the filter view sorts by one column at a time.'
+    const texts = {}
+    for (const f of read) {
+      const text = filterBoxText(f, cellKind(columnInfo.value[f.column]?.dataType))
+      if (text == null || f.column in texts) return `the condition on "${f.column}" can't be typed in its filter box.`
+      texts[f.column] = text
+    }
+    filterText.value = texts
+    filters.value = read
+    orderBy.value = byKey ? null : order[0] ?? null
+    descending.value = desc
+    total.value = null
+    goTo(at)
+    return null
   }
 
   // Arrays aren't editable yet: their text form (`{a,b}`) isn't what the grid shows.
@@ -172,7 +204,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
 
   return {
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
-    filterText, activeFilters, mode, sqlState, canUseFilters, toSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
+    filterText, activeFilters, mode, sqlState, filterRefusal, toSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     setFilterText, applyFilters, clearFilters, canEdit, editText, saveCell,
   }
 }

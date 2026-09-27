@@ -5,10 +5,12 @@ pub(super) use super::AppContext;
 pub mod schema;
 pub mod query;
 pub mod browse;
+pub mod read_select;
 
 pub use schema::*;
 pub use query::*;
 pub use browse::*;
+pub use read_select::*;
 
 /// Double-quotes a Postgres identifier (schema/table/column name), escaping any
 /// embedded `"` by doubling it — the standard Postgres quoted-identifier rule.

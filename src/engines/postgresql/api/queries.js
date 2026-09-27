@@ -20,3 +20,9 @@ export function countTable({ connectionId, schema, table }, filters = []) {
 export function updateRow({ connectionId, schema, table }, set, where) {
   return invoke('update_pg_row', { id: connectionId, schema, table, set, where })
 }
+
+// A table tab's SQL as `{ filters, orderBy, descending, limit, offset }`; rejects,
+// with the reason, SQL the filter boxes can't show.
+export function readTableSelect({ schema, table }, sql) {
+  return invoke('read_pg_table_select', { sql, schema, table })
+}

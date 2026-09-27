@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseFilter } from './parseFilter.js'
+import { parseFilter, filterBoxText } from './parseFilter.js'
 
 describe('parseFilter', () => {
   it('ignores an empty box', () => {
@@ -31,5 +31,31 @@ describe('parseFilter', () => {
 
   it('leaves a bare operator unapplied', () => {
     expect(parseFilter('>', 'num')).toBe(null)
+  })
+})
+
+describe('filterBoxText', () => {
+  it('writes a filter as the text that types it back', () => {
+    const cases = [
+      [{ op: 'gt', value: '100' }, 'num', '>100'],
+      [{ op: 'eq', value: '42' }, 'num', '42'],
+      [{ op: 'eq', value: 'Ada' }, 'str', '=Ada'],
+      [{ op: 'contains', value: 'ad' }, 'str', 'ad'],
+      [{ op: 'contains', value: '2026-09' }, 'date', '2026-09'],
+      [{ op: 'ne', value: 'x' }, 'str', '!=x'],
+      [{ op: 'isNull' }, 'num', 'null'],
+      [{ op: 'notNull' }, 'str', '!null'],
+    ]
+    for (const [filter, kind, text] of cases) {
+      expect(filterBoxText(filter, kind)).toBe(text)
+      expect(parseFilter(text, kind)).toEqual(filter)
+    }
+  })
+
+  it('gives null when no box text would type the filter back', () => {
+    expect(filterBoxText({ op: 'contains', value: '4' }, 'num')).toBe(null)
+    expect(filterBoxText({ op: 'contains', value: '>5' }, 'str')).toBe(null)
+    expect(filterBoxText({ op: 'contains', value: 'null' }, 'str')).toBe(null)
+    expect(filterBoxText({ op: 'eq', value: ' padded ' }, 'str')).toBe(null)
   })
 })
