@@ -22,6 +22,7 @@ const COLUMNS = [
 beforeEach(() => {
   vi.resetAllMocks()
   listColumns.mockResolvedValue(COLUMNS)
+  runQuery.mockResolvedValue({ columns: ['version', 'encoding'], rows: [['16.2', 'UTF8']] })
   countTable.mockResolvedValue(250)
   browseTable.mockResolvedValue({
     columns: ['id', 'name', 'tags', 'meta'],
@@ -121,6 +122,48 @@ describe('filtering', () => {
   })
 })
 
+describe('limit, messages and server details', () => {
+  it('applies a new limit with the filters, restarting from the first row', async () => {
+    const t = await loaded({ pageSize: 100 })
+    await t.nextPage()
+    await t.applyFilters(20)
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ limit: 20, offset: 0 }))
+    await t.nextPage()
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ limit: 20, offset: 20 }))
+  })
+
+  it('takes an edited query\'s LIMIT as the new limit', async () => {
+    const t = await loaded({ pageSize: 100 })
+    await t.toSql()
+    t.sqlState.sql = 'edited'
+    readTableSelect.mockResolvedValue({ filters: [], orderBy: [], descending: false, limit: 5, offset: 0 })
+    await t.toFilters()
+    expect(t.limit.value).toBe(5)
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ limit: 5 }))
+  })
+
+  it('logs each load as a message, successes with their row count and time', async () => {
+    const t = await loaded()
+    browseTable.mockRejectedValueOnce({ code: 'postgres', message: 'permission denied' })
+    await t.refresh()
+    expect(t.messages.value.map(m => [m.ok, m.text, m.ms])).toEqual([[true, 'SELECT 2', 3], [false, 'permission denied', undefined]])
+  })
+
+  it('reads the server version and encoding once, for the footer', async () => {
+    runQuery.mockResolvedValue({ columns: ['version', 'encoding'], rows: [['16.2', 'UTF8']] })
+    const t = await loaded()
+    await t.refresh()
+    await Promise.resolve()
+    expect(runQuery).toHaveBeenCalledTimes(1)
+    expect(t.server.value).toEqual({ version: '16.2', encoding: 'UTF8' })
+  })
+
+  it('shows the SQL the current filters, sort and page amount to', async () => {
+    const t = await loaded({ pageSize: 50 })
+    expect(t.currentSql.value).toBe('SELECT *\nFROM "public"."users"\nORDER BY "id" ASC\nLIMIT 50;')
+  })
+})
+
 describe('SQL mode', () => {
   it('opens on the SQL for the current filters, sort and page, already run', async () => {
     const t = await loaded({ pageSize: 100 })
@@ -177,9 +220,9 @@ describe('SQL mode', () => {
     await t.toFilters()
     expect(t.filterRefusal.value).toBe('only SELECT * can be shown as filters')
 
-    readTableSelect.mockResolvedValue({ ...read, limit: 5 })
+    readTableSelect.mockResolvedValue({ ...read, limit: null })
     await t.toFilters()
-    expect(t.filterRefusal.value).toMatch(/LIMIT 100/)
+    expect(t.filterRefusal.value).toMatch(/LIMIT/)
 
     readTableSelect.mockResolvedValue({ ...read, filters: [{ column: 'id', op: 'contains', value: '4' }] })
     await t.toFilters()
