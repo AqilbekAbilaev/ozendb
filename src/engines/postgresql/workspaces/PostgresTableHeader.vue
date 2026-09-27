@@ -1,19 +1,13 @@
 <script setup>
 import { computed } from 'vue'
-import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import WorkspaceCrumbs from '../../../components/base/WorkspaceCrumbs.vue'
 import { openConnections } from '../../../stores/openConnections'
 import { crumbSegments } from '../../../utils/crumbSegments'
 
-// The table tab's top line: engine, login and server, the table's path, and the
-// Filter / SQL switch.
+// The table tab's crumbs: engine, login and server, and the table's path.
 const props = defineProps({
   activeTab: { type: Object, required: true },
-  mode:      { type: String, required: true },
 })
-const emit = defineEmits(['mode'])
-
-const MODES = [{ value: 'filter', label: 'Filter', icon: 'filter' }, { value: 'sql', label: 'SQL', icon: 'sql' }]
 
 const conn = computed(() => openConnections.value.find(c => c.id === props.activeTab.connectionId))
 const items = computed(() => {
@@ -24,7 +18,5 @@ const items = computed(() => {
 </script>
 
 <template>
-  <WorkspaceCrumbs engine="postgresql" :items="items">
-    <SegmentedControl :model-value="mode" :options="MODES" variant="subtle" @update:model-value="emit('mode', $event)" />
-  </WorkspaceCrumbs>
+  <WorkspaceCrumbs engine="postgresql" :items="items" />
 </template>

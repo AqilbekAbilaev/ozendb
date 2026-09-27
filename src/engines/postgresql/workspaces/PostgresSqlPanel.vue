@@ -16,7 +16,8 @@ import { runSql } from './runSql.js'
 // A SQL editor with its toolbar, results and status line. `state` holds
 // `{ connectionId, sql, result, error, running, messages? }` and is written in place —
 // a query tab passes itself. `server` (`{ version, encoding }`) fills the status line
-// when known. The default slot is a line above the toolbar.
+// when known. The default slot is a line above the toolbar; `toolbar-start` goes at
+// the toolbar's left edge (the table tab's Filter / SQL switch).
 const props = defineProps({
   state:  { type: Object, required: true },
   server: { type: Object, default: null },
@@ -71,6 +72,7 @@ const summary = computed(() => {
   <div class="pg-sql">
     <slot />
     <div class="qbar">
+      <slot name="toolbar-start" />
       <BaseButton variant="ghost" icon="run" class="run" :disabled="state.running || !state.sql.trim()" @click="run()">
         {{ state.running ? 'Running…' : 'Run' }} <span class="kbd">⌘↵</span>
       </BaseButton>
