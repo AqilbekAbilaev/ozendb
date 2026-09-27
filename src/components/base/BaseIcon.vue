@@ -43,6 +43,7 @@ const PATHS = {
   uri:        '<path d="M9 15l6-6M8 9H6a3 3 0 0 0 0 6h2M16 9h2a3 3 0 0 1 0 6h-2"/>',
   filter:     '<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',
   check:      '<path d="M5 12l4 4 10-10"/>',
+  undo:       '<path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/>',
   close:      '<path d="M6 6l12 12M18 6 6 18"/>',
   textType:   '<path d="M5 7V5h14v2M12 5v14M9 19h6"/>',
   count:      '<path d="M5 6h3M5 12h3M5 18h3M13 6h6M13 12h6M13 18h6"/>',

@@ -349,7 +349,7 @@ describe('SQL mode', () => {
     await t.toSql()
     expect(t.mode.value).toBe('sql')
     expect(t.sqlState.sql).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC\nLIMIT 100 OFFSET 100;')
-    expect(runQuery).toHaveBeenCalledWith('c1', t.sqlState.sql, expect.any(String))
+    expect(runQuery).toHaveBeenCalledWith('c1', t.sqlState.sql, expect.any(String), null)
   })
 
   it('opens given SQL — a saved or earlier query — without running it', async () => {

@@ -4,11 +4,14 @@ const runQuery = vi.fn()
 const cancelQuery = vi.fn()
 const explainQuery = vi.fn()
 const formatQuery = vi.fn()
-vi.mock('../api/queries', () => ({ runQuery, cancelQuery, explainQuery, formatQuery }))
+const beginTransaction = vi.fn()
+const commitTransaction = vi.fn()
+const rollbackTransaction = vi.fn()
+vi.mock('../api/queries', () => ({ runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction }))
 const pushHistory = vi.fn()
 vi.mock('../api/library', () => ({ pushHistory }))
 
-const { runSql, cancelSql, explainSql, formatSql } = await import('./runSql.js')
+const { runSql, cancelSql, explainSql, formatSql, endTransaction, abandonTransaction } = await import('./runSql.js')
 
 const tab = (over = {}) => ({ connectionId: 'c1', sql: 'SELECT 1', result: null, error: null, running: false, ...over })
 
@@ -25,7 +28,7 @@ describe('runSql', () => {
 
     await runSql(t)
 
-    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 1', expect.any(String))
+    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 1', expect.any(String), null)
     expect(t).toMatchObject({ result, error: null, running: false })
   })
 
@@ -51,7 +54,7 @@ describe('runSql', () => {
   it('runs just the given SQL when a selection is passed', async () => {
     runQuery.mockResolvedValue({ columns: [], rows: [], truncated: false, elapsedMs: 1 })
     await runSql(tab({ sql: 'SELECT 1;\nSELECT 2' }), 'SELECT 2')
-    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 2', expect.any(String))
+    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 2', expect.any(String), null)
   })
 
   it('logs each run for the Messages tab', async () => {
@@ -121,5 +124,68 @@ describe('formatSql', () => {
     const t = tab({ sql: 'select 1 -- x' })
     expect(await formatSql(t)).toBe('SQL with comments isn\'t formatted')
     expect(t.sql).toBe('select 1 -- x')
+  })
+})
+
+describe('Manual transactions', () => {
+  const ok = { columns: [], rows: [], truncated: false, elapsedMs: 1, rowsAffected: 1 }
+
+  it('begins one on the first run and runs every run in it until it ends', async () => {
+    runQuery.mockResolvedValue(ok)
+    const t = tab({ txn: 'manual', sql: 'DELETE FROM t' })
+    await runSql(t)
+    await runSql(t)
+    expect(beginTransaction).toHaveBeenCalledTimes(1)
+    const txId = beginTransaction.mock.calls[0][1]
+    expect(beginTransaction).toHaveBeenCalledWith('c1', txId)
+    expect(runQuery.mock.calls.map(c => c[3])).toEqual([txId, txId])
+    expect(t.txId).toBe(txId)
+
+    await endTransaction(t, true)
+    expect(commitTransaction).toHaveBeenCalledWith(txId)
+    expect(t.txId).toBeNull()
+    expect(t.messages.at(-1)).toMatchObject({ ok: true, text: 'COMMIT' })
+
+    await runSql(t)
+    await endTransaction(t, false)
+    expect(beginTransaction).toHaveBeenCalledTimes(2)
+    expect(rollbackTransaction).toHaveBeenCalledWith(beginTransaction.mock.calls[1][1])
+    expect(t.messages.at(-1)).toMatchObject({ ok: true, text: 'ROLLBACK' })
+  })
+
+  it('reports a commit that failed, and the transaction is over either way', async () => {
+    runQuery.mockResolvedValue(ok)
+    commitTransaction.mockRejectedValue({ code: 'validation', message: 'nothing was committed' })
+    const t = tab({ txn: 'manual' })
+    await runSql(t)
+    await endTransaction(t, true)
+    expect(t.txId).toBeNull()
+    expect(t.messages.at(-1)).toMatchObject({ ok: false, text: 'nothing was committed' })
+  })
+
+  it('does not run when the transaction could not begin', async () => {
+    beginTransaction.mockRejectedValue({ code: 'connection', message: 'no route' })
+    const t = tab({ txn: 'manual' })
+    await runSql(t)
+    expect(runQuery).not.toHaveBeenCalled()
+    expect(t).toMatchObject({ error: 'no route', running: false })
+    expect(t.txId).toBeFalsy()
+  })
+
+  it('auto-commit runs outside any transaction', async () => {
+    runQuery.mockResolvedValue(ok)
+    await runSql(tab())
+    expect(beginTransaction).not.toHaveBeenCalled()
+    expect(runQuery.mock.calls[0][3]).toBeNull()
+  })
+
+  it('rolls back an open transaction when its tab goes away', async () => {
+    runQuery.mockResolvedValue(ok)
+    const t = tab({ txn: 'manual' })
+    expect(await abandonTransaction(t)).toBe(false)
+    await runSql(t)
+    const txId = t.txId
+    expect(await abandonTransaction(t)).toBe(true)
+    expect(rollbackTransaction).toHaveBeenCalledWith(txId)
   })
 })

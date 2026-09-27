@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { runQuery, cancelQuery, explainQuery, formatQuery, browseTable, countTable, updateRow, readTableSelect } from './queries'
+import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction, browseTable, countTable, updateRow, readTableSelect } from './queries'
 
 const table = { connectionId: 'c1', schema: 'public', table: 'users' }
 
@@ -15,14 +15,25 @@ beforeEach(() => {
 describe('PostgreSQL queries', () => {
   it('runs SQL against a connection', async () => {
     await runQuery('c1', 'SELECT 1')
-    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT 1', runId: null })
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT 1', runId: null, txId: null })
   })
 
   it('names a run so it can be cancelled, and cancels it by that name', async () => {
     await runQuery('c1', 'SELECT pg_sleep(9)', 'run-1')
-    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT pg_sleep(9)', runId: 'run-1' })
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT pg_sleep(9)', runId: 'run-1', txId: null })
     await cancelQuery('c1', 'run-1')
     expect(invoke).toHaveBeenCalledWith('cancel_pg_query', { id: 'c1', runId: 'run-1' })
+  })
+
+  it('holds a transaction open, runs in it, and ends it', async () => {
+    await beginTransaction('c1', 'tx-1')
+    expect(invoke).toHaveBeenCalledWith('begin_pg_transaction', { id: 'c1', txId: 'tx-1' })
+    await runQuery('c1', 'DELETE FROM t', 'run-1', 'tx-1')
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'DELETE FROM t', runId: 'run-1', txId: 'tx-1' })
+    await commitTransaction('tx-1')
+    expect(invoke).toHaveBeenCalledWith('commit_pg_transaction', { txId: 'tx-1' })
+    await rollbackTransaction('tx-1')
+    expect(invoke).toHaveBeenCalledWith('rollback_pg_transaction', { txId: 'tx-1' })
   })
 
   it('formats SQL', async () => {
