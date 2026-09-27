@@ -37,6 +37,7 @@ mod pg_integration_tests;
 mod pg_uri;
 mod pool;
 mod saved_queries;
+mod pg_query_library;
 mod settings;
 mod shell;
 mod ssh;
@@ -60,6 +61,7 @@ use operations::OperationsRegistry;
 use pool::ConnectionPool;
 use std::sync::Arc;
 use saved_queries::SavedQueryStorage;
+use pg_query_library::PgQueryLibraryStore;
 use settings::SettingsStorage;
 use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;
@@ -90,6 +92,7 @@ pub fn run() {
             app.manage(FolderStorage::new(data_dir.join("folders.json")));
             app.manage(HistoryStorage::new(data_dir.join("history.json")));
             app.manage(SavedQueryStorage::new(data_dir.join("saved_queries.json")));
+            app.manage(PgQueryLibraryStore::new(data_dir.join("pg_queries.json")));
             app.manage(DefaultQueryStorage::new(data_dir.join("default_queries.json")));
             app.manage(SettingsStorage::new(data_dir.join("settings.json")));
             app.manage(TabStorage::new(data_dir.join("tabs.json")));
@@ -197,6 +200,12 @@ pub fn run() {
             run_pg_query,
             cancel_pg_query,
             explain_pg_query,
+            list_pg_history,
+            push_pg_history,
+            clear_pg_history,
+            list_pg_saved,
+            save_pg_query,
+            delete_pg_saved,
             browse_pg_table,
             count_pg_table,
             read_pg_table_select,

@@ -1,9 +1,11 @@
 import { runQuery, cancelQuery, explainQuery } from '../api/queries'
+import { pushHistory } from '../api/library'
 import { errMessage } from '../../../utils/errors'
 
 // Runs a query tab's SQL — or `sql`, a selection of it — and keeps the outcome on the
 // tab, so it survives switching tabs, with a line per run in `tab.messages`. A second
-// run while one is in flight is ignored; the one in flight can be cancelled.
+// run while one is in flight is ignored; the one in flight can be cancelled. A run
+// that succeeds joins the connection's history.
 export async function runSql(tab, sql = tab.sql) {
   if (tab.running) return
   tab.running = true
@@ -13,6 +15,7 @@ export async function runSql(tab, sql = tab.sql) {
   try {
     tab.result = await runQuery(tab.connectionId, sql, tab.runId)
     log(true, `SELECT ${tab.result.rows.length}`, tab.result.elapsedMs)
+    pushHistory(tab.connectionId, sql).catch(() => {})
   } catch (e) {
     tab.error = errMessage(e)
     tab.result = null
