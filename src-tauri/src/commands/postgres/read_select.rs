@@ -70,11 +70,11 @@ fn contains_text(pattern: &Expr) -> Result<String, String> {
 }
 
 fn condition(expr: &Expr) -> Result<ColumnFilter, String> {
-    let with_value = |col: &Expr, op, value: String| Ok(ColumnFilter { column: column(col)?, op, value: Some(value) });
+    let with_value = |col: &Expr, op, value: String| Ok(ColumnFilter { table: 0, column: column(col)?, op, value: Some(value) });
     match expr {
         Expr::Nested(inner) => condition(inner),
-        Expr::IsNull(col) => Ok(ColumnFilter { column: column(col)?, op: FilterOp::IsNull, value: None }),
-        Expr::IsNotNull(col) => Ok(ColumnFilter { column: column(col)?, op: FilterOp::NotNull, value: None }),
+        Expr::IsNull(col) => Ok(ColumnFilter { table: 0, column: column(col)?, op: FilterOp::IsNull, value: None }),
+        Expr::IsNotNull(col) => Ok(ColumnFilter { table: 0, column: column(col)?, op: FilterOp::NotNull, value: None }),
         Expr::ILike { negated: false, any: false, expr, pattern, escape_char: None } => {
             let col = match expr.as_ref() {
                 Expr::Cast { expr, data_type: DataType::Text, .. } => expr.as_ref(),

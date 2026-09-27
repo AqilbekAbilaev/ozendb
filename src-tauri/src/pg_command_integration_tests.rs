@@ -7,7 +7,7 @@
 
 use crate::commands::{
     browse_table_impl, count_table_impl, list_columns_impl, list_databases_impl, list_schemas_impl,
-    list_tables_impl, run_query_impl, update_row_impl, ColumnValue,
+    list_tables_impl, run_query_impl, update_row_impl, ColumnRef, ColumnValue,
 };
 use crate::pg_integration_tests::{pool, test_config};
 
@@ -68,14 +68,14 @@ async fn postgres_commands_round_trip() {
     assert!(!result.truncated);
 
     // browse_pg_table — paged, ordered by qty descending.
-    let page = browse_table_impl(&pool, "ozendb_it", "widgets", &[], Some("qty"), true, 2, 0)
+    let page = browse_table_impl(&pool, "ozendb_it", "widgets", &[], &[], Some(&ColumnRef { table: 0, column: String::from("qty") }), true, 2, 0)
         .await
         .unwrap();
     assert_eq!(page.rows.len(), 2);
     assert_eq!(page.rows[0][1], serde_json::json!("c"));
 
     // count_pg_table
-    let total = count_table_impl(&pool, "ozendb_it", "widgets", &[]).await.unwrap();
+    let total = count_table_impl(&pool, "ozendb_it", "widgets", &[], &[]).await.unwrap();
     assert_eq!(total, 3);
 
     // update_pg_row — edit by primary key, then verify the change stuck.
@@ -297,7 +297,7 @@ async fn browse_defaults_to_ordering_by_the_primary_key() {
         sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
     }
 
-    let page = browse_table_impl(&pool, "ozendb_it_order", "t", &[], None, false, 10, 0).await.unwrap();
+    let page = browse_table_impl(&pool, "ozendb_it_order", "t", &[], &[], None, false, 10, 0).await.unwrap();
     let ids: Vec<i64> = page.rows.iter().map(|row| row[0].as_i64().unwrap()).collect();
     assert_eq!(ids, vec![1, 2, 3]);
 
@@ -327,7 +327,7 @@ async fn descending_order_applies_to_every_column_of_a_composite_key() {
         sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
     }
 
-    let page = browse_table_impl(&pool, "ozendb_it_composite", "t", &[], None, true, 10, 0).await.unwrap();
+    let page = browse_table_impl(&pool, "ozendb_it_composite", "t", &[], &[], None, true, 10, 0).await.unwrap();
     let pairs: Vec<(i64, i64)> =
         page.rows.iter().map(|row| (row[0].as_i64().unwrap(), row[1].as_i64().unwrap())).collect();
     assert_eq!(pairs, vec![(2, 2), (2, 1), (1, 2), (1, 1)]);
