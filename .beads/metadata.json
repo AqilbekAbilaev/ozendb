@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "ozendb",
+  "project_id": "83ad2f97-a419-423e-b35c-ab25e99086f6"
+}
