@@ -33,6 +33,9 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   // typing edits the boxes, and only applying reloads.
   const filterText = ref({})
   const filters = ref([])
+  // The columns the grid shows, in order; empty shows them all. Rows are still read
+  // whole, so a hidden primary key can identify a row for editing.
+  const shownColumns = ref([])
   // SQL mode: an editor seeded with the SQL the filters amount to. Going back reads
   // edited SQL into the boxes, or says why they can't show it.
   const mode = ref('filter')
@@ -50,9 +53,15 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   const hasPrev = computed(() => offset.value > 0)
   const activeFilters = computed(() => filters.value.length)
   const hasNext = computed(() => total.value != null && offset.value + limit.value < total.value)
+  const view = computed(() => {
+    if (!shownColumns.value.length) return { columns: columns.value, rows: rows.value }
+    const at = shownColumns.value.map(c => columns.value.indexOf(c))
+    return { columns: shownColumns.value, rows: rows.value.map(row => at.map(i => row[i])) }
+  })
   const currentSql = computed(() => buildSelectSql({
     schema: target.schema,
     table: target.table,
+    columns: shownColumns.value,
     filters: filters.value,
     orderBy: orderBy.value ? [orderBy.value] : keyColumns.value,
     descending: descending.value,
@@ -129,6 +138,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     filterText.value = { ...filterText.value, [column]: text }
   }
 
+  function setShownColumns(list) {
+    shownColumns.value = list
+  }
+
   function replaceFilterText(texts) {
     filterText.value = texts
   }
@@ -173,7 +186,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
 
   // Takes SQL read back by the backend as the grid's filters, sort and page, or
   // returns why the grid can't show it.
-  function adopt({ filters: read, orderBy: order, descending: desc, limit: rowsPerPage, offset: at }) {
+  function adopt({ columns: shown = [], filters: read, orderBy: order, descending: desc, limit: rowsPerPage, offset: at }) {
     if (rowsPerPage == null) return 'the filter view shows a page at a time, so it needs a LIMIT.'
     const keys = keyColumns.value
     const byKey = order.length === keys.length && order.every((c, i) => c === keys[i])
@@ -186,6 +199,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
     }
     filterText.value = texts
     filters.value = read
+    shownColumns.value = shown
     orderBy.value = byKey ? null : order[0] ?? null
     descending.value = desc
     limit.value = rowsPerPage
@@ -239,6 +253,6 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   return {
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
-    setFilterText, replaceFilterText, setSort, applyFilters, clearFilters, canEdit, editText, saveCell,
+    setFilterText, replaceFilterText, setSort, shownColumns, setShownColumns, view, applyFilters, clearFilters, canEdit, editText, saveCell,
   }
 }

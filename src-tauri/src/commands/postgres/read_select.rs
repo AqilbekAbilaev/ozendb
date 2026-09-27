@@ -13,6 +13,8 @@ use super::browse::{ColumnFilter, FilterOp};
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TableSelect {
+    /// The columns to show, in order; empty for `SELECT *`.
+    pub columns: Vec<String>,
     pub filters: Vec<ColumnFilter>,
     pub order_by: Vec<String>,
     pub descending: bool,
@@ -110,7 +112,7 @@ fn integer(expr: &Expr) -> Result<i64, String> {
     literal(expr)?.parse().map_err(|_| "LIMIT and OFFSET must be whole numbers".to_string())
 }
 
-/// Reads `sql` as a filter view of `schema.table`: `SELECT *` from that one table,
+/// Reads `sql` as a filter view of `schema.table`: `*` or plain columns from that one table,
 /// conditions joined by AND, one sort direction, and LIMIT/OFFSET. Anything else is
 /// refused with the reason, since the filter boxes couldn't show it.
 pub(crate) fn read_table_select(sql: &str, schema: &str, table: &str) -> Result<TableSelect, String> {
@@ -124,11 +126,20 @@ pub(crate) fn read_table_select(sql: &str, schema: &str, table: &str) -> Result<
     let plain = query.with.is_none()
         && select.distinct.is_none()
         && select.having.is_none()
-        && matches!(&select.group_by, GroupByExpr::Expressions(e, _) if e.is_empty())
-        && matches!(select.projection.as_slice(), [SelectItem::Wildcard(_)]);
+        && matches!(&select.group_by, GroupByExpr::Expressions(e, _) if e.is_empty());
     if !plain {
-        return Err("only SELECT * with WHERE, ORDER BY and LIMIT can be shown as filters".to_string());
+        return Err("only a SELECT with WHERE, ORDER BY and LIMIT can be shown as filters".to_string());
     }
+    let columns = match select.projection.as_slice() {
+        [SelectItem::Wildcard(_)] => Vec::new(),
+        items => items
+            .iter()
+            .map(|item| match item {
+                SelectItem::UnnamedExpr(expr) => column(expr),
+                other => Err(format!("`{other}` isn't a plain column to show")),
+            })
+            .collect::<Result<_, _>>()?,
+    };
 
     let from_this_table = match select.from.as_slice() {
         [from] if from.joins.is_empty() => match &from.relation {
@@ -173,7 +184,7 @@ pub(crate) fn read_table_select(sql: &str, schema: &str, table: &str) -> Result<
         Some(_) => return Err("only LIMIT n OFFSET m paging can be shown".to_string()),
     };
 
-    Ok(TableSelect { filters, order_by, descending: directions.first() == Some(&true), limit, offset })
+    Ok(TableSelect { columns, filters, order_by, descending: directions.first() == Some(&true), limit, offset })
 }
 
 /// Reads a table tab's edited SQL back into its filters, sort and page, or says why

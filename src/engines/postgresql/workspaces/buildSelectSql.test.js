@@ -33,6 +33,10 @@ describe('buildSelectSql', () => {
     expect(sql).toBe('SELECT *\nFROM "public"."users"\nORDER BY "a" DESC, "b" DESC\nLIMIT 100 OFFSET 200;')
   })
 
+  it('selects just the chosen columns, in order', () => {
+    expect(buildSelectSql({ ...base, columns: ['id', 'n"ame'] })).toBe('SELECT "id", "n""ame"\nFROM "public"."users"\nLIMIT 100;')
+  })
+
   it('quotes names and values so neither can break out of the query', () => {
     const sql = buildSelectSql({
       ...base,

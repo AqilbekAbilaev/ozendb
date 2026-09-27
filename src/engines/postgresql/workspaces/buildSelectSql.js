@@ -15,8 +15,10 @@ function condition({ column, op, value }) {
   return `${ident(column)} ${OPERATORS[op]} ${literal(value)}`
 }
 
-export function buildSelectSql({ schema, table, filters, orderBy, descending, limit, offset }) {
-  const lines = ['SELECT *', `FROM ${ident(schema)}.${ident(table)}`]
+// `columns` are the ones to show, or empty for all of them.
+export function buildSelectSql({ schema, table, columns = [], filters, orderBy, descending, limit, offset }) {
+  const shown = columns.length ? columns.map(ident).join(', ') : '*'
+  const lines = [`SELECT ${shown}`, `FROM ${ident(schema)}.${ident(table)}`]
   filters.forEach((f, i) => lines.push(`${i ? '  AND' : 'WHERE'} ${condition(f)}`))
   if (orderBy.length) {
     const direction = descending ? 'DESC' : 'ASC'

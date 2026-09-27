@@ -141,6 +141,37 @@ describe('query builder', () => {
   })
 })
 
+describe('shown columns', () => {
+  it('shows just the chosen columns, without reloading', async () => {
+    const t = await loaded()
+    t.setShownColumns(['name', 'id'])
+    expect(t.view.value).toEqual({ columns: ['name', 'id'], rows: [['Ada', 1], ['Linus', 2]] })
+    expect(browseTable).toHaveBeenCalledTimes(1)
+    t.setShownColumns([])
+    expect(t.view.value.columns).toEqual(['id', 'name', 'tags', 'meta'])
+  })
+
+  it('selects them in the SQL, and takes them from an edited query', async () => {
+    const t = await loaded()
+    t.setShownColumns(['name'])
+    expect(t.currentSql.value).toMatch(/^SELECT "name"\n/)
+    await t.toSql()
+    t.sqlState.sql = 'edited'
+    readTableSelect.mockResolvedValue({ columns: ['id'], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 })
+    await t.toFilters()
+    expect(t.shownColumns.value).toEqual(['id'])
+  })
+
+  it('still edits a cell by its hidden primary key', async () => {
+    updateRow.mockResolvedValue(1)
+    const t = await loaded()
+    t.setShownColumns(['name'])
+    await t.saveCell(0, 'name', 'Ada L.')
+    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'Ada L.' }], [{ column: 'id', value: 1 }])
+    expect(t.view.value.rows[0]).toEqual(['Ada L.'])
+  })
+})
+
 describe('limit, messages and server details', () => {
   it('applies a new limit with the filters, restarting from the first row', async () => {
     const t = await loaded({ pageSize: 100 })
