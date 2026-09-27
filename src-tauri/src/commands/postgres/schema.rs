@@ -86,12 +86,19 @@ pub struct PgTableInfo {
     /// few other exotic kinds, folded into "table" here since nothing downstream
     /// treats them differently yet.
     pub kind: String,
+    /// The planner's row estimate (`pg_class.reltuples`) — free to read, unlike a
+    /// count. None for a view, or a table never vacuumed or analysed (-1 there).
+    pub estimated_rows: Option<i64>,
 }
 
 pub(crate) async fn list_tables_impl(pool: &sqlx::PgPool, schema: &str) -> Result<Vec<PgTableInfo>, AppError> {
-    let rows: Vec<(String, String)> = match sqlx::query_as(
-        "SELECT table_name, table_type FROM information_schema.tables \
-         WHERE table_schema = $1 ORDER BY table_name",
+    // information_schema lists only what the role may see; pg_class adds the estimate.
+    let rows: Vec<(String, String, Option<f32>)> = match sqlx::query_as(
+        "SELECT t.table_name, t.table_type, c.reltuples \
+         FROM information_schema.tables t \
+         LEFT JOIN pg_namespace n ON n.nspname = t.table_schema \
+         LEFT JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = t.table_name \
+         WHERE t.table_schema = $1 ORDER BY t.table_name",
     )
     .bind(schema)
     .fetch_all(pool)
@@ -102,9 +109,13 @@ pub(crate) async fn list_tables_impl(pool: &sqlx::PgPool, schema: &str) -> Resul
     };
     Ok(rows
         .into_iter()
-        .map(|(name, table_type)| PgTableInfo {
-            name,
-            kind: if table_type == "VIEW" { String::from("view") } else { String::from("table") },
+        .map(|(name, table_type, reltuples)| {
+            let is_view = table_type == "VIEW";
+            PgTableInfo {
+                name,
+                kind: if is_view { String::from("view") } else { String::from("table") },
+                estimated_rows: reltuples.filter(|&n| !is_view && n >= 0.0).map(|n| n as i64),
+            }
         })
         .collect())
 }

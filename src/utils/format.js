@@ -58,3 +58,10 @@ export function formatNow() {
     hour: '2-digit', minute: '2-digit',
   }).replace(',', '')
 }
+
+const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+// A count short enough for a sidebar row: 48, 1.2K, 3.4M.
+export function formatCompact(n) {
+  return compact.format(n)
+}
