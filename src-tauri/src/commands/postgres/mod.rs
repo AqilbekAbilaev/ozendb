@@ -10,6 +10,7 @@ pub mod cancel;
 pub mod explain;
 pub mod library;
 pub mod format;
+mod statement;
 mod array_literal;
 
 pub use schema::*;

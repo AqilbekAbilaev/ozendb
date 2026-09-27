@@ -14,7 +14,7 @@ export async function runSql(tab, sql = tab.sql) {
   const log = (ok, text, ms) => { tab.messages = [...(tab.messages ?? []), { at: new Date(), ok, text, ms }] }
   try {
     tab.result = await runQuery(tab.connectionId, sql, tab.runId)
-    log(true, `SELECT ${tab.result.rows.length}`, tab.result.elapsedMs)
+    log(true, outcome(tab.result), tab.result.elapsedMs)
     pushHistory(tab.connectionId, sql).catch(() => {})
   } catch (e) {
     tab.error = errMessage(e)
@@ -24,6 +24,12 @@ export async function runSql(tab, sql = tab.sql) {
     tab.running = false
     tab.runId = null
   }
+}
+
+// What a run did, in a line: the rows a query returned, or the rows a statement changed.
+export function outcome({ rows, rowsAffected }) {
+  if (rowsAffected == null) return `SELECT ${rows.length}`
+  return `${rowsAffected} row${rowsAffected === 1 ? '' : 's'} affected`
 }
 
 // The run then ends with a "cancelled" error, handled like any other.

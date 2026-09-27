@@ -63,6 +63,15 @@ describe('runSql', () => {
     expect(t.messages.map(m => [m.ok, m.text, m.ms])).toEqual([[true, 'SELECT 2', 4], [false, 'boom', undefined]])
   })
 
+  it('logs how many rows a statement changed', async () => {
+    const t = tab({ sql: 'DELETE FROM t' })
+    runQuery.mockResolvedValueOnce({ columns: [], rows: [], truncated: false, elapsedMs: 2, rowsAffected: 1 })
+    await runSql(t)
+    runQuery.mockResolvedValueOnce({ columns: [], rows: [], truncated: false, elapsedMs: 2, rowsAffected: 3 })
+    await runSql(t)
+    expect(t.messages.map(m => m.text)).toEqual(['1 row affected', '3 rows affected'])
+  })
+
   it('cancels the run in flight by its id, and does nothing once it has ended', async () => {
     let finish
     runQuery.mockImplementation(() => new Promise((resolve, reject) => { finish = reject }))

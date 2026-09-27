@@ -11,7 +11,7 @@ import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
 import PostgresMessages from './PostgresMessages.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
-import { runSql, cancelSql, explainSql, formatSql } from './runSql.js'
+import { runSql, cancelSql, explainSql, formatSql, outcome } from './runSql.js'
 import { showToast } from '../../../stores/toast'
 import PostgresPlan from './PostgresPlan.vue'
 import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
@@ -77,6 +77,7 @@ const rtabs = computed(() => [
 const summary = computed(() => {
   const r = props.state.result
   if (!r) return 'No results'
+  if (r.rowsAffected != null) return outcome(r)
   const rows = `${r.rows.length} row${r.rows.length === 1 ? '' : 's'}`
   return r.truncated ? `${rows} (first rows only — the result was capped)` : rows
 })
@@ -120,7 +121,8 @@ const summary = computed(() => {
       <StateMessage v-else-if="state.error" mode="error" :message="state.error" />
       <StateMessage v-else-if="state.running && !state.result" mode="loading" />
       <template v-else-if="state.result">
-        <StateMessage v-if="!state.result.rows.length" mode="empty" label="The query returned no rows" />
+        <StateMessage v-if="state.result.rowsAffected != null" mode="empty" :label="outcome(state.result)" />
+        <StateMessage v-else-if="!state.result.rows.length" mode="empty" label="The query returned no rows" />
         <PostgresResultGrid v-else :columns="state.result.columns" :rows="state.result.rows" />
       </template>
       <StateMessage v-else mode="empty" label="Run a query to see its results (⌘↵)" />
