@@ -8,6 +8,7 @@ import { contextMenu, contextActiveNodeKey, pgNodeKey } from '../../../stores/co
 import { PG_MENUS } from './contextMenus.js'
 import { tagOverrides } from '../../../stores/nodeTags'
 import { colorHex, nodeTagName } from '../../../utils/tabColor.js'
+import { formatCompact } from '../../../utils/format'
 
 const props = defineProps({
   conn: { type: Object, required: true },
@@ -120,6 +121,11 @@ function openTable(schema, table) {
           <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
           <span class="ti"><BaseIcon name="table" :size="15" /></span>
           <span class="tt">{{ table.name }}</span>
+          <span
+            v-if="table.estimatedRows != null"
+            class="cnt"
+            :title="`About ${table.estimatedRows.toLocaleString()} rows (PostgreSQL's estimate)`"
+          >{{ formatCompact(table.estimatedRows) }}</span>
         </div>
       </template>
     </template>

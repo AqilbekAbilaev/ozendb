@@ -3,7 +3,7 @@
 //! and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{
-    browse_table_impl, count_table_impl, list_foreign_keys_impl, update_row_impl, ColumnFilter, ColumnRef, ColumnValue,
+    browse_table_impl, count_table_impl, list_foreign_keys_impl, list_tables_impl, update_row_impl, ColumnFilter, ColumnRef, ColumnValue,
     FilterOp, JoinKind, TableJoin,
 };
 use crate::pg_integration_tests::{pool, test_config};
@@ -253,4 +253,34 @@ async fn edits_array_cells_and_sets_cells_to_null() {
     assert_eq!(page.rows[0][3], serde_json::Value::Null);
 
     sqlx::query("DROP SCHEMA ozendb_it_arrays CASCADE").execute(&pool).await.unwrap();
+}
+
+#[tokio::test]
+async fn lists_tables_with_the_planner_row_estimate_when_there_is_one() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_estimate CASCADE",
+        "CREATE SCHEMA ozendb_it_estimate",
+        "CREATE TABLE ozendb_it_estimate.analysed (id INT)",
+        "INSERT INTO ozendb_it_estimate.analysed SELECT generate_series(1, 1000)",
+        "ANALYZE ozendb_it_estimate.analysed",
+        "CREATE TABLE ozendb_it_estimate.fresh (id INT)",
+        "CREATE VIEW ozendb_it_estimate.v AS SELECT 1 AS x",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+    let tables = list_tables_impl(&pool, "ozendb_it_estimate").await.unwrap();
+    let estimate = |name: &str| tables.iter().find(|t| t.name == name).unwrap().estimated_rows;
+    assert_eq!(estimate("analysed"), Some(1000));
+    assert_eq!(estimate("fresh"), None, "never analysed: no estimate rather than -1");
+    assert_eq!(estimate("v"), None, "a view has no rows of its own");
+
+    sqlx::query("DROP SCHEMA ozendb_it_estimate CASCADE").execute(&pool).await.unwrap();
 }

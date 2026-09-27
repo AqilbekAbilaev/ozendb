@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { fmtBytes, fmtBytesExact, fmtClock, cellText } from './format'
+import { fmtBytes, fmtBytesExact, fmtClock, cellText, formatCompact } from './format'
 
 describe('fmtBytesExact', () => {
   it('follows the human size with the exact byte count', () => {
@@ -77,5 +77,13 @@ describe('cellText', () => {
   it('renders objects and arrays as compact JSON', () => {
     expect(cellText({ $oid: 'abc' })).toBe('{"$oid":"abc"}')
     expect(cellText([1, 2])).toBe('[1,2]')
+  })
+})
+
+describe('formatCompact', () => {
+  it('shortens a large count the way a sidebar can fit it', () => {
+    expect(formatCompact(48)).toBe('48')
+    expect(formatCompact(1234)).toBe('1.2K')
+    expect(formatCompact(3_400_000)).toBe('3.4M')
   })
 })
