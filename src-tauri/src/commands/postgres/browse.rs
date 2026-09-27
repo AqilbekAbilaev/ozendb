@@ -218,7 +218,7 @@ pub(crate) async fn browse_table_impl(
     }
     inner.push_str(&format!(" LIMIT {effective_limit} OFFSET {effective_offset}"));
 
-    run_wrapped(pool, &inner, &binds).await
+    run_wrapped(pool, &inner, &binds, None).await
 }
 
 /// Paged `SELECT *` over one table or view, with optional joins — the table-browse

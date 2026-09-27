@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Column, Executor, SqlSafeStr, Statement};
 use tauri::State;
 
-use super::{array_literal::array_literal, primary_key_columns, quote_ident, AppContext};
+use super::{array_literal::array_literal, cancel, primary_key_columns, quote_ident, AppContext};
 
 /// Cap on rows returned by an arbitrary or browse query — the Postgres sibling of
 /// `AGG_RESULT_CAP` for Mongo's `run_aggregate`. Requested as `<cap>+1` so
@@ -118,19 +118,22 @@ fn rows_from_json(mut raw_rows: Vec<serde_json::Value>) -> (Vec<Vec<serde_json::
 /// statements — the wrapper is only valid SQL when `inner_sql` is something a
 /// `FROM` clause can wrap, which INSERT/UPDATE/DELETE/DDL are not.
 ///
-/// Column names come from `Executor::prepare`, not `describe` — the latter is
-/// `#[cfg(feature = "offline")]` internal plumbing for the `query!`/`query_as!`
-/// macros (not meant to be called directly), and reaching it would mean
-/// depending on the unused `macros` feature. `prepare`'s `Statement::columns()`
-/// gives the same names and types without that.
+/// Column names come from `Executor::prepare`, not `describe`: the latter is the
+/// `query!` macros' offline plumbing, behind the unused `macros` feature.
 ///
 /// Runs on one connection — the caller's plain one, or its read-only transaction.
-/// `binds` fill `inner_sql`'s `$n` placeholders, in order.
+/// `binds` fill `inner_sql`'s `$n` placeholders, in order; a `run_id` makes the run
+/// cancellable (see cancel.rs) until it ends.
 async fn run_wrapped_on(
     conn: &mut sqlx::PgConnection,
     inner_sql: &str,
     binds: &[String],
+    run_id: Option<&str>,
 ) -> Result<PgQueryResult, AppError> {
+    let _running = match run_id {
+        Some(id) => Some(cancel::register(&mut *conn, id).await?),
+        None => None,
+    };
     let stmt = match (&mut *conn).prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
@@ -156,12 +159,12 @@ async fn run_wrapped_on(
 }
 
 /// `run_wrapped_on` a connection borrowed from the pool.
-pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[String]) -> Result<PgQueryResult, AppError> {
+pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[String], run_id: Option<&str>) -> Result<PgQueryResult, AppError> {
     let mut conn = match pool.acquire().await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
     };
-    run_wrapped_on(&mut conn, inner_sql, binds).await
+    run_wrapped_on(&mut conn, inner_sql, binds, run_id).await
 }
 
 /// The `read_only`-enforced sibling of `run_wrapped`, for `run_pg_query` alone:
@@ -173,53 +176,46 @@ pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[S
 /// `set_config('default_transaction_read_only', 'off', false)` (confirmed live),
 /// but can't do the same to a transaction that already explicitly set itself
 /// read-only, and every call here starts a fresh one.
-async fn run_wrapped_read_only(pool: &sqlx::PgPool, inner_sql: &str) -> Result<PgQueryResult, AppError> {
+async fn run_wrapped_read_only(pool: &sqlx::PgPool, inner_sql: &str, run_id: Option<&str>) -> Result<PgQueryResult, AppError> {
     let mut tx = match pool.begin().await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
     };
     let result = match sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await {
-        Ok(_) => run_wrapped_on(&mut tx, inner_sql, &[]).await,
+        Ok(_) => run_wrapped_on(&mut tx, inner_sql, &[], run_id).await,
         Err(e) => Err(AppError::Postgres(e)),
     };
     let _ = tx.rollback().await;
     result
 }
 
-pub(crate) async fn run_query_impl(
-    pool: &sqlx::PgPool,
-    sql: &str,
-    read_only: bool,
-) -> Result<PgQueryResult, AppError> {
+/// Runs caller SQL (see `run_pg_query`) — cancellable under `run_id` while it runs.
+pub(crate) async fn run_query_as(pool: &sqlx::PgPool, sql: &str, read_only: bool, run_id: Option<&str>) -> Result<PgQueryResult, AppError> {
     let trimmed = sql.trim().trim_end_matches(';');
     if trimmed.is_empty() {
         return Err(AppError::Validation("Enter a query to run.".to_string()));
     }
     if read_only {
-        run_wrapped_read_only(pool, trimmed).await
-    } else {
-        run_wrapped(pool, trimmed, &[]).await
+        return run_wrapped_read_only(pool, trimmed, run_id).await;
     }
+    run_wrapped(pool, trimmed, &[], run_id).await
 }
 
-/// Runs arbitrary read-oriented SQL (a single SELECT, CTE, or VALUES expression)
-/// and returns every row — the SQL editor workspace's core. A general
-/// SQL-*execution* surface (INSERT/UPDATE/DELETE/DDL, multiple statements) is out
-/// of v1's scope; see `run_wrapped`'s doc comment for why those fail with a
-/// Postgres syntax error here rather than running.
-///
-/// Reaches the driver through `pg_pool`, not `pg_pool_for_write` — this command
-/// must still be usable on a `read_only` connection, just constrained rather
-/// than refused outright. See `run_wrapped_read_only` for how that's enforced.
+/// Runs read-oriented SQL (one SELECT, CTE or VALUES) and returns every row — the SQL
+/// editor's core. INSERT/UPDATE/DELETE/DDL fail with a syntax error (see
+/// `run_wrapped`). Uses `pg_pool`, not `pg_pool_for_write`, so a `read_only`
+/// connection can still query — constrained by `run_wrapped_read_only`. A `run_id`
+/// lets `cancel_pg_query` stop it.
 #[tauri::command]
 pub async fn run_pg_query(
     ctx: State<'_, AppContext>,
     id: String,
     sql: String,
+    run_id: Option<String>,
 ) -> Result<PgQueryResult, AppError> {
     let pool = ctx.pg_pool(&id).await?;
     let read_only = ctx.is_read_only(&id);
-    run_query_impl(&pool, &sql, read_only).await
+    run_query_as(&pool, &sql, read_only, run_id.as_deref()).await
 }
 
 #[derive(Deserialize)]

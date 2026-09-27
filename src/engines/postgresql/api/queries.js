@@ -3,8 +3,13 @@
 
 import { invoke } from '@tauri-apps/api/core'
 
-export function runQuery(connectionId, sql) {
-  return invoke('run_pg_query', { id: connectionId, sql })
+// `runId` names the run so cancelQuery can stop it while it's in flight.
+export function runQuery(connectionId, sql, runId = null) {
+  return invoke('run_pg_query', { id: connectionId, sql, runId })
+}
+
+export function cancelQuery(connectionId, runId) {
+  return invoke('cancel_pg_query', { id: connectionId, runId })
 }
 
 // A column is named by `table` — 0 for the browsed table, 1 and on for `joins` in
