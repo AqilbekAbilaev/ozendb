@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const listTables = vi.fn()
 vi.mock('../api/resources', () => ({ listTables }))
 
-const { usePostgresTree, visibleSchemas } = await import('./usePostgresTree.js')
+const { usePostgresTree, visibleSchemas, isOpenTable } = await import('./usePostgresTree.js')
 
 beforeEach(() => vi.resetAllMocks())
 
@@ -11,6 +11,17 @@ describe('visibleSchemas', () => {
   it('hides PostgreSQL\'s own schemas', () => {
     const schemas = [{ name: 'pg_catalog', system: true }, { name: 'public', system: false }]
     expect(visibleSchemas(schemas)).toEqual([{ name: 'public', system: false }])
+  })
+})
+
+describe('isOpenTable', () => {
+  const tab = { type: 'postgresql.table_browse', connectionId: 'c1', schema: 'public', table: 'users' }
+  it('is the table the active tab is browsing, on this connection', () => {
+    expect(isOpenTable(tab, 'c1', 'public', 'users')).toBe(true)
+    expect(isOpenTable(tab, 'c2', 'public', 'users')).toBe(false)
+    expect(isOpenTable(tab, 'c1', 'audit', 'users')).toBe(false)
+    expect(isOpenTable({ ...tab, type: 'postgresql.query' }, 'c1', 'public', 'users')).toBe(false)
+    expect(isOpenTable(null, 'c1', 'public', 'users')).toBe(false)
   })
 })
 
