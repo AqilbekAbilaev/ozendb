@@ -1,21 +1,31 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import { usePostgresTree, visibleSchemas } from './usePostgresTree.js'
 import { openPostgresTable, openPostgresQuery } from '../../../stores/tabCreators'
+import { contextMenu } from '../../../stores/contextMenu'
+import { PG_MENUS } from './contextMenus.js'
 
 const props = defineProps({
   conn: { type: Object, required: true },
   schemas: { type: Array, required: true },
 })
 
-const { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, toggleSchema } =
+const { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, toggleSchema, reloadTables } =
   usePostgresTree(props.conn.id)
+// A refresh brings a new schema list; the open schemas' tables are re-read with it.
+watch(() => props.schemas, reloadTables)
 const shown = computed(() => visibleSchemas(props.schemas))
 const database = computed(() => props.conn.database || 'postgres')
 
 function openQuery() {
   openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: database.value })
+}
+
+// Right-click on a row: `level` picks its menu, `extra` names the schema/table under it.
+function onContext(e, level, label, extra = {}) {
+  const node = { connId: props.conn.id, connName: props.conn.name, engine: 'postgresql', database: database.value, ...extra }
+  contextMenu.value = { type: 'pg:' + level, x: e.clientX, y: e.clientY, label, nodeData: node, items: PG_MENUS[level] }
 }
 
 function openTable(schema, table) {
@@ -31,7 +41,7 @@ function openTable(schema, table) {
 
 <template>
   <!-- A connection is bound to one database; it's the only one there is to browse. -->
-  <div class="tnode" style="padding-left: 21px" @click="toggleDatabase">
+  <div class="tnode" style="padding-left: 21px" @click="toggleDatabase" @contextmenu.prevent="onContext($event, 'database', database)">
     <span class="tw"><BaseIcon :name="databaseOpen ? 'caretDown' : 'caret'" :size="12" /></span>
     <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
     <span class="tt">{{ database }}</span>
@@ -43,7 +53,12 @@ function openTable(schema, table) {
 
   <template v-if="databaseOpen">
     <template v-for="schema in shown" :key="schema.name">
-      <div class="tnode" style="padding-left: 36px" @click="toggleSchema(schema.name)">
+      <div
+        class="tnode"
+        style="padding-left: 36px"
+        @click="toggleSchema(schema.name)"
+        @contextmenu.prevent="onContext($event, 'schema', schema.name, { schema: schema.name })"
+      >
         <span class="tw"><BaseIcon :name="openSchemas[schema.name] ? 'caretDown' : 'caret'" :size="12" /></span>
         <span class="ti"><BaseIcon name="folder" :size="15" /></span>
         <span class="tt">{{ schema.name }}</span>
@@ -66,6 +81,7 @@ function openTable(schema, table) {
           class="tnode"
           style="padding-left: 66px"
           @dblclick="openTable(schema.name, table.name)"
+          @contextmenu.prevent="onContext($event, 'table', table.name, { schema: schema.name, table: table.name })"
         >
           <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
           <span class="ti"><BaseIcon name="collSmall" :size="15" /></span>

@@ -14,6 +14,7 @@ vi.mock('../stores/tabCreators', () => ({
   openCollectionTab: vi.fn(), openShellTab: vi.fn(), openIndexManagerTab: vi.fn(),
   openSqlTab: vi.fn(), openSchemaTab: vi.fn(), openSearchTab: vi.fn(),
   openCurrentOpsTab: vi.fn(), openExportSource: vi.fn(),
+  openPostgresQuery: vi.fn(), openPostgresTable: vi.fn(),
 }))
 vi.mock('./useDbActions', () => ({ useDbActions: () => ({ pasteClipboard: vi.fn() }) }))
 vi.mock('./useNodeTags', () => ({ useNodeTags: () => ({ applyColorTag }) }))
@@ -23,9 +24,10 @@ vi.mock('./useDbTransfer', () => ({
 
 const { tabs, activeTabId } = await import('../stores/tabs')
 const { showToast } = await import('../stores/toast')
-const { openCollectionTab, openShellTab, openSqlTab } = await import('../stores/tabCreators')
+const { openCollectionTab, openShellTab, openSqlTab, openPostgresQuery } = await import('../stores/tabCreators')
 const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
 const { MENUS } = await import('../constants/contextMenus')
+const { PG_MENUS, PG_ACTIONS } = await import('../engines/postgresql/tree/contextMenus')
 const { contextMenu } = await import('../stores/contextMenu')
 const { treeSelection, setTreeSelection } = await import('../stores/connectionNavigation')
 
@@ -332,6 +334,19 @@ describe('context menu coverage', () => {
     const { knownActions } = makeFeatures()
     const orphans = offered.filter(a => !knownActions.has(a) && !UNBUILT_ACTIONS.has(a))
     expect(orphans).toEqual([])
+  })
+
+  it('can dispatch every action the PostgreSQL menus offer', () => {
+    const { knownActions } = makeFeatures()
+    const pgOffered = Object.values(PG_MENUS).flatMap(actionsIn)
+    expect(pgOffered.filter(a => !PG_ACTIONS[a] && !knownActions.has(a))).toEqual([])
+  })
+
+  it('runs a PostgreSQL node\'s own action, not the MongoDB one of the same level', () => {
+    const node = { connId: 'p1', connName: 'Payments PG', engine: 'postgresql', database: 'payments' }
+    contextMenu.value = { type: 'pg:database', x: 0, y: 0, label: 'payments', nodeData: node, items: PG_MENUS.database }
+    makeFeatures().handleContextAction('New SQL Query')
+    expect(openPostgresQuery).toHaveBeenCalledWith({ connectionId: 'p1', connectionName: 'Payments PG', database: 'payments' })
   })
 
   it('keeps no placeholder for an action that is in fact implemented', () => {

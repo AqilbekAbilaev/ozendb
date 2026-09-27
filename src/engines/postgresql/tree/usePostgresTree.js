@@ -26,7 +26,18 @@ export function usePostgresTree(connectionId) {
   async function toggleSchema(schema) {
     openSchemas.value[schema] = !openSchemas.value[schema]
     if (!openSchemas.value[schema] || tables.value[schema]) return
+    return loadTables(schema)
+  }
 
+  // After a refresh: the open schemas' tables are re-read, the closed ones' dropped
+  // so they're fetched fresh when next opened.
+  function reloadTables() {
+    tables.value = {}
+    const open = Object.keys(openSchemas.value).filter(schema => openSchemas.value[schema])
+    return Promise.all(open.map(loadTables))
+  }
+
+  async function loadTables(schema) {
     loading.value[schema] = true
     delete errors.value[schema]
     try {
@@ -39,5 +50,5 @@ export function usePostgresTree(connectionId) {
     }
   }
 
-  return { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, toggleSchema }
+  return { databaseOpen, toggleDatabase, openSchemas, tables, loading, errors, toggleSchema, reloadTables }
 }

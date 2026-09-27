@@ -40,6 +40,23 @@ describe('usePostgresTree', () => {
     expect(t.loading.value.app).toBe(false)
   })
 
+  it('reloads the open schemas\' tables on refresh, and forgets the closed ones', async () => {
+    listTables.mockResolvedValue([{ name: 'users', kind: 'table' }])
+    const t = usePostgresTree('c1')
+    await t.toggleSchema('public')
+    await t.toggleSchema('audit')
+    await t.toggleSchema('audit')
+    listTables.mockClear()
+    listTables.mockResolvedValue([{ name: 'users', kind: 'table' }, { name: 'orders', kind: 'table' }])
+
+    await t.reloadTables()
+    expect(listTables).toHaveBeenCalledTimes(1)
+    expect(listTables).toHaveBeenCalledWith({ connectionId: 'c1', schema: 'public' })
+    expect(t.tables.value.public).toHaveLength(2)
+    expect(t.tables.value.audit).toBeUndefined()
+    expect(t.openSchemas.value.public).toBe(true)
+  })
+
   it('toggles the database row', () => {
     const t = usePostgresTree('c1')
     expect(t.databaseOpen.value).toBe(false)
