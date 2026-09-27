@@ -22,6 +22,8 @@ pub struct PgQueryResult {
     pub rows: Vec<Vec<serde_json::Value>>,
     pub truncated: bool,
     pub elapsed_ms: u64,
+    /// Set for a statement that returns no rows (INSERT, UPDATE, DDL…): how many rows it changed.
+    pub rows_affected: Option<u64>,
 }
 
 /// Column names and the `json_build_array(...)` wrapper SQL, built from a
@@ -114,9 +116,8 @@ fn rows_from_json(mut raw_rows: Vec<serde_json::Value>) -> (Vec<Vec<serde_json::
 /// row comes back as a JSON array via Postgres's own `to_json` (see
 /// `wrap_for_json`), sidestepping a per-Postgres-type Rust-side decoder
 /// entirely: whatever the query returns, the server already knows how to render
-/// as JSON. This is also why `run_pg_query` only supports queries, not arbitrary
-/// statements — the wrapper is only valid SQL when `inner_sql` is something a
-/// `FROM` clause can wrap, which INSERT/UPDATE/DELETE/DDL are not.
+/// as JSON. Only something a `FROM` clause can wrap returns rows this way; a statement
+/// with no result columns (INSERT, UPDATE, DDL…) runs as it is instead.
 ///
 /// Column names come from `Executor::prepare`, not `describe`: the latter is the
 /// `query!` macros' offline plumbing, behind the unused `macros` feature.
@@ -134,16 +135,19 @@ async fn run_wrapped_on(
         Some(id) => Some(cancel::register(&mut *conn, id).await?),
         None => None,
     };
-    let stmt = match (&mut *conn).prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Postgres(e)),
-    };
+    let stmt = (&mut *conn).prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await.map_err(AppError::Postgres)?;
     let (columns, wrapped) = wrap_for_json(&stmt, inner_sql);
-    if columns.is_empty() {
-        return Ok(PgQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0 });
-    }
-
     let started = std::time::Instant::now();
+    // Nothing to wrap: a statement, run as it is.
+    if columns.is_empty() {
+        let mut query = sqlx::query(sqlx::AssertSqlSafe(inner_sql.to_string()));
+        for bind in binds {
+            query = query.bind(bind);
+        }
+        let done = query.execute(&mut *conn).await.map_err(AppError::Postgres)?;
+        let elapsed_ms = started.elapsed().as_millis() as u64;
+        return Ok(PgQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms, rows_affected: Some(done.rows_affected()) });
+    }
     let mut query = sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped));
     for bind in binds {
         query = query.bind(bind);
@@ -155,15 +159,12 @@ async fn run_wrapped_on(
     let elapsed_ms = started.elapsed().as_millis() as u64;
     let (rows, truncated) = rows_from_json(raw_rows);
 
-    Ok(PgQueryResult { columns, rows, truncated, elapsed_ms })
+    Ok(PgQueryResult { columns, rows, truncated, elapsed_ms, rows_affected: None })
 }
 
 /// `run_wrapped_on` a connection borrowed from the pool.
 pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[String], run_id: Option<&str>) -> Result<PgQueryResult, AppError> {
-    let mut conn = match pool.acquire().await {
-        Ok(val) => val,
-        Err(e) => return Err(AppError::Postgres(e)),
-    };
+    let mut conn = pool.acquire().await.map_err(AppError::Postgres)?;
     run_wrapped_on(&mut conn, inner_sql, binds, run_id).await
 }
 
@@ -195,15 +196,16 @@ pub(crate) async fn run_query_as(pool: &sqlx::PgPool, sql: &str, read_only: bool
     if trimmed.is_empty() {
         return Err(AppError::Validation("Enter a query to run.".to_string()));
     }
+    super::statement::refuse_transaction_control(trimmed).map_err(AppError::Validation)?;
     if read_only {
         return run_wrapped_read_only(pool, trimmed, run_id).await;
     }
     run_wrapped(pool, trimmed, &[], run_id).await
 }
 
-/// Runs read-oriented SQL (one SELECT, CTE or VALUES) and returns every row — the SQL
-/// editor's core. INSERT/UPDATE/DELETE/DDL fail with a syntax error (see
-/// `run_wrapped`). Uses `pg_pool`, not `pg_pool_for_write`, so a `read_only`
+/// Runs one statement from the SQL editor: a query returns its rows, anything else
+/// (INSERT, UPDATE, DDL…) how many rows it changed. A statement that also returns rows
+/// (`… RETURNING`) can't be wrapped and fails (see `run_wrapped`). Uses `pg_pool`, not `pg_pool_for_write`, so a `read_only`
 /// connection can still query — constrained by `run_wrapped_read_only`. A `run_id`
 /// lets `cancel_pg_query` stop it.
 #[tauri::command]

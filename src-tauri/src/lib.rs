@@ -33,6 +33,8 @@ mod pg_cancel_integration_tests;
 #[cfg(test)]
 mod pg_explain_integration_tests;
 #[cfg(test)]
+mod pg_statement_integration_tests;
+#[cfg(test)]
 mod pg_integration_tests;
 mod pg_uri;
 mod pool;
