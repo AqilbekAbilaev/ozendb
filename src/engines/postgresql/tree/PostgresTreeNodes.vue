@@ -5,6 +5,8 @@ import { usePostgresTree, visibleSchemas } from './usePostgresTree.js'
 import { openPostgresTable, openPostgresQuery } from '../../../stores/tabCreators'
 import { contextMenu, contextActiveNodeKey, pgNodeKey } from '../../../stores/contextMenu'
 import { PG_MENUS } from './contextMenus.js'
+import { tagOverrides } from '../../../stores/nodeTags'
+import { colorHex, nodeTagName } from '../../../utils/tabColor.js'
 
 const props = defineProps({
   conn: { type: Object, required: true },
@@ -21,6 +23,11 @@ const database = computed(() => props.conn.database || 'postgres')
 function openQuery() {
   openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: database.value })
 }
+
+// Rows below the connection have no colours of their own yet, so they all show the
+// connection's, as MongoDB's rows inherit their nearest coloured ancestor's.
+const color = computed(() => nodeTagName(tagOverrides.value, props.conn.id, props.conn.tag))
+const tagStyle = computed(() => (color.value ? { '--tag-color': colorHex(color.value) } : null))
 
 // The row whose right-click menu is open stays highlighted, as MongoDB's rows do.
 const ctxSel = (level, schema, table) => contextActiveNodeKey.value === pgNodeKey(level, { connId: props.conn.id, schema, table })
@@ -46,7 +53,8 @@ function openTable(schema, table) {
   <!-- A connection is bound to one database; it's the only one there is to browse. -->
   <div
     class="tnode"
-    :class="{ 'ctx-sel': ctxSel('database') }"
+    :class="{ 'ctx-sel': ctxSel('database'), tagged: !!color }"
+    :style="tagStyle"
     style="padding-left: 21px"
     @click="toggleDatabase"
     @contextmenu.prevent="onContext($event, 'database', database)"
@@ -64,7 +72,8 @@ function openTable(schema, table) {
     <template v-for="schema in shown" :key="schema.name">
       <div
         class="tnode"
-        :class="{ 'ctx-sel': ctxSel('schema', schema.name) }"
+        :class="{ 'ctx-sel': ctxSel('schema', schema.name), tagged: !!color }"
+        :style="tagStyle"
         style="padding-left: 36px"
         @click="toggleSchema(schema.name)"
         @contextmenu.prevent="onContext($event, 'schema', schema.name, { schema: schema.name })"
@@ -89,7 +98,8 @@ function openTable(schema, table) {
           v-for="table in tables[schema.name]"
           :key="table.name"
           class="tnode"
-          :class="{ 'ctx-sel': ctxSel('table', schema.name, table.name) }"
+          :class="{ 'ctx-sel': ctxSel('table', schema.name, table.name), tagged: !!color }"
+          :style="tagStyle"
           style="padding-left: 66px"
           @dblclick="openTable(schema.name, table.name)"
           @contextmenu.prevent="onContext($event, 'table', table.name, { schema: schema.name, table: table.name })"
