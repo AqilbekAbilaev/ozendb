@@ -16,6 +16,7 @@ const {
   invalidateConnectionResources,
   refreshConnectionResources,
 } = await import('./connectionData')
+const { openConnections } = await import('./openConnectionList')
 
 function deferred() {
   let resolve
@@ -200,29 +201,27 @@ describe('connection resource state', () => {
 })
 
 describe('engine-specific loading', () => {
-  it('loads a MongoDB connection\'s databases by default', async () => {
+  // The engine comes from the open-connection list, so every caller — the tree, the
+  // refresh action, a modal that only knows the id — reaches the right command.
+  it('loads a MongoDB connection\'s databases', async () => {
+    openConnections.value = [{ id: 'a', engine: 'mongodb' }]
     listDatabases.mockResolvedValue([{ name: 'app' }])
     await ensureConnectionResources('a')
     expect(listDatabases).toHaveBeenCalledWith('a')
     expect(listSchemas).not.toHaveBeenCalled()
   })
 
-  it('loads a PostgreSQL connection\'s schemas, and refreshes it the same way', async () => {
+  it('refreshes a PostgreSQL connection\'s schemas even if the tree never loaded it', async () => {
+    openConnections.value = [{ id: 'a', engine: 'postgresql' }]
     listSchemas.mockResolvedValue([{ name: 'public', system: false }])
-    await ensureConnectionResources('a', 'postgresql')
-    expect(connDatabases.value.a).toEqual([{ name: 'public', system: false }])
-
-    // Later refreshes come from callers that only know the id.
     await refreshConnectionResources('a')
-    expect(listSchemas).toHaveBeenCalledTimes(2)
+    expect(connDatabases.value.a).toEqual([{ name: 'public', system: false }])
     expect(listDatabases).not.toHaveBeenCalled()
   })
 
-  it('forgets the engine when the connection is cleared', async () => {
-    listSchemas.mockResolvedValue([])
+  it('treats a connection without an engine as MongoDB', async () => {
+    openConnections.value = [{ id: 'a' }]
     listDatabases.mockResolvedValue([])
-    await ensureConnectionResources('a', 'postgresql')
-    clearConnectionResources('a')
     await ensureConnectionResources('a')
     expect(listDatabases).toHaveBeenCalledWith('a')
   })
