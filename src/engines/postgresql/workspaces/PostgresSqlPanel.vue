@@ -70,7 +70,7 @@ const summary = computed(() => {
 <template>
   <div class="pg-sql">
     <slot />
-    <div class="pg-toolbar">
+    <div class="qbar">
       <BaseButton variant="ghost" icon="run" class="run" :disabled="state.running || !state.sql.trim()" @click="run()">
         Run <span class="kbd">⌘↵</span>
       </BaseButton>
@@ -125,13 +125,6 @@ const summary = computed(() => {
 
 <style scoped>
 .pg-sql { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.pg-toolbar {
-  display: flex; align-items: center; gap: 2px; flex: none;
-  padding: 3px 10px; border-bottom: 1px solid var(--border);
-}
-.pg-toolbar .run :deep(svg) { color: var(--green); }
-.kbd { margin-left: 2px; font: 10.5px var(--mono); color: var(--text-faint); }
-.qsep { width: 1px; height: 18px; margin: 0 6px; background: var(--border-soft); }
 .pg-editor { flex: none; }
 .rtabs { display: flex; flex: none; border-bottom: 1px solid var(--border); }
 .pg-results { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -143,3 +136,4 @@ const summary = computed(() => {
 .fitem { display: flex; align-items: center; gap: 6px; }
 .spacer { flex: 1; }
 </style>
+<style scoped src="../../../components/workspace/WorkspaceToolbar.css"></style>

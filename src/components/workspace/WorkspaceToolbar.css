@@ -1,0 +1,10 @@
+/* The toolbar under every query workspace's crumbs (MongoDB's QueryBar, the PostgreSQL
+   table and SQL tabs). Imported as a scoped stylesheet by each; the buttons differ, so
+   there's no wrapper component. */
+.qbar { display: flex; align-items: center; gap: 2px; padding: 4px 10px; border-bottom: 1px solid var(--border); flex: none; flex-wrap: wrap; }
+.qsep { width: 1px; height: 18px; margin: 0 6px; background: var(--border-soft); }
+.qbar-spacer { flex: 1; }
+.qlabel { font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }
+.kbd { margin-left: 2px; font: 10.5px var(--mono); color: var(--text-faint); }
+.base-btn.run { min-width: 92px; justify-content: flex-start; border: 1px solid var(--green); }
+.base-btn.run :deep(svg) { color: var(--green); }

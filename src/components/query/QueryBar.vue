@@ -342,4 +342,5 @@ watch(() => props.activeTab && props.activeTab.id, () => {
   </template>
 </template>
 
+<style scoped src="../workspace/WorkspaceToolbar.css"></style>
 <style scoped src="./QueryBar.css"></style>
