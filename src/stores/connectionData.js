@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { listSchemas } from '../engines/postgresql/api/resources'
+import { openConnections } from './openConnectionList'
 
 // The databases the sidebar has fetched for each connection, keyed by connection id.
 //
@@ -22,12 +23,10 @@ const pendingRequests = new Map()
 const staleConnections = new Set()
 
 const LOADERS = { mongodb: listDatabases, postgresql: listSchemas }
-// Recorded by the tree's first load, so a later refresh from a caller that only knows
-// the id still reaches the right engine.
-const connectionEngines = new Map()   // connId → engine
 
-function remember(id, engine) {
-  if (engine) connectionEngines.set(id, engine)
+function loaderFor(id) {
+  const engine = openConnections.value.find(c => c.id === id)?.engine
+  return LOADERS[engine] ?? listDatabases
 }
 
 function hasOwn(record, id) {
@@ -58,7 +57,7 @@ function loadConnectionResources(id) {
 
   const request = (async () => {
     try {
-      const databases = await LOADERS[connectionEngines.get(id) ?? 'mongodb'](id)
+      const databases = await loaderFor(id)(id)
       if (requestGenerations.get(id) === generation) {
         connDatabases.value = { ...connDatabases.value, [id]: databases }
         staleConnections.delete(id)
@@ -81,14 +80,12 @@ function loadConnectionResources(id) {
   return request
 }
 
-export function ensureConnectionResources(id, engine) {
-  remember(id, engine)
+export function ensureConnectionResources(id) {
   if (hasLoadedData(id) && !staleConnections.has(id)) return Promise.resolve(connDatabases.value[id])
   return pendingRequests.get(id) || loadConnectionResources(id)
 }
 
-export function refreshConnectionResources(id, engine) {
-  remember(id, engine)
+export function refreshConnectionResources(id) {
   return loadConnectionResources(id)
 }
 
@@ -103,7 +100,6 @@ export function clearConnectionResources(id) {
   advanceGeneration(id)
   pendingRequests.delete(id)
   staleConnections.delete(id)
-  connectionEngines.delete(id)
   connDatabases.value = without(connDatabases.value, id)
   connectionResourceLoading.value = without(connectionResourceLoading.value, id)
   connectionResourceErrors.value = without(connectionResourceErrors.value, id)

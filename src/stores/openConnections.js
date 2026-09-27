@@ -1,8 +1,8 @@
-import { ref } from 'vue'
 import { listConnections } from '../appApi/connections'
 import { setConnectionOpen } from '../appApi/connectionState'
 import { clearConnectionResources } from './connectionData'
 import { applyConnectionUpdate } from '../utils/connectionList'
+import { openConnections } from './openConnectionList'
 
 // The connections currently open — what the sidebar lists, and the registry anything
 // else asks "which connections are open?" of.
@@ -13,7 +13,7 @@ import { applyConnectionUpdate } from '../utils/connectionList'
 //
 // The sibling store connectionData.js holds the databases fetched *within* each of
 // these connections; closing one here releases them.
-export const openConnections = ref([])
+export { openConnections }
 
 // Load-once latch. The tree mounts and unmounts (it is a v-if'd pane), so without
 // this every remount refetches a list that has not changed.
