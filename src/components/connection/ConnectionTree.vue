@@ -12,6 +12,7 @@ import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
 import PostgresTreeNodes from '../../engines/postgresql/tree/PostgresTreeNodes.vue'
 import EngineBadge from '../base/EngineBadge.vue'
+import { PG_MENUS } from '../../engines/postgresql/tree/contextMenus'
 
 const props = defineProps({
   width: { type: Number, default: 320 },
@@ -69,11 +70,20 @@ const STATUS_LABEL = {
   idle:      'Not connected',
 }
 
-function onNodeContext(e, type, label, nodeData) {
+function onNodeContext(e, type, label, nodeData, items) {
   // The stats card opens at the pointer, which is exactly where the menu is about to
   // appear — drop it at once rather than leaving it to the hover grace period.
   statsTip.hide()
-  contextMenu.value = { type: type, x: e.clientX, y: e.clientY, label: label, nodeData: nodeData }
+  contextMenu.value = { type: type, x: e.clientX, y: e.clientY, label: label, nodeData: nodeData, items }
+}
+
+// A PostgreSQL connection keeps the `connection` menu type (so colour tags and the
+// right-click highlight work as for MongoDB) but offers only what works on it.
+function onConnectionContext(e, conn) {
+  const node = { connId: conn.id, connName: conn.name }
+  if (conn.engine !== 'postgresql') return onNodeContext(e, 'connection', conn.name, node)
+  const pg = { ...node, engine: 'postgresql', database: conn.database || 'postgres' }
+  onNodeContext(e, 'connection', conn.name, pg, PG_MENUS.connection)
 }
 // Hovering a database or collection row pops its stats card (see useStatsTip). The rows
 // pass their own target, so the card needs no per-kind handler here.
@@ -114,7 +124,7 @@ const { tip, ...statsTip } = useStatsTip()
           :style="connColor(conn) ? { '--tag-color': colorHex(connColor(conn)) } : null"
           style="padding-left: 6px"
           @click="selectConnection(conn)"
-          @contextmenu.prevent="onNodeContext($event, 'connection', conn.name, { connId: conn.id, connName: conn.name })"
+          @contextmenu.prevent="onConnectionContext($event, conn)"
         >
           <span class="tw">
             <BaseIcon :name="expandedConns[conn.id] ? 'caretDown' : 'caret'" :size="12" />
