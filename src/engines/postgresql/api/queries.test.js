@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { runQuery, cancelQuery, explainQuery, browseTable, countTable, updateRow, readTableSelect } from './queries'
+import { runQuery, cancelQuery, explainQuery, formatQuery, browseTable, countTable, updateRow, readTableSelect } from './queries'
 
 const table = { connectionId: 'c1', schema: 'public', table: 'users' }
 
@@ -23,6 +23,11 @@ describe('PostgreSQL queries', () => {
     expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT pg_sleep(9)', runId: 'run-1' })
     await cancelQuery('c1', 'run-1')
     expect(invoke).toHaveBeenCalledWith('cancel_pg_query', { id: 'c1', runId: 'run-1' })
+  })
+
+  it('formats SQL', async () => {
+    await formatQuery('select 1')
+    expect(invoke).toHaveBeenCalledWith('format_pg_sql', { sql: 'select 1' })
   })
 
   it('explains a query', async () => {

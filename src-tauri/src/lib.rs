@@ -206,6 +206,7 @@ pub fn run() {
             list_pg_saved,
             save_pg_query,
             delete_pg_saved,
+            format_pg_sql,
             browse_pg_table,
             count_pg_table,
             read_pg_table_select,
