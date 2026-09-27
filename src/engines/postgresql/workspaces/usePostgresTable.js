@@ -117,7 +117,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false } = 
   }
 
   return {
-    columns, rows, total, offset, orderBy, descending, loading, error, editError,
+    columns, columnInfo, rows, total, offset, orderBy, descending, loading, error, editError,
     hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy, canEdit, editText, saveCell,
   }
 }

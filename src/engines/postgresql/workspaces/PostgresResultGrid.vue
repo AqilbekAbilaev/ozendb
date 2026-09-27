@@ -1,12 +1,16 @@
 <script setup>
-import { ref, nextTick } from 'vue'
-import { formatCell } from './formatCell.js'
+import { ref, computed, nextTick } from 'vue'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import { formatCell, cellKind } from './formatCell.js'
 
 // Rows arrive as arrays aligned to `columns`, so a repeated column name stays its own
-// column. Sorting and editing are opt-in: the query tab shows results read-only.
+// column. Sorting and editing are opt-in: the query tab shows results read-only, and
+// without `columnInfo` (types, primary keys), since a query's columns aren't a table's.
 const props = defineProps({
   columns:    { type: Array,    required: true },
   rows:       { type: Array,    required: true },
+  columnInfo: { type: Object,   default: () => ({}) },
+  rowOffset:  { type: Number,   default: 0 },
   orderBy:    { type: String,   default: null },
   descending: { type: Boolean,  default: false },
   sortable:   { type: Boolean,  default: false },
@@ -14,6 +18,8 @@ const props = defineProps({
   editText:   { type: Function, default: (column, value) => (value === null ? '' : formatCell(value)) },
 })
 const emit = defineEmits(['sort', 'save'])
+
+const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType)))
 
 const editing = ref(null)   // { row, column, text, seed }
 const input = ref(null)
@@ -41,23 +47,29 @@ function commit() {
     <table>
       <thead>
         <tr>
+          <th class="rownum"></th>
           <th
             v-for="(column, c) in columns"
             :key="c"
             :class="{ sortable }"
             @click="sortable && emit('sort', column)"
           >
-            {{ column }}
-            <span v-if="sortable && orderBy === column" class="dir">{{ descending ? '▼' : '▲' }}</span>
+            <span class="th-name">
+              <BaseIcon v-if="columnInfo[column]?.isPrimaryKey" name="key" :size="12" class="pk" />
+              {{ column }}
+              <span v-if="sortable && orderBy === column" class="dir">{{ descending ? '▼' : '▲' }}</span>
+            </span>
+            <span v-if="columnInfo[column]" class="th-type">{{ columnInfo[column].dataType }}</span>
           </th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="(row, r) in rows" :key="r">
+          <td class="rownum">{{ rowOffset + r + 1 }}</td>
           <td
             v-for="(value, c) in row"
             :key="c"
-            :class="{ null: value === null, editable: canEdit(columns[c]) }"
+            :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c]) }]"
             @dblclick="startEdit(r, columns[c], value)"
           >
             <input
@@ -79,9 +91,11 @@ function commit() {
 
 <style scoped>
 .pg-grid { flex: 1; min-height: 0; overflow: auto; }
-table { border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+/* Separate borders: collapsed ones don't travel with the sticky header and gutter. */
+table { border-collapse: separate; border-spacing: 0; font-family: var(--mono); font-size: 12.5px; }
 th, td {
-  border: 1px solid var(--grid-line);
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
   padding: 4px 8px;
   white-space: nowrap;
   max-width: 360px;
@@ -90,17 +104,32 @@ th, td {
   text-align: left;
 }
 th {
-  position: sticky; top: 0;
+  position: sticky; top: 0; z-index: 2;
   background: var(--bg-toolbar);
   color: var(--text-dim);
   font-weight: 600;
+  vertical-align: bottom;
 }
 th.sortable { cursor: pointer; }
 th.sortable:hover { color: var(--text); }
-.dir { font-size: 9px; margin-left: 4px; }
+.th-name { display: flex; align-items: center; gap: 4px; }
+.th-type { display: block; font-weight: 400; font-size: 10.5px; color: var(--text-faint); margin-top: 1px; }
+.pk { color: var(--warn); flex: none; }
+.dir { font-size: 9px; }
+.rownum {
+  position: sticky; left: 0; z-index: 1;
+  min-width: 40px; text-align: right;
+  background: var(--bg-panel-2); color: var(--text-faint);
+  border-right-color: var(--border-soft);
+}
+th.rownum { z-index: 3; }
 tbody tr:nth-child(even) { background: var(--bg-row-alt); }
 td { color: var(--text); }
 td.null { color: var(--text-faint); font-style: italic; }
+td.num  { color: var(--cell-num); text-align: right; }
+td.bool { color: var(--cell-num); }
+td.str  { color: var(--cell-str-green); }
+td.date { color: var(--text-dim); }
 td.editable { cursor: text; }
 .pg-edit {
   width: 100%; min-width: 120px;
