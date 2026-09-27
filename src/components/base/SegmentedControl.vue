@@ -3,7 +3,7 @@
 // bar's Find / Aggregate switch). Owns the option <button>s so feature code has none.
 defineProps({
   modelValue: { type: [String, Number], default: '' },
-  // [{ value, label }]
+  // [{ value, label, disabled?, title? }]
   options: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['update:modelValue'])
@@ -15,6 +15,8 @@ const emit = defineEmits(['update:modelValue'])
       v-for="opt in options"
       :key="opt.value"
       :class="{ on: modelValue === opt.value }"
+      :disabled="opt.disabled"
+      :title="opt.title"
       @click="emit('update:modelValue', opt.value)"
     >{{ opt.label }}</button>
   </div>
@@ -31,4 +33,5 @@ const emit = defineEmits(['update:modelValue'])
   cursor: pointer;
 }
 .seg button.on { background: var(--accent); color: #fff; }
+.seg button:disabled { opacity: .4; cursor: not-allowed; }
 </style>

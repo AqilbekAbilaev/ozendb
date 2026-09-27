@@ -2,8 +2,10 @@
 import { reactive, shallowRef, watch, computed } from 'vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
+import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
+import PostgresSqlPanel from './PostgresSqlPanel.vue'
 import { usePostgresTable } from './usePostgresTable.js'
 import { openConnections } from '../../../stores/openConnections'
 
@@ -20,6 +22,22 @@ watch(() => props.activeTab.id, () => {
   t.value = reactive(usePostgresTable({ connectionId, schema, table }, { readOnly }))
   t.value.load()
 }, { immediate: true })
+
+const modes = computed(() => [
+  {
+    value: 'filter',
+    label: 'Filter',
+    disabled: !t.value.canUseFilters,
+    title: t.value.canUseFilters ? '' : 'The SQL was edited, so it no longer matches the filters',
+  },
+  { value: 'sql', label: 'SQL' },
+])
+
+function switchMode(mode) {
+  if (mode === t.value.mode) return
+  if (mode === 'sql') t.value.toSql()
+  else t.value.toFilters()
+}
 
 const range = computed(() => {
   const { offset, rows, total } = t.value
@@ -43,45 +61,51 @@ const range = computed(() => {
       <BaseIcon name="collSmall" :size="15" class="c-ic" />
       <span class="pg-name">{{ activeTab.table }}</span>
       <span class="spacer"></span>
-      <BaseButton v-if="t.activeFilters" icon="close" title="Show every row again" @click="t.clearFilters">
-        Clear filters ({{ t.activeFilters }})
-      </BaseButton>
-      <BaseButton icon="refresh" :disabled="t.loading" title="Refresh" @click="t.refresh" />
+      <template v-if="t.mode === 'filter'">
+        <BaseButton v-if="t.activeFilters" icon="close" title="Show every row again" @click="t.clearFilters">
+          Clear filters ({{ t.activeFilters }})
+        </BaseButton>
+        <BaseButton icon="refresh" :disabled="t.loading" title="Refresh" @click="t.refresh" />
+      </template>
+      <SegmentedControl :model-value="t.mode" :options="modes" @update:model-value="switchMode" />
     </div>
 
-    <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
-    <!-- Once the grid has columns, a failure (usually a filter value the column's type
-         can't read) keeps it on screen, so the filter can be corrected in place. -->
-    <div v-if="t.error && t.columns.length" class="pg-edit-error">{{ t.error }}</div>
+    <PostgresSqlPanel v-if="t.mode === 'sql'" :state="t.sqlState" />
+    <template v-else>
+      <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
+      <!-- Once the grid has columns, a failure (usually a filter value the column's type
+           can't read) keeps it on screen, so the filter can be corrected in place. -->
+      <div v-if="t.error && t.columns.length" class="pg-edit-error">{{ t.error }}</div>
 
-    <StateMessage v-if="t.error && !t.columns.length" mode="error" :message="t.error" retryable @retry="t.load" />
-    <StateMessage v-else-if="t.loading && !t.columns.length" mode="loading" />
-    <StateMessage v-else-if="!t.rows.length && !t.activeFilters && !t.error" mode="empty" label="This table has no rows" />
-    <PostgresResultGrid
-      v-else
-      :columns="t.columns"
-      :rows="t.rows"
-      :column-info="t.columnInfo"
-      :row-offset="t.offset"
-      :order-by="t.orderBy"
-      :descending="t.descending"
-      sortable
-      :can-edit="t.canEdit"
-      :edit-text="t.editText"
-      :filter-text="t.filterText"
-      @sort="t.sortBy"
-      @save="t.saveCell"
-      @filter-text="t.setFilterText"
-      @apply-filters="t.applyFilters"
-    />
+      <StateMessage v-if="t.error && !t.columns.length" mode="error" :message="t.error" retryable @retry="t.load" />
+      <StateMessage v-else-if="t.loading && !t.columns.length" mode="loading" />
+      <StateMessage v-else-if="!t.rows.length && !t.activeFilters && !t.error" mode="empty" label="This table has no rows" />
+      <PostgresResultGrid
+        v-else
+        :columns="t.columns"
+        :rows="t.rows"
+        :column-info="t.columnInfo"
+        :row-offset="t.offset"
+        :order-by="t.orderBy"
+        :descending="t.descending"
+        sortable
+        :can-edit="t.canEdit"
+        :edit-text="t.editText"
+        :filter-text="t.filterText"
+        @sort="t.sortBy"
+        @save="t.saveCell"
+        @filter-text="t.setFilterText"
+        @apply-filters="t.applyFilters"
+      />
 
-    <div class="pg-footer">
-      <span>{{ range }}</span>
-      <span v-if="t.elapsedMs != null" class="fitem"><BaseIcon name="clock" :size="14" /> {{ t.elapsedMs }} ms</span>
-      <span class="spacer"></span>
-      <BaseButton icon="prev" :disabled="!t.hasPrev || t.loading" title="Previous page" @click="t.prevPage" />
-      <BaseButton icon="next" :disabled="!t.hasNext || t.loading" title="Next page" @click="t.nextPage" />
-    </div>
+      <div class="pg-footer">
+        <span>{{ range }}</span>
+        <span v-if="t.elapsedMs != null" class="fitem"><BaseIcon name="clock" :size="14" /> {{ t.elapsedMs }} ms</span>
+        <span class="spacer"></span>
+        <BaseButton icon="prev" :disabled="!t.hasPrev || t.loading" title="Previous page" @click="t.prevPage" />
+        <BaseButton icon="next" :disabled="!t.hasNext || t.loading" title="Next page" @click="t.nextPage" />
+      </div>
+    </template>
   </div>
 </template>
 
