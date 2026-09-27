@@ -222,15 +222,14 @@ watch(() => props.activeTab && props.activeTab.id, () => {
       :options="[{ value: 'find', label: 'Find' }, { value: 'aggregate', label: 'Aggregate' }]"
       @update:model-value="setMode"
     />
-    <BaseButton variant="ghost" class="run" @click="emit('run')" :disabled="activeTab.isRunning || !runValid">
-      <BaseIcon name="run" :size="18" class="ic" />
+    <BaseButton variant="ghost" icon="run" class="run" @click="emit('run')" :disabled="activeTab.isRunning || !runValid">
       {{ activeTab.isRunning ? 'Running…' : 'Run' }}
     </BaseButton>
     <template v-if="!isAggregate">
-      <BaseButton variant="ghost" class="qbar-load" @click="emit('open-browser')"><BaseIcon name="load" :size="18" class="ic" /> Load query</BaseButton>
-      <div class="save-wrap">
-        <BaseButton variant="ghost" :active="showSaveForm" @click="showSaveForm = !showSaveForm">
-          <BaseIcon name="save" :size="18" class="ic" /> Save query
+      <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" @click="emit('open-browser')">Load query</BaseButton>
+      <div class="save-wrap qbar-hide-sm">
+        <BaseButton variant="ghost" icon="save" :active="showSaveForm" @click="showSaveForm = !showSaveForm">
+          Save query
         </BaseButton>
         <div v-if="showSaveForm" class="save-backdrop" @mousedown.self="showSaveForm = false"></div>
         <div v-if="showSaveForm" class="save-form">
@@ -246,9 +245,9 @@ watch(() => props.activeTab && props.activeTab.id, () => {
           <BaseButton variant="ghost" size="sm" bordered @click="showSaveForm = false">Cancel</BaseButton>
         </div>
       </div>
-      <div class="hist-wrap">
-        <BaseButton variant="ghost" :active="historyMenu" @click="openHistoryMenu">
-          <BaseIcon name="history" :size="18" class="ic" /> Query history
+      <div class="hist-wrap qbar-hide-sm">
+        <BaseButton variant="ghost" icon="history" :active="historyMenu" @click="openHistoryMenu">
+          Query history
         </BaseButton>
         <div v-if="historyMenu" class="hist-backdrop" @mousedown.self="historyMenu = false"></div>
         <div v-if="historyMenu" class="hist-menu">
@@ -274,9 +273,9 @@ watch(() => props.activeTab && props.activeTab.id, () => {
           </div>
         </div>
       </div>
-      <div class="default-wrap">
-        <BaseButton variant="ghost" :active="showDefaultMenu" @click="showDefaultMenu = !showDefaultMenu">
-          <BaseIcon name="anchor" :size="18" class="ic" /> Set default query
+      <div class="default-wrap qbar-hide-sm">
+        <BaseButton variant="ghost" icon="anchor" :active="showDefaultMenu" @click="showDefaultMenu = !showDefaultMenu">
+          Set default query
           <BaseIcon name="caretDown" :size="11" class="drop" />
         </BaseButton>
         <div v-if="showDefaultMenu" class="default-backdrop" @mousedown.self="showDefaultMenu = false"></div>
@@ -289,16 +288,16 @@ watch(() => props.activeTab && props.activeTab.id, () => {
           </MenuItem>
         </div>
       </div>
-      <BaseButton variant="ghost" class="qbar-copy" @click="onCopy">
-        <BaseIcon name="copy" :size="18" class="ic" /> Copy
+      <BaseButton variant="ghost" icon="copy" class="qbar-hide-md" @click="onCopy">
+        Copy
       </BaseButton>
-      <BaseButton variant="ghost" class="qbar-paste" :disabled="!clipboardQuery" @click="onPaste">
-        <BaseIcon name="paste" :size="18" class="ic" /> Paste
+      <BaseButton variant="ghost" icon="paste" class="qbar-hide-md" :disabled="!clipboardQuery" @click="onPaste">
+        Paste
       </BaseButton>
     </template>
     <span class="qbar-spacer"></span>
-    <BaseButton v-if="!isAggregate" bordered class="vqb-toggle" :class="{ on: vqbOpen }" @click="vqbOpen = !vqbOpen">
-      <BaseIcon name="aggregate" :size="15" /> Visual Query Builder
+    <BaseButton v-if="!isAggregate" bordered icon="aggregate" class="qbar-hide-lg" :active="vqbOpen" title="Visual Query Builder" @click="vqbOpen = !vqbOpen">
+      Query Builder
     </BaseButton>
   </div>
 

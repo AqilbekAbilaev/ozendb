@@ -6,5 +6,13 @@
 .qbar-spacer { flex: 1; }
 .qlabel { font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }
 .kbd { margin-left: 2px; font: 10.5px var(--mono); color: var(--text-faint); }
+.qbar .base-btn :deep(svg) { color: var(--text-dim); }
+.qbar .base-btn :deep(svg.drop) { color: var(--text-faint); }
 .base-btn.run { min-width: 92px; justify-content: flex-start; border: 1px solid var(--green); }
-.base-btn.run :deep(svg) { color: var(--green); }
+.qbar .base-btn.run :deep(svg) { color: var(--green); }
+
+/* Narrow windows drop the less-used buttons in three steps, the same kinds in every
+   toolbar: the builder toggle first, then clipboard, then saved queries. */
+@media (max-width: 1540px) { .qbar-hide-lg { display: none; } }
+@media (max-width: 1400px) { .qbar-hide-lg, .qbar-hide-md { display: none; } }
+@media (max-width: 1260px) { .qbar-hide-lg, .qbar-hide-md, .qbar-hide-sm { display: none; } }
