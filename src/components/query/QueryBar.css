@@ -1,11 +1,6 @@
 .ic { color: var(--text-dim); }
 .drop { color: var(--text-faint); }
-.vqb-toggle.on { color: var(--accent); border-color: var(--accent-soft); }
-.vqb-toggle:disabled { opacity: .4; }
 .mode-toggle { margin-right: 6px; }
-@media (max-width: 1540px) { .vqb-toggle { display: none; } }
-@media (max-width: 1400px) { .vqb-toggle, .qbar-copy, .qbar-paste { display: none; } }
-@media (max-width: 1260px) { .vqb-toggle, .qbar-copy, .qbar-paste, .qbar-load, .save-wrap, .hist-wrap, .default-wrap { display: none; } }
 .qparse-error { padding: 4px 12px 6px; flex: none; }
 .qfields { padding: 6px 12px 8px; display: grid; grid-template-columns: auto 1fr auto 1fr auto; gap: 6px 12px; align-items: center; border-bottom: 1px solid var(--border); flex: none; }
 .qinput { background: var(--bg-input); border: 1px solid var(--border-soft); border-radius: 6px; padding: 0 10px; font-family: var(--mono); font-size: 12.5px; display: flex; align-items: center; gap: 8px; min-width: 0; }

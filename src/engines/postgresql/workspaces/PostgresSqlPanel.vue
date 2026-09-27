@@ -72,15 +72,15 @@ const summary = computed(() => {
     <slot />
     <div class="qbar">
       <BaseButton variant="ghost" icon="run" class="run" :disabled="state.running || !state.sql.trim()" @click="run()">
-        Run <span class="kbd">⌘↵</span>
+        {{ state.running ? 'Running…' : 'Run' }} <span class="kbd">⌘↵</span>
       </BaseButton>
       <BaseButton variant="ghost" icon="run" :disabled="state.running" title="Run the selected text" @click="runSelection">Run selection</BaseButton>
       <BaseButton variant="ghost" icon="exScan" disabled :title="SOON">Explain</BaseButton>
       <BaseButton variant="ghost" icon="close" disabled :title="SOON">Cancel</BaseButton>
       <span class="qsep"></span>
-      <BaseButton variant="ghost" icon="textType" disabled :title="SOON">Format</BaseButton>
-      <BaseButton variant="ghost" icon="history" disabled :title="SOON" />
-      <BaseButton variant="ghost" icon="save" disabled :title="SOON" />
+      <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" disabled :title="SOON">Format</BaseButton>
+      <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" disabled :title="SOON" />
+      <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" disabled :title="SOON" />
       <span class="qsep"></span>
       <SegmentedControl model-value="auto" :options="TXN" variant="subtle" />
     </div>

@@ -65,20 +65,20 @@ function copySql() {
     </template>
     <template v-else>
       <div class="qbar">
-        <BaseButton variant="ghost" icon="run" class="run" :disabled="t.loading" title="Apply the filters and limit (Enter)" @click="run">Run</BaseButton>
+        <BaseButton variant="ghost" icon="run" class="run" :disabled="t.loading" title="Apply the filters and limit (Enter)" @click="run">{{ t.loading ? 'Running…' : 'Run' }}</BaseButton>
         <BaseButton variant="ghost" icon="exScan" disabled :title="SOON">Explain</BaseButton>
         <span class="qsep"></span>
-        <BaseButton variant="ghost" icon="load" disabled :title="SOON" />
-        <BaseButton variant="ghost" icon="save" disabled :title="SOON" />
-        <BaseButton variant="ghost" icon="history" disabled :title="SOON" />
-        <BaseButton variant="ghost" icon="copy" title="Copy SQL" @click="copySql" />
+        <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" disabled :title="SOON" />
+        <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" disabled :title="SOON" />
+        <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" disabled :title="SOON" />
+        <BaseButton variant="ghost" icon="copy" class="qbar-hide-md" title="Copy SQL" @click="copySql" />
         <BaseButton v-if="t.activeFilters" variant="ghost" icon="close" title="Show every row again" @click="t.clearFilters">
           Clear ({{ t.activeFilters }})
         </BaseButton>
         <span class="qbar-spacer"></span>
         <span class="qlabel limit">Limit</span>
         <NumberStepper v-model="limitDraft" :min="1" @enter="run" />
-        <BaseButton bordered icon="aggregate" :active="builderOpen" title="Visual Query Builder" @click="builderOpen = !builderOpen">Query Builder</BaseButton>
+        <BaseButton bordered icon="aggregate" class="qbar-hide-lg" :active="builderOpen" title="Visual Query Builder" @click="builderOpen = !builderOpen">Query Builder</BaseButton>
       </div>
 
       <div class="pg-body">
