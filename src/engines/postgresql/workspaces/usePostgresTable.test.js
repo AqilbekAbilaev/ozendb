@@ -4,10 +4,11 @@ const browseTable = vi.fn()
 const countTable = vi.fn()
 const updateRow = vi.fn()
 const listColumns = vi.fn()
+const listForeignKeys = vi.fn()
 const runQuery = vi.fn()
 const readTableSelect = vi.fn()
 vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow, runQuery, readTableSelect }))
-vi.mock('../api/resources', () => ({ listColumns }))
+vi.mock('../api/resources', () => ({ listColumns, listForeignKeys }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
 
@@ -22,6 +23,7 @@ const COLUMNS = [
 beforeEach(() => {
   vi.resetAllMocks()
   listColumns.mockResolvedValue(COLUMNS)
+  listForeignKeys.mockResolvedValue([])
   runQuery.mockResolvedValue({ columns: ['version', 'encoding'], rows: [['16.2', 'UTF8']] })
   countTable.mockResolvedValue(250)
   browseTable.mockResolvedValue({
@@ -169,6 +171,79 @@ describe('shown columns', () => {
     await t.saveCell(0, 'name', 'Ada L.')
     expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'Ada L.' }], [{ column: 'id', value: 1 }])
     expect(t.view.value.rows[0]).toEqual(['Ada L.'])
+  })
+})
+
+describe('joins', () => {
+  const REGIONS = [{ name: 'id', dataType: 'integer', isPrimaryKey: true }, { name: 'name', dataType: 'text', isPrimaryKey: false }]
+  const offer = { schema: 'public', table: 'regions', column: 'id', equals: 'id', label: 'regions (linked by users.region_id)' }
+
+  async function joined() {
+    const t = await loaded()
+    listColumns.mockResolvedValue(REGIONS)
+    await t.addJoin(offer)
+    return t
+  }
+
+  it('offers the tables the browsed one links to', async () => {
+    listForeignKeys.mockResolvedValue([{ fromSchema: 'public', fromTable: 'users', fromColumn: 'id', toSchema: 'public', toTable: 'regions', toColumn: 'id' }])
+    const t = await loaded()
+    await Promise.resolve()
+    expect(listForeignKeys).toHaveBeenCalledWith(target)
+    expect(t.joinOffers.value.map(o => o.table)).toEqual(['regions'])
+  })
+
+  it('adds a join\'s columns after the table\'s own, and reloads from page one with a fresh count', async () => {
+    const t = await joined()
+    expect(listColumns).toHaveBeenLastCalledWith({ connectionId: 'c1', schema: 'public', table: 'regions' })
+    const joins = [{ schema: 'public', table: 'regions', kind: 'left', column: 'id', equals: { table: 0, column: 'id' } }]
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ joins, offset: 0 }))
+    expect(countTable).toHaveBeenLastCalledWith(target, [], joins)
+    expect(t.view.value.columns).toEqual(['id', 'name', 'tags', 'meta', 'j1.id', 'j1.name'])
+    expect(t.columnInfo.value['j1.name'].tableLabel).toBe('regions')
+  })
+
+  it('filters and sorts on a joined column, which it never edits', async () => {
+    const t = await joined()
+    t.setFilterText('j1.name', 'no')
+    await t.applyFilters()
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ filters: [{ table: 1, column: 'name', op: 'contains', value: 'no' }] }))
+    await t.sortBy('j1.name')
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: { table: 1, column: 'name' } }))
+    expect(t.canEdit('j1.name')).toBe(false)
+    expect(t.canEdit('name')).toBe(true)
+  })
+
+  it('switches a join between keeping every row and only matches', async () => {
+    const t = await joined()
+    await t.setJoinKind('j1', 'inner')
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ joins: [expect.objectContaining({ kind: 'inner' })] }))
+  })
+
+  it('removing a join drops its filters, shown columns and sort', async () => {
+    const t = await joined()
+    t.setFilterText('j1.name', 'no')
+    t.setFilterText('name', 'ad')
+    await t.applyFilters()
+    t.setShownColumns(['name', 'j1.name'])
+    await t.sortBy('j1.name')
+    await t.removeJoin('j1')
+    expect(t.filterText.value).toEqual({ name: 'ad' })
+    expect(t.shownColumns.value).toEqual(['name'])
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({
+      joins: [], orderBy: null, filters: [{ table: 0, column: 'name', op: 'contains', value: 'ad' }],
+    }))
+  })
+
+  it('writes the joins into the SQL, and keeps edited joined SQL in SQL mode', async () => {
+    const t = await joined()
+    expect(t.currentSql.value).toContain('LEFT JOIN "public"."regions" ON "regions"."id" = "users"."id"')
+    await t.toSql()
+    t.sqlState.sql = 'edited'
+    await t.toFilters()
+    expect(readTableSelect).not.toHaveBeenCalled()
+    expect(t.filterRefusal.value).toMatch(/join/)
+    expect(t.mode.value).toBe('sql')
   })
 })
 
