@@ -59,7 +59,7 @@ function copySql() {
 
     <template v-if="t.mode === 'sql'">
       <div v-if="t.filterRefusal" class="pg-edit-error">Can't show this as filters: {{ t.filterRefusal }}</div>
-      <PostgresSqlPanel :state="t.sqlState" />
+      <PostgresSqlPanel :state="t.sqlState" :server="t.server" />
     </template>
     <template v-else>
       <div class="pg-toolbar">
