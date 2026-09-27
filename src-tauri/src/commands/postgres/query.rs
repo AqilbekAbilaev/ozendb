@@ -112,9 +112,15 @@ fn rows_from_json(mut raw_rows: Vec<serde_json::Value>) -> (Vec<Vec<serde_json::
 /// macros (not meant to be called directly), and reaching it would mean
 /// depending on the unused `macros` feature. `prepare`'s `Statement::columns()`
 /// gives the same names and types without that.
+///
+/// Runs on one connection — the caller's plain one, or its read-only transaction.
 /// `binds` fill `inner_sql`'s `$n` placeholders, in order.
-pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[String]) -> Result<PgQueryResult, AppError> {
-    let stmt = match pool.prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await {
+async fn run_wrapped_on(
+    conn: &mut sqlx::PgConnection,
+    inner_sql: &str,
+    binds: &[String],
+) -> Result<PgQueryResult, AppError> {
+    let stmt = match (&mut *conn).prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
     };
@@ -128,7 +134,7 @@ pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[S
     for bind in binds {
         query = query.bind(bind);
     }
-    let raw_rows: Vec<serde_json::Value> = match query.fetch_all(pool).await {
+    let raw_rows: Vec<serde_json::Value> = match query.fetch_all(&mut *conn).await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
     };
@@ -136,6 +142,15 @@ pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[S
     let (rows, truncated) = rows_from_json(raw_rows);
 
     Ok(PgQueryResult { columns, rows, truncated, elapsed_ms })
+}
+
+/// `run_wrapped_on` a connection borrowed from the pool.
+pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[String]) -> Result<PgQueryResult, AppError> {
+    let mut conn = match pool.acquire().await {
+        Ok(val) => val,
+        Err(e) => return Err(AppError::Postgres(e)),
+    };
+    run_wrapped_on(&mut conn, inner_sql, binds).await
 }
 
 /// The `read_only`-enforced sibling of `run_wrapped`, for `run_pg_query` alone:
@@ -152,41 +167,12 @@ async fn run_wrapped_read_only(pool: &sqlx::PgPool, inner_sql: &str) -> Result<P
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
     };
-    if let Err(e) = sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await {
-        let _ = tx.rollback().await;
-        return Err(AppError::Postgres(e));
-    }
-
-    let stmt = match (&mut *tx).prepare(sqlx::AssertSqlSafe(inner_sql.to_string()).into_sql_str()).await {
-        Ok(val) => val,
-        Err(e) => {
-            let _ = tx.rollback().await;
-            return Err(AppError::Postgres(e));
-        }
+    let result = match sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await {
+        Ok(_) => run_wrapped_on(&mut tx, inner_sql, &[]).await,
+        Err(e) => Err(AppError::Postgres(e)),
     };
-    let (columns, wrapped) = wrap_for_json(&stmt, inner_sql);
-    if columns.is_empty() {
-        let _ = tx.rollback().await;
-        return Ok(PgQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0 });
-    }
-
-    let started = std::time::Instant::now();
-    let raw_rows: Vec<serde_json::Value> =
-        match sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped))
-            .fetch_all(&mut *tx)
-            .await
-        {
-            Ok(val) => val,
-            Err(e) => {
-                let _ = tx.rollback().await;
-                return Err(AppError::Postgres(e));
-            }
-        };
-    let elapsed_ms = started.elapsed().as_millis() as u64;
-    let (rows, truncated) = rows_from_json(raw_rows);
     let _ = tx.rollback().await;
-
-    Ok(PgQueryResult { columns, rows, truncated, elapsed_ms })
+    result
 }
 
 pub(crate) async fn run_query_impl(
