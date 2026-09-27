@@ -23,6 +23,7 @@ const emit = defineEmits(['sort', 'save', 'filter-text', 'apply-filters'])
 
 const PLACEHOLDERS = { num: 'e.g. >100', date: 'e.g. 2026-09', bool: 'true / false' }
 
+const filtering = computed(() => Object.values(props.filterText ?? {}).some(text => text?.trim()))
 const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType)))
 
 const editing = ref(null)   // { row, column, text, seed }
@@ -51,7 +52,9 @@ function commit() {
     <table>
       <thead>
         <tr>
-          <th class="rownum"></th>
+          <th class="rownum">
+            <BaseIcon v-if="filterText" name="filter" :size="12" class="funnel" :class="{ on: filtering }" />
+          </th>
           <th
             v-for="(column, c) in columns"
             :key="c"
@@ -109,13 +112,13 @@ function commit() {
 </template>
 
 <style scoped>
-.pg-grid { flex: 1; min-height: 0; overflow: auto; }
+.pg-grid { flex: 1; min-height: 0; overflow: auto; background: var(--bg-window); }
 /* Separate borders: collapsed ones don't travel with the sticky header and gutter. */
-table { border-collapse: separate; border-spacing: 0; font-family: var(--mono); font-size: 12.5px; }
+table { border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
 th, td {
   border-right: 1px solid var(--grid-line);
   border-bottom: 1px solid var(--grid-line);
-  padding: 4px 8px;
+  padding: 5px 12px;
   white-space: nowrap;
   max-width: 360px;
   overflow: hidden;
@@ -124,17 +127,17 @@ th, td {
 }
 th {
   position: sticky; top: 0; z-index: 2;
-  background: var(--bg-toolbar);
-  color: var(--text-dim);
+  background: var(--bg-panel-2);
+  border-bottom-color: var(--border);
+  color: var(--text);
   font-weight: 600;
-  vertical-align: bottom;
+  vertical-align: top;
 }
 th.sortable { cursor: pointer; }
-th.sortable:hover { color: var(--text); }
-.th-name { display: flex; align-items: center; gap: 4px; }
-.th-type { display: block; font-weight: 400; font-size: 10.5px; color: var(--text-faint); margin-top: 1px; }
+.th-name { display: flex; align-items: center; gap: 5px; }
+.th-type { display: block; margin-top: 1px; font: 400 10.5px var(--mono); color: var(--text-faint); }
 .pk { color: var(--warn); flex: none; }
-.dir { font-size: 9px; }
+.dir { color: var(--accent); font-size: 9px; }
 .th-filter {
   display: block; width: 100%; min-width: 92px; box-sizing: border-box;
   margin-top: 5px; height: 22px; padding: 0 7px;
@@ -144,21 +147,25 @@ th.sortable:hover { color: var(--text); }
 }
 .th-filter::placeholder { color: var(--text-faint); }
 .th-filter:focus, .th-filter.on { border-color: var(--accent); }
-.no-rows td { padding: 18px 12px; color: var(--text-faint); font-style: italic; }
+.no-rows td { padding: 18px 12px; color: var(--text-faint); font-style: italic; background: none; }
 .rownum {
   position: sticky; left: 0; z-index: 1;
-  min-width: 40px; text-align: right;
+  width: 38px; text-align: right;
   background: var(--bg-panel-2); color: var(--text-faint);
-  border-right-color: var(--border-soft);
+  font: 11px var(--mono);
 }
-th.rownum { z-index: 3; }
-tbody tr:nth-child(even) { background: var(--bg-row-alt); }
+th.rownum { z-index: 3; vertical-align: bottom; padding-bottom: 10px; }
+.funnel { display: block; margin-left: auto; color: var(--text-faint); }
+.funnel.on { color: var(--accent); }
+tbody tr:nth-child(even) td { background: var(--bg-row-alt); }
+tbody tr:hover td { background: var(--bg-hover); }
+tbody tr td.rownum { background: var(--bg-panel-2); }
 td { color: var(--text); }
-td.null { color: var(--text-faint); font-style: italic; }
-td.num  { color: var(--cell-num); text-align: right; }
-td.bool { color: var(--cell-num); }
+td.null { color: var(--text-faint); font-style: italic; font-size: 11.5px; }
+td.num  { color: var(--warn); text-align: right; font-family: var(--mono); }
+td.bool { color: var(--warn); font-family: var(--mono); }
 td.str  { color: var(--cell-str-green); }
-td.date { color: var(--text-dim); }
+td.date { color: var(--text-dim); font-family: var(--mono); }
 td.editable { cursor: text; }
 .pg-edit {
   width: 100%; min-width: 120px;
