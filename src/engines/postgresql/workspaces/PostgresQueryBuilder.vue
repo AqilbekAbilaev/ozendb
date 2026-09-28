@@ -27,9 +27,11 @@ const props = defineProps({
   joins:      { type: Array,  default: () => [] },
   joinOffers: { type: Array,  default: () => [] },
   tableNames: { type: Array,  default: () => [] },
+  // `key` → `{ own, earlier }`: what a join's pairs can match (usePostgresTable).
+  joinChoices: { type: Function, required: true },
   pauses:     { type: Object, required: true },
 })
-const emit = defineEmits(['filter-text', 'sort', 'columns', 'add-join', 'join-kind', 'remove-join', 'paused-text', 'apply'])
+const emit = defineEmits(['filter-text', 'sort', 'columns', 'add-join', 'join-kind', 'remove-join', 'join-on', 'paused-text', 'apply'])
 
 // A column as the SQL names it: `name`, or `table.name` once the tab joins others.
 function label(key) {
@@ -108,8 +110,26 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
             <BaseSelect class="grow" size="sm" :model-value="j.kind" :options="kindOptions" @update:model-value="emit('join-kind', j.key, $event)" />
           </div>
           <template v-for="(p, n) in j.on" :key="n">
-            <div class="cond-line"><span class="onl">{{ n ? 'and' : 'where' }}</span><span class="pill grow onv">{{ joinName(i) }}.{{ p.column }}</span></div>
-            <div class="cond-line"><span class="onl">equals</span><span class="pill grow onv">{{ label(p.equals) }}</span></div>
+            <div class="cond-line">
+              <span class="onl">{{ n ? 'and' : 'where' }}</span>
+              <BaseSelect
+                class="grow"
+                size="sm"
+                :model-value="p.column"
+                :options="joinChoices(j.key).own.map(c => ({ value: c, label: `${joinName(i)}.${c}` }))"
+                @update:model-value="emit('join-on', j.key, n, { ...p, column: $event })"
+              />
+            </div>
+            <div class="cond-line">
+              <span class="onl">equals</span>
+              <BaseSelect
+                class="grow"
+                size="sm"
+                :model-value="p.equals"
+                :options="joinChoices(j.key).earlier.map(k => ({ value: k, label: label(k) }))"
+                @update:model-value="emit('join-on', j.key, n, { ...p, equals: $event })"
+              />
+            </div>
           </template>
         </div>
         <BaseSelect
@@ -237,7 +257,6 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
 .join b { font-size: 12.5px; color: var(--text); }
 .ti { color: var(--text-faint); flex: none; }
 .onl { flex: none; width: 44px; font-size: 11.5px; color: var(--text-faint); }
-.onv { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grp { padding: 8px 4px 3px; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
 .count { font-size: 11.5px; color: var(--text-faint); }
 .cols { gap: 2px; }
