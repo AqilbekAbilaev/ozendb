@@ -178,7 +178,7 @@ describe('shown columns', () => {
 
 describe('joins', () => {
   const REGIONS = [{ name: 'id', dataType: 'integer', isPrimaryKey: true }, { name: 'name', dataType: 'text', isPrimaryKey: false }]
-  const offer = { schema: 'public', table: 'regions', column: 'id', equals: 'id', label: 'regions (linked by users.region_id)' }
+  const offer = { schema: 'public', table: 'regions', on: [{ column: 'id', equals: 'id' }], label: 'regions (linked by users.region_id)' }
 
   async function joined() {
     const t = await loaded()
@@ -188,7 +188,7 @@ describe('joins', () => {
   }
 
   it('offers the tables the browsed one links to', async () => {
-    listForeignKeys.mockResolvedValue([{ fromSchema: 'public', fromTable: 'users', fromColumn: 'id', toSchema: 'public', toTable: 'regions', toColumn: 'id' }])
+    listForeignKeys.mockResolvedValue([{ fromSchema: 'public', fromTable: 'users', fromColumns: ['id'], toSchema: 'public', toTable: 'regions', toColumns: ['id'] }])
     const t = await loaded()
     await Promise.resolve()
     expect(listForeignKeys).toHaveBeenCalledWith(target)
@@ -198,7 +198,7 @@ describe('joins', () => {
   it('adds a join\'s columns after the table\'s own, and reloads from page one with a fresh count', async () => {
     const t = await joined()
     expect(listColumns).toHaveBeenLastCalledWith({ connectionId: 'c1', schema: 'public', table: 'regions' })
-    const joins = [{ schema: 'public', table: 'regions', kind: 'left', column: 'id', equals: { table: 0, column: 'id' } }]
+    const joins = [{ schema: 'public', table: 'regions', kind: 'left', on: [{ column: 'id', equals: { table: 0, column: 'id' } }] }]
     expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ joins, offset: 0 }))
     expect(countTable).toHaveBeenLastCalledWith(target, [], joins)
     expect(t.view.value.columns).toEqual(['id', 'name', 'tags', 'meta', 'j1.id', 'j1.name'])
@@ -267,7 +267,7 @@ describe('snapshot and restore', () => {
     await t.sortBy('name')
     t.setShownColumns(['name', 'id'])
     listColumns.mockResolvedValue([{ name: 'id', dataType: 'integer', isPrimaryKey: true }])
-    await t.addJoin({ schema: 'public', table: 'regions', column: 'id', equals: 'id' })
+    await t.addJoin({ schema: 'public', table: 'regions', on: [{ column: 'id', equals: 'id' }] })
     const snap = JSON.parse(JSON.stringify(t.snapshot()))
 
     browseTable.mockClear()
@@ -291,8 +291,10 @@ describe('snapshot and restore', () => {
     expect(t.mode.value).toBe('sql')
     expect(t.sqlState.sql).toBe('SELECT 1')
     listColumns.mockResolvedValue([])
-    await t.addJoin({ schema: 'public', table: 's', column: 'id', equals: 'id' })
+    await t.addJoin({ schema: 'public', table: 's', on: [{ column: 'id', equals: 'id' }] })
     expect(t.joins.value.map(j => j.key)).toEqual(['j3', 'j4'])
+    // A tab saved before joins matched on several columns comes back with its one pair.
+    expect(t.joins.value[0].on).toEqual([{ column: 'id', equals: 'id' }])
   })
 })
 

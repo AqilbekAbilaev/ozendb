@@ -59,15 +59,22 @@ pub enum JoinKind {
     Inner,
 }
 
-/// A table joined into a browse, matched where its `column` equals `equals`, a
-/// column of a table before it.
+/// One pair a join matches on: its own `column` equals `equals`, a column of a table
+/// before it.
+#[derive(Debug, Deserialize)]
+pub struct JoinOn {
+    pub column: String,
+    pub equals: ColumnRef,
+}
+
+/// A table joined into a browse, matched where every pair in `on` holds — more than one
+/// for a foreign key over several columns.
 #[derive(Debug, Deserialize)]
 pub struct TableJoin {
     pub schema: String,
     pub table: String,
     pub kind: JoinKind,
-    pub column: String,
-    pub equals: ColumnRef,
+    pub on: Vec<JoinOn>,
 }
 
 /// `"t<table>"."column"`, refused when `table` names none of the first `tables`.
@@ -84,19 +91,25 @@ fn from_clause(schema: &str, table: &str, joins: &[TableJoin]) -> Result<String,
     let mut sql = format!("{}.{} AS \"t0\"", quote_ident(schema)?, quote_ident(table)?);
     for (i, join) in joins.iter().enumerate() {
         let n = i + 1;
-        if join.equals.table >= n {
-            return Err(AppError::Validation(String::from("A join can only match a table that comes before it.")));
+        if join.on.is_empty() {
+            return Err(AppError::Validation(format!("The join to \"{}\" matches on no columns.", join.table)));
+        }
+        let mut pairs = Vec::with_capacity(join.on.len());
+        for pair in &join.on {
+            if pair.equals.table >= n {
+                return Err(AppError::Validation(String::from("A join can only match a table that comes before it.")));
+            }
+            pairs.push(format!("\"t{n}\".{} = {}", quote_ident(&pair.column)?, column_sql(pair.equals.table, &pair.equals.column, n)?));
         }
         let kind = match join.kind {
             JoinKind::Left => "LEFT JOIN",
             JoinKind::Inner => "JOIN",
         };
         sql.push_str(&format!(
-            " {kind} {}.{} AS \"t{n}\" ON \"t{n}\".{} = {}",
+            " {kind} {}.{} AS \"t{n}\" ON {}",
             quote_ident(&join.schema)?,
             quote_ident(&join.table)?,
-            quote_ident(&join.column)?,
-            column_sql(join.equals.table, &join.equals.column, n)?,
+            pairs.join(" AND "),
         ));
     }
     Ok(sql)

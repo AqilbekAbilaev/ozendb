@@ -88,15 +88,16 @@ describe('usePostgresTree', () => {
       { name: 'region_id', dataType: 'integer', isPrimaryKey: false, nullable: true },
     ])
     listForeignKeys.mockResolvedValue([
-      { fromSchema: 'public', fromTable: 'merchants', fromColumn: 'region_id', toSchema: 'public', toTable: 'regions', toColumn: 'id' },
-      { fromSchema: 'billing', fromTable: 'payments', fromColumn: 'merchant_id', toSchema: 'public', toTable: 'merchants', toColumn: 'id' },
+      { fromSchema: 'public', fromTable: 'merchants', fromColumns: ['region_id'], toSchema: 'public', toTable: 'regions', toColumns: ['id'] },
+      { fromSchema: 'billing', fromTable: 'payments', fromColumns: ['merchant_id'], toSchema: 'public', toTable: 'merchants', toColumns: ['id'] },
+      { fromSchema: 'public', fromTable: 'merchants', fromColumns: ['id', 'region_id'], toSchema: 'public', toTable: 'pairs', toColumns: ['a', 'b'] },
     ])
     const t = usePostgresTree('c1')
     await t.toggleTable('public', 'merchants')
     expect(listColumns).toHaveBeenCalledWith({ connectionId: 'c1', schema: 'public', table: 'merchants' })
     expect(t.isTableOpen('public', 'merchants')).toBe(true)
     expect(t.columnsOf('public', 'merchants')).toEqual([
-      { name: 'id', dataType: 'integer', primaryKey: true, references: null, nullable: false },
+      { name: 'id', dataType: 'integer', primaryKey: true, references: 'pairs.a', nullable: false },
       { name: 'region_id', dataType: 'integer', primaryKey: false, references: 'regions.id', nullable: true },
     ])
     await t.toggleTable('public', 'merchants')

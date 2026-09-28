@@ -55,7 +55,7 @@ describe('buildSelectSql', () => {
   })
 
   it('joins related tables, naming every column by its table', () => {
-    const joins = [{ schema: 'public', table: 'regions', kind: 'left', column: 'id', equals: col('region_id') }]
+    const joins = [{ schema: 'public', table: 'regions', kind: 'left', on: [{ column: 'id', equals: col('region_id') }] }]
     const sql = buildSelectSql({
       ...base, table: 'merchants', joins,
       filters: [{ table: 1, column: 'name', op: 'contains', value: 'so' }],
@@ -72,7 +72,7 @@ describe('buildSelectSql', () => {
   })
 
   it('gives a table joined twice a name of its own, and selects chosen columns by table', () => {
-    const joins = [{ schema: 'public', table: 'merchants', kind: 'inner', column: 'id', equals: col('parent_id') }]
+    const joins = [{ schema: 'public', table: 'merchants', kind: 'inner', on: [{ column: 'id', equals: col('parent_id') }] }]
     const sql = buildSelectSql({ ...base, table: 'merchants', joins, columns: [col('name'), col('name', 1)] })
     expect(sql).toBe([
       'SELECT "merchants"."name", "merchants_2"."name"',
@@ -80,5 +80,10 @@ describe('buildSelectSql', () => {
       'JOIN "public"."merchants" AS "merchants_2" ON "merchants_2"."id" = "merchants"."parent_id"',
       'LIMIT 100;',
     ].join('\n'))
+  })
+
+  it('matches a join on every pair of a key over several columns', () => {
+    const joins = [{ schema: 'public', table: 'pairs', kind: 'inner', on: [{ column: 'a', equals: col('x') }, { column: 'b', equals: col('y') }] }]
+    expect(buildSelectSql({ ...base, joins })).toContain('JOIN "public"."pairs" ON "pairs"."a" = "users"."x" AND "pairs"."b" = "users"."y"')
   })
 })

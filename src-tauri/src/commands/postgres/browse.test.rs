@@ -1,4 +1,4 @@
-use super::{from_clause, where_clause, ColumnFilter, ColumnRef, FilterOp, JoinKind, TableJoin};
+use super::{from_clause, where_clause, ColumnFilter, ColumnRef, FilterOp, JoinKind, JoinOn, TableJoin};
 use crate::error::AppError;
 use std::collections::BTreeMap;
 
@@ -22,8 +22,7 @@ fn join(table: &str, kind: JoinKind, column: &str, equals: (usize, &str)) -> Tab
         schema: String::from("public"),
         table: table.to_string(),
         kind,
-        column: column.to_string(),
-        equals: ColumnRef { table: equals.0, column: equals.1.to_string() },
+        on: vec![JoinOn { column: column.to_string(), equals: ColumnRef { table: equals.0, column: equals.1.to_string() } }],
     }
 }
 
@@ -104,6 +103,19 @@ fn from_names_the_main_table_t0_and_each_join_after_it() {
          LEFT JOIN \"public\".\"regions\" AS \"t1\" ON \"t1\".\"id\" = \"t0\".\"region_id\" \
          JOIN \"public\".\"countries\" AS \"t2\" ON \"t2\".\"code\" = \"t1\".\"country\""
     );
+}
+
+#[test]
+fn a_join_on_several_columns_needs_them_all_to_match() {
+    let mut pairs = join("pairs", JoinKind::Inner, "a", (0, "a"));
+    pairs.on.push(JoinOn { column: String::from("b"), equals: ColumnRef { table: 0, column: String::from("b") } });
+    assert_eq!(
+        from_clause("public", "refs", &[pairs]).unwrap(),
+        "\"public\".\"refs\" AS \"t0\" JOIN \"public\".\"pairs\" AS \"t1\" ON \"t1\".\"a\" = \"t0\".\"a\" AND \"t1\".\"b\" = \"t0\".\"b\""
+    );
+    let mut none = join("pairs", JoinKind::Inner, "a", (0, "a"));
+    none.on.clear();
+    assert!(matches!(from_clause("public", "refs", &[none]), Err(AppError::Validation(_))));
 }
 
 #[test]

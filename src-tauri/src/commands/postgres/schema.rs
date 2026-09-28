@@ -206,40 +206,44 @@ pub async fn list_pg_columns(
     list_columns_impl(&pool, &schema, &table).await
 }
 
-/// One single-column foreign key: `from_*` holds the key, `to_*` the column it
-/// references.
+/// One foreign key: `from_columns` hold the key, `to_columns` the columns they
+/// reference, pairwise in the key's order.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PgForeignKey {
     pub from_schema: String,
     pub from_table: String,
-    pub from_column: String,
+    pub from_columns: Vec<String>,
     pub to_schema: String,
     pub to_table: String,
-    pub to_column: String,
+    pub to_columns: Vec<String>,
 }
 
 /// The foreign keys linking `schema.table` to other tables, whichever side it is
-/// on — what a join from this table can follow. Keys over several columns are left
-/// out: a join is offered as one `a.x = b.y` pair.
+/// on — what a join from this table can follow.
 pub(crate) async fn list_foreign_keys_impl(
     pool: &sqlx::PgPool,
     schema: &str,
     table: &str,
 ) -> Result<Vec<PgForeignKey>, AppError> {
-    let rows: Vec<(String, String, String, String, String, String)> = match sqlx::query_as(
+    let rows: Vec<(String, String, Vec<String>, String, String, Vec<String>)> = match sqlx::query_as(
         r#"
-        SELECT fns.nspname, f.relname, fa.attname, tns.nspname, t.relname, ta.attname
+        SELECT fns.nspname, f.relname,
+            array_agg(fa.attname::text ORDER BY u.i),
+            tns.nspname, t.relname,
+            array_agg(ta.attname::text ORDER BY u.i)
         FROM pg_constraint k
+        CROSS JOIN LATERAL unnest(k.conkey, k.confkey) WITH ORDINALITY AS u(fcol, tcol, i)
         JOIN pg_class f ON f.oid = k.conrelid
         JOIN pg_namespace fns ON fns.oid = f.relnamespace
         JOIN pg_class t ON t.oid = k.confrelid
         JOIN pg_namespace tns ON tns.oid = t.relnamespace
-        JOIN pg_attribute fa ON fa.attrelid = k.conrelid AND fa.attnum = k.conkey[1]
-        JOIN pg_attribute ta ON ta.attrelid = k.confrelid AND ta.attnum = k.confkey[1]
-        WHERE k.contype = 'f' AND cardinality(k.conkey) = 1
+        JOIN pg_attribute fa ON fa.attrelid = k.conrelid AND fa.attnum = u.fcol
+        JOIN pg_attribute ta ON ta.attrelid = k.confrelid AND ta.attnum = u.tcol
+        WHERE k.contype = 'f'
             AND ((fns.nspname = $1 AND f.relname = $2) OR (tns.nspname = $1 AND t.relname = $2))
-        ORDER BY fns.nspname, f.relname, fa.attname
+        GROUP BY k.oid, fns.nspname, f.relname, tns.nspname, t.relname
+        ORDER BY fns.nspname, f.relname, min(fa.attname)
         "#,
     )
     .bind(schema)
@@ -252,13 +256,13 @@ pub(crate) async fn list_foreign_keys_impl(
     };
     Ok(rows
         .into_iter()
-        .map(|(from_schema, from_table, from_column, to_schema, to_table, to_column)| PgForeignKey {
+        .map(|(from_schema, from_table, from_columns, to_schema, to_table, to_columns)| PgForeignKey {
             from_schema,
             from_table,
-            from_column,
+            from_columns,
             to_schema,
             to_table,
-            to_column,
+            to_columns,
         })
         .collect())
 }

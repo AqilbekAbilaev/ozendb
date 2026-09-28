@@ -41,7 +41,8 @@ export function buildSelectSql({ schema, table, joins = [], columns = [], filter
   const lines = [`SELECT ${columns.length ? columns.map(col).join(', ') : all}`, `FROM ${from(schema, table, 0)}`]
   joins.forEach((j, i) => {
     const kind = j.kind === 'inner' ? 'JOIN' : 'LEFT JOIN'
-    lines.push(`${kind} ${from(j.schema, j.table, i + 1)} ON ${col({ table: i + 1, column: j.column })} = ${col(j.equals)}`)
+    const on = j.on.map(p => `${col({ table: i + 1, column: p.column })} = ${col(p.equals)}`).join(' AND ')
+    lines.push(`${kind} ${from(j.schema, j.table, i + 1)} ON ${on}`)
   })
   filters.forEach((f, i) => lines.push(`${i ? '  AND' : 'WHERE'} ${condition(col(f), f)}`))
   if (orderBy.length) {

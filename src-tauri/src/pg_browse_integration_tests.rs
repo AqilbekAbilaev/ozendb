@@ -4,7 +4,7 @@
 
 use crate::commands::{
     browse_table_impl, count_table_impl, list_columns_impl, list_foreign_keys_impl, list_tables_impl, update_row_impl, ColumnFilter, ColumnRef, ColumnValue,
-    FilterOp, JoinKind, TableJoin,
+    FilterOp, JoinKind, JoinOn, TableJoin,
 };
 use crate::pg_integration_tests::{pool, test_config};
 
@@ -73,7 +73,7 @@ async fn filters_narrow_both_the_page_and_the_count() {
 }
 
 #[tokio::test]
-async fn lists_single_column_foreign_keys_in_both_directions() {
+async fn lists_foreign_keys_in_both_directions_with_every_column() {
     let config = match test_config() {
         Some(val) => val,
         None => {
@@ -99,17 +99,19 @@ async fn lists_single_column_foreign_keys_in_both_directions() {
     let keys = list_foreign_keys_impl(&pool, "ozendb_it_fk", "merchants").await.unwrap();
     let described: Vec<String> = keys
         .iter()
-        .map(|k| format!("{}.{}.{} -> {}.{}.{}", k.from_schema, k.from_table, k.from_column, k.to_schema, k.to_table, k.to_column))
+        .map(|k| format!("{}.{}.{:?} -> {}.{}.{:?}", k.from_schema, k.from_table, k.from_columns, k.to_schema, k.to_table, k.to_columns))
         .collect();
     assert_eq!(
         described,
         vec![
-            "ozendb_it_fk.merchants.region_id -> ozendb_it_fk.regions.id",
-            "ozendb_it_fk_other.payments.merchant_id -> ozendb_it_fk.merchants.id",
+            r#"ozendb_it_fk.merchants.["region_id"] -> ozendb_it_fk.regions.["id"]"#,
+            r#"ozendb_it_fk_other.payments.["merchant_id"] -> ozendb_it_fk.merchants.["id"]"#,
         ]
     );
-    // A key over several columns isn't offered.
-    assert!(list_foreign_keys_impl(&pool, "ozendb_it_fk", "pairs").await.unwrap().is_empty());
+    // A key over several columns lists them paired, in the key's order.
+    let pairs = list_foreign_keys_impl(&pool, "ozendb_it_fk", "pairs").await.unwrap();
+    assert_eq!(pairs.len(), 1);
+    assert_eq!((pairs[0].from_columns.clone(), pairs[0].to_columns.clone()), (vec!["a".to_string(), "b".to_string()], vec!["a".to_string(), "b".to_string()]));
 
     for stmt in ["DROP SCHEMA ozendb_it_fk_other CASCADE", "DROP SCHEMA ozendb_it_fk CASCADE"] {
         sqlx::query(stmt).execute(&pool).await.unwrap();
@@ -140,8 +142,7 @@ async fn joins_add_related_columns_and_filter_sort_and_count_across_them() {
         schema: String::from("ozendb_it_join"),
         table: String::from("regions"),
         kind,
-        column: String::from("id"),
-        equals: by("region_id"),
+        on: vec![JoinOn { column: String::from("id"), equals: by("region_id") }],
     };
     let browse = |joins: Vec<TableJoin>, filters: Vec<ColumnFilter>, order: ColumnRef, desc: bool| {
         let pool = pool.clone();
@@ -180,8 +181,7 @@ async fn joins_add_related_columns_and_filter_sort_and_count_across_them() {
         schema: String::from("ozendb_it_join"),
         table: String::from("merchants"),
         kind: JoinKind::Inner,
-        column: String::from("id"),
-        equals: by("parent_id"),
+        on: vec![JoinOn { column: String::from("id"), equals: by("parent_id") }],
     };
     let page = browse(vec![parents], vec![], by("id"), false).await;
     let pairs: Vec<_> = page.rows.iter().map(|r| (r[1].clone(), r[5].clone())).collect();
