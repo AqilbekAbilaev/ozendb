@@ -1,11 +1,11 @@
-import { ref, reactive, computed, toRef } from 'vue'
+import { computed, toRef } from 'vue'
 import { browseTable, countTable, updateRow, readTableSelect, runQuery } from '../api/queries'
 import { listColumns, listForeignKeys } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 import { formatCell, cellKind } from './formatCell.js'
 import { parseFilter, filterBoxText } from './parseFilter.js'
 import { buildSelectSql, aliases } from './buildSelectSql.js'
-import { runSql, explainSql, createSqlRun } from './runSql.js'
+import { runSql, explainSql } from './runSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
 import { useBuilderPauses } from './builderPauses.js'
@@ -21,21 +21,22 @@ const JSON_TYPES = ['json', 'jsonb']
 export function usePostgresTable(tab, { readOnly = false } = {}) {
   const target = { connectionId: tab.connectionId, schema: tab.schema, table: tab.table }
   const query = tab.state.query
-  const columns = ref([])
-  const rows = ref([])
-  const total = ref(null)
-  const elapsedMs = ref(null)
+  const runtime = tab.runtime
+  const columns = toRef(runtime, 'columns')
+  const rows = toRef(runtime, 'rows')
+  const total = toRef(runtime, 'total')
+  const elapsedMs = toRef(runtime, 'elapsedMs')
   const offset = toRef(query, 'offset')
   const limit = toRef(query, 'limit')
   // One entry per load, newest last: `{ at, ok, text, ms }`.
-  const messages = ref([])
+  const messages = toRef(runtime, 'messages')
   // `{ version, encoding }` for the footer, read once; stays null if it can't be.
-  const server = ref(null)
+  const server = toRef(runtime, 'server')
   const orderBy = toRef(query, 'orderBy')
   const descending = toRef(query, 'descending')
-  const loading = ref(false)
-  const error = ref(null)
-  const editError = ref(null)
+  const loading = toRef(runtime, 'loading')
+  const error = toRef(runtime, 'error')
+  const editError = toRef(runtime, 'editError')
   // What each header box holds, by column, and the filters last applied from them:
   // typing edits the boxes, and only applying reloads.
   const filterText = toRef(query, 'filterText')
@@ -47,13 +48,12 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   // SQL mode: an editor seeded with the SQL the filters amount to. Going back reads
   // edited SQL into the boxes, or says why they can't show it.
   const mode = toRef(tab.state, 'mode')
-  const filterRefusal = ref(null)
+  const filterRefusal = toRef(runtime, 'filterRefusal')
   // SQL mode's text is lasting state; its runs aren't.
   const sql = toRef(tab.state, 'sql')
-  const sqlRun = reactive(createSqlRun(target.connectionId))
-  let builtSql = null
+  const sqlRun = runtime.sqlRun
   // Filter mode's Explain: the plan for currentSql, kept like SQL mode's result.
-  const explainRun = reactive(createSqlRun(target.connectionId))
+  const explainRun = runtime.explainRun
   const explain = () => explainSql(explainRun, currentSql.value)
   // The screen around the data — the Query Builder and the result sub-tab — kept with
   // the tab, since the workspace component is unmounted whenever another kind of tab shows.
@@ -65,12 +65,12 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   // restored join). A join's key never changes, so removing one leaves the others'
   // columns keyed as they were. Filters, sort, shown columns and edits name a column by
   // its key (see columnRefs.js).
-  const mainColumns = ref(null)
+  const mainColumns = toRef(runtime, 'mainColumns')
   const joins = toRef(query, 'joins')
-  const joinColumns = ref({})
+  const joinColumns = toRef(runtime, 'joinColumns')
   const nextJoinKey = () => `j${query.nextJoin++}`
   // Foreign keys by `schema.table`, fetched as each table enters the tab.
-  const foreignKeys = ref({})
+  const foreignKeys = toRef(runtime, 'foreignKeys')
   const refs = computed(() => columnRefs(mainColumns.value && joins.value.every(j => joinColumns.value[j.key])
     ? [{ key: '', columns: mainColumns.value }, ...joins.value.map(j => ({ key: j.key, columns: joinColumns.value[j.key] }))]
     : []))
@@ -88,9 +88,8 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
     foreignKeys.value,
   ))
   const pauses = useBuilderPauses({ shownColumns, orderBy, descending, setShownColumns, setSort }, tab.state.paused)
-  // Only the latest load may write back: a sort clicked while a page is loading
-  // must not be overwritten by that older page.
-  let generation = 0
+  // Only the latest load may write back (runtime.generation): a sort clicked while a
+  // page is loading must not be overwritten by that older page.
 
   const keyColumns = computed(() => (mainColumns.value ?? []).filter(c => c.isPrimaryKey).map(c => c.name))
   const hasPrev = computed(() => offset.value > 0)
@@ -134,7 +133,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   }
 
   async function load() {
-    const mine = ++generation
+    const mine = ++runtime.generation
     loading.value = true
     error.value = null
     if (mine === 1) {
@@ -146,13 +145,13 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
       // a restored tab has them before it has ever loaded.
       if (!mainColumns.value) {
         const info = await listColumns(target)
-        if (mine !== generation) return
+        if (mine !== runtime.generation) return
         mainColumns.value = info
       }
       const missing = joins.value.filter(j => !joinColumns.value[j.key])
       if (missing.length) {
         const lists = await Promise.all(missing.map(({ schema, table }) => listColumns({ connectionId: target.connectionId, schema, table })))
-        if (mine !== generation) return
+        if (mine !== runtime.generation) return
         joinColumns.value = { ...joinColumns.value, ...Object.fromEntries(missing.map((j, i) => [j.key, lists[i]])) }
       }
       const [page, count] = await Promise.all([
@@ -162,19 +161,19 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
         }),
         total.value == null ? countTable(target, wireFilters.value, wireJoins.value) : total.value,
       ])
-      if (mine !== generation) return
+      if (mine !== runtime.generation) return
       columns.value = page.columns
       rows.value = page.rows
       elapsedMs.value = page.elapsedMs
       total.value = count
       log(true, `SELECT ${page.rows.length}`, page.elapsedMs)
     } catch (e) {
-      if (mine !== generation) return
+      if (mine !== runtime.generation) return
       error.value = tableErrorText(e)
       log(false, error.value)
       rows.value = []
     } finally {
-      if (mine === generation) loading.value = false
+      if (mine === runtime.generation) loading.value = false
     }
   }
 
@@ -297,7 +296,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
 
   // Not run: SQL loaded from the library may change data.
   function openSql(text) {
-    builtSql = currentSql.value
+    runtime.builtSql = currentSql.value
     sql.value = text
     filterRefusal.value = null
     mode.value = 'sql'
@@ -305,7 +304,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
 
   async function toFilters() {
     filterRefusal.value = null
-    if (sql.value !== builtSql) {
+    if (sql.value !== runtime.builtSql) {
       try {
         filterRefusal.value = await adopt(await readTableSelect(target, sql.value))
       } catch (e) {

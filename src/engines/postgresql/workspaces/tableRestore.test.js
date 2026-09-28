@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { reactive } from 'vue'
 import { COLUMNS, SAVED_TABLE_STATES } from './tableState.fixtures.js'
 
@@ -17,7 +17,6 @@ const { restoreWorkspace } = await import('../../../workspaces/lifecycle.js')
 const { getWorkspaceDefinition } = await import('../../../workspaces/registry.js')
 const { toLegacyRecord } = await import('../../../utils/sessionMigration.js')
 const { usePostgresTable } = await import('./usePostgresTable.js')
-const { tableSession, dropTableSession } = await import('./tableSessions.js')
 registerWorkspaceDefinitions()
 
 const TYPE = 'postgresql.table_browse'
@@ -35,7 +34,7 @@ const serialize = (tab) => JSON.parse(JSON.stringify(getWorkspaceDefinition(TYPE
 // The one place these specs reach into how a tab holds its state; the plan's steps
 // (postgresql-tab-objects.md) change only this, never the fixtures or expectations.
 async function load(tab) {
-  const t = tableSession(tab.id, () => reactive(usePostgresTable(reactive(tab))))
+  const t = reactive(usePostgresTable(reactive(tab)))
   await t.load()
   return { mode: t.mode, sql: t.sql, filterText: t.filterText, shownColumns: t.shownColumns }
 }
@@ -46,7 +45,6 @@ beforeEach(() => {
   countTable.mockResolvedValue(3)
   browseTable.mockResolvedValue({ columns: [], rows: [], truncated: false, elapsedMs: 1 })
 })
-afterEach(() => ['t1', 't2'].forEach(dropTableSession))
 
 describe('a PostgreSQL table tab restored from a saved session', () => {
   for (const fixture of SAVED_TABLE_STATES) {

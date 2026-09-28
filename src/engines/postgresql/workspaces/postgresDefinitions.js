@@ -1,11 +1,10 @@
-// PostgreSQL workspace definitions. A table tab carries what the user built as `state`
-// and its panel as `ui` (tableState.js); a session saves the state. Rows and results
-// are never saved — they load again.
+// PostgreSQL workspace definitions. A tab is plain data: what the user built as `state`,
+// a table tab's panel as `ui`, and what it loaded or is running as `runtime`
+// (tableState.js). A session saves the state; runtime starts fresh and loads again.
 import PostgresTableWorkspace from './PostgresTableWorkspace.vue'
 import PostgresQueryWorkspace from './PostgresQueryWorkspace.vue'
 import { createResourceRef } from '../../../utils/resourceRef'
-import { peekTableSession, dropTableSession } from './tableSessions.js'
-import { createTableState, createTableUi, migrateTableState, stateToSave } from './tableState.js'
+import { createTableState, createTableUi, createTableRuntime, migrateTableState, stateToSave } from './tableState.js'
 import { abandonTransaction, createSqlRun } from './runSql.js'
 import { showToast } from '../../../stores/toast'
 
@@ -23,7 +22,10 @@ function tableWorkspace({ connectionId, connectionName, database, schema, table 
       { kind: 'schema', name: schema },
       { kind: 'table', name: table },
     ]),
-    fields: { kind: 'pgTable', connectionId, connectionName, database, schema, table, state, ui: createTableUi() },
+    fields: {
+      kind: 'pgTable', connectionId, connectionName, database, schema, table,
+      state, ui: createTableUi(), runtime: createTableRuntime(connectionId),
+    },
   }
 }
 
@@ -49,11 +51,7 @@ export const postgresDefinitions = [
     duplicate: (workspace) => tableWorkspace(workspace),
     serialize: (workspace) => ({ state: stateToSave(workspace.state) }),
     restore: (saved) => tableWorkspace(saved, migrateTableState(saved)),
-    dispose: (workspace) => {
-      const run = peekTableSession(workspace.id)?.sqlRun
-      dropTableSession(workspace.id)
-      return rollBackOnClose(run)
-    },
+    dispose: (workspace) => rollBackOnClose(workspace.runtime.sqlRun),
   },
   {
     type: 'postgresql.query',

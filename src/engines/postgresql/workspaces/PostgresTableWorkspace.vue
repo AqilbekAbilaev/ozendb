@@ -16,7 +16,6 @@ import PostgresTableHeader from './PostgresTableHeader.vue'
 import Resizer from '../../../components/base/Resizer.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { usePostgresTable } from './usePostgresTable.js'
-import { tableSession } from './tableSessions.js'
 import { openConnections } from '../../../stores/openConnections'
 import { showToast } from '../../../stores/toast'
 
@@ -24,22 +23,17 @@ const props = defineProps({
   activeTab: { type: Object, required: true },
 })
 
-// The host reuses this component across table tabs, so which tab's state it shows
-// follows the active tab.
+// The host reuses this component across table tabs, so which tab it shows follows the
+// active tab. Everything the tab holds is on the tab itself, so coming back to it shows
+// it as it was; only a tab that has never loaded loads.
 const t = shallowRef(null)
 const limitDraft = ref(0)
 const library = ref(null)   // which view of the query library is open, if any
-// Each tab keeps its state for as long as it's open (see tableSessions), so coming
-// back to it shows it as it was; only a tab seen for the first time loads.
-watch(() => props.activeTab.id, (id) => {
+watch(() => props.activeTab.id, () => {
   const readOnly = !!openConnections.value.find(c => c.id === props.activeTab.connectionId)?.read_only
-  let fresh = false
-  t.value = tableSession(id, () => {
-    fresh = true
-    return reactive(usePostgresTable(props.activeTab, { readOnly }))
-  })
+  t.value = reactive(usePostgresTable(props.activeTab, { readOnly }))
   limitDraft.value = t.value.limit
-  if (fresh) t.value.load()
+  if (props.activeTab.runtime.generation === 0) t.value.load()
 }, { immediate: true })
 
 const MODES = [{ value: 'filter', label: 'Filter' }, { value: 'sql', label: 'SQL' }]

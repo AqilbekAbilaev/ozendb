@@ -6,8 +6,7 @@ vi.mock('../api/queries', async (original) => ({ ...(await original()), rollback
 vi.mock('../../../stores/toast', () => ({ showToast }))
 
 const { postgresDefinitions } = await import('./postgresDefinitions.js')
-const { tableSession } = await import('./tableSessions.js')
-const { createTableState, createTableUi } = await import('./tableState.js')
+const { createTableState, createTableUi, createTableRuntime } = await import('./tableState.js')
 const { createSqlRun } = await import('./runSql.js')
 
 beforeEach(() => vi.clearAllMocks())
@@ -29,7 +28,7 @@ describe('postgresql.table_browse', () => {
         { kind: 'table', name: 'users' },
       ],
     })
-    expect(created.fields).toEqual({ kind: 'pgTable', ...target, state: createTableState(), ui: createTableUi() })
+    expect(created.fields).toEqual({ kind: 'pgTable', ...target, state: createTableState(), ui: createTableUi(), runtime: createTableRuntime('c1') })
   })
 
   it('duplicates onto the same table', () => {
@@ -69,8 +68,7 @@ describe('closing a tab with a transaction open', () => {
   })
 
   it('rolls back a table tab\'s SQL-mode transaction', async () => {
-    tableSession('t1', () => ({ sqlRun: { txId: 'tx-2' } }))
-    await byType['postgresql.table_browse'].dispose({ id: 't1' })
+    await byType['postgresql.table_browse'].dispose({ id: 't1', runtime: { sqlRun: { txId: 'tx-2' } } })
     expect(rollbackTransaction).toHaveBeenCalledWith('tx-2')
   })
 })

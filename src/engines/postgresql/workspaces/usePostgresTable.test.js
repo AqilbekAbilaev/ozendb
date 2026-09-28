@@ -14,7 +14,7 @@ vi.mock('../api/resources', () => ({ listColumns, listForeignKeys }))
 vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
-const { createTableState, createTableUi } = await import('./tableState.js')
+const { createTableState, createTableUi, createTableRuntime } = await import('./tableState.js')
 
 const target = { connectionId: 'c1', schema: 'public', table: 'users' }
 const COLUMNS = [
@@ -40,7 +40,7 @@ beforeEach(() => {
 
 // A table tab as the workspace holds it, with the state it starts from.
 const tabOf = ({ pageSize, initial } = {}) =>
-  reactive({ ...target, state: initial ?? createTableState({ limit: pageSize }), ui: createTableUi() })
+  reactive({ ...target, state: initial ?? createTableState({ limit: pageSize }), ui: createTableUi(), runtime: createTableRuntime(target.connectionId) })
 const table = ({ readOnly, ...start } = {}) => usePostgresTable(tabOf(start), { readOnly })
 
 async function loaded(options) {
