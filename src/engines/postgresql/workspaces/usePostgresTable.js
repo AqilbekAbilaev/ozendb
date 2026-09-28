@@ -246,7 +246,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     limit.value = rowsPerPage
     filters.value = Object.entries(filterText.value).flatMap(([key, text]) => {
       const ref = refByKey.value[key]
-      const parsed = ref && parseFilter(text, cellKind(ref.info.dataType))
+      const parsed = ref && parseFilter(text, cellKind(ref.info.dataType, ref.info.enumValues))
       return parsed ? [{ key, ...parsed }] : []
     })
     total.value = null
@@ -297,7 +297,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     if (order.length > 1 && !byKey) return 'the filter view sorts by one column at a time.'
     const texts = {}
     for (const f of read) {
-      const text = filterBoxText(f, cellKind(columnInfo.value[f.column]?.dataType))
+      const text = filterBoxText(f, cellKind(columnInfo.value[f.column]?.dataType, columnInfo.value[f.column]?.enumValues))
       if (text == null || f.column in texts) return `the condition on "${f.column}" can't be typed in its filter box.`
       texts[f.column] = text
     }

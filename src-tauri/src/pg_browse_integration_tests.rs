@@ -3,7 +3,7 @@
 //! and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{
-    browse_table_impl, count_table_impl, list_foreign_keys_impl, list_tables_impl, update_row_impl, ColumnFilter, ColumnRef, ColumnValue,
+    browse_table_impl, count_table_impl, list_columns_impl, list_foreign_keys_impl, list_tables_impl, update_row_impl, ColumnFilter, ColumnRef, ColumnValue,
     FilterOp, JoinKind, TableJoin,
 };
 use crate::pg_integration_tests::{pool, test_config};
@@ -321,6 +321,12 @@ async fn starts_with_and_any_of_work_on_real_column_types() {
     assert_eq!(ids(vec![filter("mcc", FilterOp::In, Some("5812, 7011"))]).await, vec![2, 4]);
     assert_eq!(ids(vec![filter("status", FilterOp::In, Some("blocked,closed"))]).await, vec![2, 3]);
     assert_eq!(ids(vec![filter("name", FilterOp::In, Some("EVOS, Korzinka"))]).await, vec![1, 3]);
+
+    // An enum column lists its labels in their declared order; others list none.
+    let columns = list_columns_impl(&pool, "ozendb_it_ops", "t").await.unwrap();
+    let status = columns.iter().find(|c| c.name == "status").unwrap();
+    assert_eq!(status.enum_values, Some(vec!["active".to_string(), "blocked".to_string(), "closed".to_string()]));
+    assert_eq!(columns.iter().find(|c| c.name == "mcc").unwrap().enum_values, None);
 
     sqlx::query("DROP SCHEMA ozendb_it_ops CASCADE").execute(&pool).await.unwrap();
 }

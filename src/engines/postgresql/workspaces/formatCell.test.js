@@ -35,3 +35,11 @@ describe('cellKind', () => {
     expect(cellKind(undefined)).toBe(null)
   })
 })
+
+describe('enum columns', () => {
+  it('are their own kind whenever the column lists its labels', () => {
+    expect(cellKind('merchant_status', ['active', 'blocked'])).toBe('enum')
+    expect(cellKind('merchant_status')).toBe(null)
+    expect(cellKind('text', [])).toBe('str')
+  })
+})

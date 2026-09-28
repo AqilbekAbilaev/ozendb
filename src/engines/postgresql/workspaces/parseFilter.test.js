@@ -68,6 +68,8 @@ describe('filterBoxText', () => {
       [{ op: 'startsWith', value: 'EVOS' }, 'str', '^EVOS'],
       [{ op: 'in', value: '5411, 5812' }, 'num', '5411, 5812'],
       [{ op: 'in', value: 'a,b' }, 'str', '=a,b'],
+      [{ op: 'eq', value: 'active' }, 'enum', 'active'],
+      [{ op: 'in', value: 'active, closed' }, 'enum', 'active, closed'],
     ]
     for (const [filter, kind, text] of cases) {
       expect(filterBoxText(filter, kind)).toBe(text)

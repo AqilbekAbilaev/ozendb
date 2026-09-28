@@ -22,10 +22,10 @@ const props = defineProps({
 })
 const emit = defineEmits(['sort', 'save', 'filter-text', 'apply-filters'])
 
-const PLACEHOLDERS = { num: 'e.g. >100', date: 'e.g. 2026-09', bool: 'true / false' }
+const PLACEHOLDERS = { num: 'e.g. >100', date: 'e.g. 2026-09', bool: 'true / false', enum: 'e.g. a, b' }
 
 const filtering = computed(() => Object.values(props.filterText ?? {}).some(text => text?.trim()))
-const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType)))
+const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType, props.columnInfo[c]?.enumValues)))
 
 const editing = ref(null)   // { row, column, text, seed }
 const input = ref(null)
@@ -120,6 +120,7 @@ function setNull() {
                 @click="setNull"
               >NULL</button>
             </span>
+            <span v-else-if="kinds[c] === 'enum' && value !== null" class="enum-pill">{{ value }}</span>
             <template v-else>{{ formatCell(value) }}</template>
           </td>
         </tr>
@@ -185,6 +186,10 @@ td.bool { color: var(--warn); font-family: var(--mono); }
 td.str  { color: var(--cell-str-green); }
 td.date { color: var(--text-dim); font-family: var(--mono); }
 td.editable { cursor: text; }
+.enum-pill {
+  display: inline-block; padding: 0 7px; border-radius: 9px; font-size: 11.5px; line-height: 17px;
+  background: var(--bg-active); color: var(--text); border: 1px solid var(--border-soft);
+}
 .pg-editing { display: flex; align-items: center; gap: 4px; }
 .pg-null {
   flex: none; padding: 1px 6px; border-radius: 3px; cursor: pointer;
