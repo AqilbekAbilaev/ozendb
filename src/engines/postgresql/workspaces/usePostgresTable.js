@@ -5,7 +5,7 @@ import { errMessage } from '../../../utils/errors'
 import { formatCell, cellKind } from './formatCell.js'
 import { parseFilter, filterBoxText } from './parseFilter.js'
 import { buildSelectSql, aliases } from './buildSelectSql.js'
-import { runSql, explainSql } from './runSql.js'
+import { runSql, explainSql, createSqlRun } from './runSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
 import { useBuilderPauses } from './builderPauses.js'
@@ -48,17 +48,13 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   // edited SQL into the boxes, or says why they can't show it.
   const mode = toRef(tab.state, 'mode')
   const filterRefusal = ref(null)
-  // The SQL panel's run, around the tab's SQL (which is lasting state; the run isn't).
-  const sqlState = reactive({
-    connectionId: target.connectionId,
-    get sql() { return tab.state.sql },
-    set sql(text) { tab.state.sql = text },
-    result: null, error: null, running: false,
-  })
+  // SQL mode's text is lasting state; its runs aren't.
+  const sql = toRef(tab.state, 'sql')
+  const sqlRun = reactive(createSqlRun(target.connectionId))
   let builtSql = null
   // Filter mode's Explain: the plan for currentSql, kept like SQL mode's result.
-  const explainState = reactive({ connectionId: target.connectionId, plan: null, planError: null, explaining: false })
-  const explain = () => explainSql(explainState, currentSql.value)
+  const explainRun = reactive(createSqlRun(target.connectionId))
+  const explain = () => explainSql(explainRun, currentSql.value)
   // The screen around the data — the Query Builder and the result sub-tab — kept with
   // the tab, since the workspace component is unmounted whenever another kind of tab shows.
   const panel = tab.ui
@@ -296,22 +292,22 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
 
   function toSql() {
     openSql(currentSql.value)
-    return runSql(sqlState)
+    return runSql(sqlRun, sql.value)
   }
 
   // Not run: SQL loaded from the library may change data.
-  function openSql(sql) {
+  function openSql(text) {
     builtSql = currentSql.value
-    sqlState.sql = sql
+    sql.value = text
     filterRefusal.value = null
     mode.value = 'sql'
   }
 
   async function toFilters() {
     filterRefusal.value = null
-    if (sqlState.sql !== builtSql) {
+    if (sql.value !== builtSql) {
       try {
-        filterRefusal.value = await adopt(await readTableSelect(target, sqlState.sql))
+        filterRefusal.value = await adopt(await readTableSelect(target, sql.value))
       } catch (e) {
         filterRefusal.value = errMessage(e)
       }
@@ -411,9 +407,9 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   }
 
   return {
-    explainState, explain, pauses, panel,
+    explainRun, explain, pauses, panel, sql, sqlRun,
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
-    filterText, activeFilters, mode, sqlState, filterRefusal, toSql, openSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
+    filterText, activeFilters, mode, filterRefusal, toSql, openSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin, joinChoices, setJoinOn,
     setFilterText, replaceFilterText, setSort, shownColumns, setShownColumns, view, applyFilters, clearFilters, canEdit, editText, saveCell,
   }

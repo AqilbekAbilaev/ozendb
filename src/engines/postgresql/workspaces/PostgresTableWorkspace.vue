@@ -74,7 +74,7 @@ function copySql() {
 
     <template v-if="t.mode === 'sql'">
       <div v-if="t.filterRefusal" class="pg-edit-error">Can't show this as filters: {{ t.filterRefusal }}</div>
-      <PostgresSqlPanel :state="t.sqlState" :server="t.server">
+      <PostgresSqlPanel v-model:sql="t.sql" :run="t.sqlRun" :server="t.server">
         <template #toolbar-start>
           <SegmentedControl class="mode-toggle" :model-value="t.mode" :options="MODES" @update:model-value="switchMode" />
         </template>
@@ -84,7 +84,7 @@ function copySql() {
       <div class="qbar">
         <SegmentedControl class="mode-toggle" :model-value="t.mode" :options="MODES" @update:model-value="switchMode" />
         <BaseButton variant="ghost" icon="run" class="run" :disabled="t.loading" title="Apply the filters and limit (Enter)" @click="run">{{ t.loading ? 'Running…' : 'Run' }}</BaseButton>
-        <BaseButton variant="ghost" icon="exScan" :disabled="t.explainState.explaining" title="Show how PostgreSQL runs these filters" @click="explain">Explain</BaseButton>
+        <BaseButton variant="ghost" icon="exScan" :disabled="t.explainRun.explaining" title="Show how PostgreSQL runs these filters" @click="explain">Explain</BaseButton>
         <span class="qsep"></span>
         <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" title="Open a saved query" @click="library = 'saved'" />
         <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save these filters' SQL" @click="library = 'saved'" />
@@ -143,9 +143,9 @@ function copySql() {
           </div>
           <PostgresPlan
             v-else-if="t.panel.rtab === 'Explain'"
-            :plan="t.explainState.plan"
-            :error="t.explainState.planError"
-            :explaining="t.explainState.explaining"
+            :plan="t.explainRun.plan"
+            :error="t.explainRun.planError"
+            :explaining="t.explainRun.explaining"
           />
           <PostgresMessages v-else :messages="t.messages" />
         </div>

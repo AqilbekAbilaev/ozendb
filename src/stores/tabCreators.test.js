@@ -336,7 +336,7 @@ describe('PostgreSQL queries', () => {
   it('opens a query tab against the connection\'s database, and activates it', () => {
     const c = harness()
     c.openPostgresQuery({ connectionId: 'c9', connectionName: 'pg', database: 'app' })
-    expect(lastTab()).toMatchObject({ type: 'postgresql.query', kind: 'pgQuery', database: 'app', sql: '' })
+    expect(lastTab()).toMatchObject({ type: 'postgresql.query', kind: 'pgQuery', database: 'app', state: { sql: '' } })
     expect(activeTabId.value).toBe(lastTab().id)
   })
 })

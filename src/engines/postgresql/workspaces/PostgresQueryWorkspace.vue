@@ -12,7 +12,7 @@ const items = computed(() => crumbSegments({ connection: props.activeTab.connect
 </script>
 
 <template>
-  <PostgresSqlPanel :state="activeTab">
+  <PostgresSqlPanel v-model:sql="activeTab.state.sql" :run="activeTab.runtime.run">
     <WorkspaceCrumbs engine="postgresql" :items="items" />
   </PostgresSqlPanel>
 </template>

@@ -16,23 +16,26 @@ import { showToast } from '../../../stores/toast'
 import PostgresPlan from './PostgresPlan.vue'
 import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
 
-// A SQL editor with its toolbar, results and status line. `state` holds
-// `{ connectionId, sql, result, error, running, messages? }` and is written in place —
-// a query tab passes itself. `server` (`{ version, encoding }`) fills the status line
-// when known. The default slot is a line above the toolbar; `toolbar-start` goes at
-// the toolbar's left edge (the table tab's Filter / SQL switch).
+// A SQL editor with its toolbar, results and status line. `sql` is the editor's text
+// (v-model:sql — the tab's lasting state); `run` is its runs (createSqlRun), written in
+// place. `server` (`{ version, encoding }`) fills the status line when known. The
+// default slot is a line above the toolbar; `toolbar-start` goes at the toolbar's left
+// edge (the table tab's Filter / SQL switch).
 const props = defineProps({
-  state:  { type: Object, required: true },
+  sql:    { type: String, required: true },
+  run:    { type: Object, required: true },
   server: { type: Object, default: null },
 })
+const emit = defineEmits(['update:sql'])
+const setSql = (text) => emit('update:sql', text)
 
 // Manual: runs go into one transaction, begun by the first of them, until Commit or
 // Rollback. The switch holds still while one is open.
 const txnOptions = computed(() => {
-  const title = props.state.txId ? 'Commit or roll back first' : undefined
+  const title = props.run.txId ? 'Commit or roll back first' : undefined
   return [
-    { value: 'auto', label: 'Auto-commit', disabled: !!props.state.txId, title },
-    { value: 'manual', label: 'Manual', disabled: !!props.state.txId, title },
+    { value: 'auto', label: 'Auto-commit', disabled: !!props.run.txId, title },
+    { value: 'manual', label: 'Manual', disabled: !!props.run.txId, title },
   ]
 })
 
@@ -42,31 +45,32 @@ const rtab = ref('Result')
 const cursor = ref({ line: 1, col: 1 })
 const library = ref(null)   // which view of the query library is open, if any
 
-function run(sql) {
+function execute(sql = props.sql) {
   rtab.value = 'Result'
-  return runSql(props.state, sql)
+  return runSql(props.run, sql)
 }
 
 function explain() {
   rtab.value = 'Explain'
-  return explainSql(props.state)
+  return explainSql(props.run, props.sql)
 }
 
 async function format() {
-  const reason = await formatSql(props.state)
+  const { sql, reason } = await formatSql(props.sql)
   if (reason) showToast(reason)
+  else setSql(sql)
 }
 
 function runSelection() {
   const { state } = editor.value.getView()
   const { from, to } = state.selection.main
-  return run(from === to ? undefined : state.sliceDoc(from, to))
+  return execute(from === to ? undefined : state.sliceDoc(from, to))
 }
 
 // Mod-Enter runs the query; high precedence so the editor's own newline binding
 // doesn't take it first.
 const editorExtensions = [
-  Prec.high(keymap.of([{ key: 'Mod-Enter', run: () => { run(); return true } }])),
+  Prec.high(keymap.of([{ key: 'Mod-Enter', run: () => { execute(); return true } }])),
   EditorView.updateListener.of((update) => {
     if (!update.selectionSet) return
     const head = update.state.selection.main.head
@@ -76,13 +80,13 @@ const editorExtensions = [
 ]
 
 const rtabs = computed(() => [
-  { value: 'Result', label: 'Result', count: props.state.result?.rows.length },
-  { value: 'Messages', label: 'Messages', count: props.state.messages?.length },
+  { value: 'Result', label: 'Result', count: props.run.result?.rows.length },
+  { value: 'Messages', label: 'Messages', count: props.run.messages.length },
   { value: 'Explain', label: 'Explain' },
 ])
 
 const summary = computed(() => {
-  const r = props.state.result
+  const r = props.run.result
   if (!r) return 'No results'
   if (r.rowsAffected != null) return outcome(r)
   const rows = `${r.rows.length} row${r.rows.length === 1 ? '' : 's'}`
@@ -95,27 +99,28 @@ const summary = computed(() => {
     <slot />
     <div class="qbar">
       <slot name="toolbar-start" />
-      <BaseButton variant="ghost" icon="run" class="run" :disabled="state.running || !state.sql.trim()" @click="run()">
-        {{ state.running ? 'Running…' : 'Run' }} <span class="kbd">⌘↵</span>
+      <BaseButton variant="ghost" icon="run" class="run" :disabled="run.running || !sql.trim()" @click="execute()">
+        {{ run.running ? 'Running…' : 'Run' }} <span class="kbd">⌘↵</span>
       </BaseButton>
-      <BaseButton variant="ghost" icon="run" :disabled="state.running" title="Run the selected text" @click="runSelection">Run selection</BaseButton>
-      <BaseButton variant="ghost" icon="exScan" :disabled="state.explaining || !state.sql.trim()" title="Show how PostgreSQL runs this query" @click="explain">Explain</BaseButton>
-      <BaseButton variant="ghost" icon="close" :disabled="!state.running" title="Stop the running query" @click="cancelSql(state)">Cancel</BaseButton>
+      <BaseButton variant="ghost" icon="run" :disabled="run.running" title="Run the selected text" @click="runSelection">Run selection</BaseButton>
+      <BaseButton variant="ghost" icon="exScan" :disabled="run.explaining || !sql.trim()" title="Show how PostgreSQL runs this query" @click="explain">Explain</BaseButton>
+      <BaseButton variant="ghost" icon="close" :disabled="!run.running" title="Stop the running query" @click="cancelSql(run)">Cancel</BaseButton>
       <span class="qsep"></span>
-      <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" :disabled="state.running || !state.sql.trim()" title="Lay the SQL out one clause per line" @click="format">Format</BaseButton>
+      <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" :disabled="run.running || !sql.trim()" title="Lay the SQL out one clause per line" @click="format">Format</BaseButton>
       <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
       <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save or open a saved query" @click="library = 'saved'" />
       <span class="qsep"></span>
-      <SegmentedControl :model-value="state.txn ?? 'auto'" :options="txnOptions" variant="subtle" @update:model-value="state.txn = $event" />
-      <template v-if="state.txn === 'manual'">
-        <BaseButton variant="ghost" icon="check" :disabled="!state.txId || state.running" title="Make this transaction's changes permanent" @click="endTransaction(state, true)">Commit</BaseButton>
-        <BaseButton variant="ghost" icon="undo" :disabled="!state.txId || state.running" title="Undo everything since the transaction began" @click="endTransaction(state, false)">Rollback</BaseButton>
+      <SegmentedControl :model-value="run.txn ?? 'auto'" :options="txnOptions" variant="subtle" @update:model-value="run.txn = $event" />
+      <template v-if="run.txn === 'manual'">
+        <BaseButton variant="ghost" icon="check" :disabled="!run.txId || run.running" title="Make this transaction's changes permanent" @click="endTransaction(run, true)">Commit</BaseButton>
+        <BaseButton variant="ghost" icon="undo" :disabled="!run.txId || run.running" title="Undo everything since the transaction began" @click="endTransaction(run, false)">Rollback</BaseButton>
       </template>
     </div>
 
     <CodeEditor
       ref="editor"
-      v-model="state.sql"
+      :model-value="sql"
+      @update:model-value="setSql"
       class="pg-editor"
       :style="{ height: editorHeight + 'px' }"
       language="sql"
@@ -127,32 +132,32 @@ const summary = computed(() => {
       <TabStrip v-model="rtab" :options="rtabs" />
     </div>
     <div class="pg-results">
-      <PostgresMessages v-if="rtab === 'Messages'" :messages="state.messages ?? []" />
-      <PostgresPlan v-else-if="rtab === 'Explain'" :plan="state.plan ?? null" :error="state.planError ?? null" :explaining="!!state.explaining" />
-      <StateMessage v-else-if="state.error" mode="error" :message="state.error" />
-      <StateMessage v-else-if="state.running && !state.result" mode="loading" />
-      <template v-else-if="state.result">
-        <StateMessage v-if="state.result.rowsAffected != null" mode="empty" :label="outcome(state.result)" />
-        <StateMessage v-else-if="!state.result.rows.length" mode="empty" label="The query returned no rows" />
-        <PostgresResultGrid v-else :columns="state.result.columns" :rows="state.result.rows" />
+      <PostgresMessages v-if="rtab === 'Messages'" :messages="run.messages" />
+      <PostgresPlan v-else-if="rtab === 'Explain'" :plan="run.plan ?? null" :error="run.planError ?? null" :explaining="!!run.explaining" />
+      <StateMessage v-else-if="run.error" mode="error" :message="run.error" />
+      <StateMessage v-else-if="run.running && !run.result" mode="loading" />
+      <template v-else-if="run.result">
+        <StateMessage v-if="run.result.rowsAffected != null" mode="empty" :label="outcome(run.result)" />
+        <StateMessage v-else-if="!run.result.rows.length" mode="empty" label="The query returned no rows" />
+        <PostgresResultGrid v-else :columns="run.result.columns" :rows="run.result.rows" />
       </template>
       <StateMessage v-else mode="empty" label="Run a query to see its results (⌘↵)" />
     </div>
 
     <PostgresQueryLibrary
       v-if="library"
-      :connection-id="state.connectionId"
-      :sql="state.sql"
+      :connection-id="run.connectionId"
+      :sql="sql"
       :view="library"
-      @load="sql => state.sql = sql"
+      @load="setSql"
       @close="library = null"
     />
 
     <div class="pg-footer">
       <span>{{ summary }}</span>
-      <span v-if="state.result" class="fitem"><BaseIcon name="clock" :size="14" /> {{ state.result.elapsedMs }} ms</span>
-      <span v-if="state.txId" class="fitem txn-open">● Transaction open</span>
-      <span v-else>{{ state.txn === 'manual' ? 'Manual' : 'Auto-commit' }}</span>
+      <span v-if="run.result" class="fitem"><BaseIcon name="clock" :size="14" /> {{ run.result.elapsedMs }} ms</span>
+      <span v-if="run.txId" class="fitem txn-open">● Transaction open</span>
+      <span v-else>{{ run.txn === 'manual' ? 'Manual' : 'Auto-commit' }}</span>
       <span class="spacer"></span>
       <span>Ln {{ cursor.line }}, Col {{ cursor.col }}</span>
       <template v-if="server">

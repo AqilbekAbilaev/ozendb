@@ -37,7 +37,7 @@ const serialize = (tab) => JSON.parse(JSON.stringify(getWorkspaceDefinition(TYPE
 async function load(tab) {
   const t = tableSession(tab.id, () => reactive(usePostgresTable(reactive(tab))))
   await t.load()
-  return { mode: t.mode, sql: t.sqlState.sql, filterText: t.filterText, shownColumns: t.shownColumns }
+  return { mode: t.mode, sql: t.sql, filterText: t.filterText, shownColumns: t.shownColumns }
 }
 
 beforeEach(() => {

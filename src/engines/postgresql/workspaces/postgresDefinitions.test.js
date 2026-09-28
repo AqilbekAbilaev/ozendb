@@ -8,6 +8,7 @@ vi.mock('../../../stores/toast', () => ({ showToast }))
 const { postgresDefinitions } = await import('./postgresDefinitions.js')
 const { tableSession } = await import('./tableSessions.js')
 const { createTableState, createTableUi } = await import('./tableState.js')
+const { createSqlRun } = await import('./runSql.js')
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -45,28 +46,30 @@ describe('postgresql.query', () => {
     const created = def.create({ target: db })
     expect(created.title).toBe('SQL: app')
     expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }] })
-    expect(created.fields).toEqual({ kind: 'pgQuery', ...db, sql: '', result: null, error: null, running: false })
+    expect(created.fields).toEqual({ kind: 'pgQuery', ...db, state: { sql: '' }, runtime: { run: createSqlRun('c1') } })
   })
 
   it('duplicates the SQL but not the result', () => {
-    const tab = { ...def.create({ target: db }).fields, sql: 'SELECT 1', result: { rows: [[1]] }, error: 'x' }
-    expect(def.duplicate(tab).fields).toMatchObject({ sql: 'SELECT 1', result: null, error: null, running: false })
+    const tab = def.create({ target: db }).fields
+    tab.state.sql = 'SELECT 1'
+    Object.assign(tab.runtime.run, { result: { rows: [[1]] }, error: 'x' })
+    expect(def.duplicate(tab).fields).toMatchObject({ state: { sql: 'SELECT 1' }, runtime: { run: createSqlRun('c1') } })
   })
 })
 
 describe('closing a tab with a transaction open', () => {
   it('rolls a query tab\'s transaction back and says so', async () => {
     const def = byType['postgresql.query']
-    await def.dispose({ id: 'q1', txId: 'tx-1' })
+    await def.dispose({ id: 'q1', runtime: { run: { txId: 'tx-1' } } })
     expect(rollbackTransaction).toHaveBeenCalledWith('tx-1')
     expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/rolled back/))
 
-    await def.dispose({ id: 'q2', txId: null })
+    await def.dispose({ id: 'q2', runtime: { run: { txId: null } } })
     expect(rollbackTransaction).toHaveBeenCalledTimes(1)
   })
 
   it('rolls back a table tab\'s SQL-mode transaction', async () => {
-    tableSession('t1', () => ({ sqlState: { txId: 'tx-2' } }))
+    tableSession('t1', () => ({ sqlRun: { txId: 'tx-2' } }))
     await byType['postgresql.table_browse'].dispose({ id: 't1' })
     expect(rollbackTransaction).toHaveBeenCalledWith('tx-2')
   })
