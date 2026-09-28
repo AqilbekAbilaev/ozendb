@@ -40,6 +40,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   // The columns the grid shows, in order; empty shows them all. Rows are still read
   // whole, so a hidden primary key can identify a row for editing.
   const shownColumns = toRef(query, 'shownColumns')
+  const columnOrder = toRef(query, 'columnOrder')
   // SQL mode: an editor seeded with the SQL the filters amount to. Going back reads
   // edited SQL into the boxes, or says why they can't show it.
   const mode = toRef(tab.state, 'mode')
@@ -69,7 +70,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   // what each part adds for the parts after it.
   const t = {
     target, runtime, columns, rows, total, elapsedMs, offset, limit, messages, server, orderBy, descending,
-    loading, error, editError, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun,
+    loading, error, editError, filterText, filters, shownColumns, columnOrder, mode, filterRefusal, sql, sqlRun,
     mainColumns, joins, joinColumns, nextJoinKey, foreignKeys,
   }
   Object.assign(t, useTableDerived(t))
@@ -82,11 +83,11 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   return {
     explainRun, explain, panel, sql, sqlRun,
     columns, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError, selection,
-    filterText, mode, filterRefusal, limit, messages, server, joins, shownColumns,
+    filterText, mode, filterRefusal, limit, messages, server, joins, shownColumns, columnOrder,
     ...pick(t, 'pauses', 'columnInfo', 'activeFilters', 'currentSql', 'hasPrev', 'hasNext', 'keys', 'joinOffers',
       'tableNames', 'view', 'toSql', 'openSql', 'toFilters', 'load', 'refresh', 'nextPage', 'prevPage', 'sortBy',
       'addJoin', 'setJoinKind', 'removeJoin', 'joinChoices', 'setJoinOn', 'setFilterText', 'replaceFilterText',
-      'setSort', 'setShownColumns', 'applyFilters', 'clearFilters', 'canEdit', 'editText', 'saveCell'),
+      'setSort', 'setShownColumns', 'moveColumn', 'applyFilters', 'clearFilters', 'canEdit', 'editText', 'saveCell'),
   }
 }
 

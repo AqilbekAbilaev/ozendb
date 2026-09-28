@@ -3,11 +3,12 @@ import { errMessage } from '../../../utils/errors'
 import { cellKind } from './formatCell.js'
 import { parseFilter } from './parseFilter.js'
 import { useBuilderPauses } from './builderPauses.js'
+import { moveInOrder } from '../../../composables/useColumnReorder'
 
 // Changing what a table tab asks for: its joins, filters, sort and shown columns, and
 // the Query Builder's pauses over them.
 export function useTableQuery(t, paused) {
-  const { target, total, limit, orderBy, descending, error, filterText, filters, shownColumns, joins, joinColumns, nextJoinKey, refs, refByKey, loadForeignKeys, goTo, reload } = t
+  const { target, total, limit, orderBy, descending, error, filterText, filters, shownColumns, columnOrder, view, joins, joinColumns, nextJoinKey, refs, refByKey, loadForeignKeys, goTo, reload } = t
   const pauses = useBuilderPauses({ shownColumns, orderBy, descending, setShownColumns, setSort }, paused)
 
   async function addJoin({ schema, table, on }) {
@@ -80,6 +81,11 @@ export function useTableQuery(t, paused) {
     shownColumns.value = list
   }
 
+  // Dragging a column only changes how the grid shows it: the SQL keeps its own order.
+  function moveColumn(key, insertBefore) {
+    columnOrder.value = moveInOrder(view.value.columns, key, insertBefore)
+  }
+
   function replaceFilterText(texts) {
     filterText.value = texts
   }
@@ -102,5 +108,5 @@ export function useTableQuery(t, paused) {
     return applyFilters()
   }
 
-  return { pauses, addJoin, setJoinKind, joinChoices, setJoinOn, removeJoin, setSort, sortBy, setFilterText, setShownColumns, replaceFilterText, applyFilters, clearFilters }
+  return { pauses, addJoin, setJoinKind, joinChoices, setJoinOn, removeJoin, setSort, sortBy, setFilterText, setShownColumns, moveColumn, replaceFilterText, applyFilters, clearFilters }
 }

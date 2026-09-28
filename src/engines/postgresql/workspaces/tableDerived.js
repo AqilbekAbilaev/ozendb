@@ -2,12 +2,13 @@ import { computed } from 'vue'
 import { buildSelectSql, aliases } from './buildSelectSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
+import { mergeColumnOrder } from '../../../composables/useColumnReorder'
 
 // What a table tab's view works out from its state and runtime: column refs and info,
 // the visible columns, the SQL the filters amount to, the joins on offer, paging flags.
 // `t` is the tab's shared context (usePostgresTable).
 export function useTableDerived(t) {
-  const { target, columns, rows, total, offset, limit, orderBy, descending, filters, shownColumns, mainColumns, joins, joinColumns, foreignKeys } = t
+  const { target, columns, rows, total, offset, limit, orderBy, descending, filters, shownColumns, columnOrder, mainColumns, joins, joinColumns, foreignKeys } = t
   const refs = computed(() => columnRefs(mainColumns.value && joins.value.every(j => joinColumns.value[j.key])
     ? [{ key: '', columns: mainColumns.value }, ...joins.value.map(j => ({ key: j.key, columns: joinColumns.value[j.key] }))]
     : []))
@@ -31,10 +32,12 @@ export function useTableDerived(t) {
   // Rows arrive in `refs` order, so a key's position is its value's place in a row.
   const keys = computed(() => (refs.value.length ? refs.value.map(r => r.key) : columns.value))
   const at = (key) => keys.value.indexOf(key)
+  // The shown columns (all, when none are chosen), in the order they were dragged into.
   const view = computed(() => {
-    if (!shownColumns.value.length) return { columns: keys.value, rows: rows.value }
-    const positions = shownColumns.value.map(at)
-    return { columns: shownColumns.value, rows: rows.value.map(row => positions.map(i => row[i])) }
+    const ordered = mergeColumnOrder(shownColumns.value.length ? shownColumns.value : keys.value, columnOrder.value)
+    if (ordered === keys.value) return { columns: ordered, rows: rows.value }
+    const positions = ordered.map(at)
+    return { columns: ordered, rows: rows.value.map(row => positions.map(i => row[i])) }
   })
   const currentSql = computed(() => buildSelectSql({
     schema: target.schema,

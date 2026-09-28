@@ -10,7 +10,7 @@ describe('createTableState', () => {
     const state = createTableState({ limit: 50 })
     expect(state).toEqual({
       v: TABLE_STATE_VERSION,
-      query: { filterText: {}, filters: [], joins: [], nextJoin: 1, shownColumns: [], orderBy: null, descending: false, limit: 50, offset: 0 },
+      query: { filterText: {}, filters: [], joins: [], nextJoin: 1, shownColumns: [], columnOrder: null, orderBy: null, descending: false, limit: 50, offset: 0 },
       mode: 'filter', sql: '',
       paused: { conditions: {}, columns: null, sort: null },
     })
@@ -20,6 +20,12 @@ describe('createTableState', () => {
 })
 
 describe('migrateTableState', () => {
+  it('reads a v1 state as one whose columns keep the order they come in', () => {
+    const v1 = { v: 1, query: { ...createTableState().query, shownColumns: ['name'] }, mode: 'sql', sql: 'SELECT 1', paused: createTableState().paused }
+    delete v1.query.columnOrder
+    expect(migrateTableState({ state: v1 })).toEqual({ ...v1, v: TABLE_STATE_VERSION, query: { ...v1.query, columnOrder: null } })
+  })
+
   for (const { name, state } of SAVED_TABLE_STATES) {
     it(`reads every saved shape as JSON-only current state: ${name}`, () => {
       const migrated = migrateTableState(state)

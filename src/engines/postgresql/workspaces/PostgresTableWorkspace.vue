@@ -118,10 +118,12 @@ function copySql() {
               :order-by="t.orderBy"
               :descending="t.descending"
               sortable
+              reorderable
               :can-edit="t.canEdit"
               :edit-text="t.editText"
               :filter-text="t.filterText"
               @sort="t.sortBy"
+              @move-column="t.moveColumn"
               @save="t.saveCell"
               @filter-text="t.setFilterText"
               @apply-filters="run"

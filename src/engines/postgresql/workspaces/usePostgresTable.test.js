@@ -171,6 +171,27 @@ describe('query builder', () => {
   })
 })
 
+describe('column order', () => {
+  it('moves a column, rows and all, without reloading or changing the SQL', async () => {
+    const t = await loaded()
+    const sql = t.currentSql.value
+    t.moveColumn('meta', 0)
+    expect(t.view.value.columns).toEqual(['meta', 'id', 'name', 'tags'])
+    expect(t.view.value.rows[0]).toEqual([{ x: 1 }, 1, 'Ada', ['a']])
+    expect(t.currentSql.value).toBe(sql)
+    expect(browseTable).toHaveBeenCalledTimes(1)
+  })
+
+  it('orders just the shown columns, and puts one shown later at the end', async () => {
+    const t = await loaded()
+    t.setShownColumns(['id', 'name'])
+    t.moveColumn('name', 0)
+    expect(t.view.value).toEqual({ columns: ['name', 'id'], rows: [['Ada', 1], ['Linus', 2]] })
+    t.setShownColumns(['id', 'tags', 'name'])
+    expect(t.view.value.columns).toEqual(['name', 'id', 'tags'])
+  })
+})
+
 describe('shown columns', () => {
   it('shows just the chosen columns, without reloading', async () => {
     const t = await loaded()
