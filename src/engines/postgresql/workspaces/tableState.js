@@ -2,6 +2,8 @@
 // session saves (and sync will later share). Nothing derived or fetched lives here —
 // column info, SQL text and rows are worked out from it. See
 // .local-docs/postgresql-tab-objects.md.
+import { createSqlRun } from './runSql.js'
+
 export const TABLE_STATE_VERSION = 1
 
 export function createTableState({ limit } = {}) {
@@ -36,6 +38,18 @@ export function stateToSave(state) {
   saved.query.offset = 0
   saved.paused = createTableState().paused
   return saved
+}
+
+// What the tab works out and fetches as it's used: rebuilt fresh, never saved.
+// `generation` counts loads, so only the latest may write back; 0 means never loaded.
+export function createTableRuntime(connectionId) {
+  return {
+    mainColumns: null, joinColumns: {}, foreignKeys: {}, server: null,
+    columns: [], rows: [], total: null, elapsedMs: null,
+    loading: false, error: null, editError: null, filterRefusal: null, messages: [],
+    generation: 0, builtSql: null,
+    sqlRun: createSqlRun(connectionId), explainRun: createSqlRun(connectionId),
+  }
 }
 
 // A join as saved: before joins matched on several columns it held one `column` /
