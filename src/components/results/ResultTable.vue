@@ -4,7 +4,7 @@ import { vqbOpen } from '../../stores/visualQueryBuilder'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { guessType, TYPE_CLASS, formatCell, columns, getAtPath } from '../../utils/resultGrid'
 import { useResultSearch } from '../../composables/useResultSearch'
-import { useColumnReorder } from '../../composables/useColumnReorder'
+import { useColumnReorder, useDrillColumnOrder } from '../../composables/useColumnReorder'
 import { useColumnResize } from '../../composables/useColumnResize'
 import { useRowSelection } from '../../composables/useRowSelection'
 import { useFieldDrag } from '../../composables/useFieldDrag'
@@ -156,18 +156,18 @@ const gridDocs = computed(() => {
 // ghost, `dropIndicator` the insertion line, `reorderGhost` the floating label.
 const derivedColumns = computed(() => columns(gridDocs.value))
 
+const { gridColumns, moveColumn } = useDrillColumnOrder({
+  activeTab: () => props.activeTab, drillPath: () => props.drillPath, derivedColumns,
+})
 const {
-  gridColumns,
   onHeaderMouseDown,
   pressed:  reorderPressed,
   dragging: reorderDragging,
   dropIndicator,
   ghost:    reorderGhost,
 } = useColumnReorder({
-  activeTab:      () => props.activeTab,
-  drillPath:      () => props.drillPath,
-  derivedColumns: derivedColumns,
-  tableRef:       tableRef,
+  columns:        () => gridColumns.value,
+  moveColumn,     tableRef,
   gridWrapRef:    gridWrapRef,
   headerLabel:    headerLabel,
   onBeforePress:  () => { if (inlineEdit.value) commitInlineEdit() },

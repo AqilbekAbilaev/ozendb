@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { mergeColumnOrder, moveInOrder, findDropIndex } from './useColumnReorder'
+import { computed, reactive } from 'vue'
+import { mergeColumnOrder, moveInOrder, findDropIndex, useDrillColumnOrder } from './useColumnReorder'
 
 describe('mergeColumnOrder', () => {
   it('returns the derived list unchanged when there is no custom order', () => {
@@ -72,5 +73,29 @@ describe('findDropIndex', () => {
   it('drops before a column on its left half and after on its right half', () => {
     expect(findDropIndex(120, rects)).toBe(1) // left half of column 1
     expect(findDropIndex(180, rects)).toBe(2) // right half of column 1
+  })
+})
+
+describe('useDrillColumnOrder', () => {
+  function setup(path = []) {
+    const tab = reactive({})
+    const drillPath = reactive(path)
+    const order = useDrillColumnOrder({
+      activeTab: () => tab, drillPath: () => drillPath, derivedColumns: computed(() => ['_id', 'a', 'b']),
+    })
+    return { tab, drillPath, ...order }
+  }
+
+  it('shows the derived columns until one is moved', () => {
+    expect(setup().gridColumns.value).toEqual(['_id', 'a', 'b'])
+  })
+
+  it('keeps a moved order on the tab, per drill level', () => {
+    const g = setup()
+    g.moveColumn('b', 0)
+    expect(g.gridColumns.value).toEqual(['b', '_id', 'a'])
+    g.drillPath.push('nested')
+    expect(g.gridColumns.value).toEqual(['_id', 'a', 'b'])
+    expect(g.tab.colOrder).toEqual({ '': ['b', '_id', 'a'] })
   })
 })

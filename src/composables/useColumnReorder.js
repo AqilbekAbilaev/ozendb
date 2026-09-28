@@ -1,10 +1,10 @@
 import { ref, computed, onUnmounted } from 'vue'
 
-// Drag-to-reorder for the grid's column headers, plus the persisted per-drill-path order that
-// `gridColumns` applies. WKWebView doesn't fire HTML5 drag/drop reliably, so the gesture is
-// built from raw mouse events: a drag only begins past a small threshold (so a plain click still
-// selects / sends the field to the VQB), an insertion line marks the drop point, and the grid
-// auto-scrolls when the pointer nears a horizontal edge. See ResultTable.vue for the wiring.
+// Drag-to-reorder for a result grid's column headers. WKWebView doesn't fire HTML5 drag/drop
+// reliably, so the gesture is built from raw mouse events: a drag only begins past a small
+// threshold (so a plain click still selects / sends the field to the VQB), an insertion line
+// marks the drop point, and the grid auto-scrolls when the pointer nears a horizontal edge.
+// Where the order is kept is the grid's business: it gets `moveColumn(col, insertBefore)`.
 
 const DRAG_THRESHOLD  = 5    // px the pointer must travel before a press becomes a drag
 const AUTOSCROLL_EDGE = 48   // px from an edge within which the grid auto-scrolls
@@ -49,10 +49,32 @@ export function findDropIndex(x, rects) {
   return -1
 }
 
-export function useColumnReorder({
+// A MongoDB grid's column order: kept on the tab per drill path, since a nested object's
+// columns aren't the root's, so reordering while drilled never clobbers the root order.
+export function useDrillColumnOrder({
   activeTab,        // () => the active tab object (holds the persisted `colOrder`)
-  drillPath,        // () => the current drill path (array); columns differ per level
+  drillPath,        // () => the current drill path (array)
   derivedColumns,   // computed<string[]> — the auto-derived column list before user ordering
+}) {
+  // Empty key ('') is the root level.
+  const pathKey = () => drillPath().join('\x00')
+
+  const gridColumns = computed(() =>
+    mergeColumnOrder(derivedColumns.value, activeTab()?.colOrder?.[pathKey()]))
+
+  function moveColumn(col, insertBefore) {
+    const tab = activeTab()
+    if (!tab) return
+    if (!tab.colOrder) tab.colOrder = {}
+    tab.colOrder[pathKey()] = moveInOrder(gridColumns.value, col, insertBefore)
+  }
+
+  return { gridColumns, moveColumn }
+}
+
+export function useColumnReorder({
+  columns,          // () => the columns in the order the header shows them
+  moveColumn,       // (col, insertBefore) => keep the new order
   tableRef,         // ref to the <table> (to locate header cells)
   gridWrapRef,      // ref to the scroll container (for auto-scroll + indicator bounds)
   headerLabel,      // (col) => display label, used for the drag ghost
@@ -71,27 +93,13 @@ export function useColumnReorder({
   let autoScrollDir = 0
   let autoScrollRAF = null
 
-  // Order is stored per drill path (root columns differ from a nested object's), so reordering
-  // while drilled never clobbers the root order. Empty key ('') is the root level.
-  const pathKey = () => drillPath().join('\x00')
-
-  const gridColumns = computed(() =>
-    mergeColumnOrder(derivedColumns.value, activeTab()?.colOrder?.[pathKey()]))
-
-  function move(target, insertBefore) {
-    const tab = activeTab()
-    if (!tab) return
-    if (!tab.colOrder) tab.colOrder = {}
-    tab.colOrder[pathKey()] = moveInOrder(gridColumns.value, target, insertBefore)
-  }
-
+  // Data headers follow the row-number header, so column i is child i + 2.
   function headerRects() {
     const table = tableRef.value
     if (!table) return []
-    const cols = gridColumns.value
     const out = []
-    for (let i = 0; i < cols.length; i++) {
-      const th = table.querySelector(`thead th[data-col="${cols[i]}"]`)
+    for (let i = 0; i < columns().length; i++) {
+      const th = table.querySelector(`thead th:nth-child(${i + 2})`)
       if (th) out.push({ index: i, rect: th.getBoundingClientRect() })
     }
     return out
@@ -163,7 +171,7 @@ export function useColumnReorder({
     document.body.style.cursor = ''
     if (dragging.value && col) {
       const insertBefore = findDropIndex(e.clientX, headerRects())
-      if (insertBefore >= 0) move(col, insertBefore)
+      if (insertBefore >= 0) moveColumn(col, insertBefore)
       if (onReordered) onReordered()
     }
     col = null
@@ -197,7 +205,6 @@ export function useColumnReorder({
   })
 
   return {
-    gridColumns: gridColumns,
     onHeaderMouseDown: onHeaderMouseDown,
     pressed: pressed,
     dragging: dragging,
