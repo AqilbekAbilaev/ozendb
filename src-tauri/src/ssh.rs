@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use russh::client;
 use russh::keys::{load_secret_key, HashAlg, PrivateKeyWithHashAlg, PublicKey};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Runtime};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 
@@ -146,7 +146,9 @@ struct HostKeyChangedEvent {
 pub struct ClientHandler {
     known_hosts: Arc<KnownHostsStore>,
     prompts: Arc<HostKeyPrompts>,
-    app: AppHandle,
+    // Emits a UI event; a function rather than the AppHandle itself so the handler (and
+    // the tunnel holding its session) needn't be generic over Tauri's runtime.
+    emit: Arc<dyn Fn(&str, serde_json::Value) -> Result<(), String> + Send + Sync>,
     host: String,
     port: u16,
     // `check_server_key` can only signal accept/reject via a bool, which loses
@@ -194,7 +196,7 @@ impl client::Handler for ClientHandler {
                     port: self.port,
                     fingerprint: fingerprint,
                 };
-                match self.app.emit("ssh-host-key-prompt", event) {
+                match (self.emit)("ssh-host-key-prompt", serde_json::to_value(event).unwrap_or_default()) {
                     Ok(()) => {}
                     Err(e) => {
                         self.prompts.cancel(request_id);
@@ -257,7 +259,7 @@ impl client::Handler for ClientHandler {
                     presented_fingerprint: fingerprint,
                 };
                 // Best-effort notify; we refuse regardless of whether it lands.
-                let _ = self.app.emit("ssh-host-key-changed", event);
+                let _ = (self.emit)("ssh-host-key-changed", serde_json::to_value(event).unwrap_or_default());
                 self.set_reason(format!(
                     "host key verification failed for {}:{} — the server's key does not match the \
                      previously trusted key. This may indicate a man-in-the-middle attack, or the \
@@ -272,11 +274,11 @@ impl client::Handler for ClientHandler {
 
 /// Open an SSH session, authenticate, and start forwarding a fresh local port to
 /// `mongo_host:mongo_port` through the tunnel.
-pub async fn establish(
+pub async fn establish<R: Runtime>(
     params: SshParams,
     known_hosts: Arc<KnownHostsStore>,
     prompts: Arc<HostKeyPrompts>,
-    app: AppHandle,
+    app: AppHandle<R>,
 ) -> Result<SshTunnel, AppError> {
     let mut config = client::Config::default();
     // Send keepalives so a dropped session is detected instead of hanging.
@@ -286,7 +288,7 @@ pub async fn establish(
     let handler = ClientHandler {
         known_hosts: known_hosts,
         prompts: prompts,
-        app: app,
+        emit: Arc::new(move |name: &str, payload: serde_json::Value| app.emit(name, payload).map_err(|e| e.to_string())),
         host: params.ssh_host.clone(),
         port: params.ssh_port,
         reject_reason: Arc::clone(&reject_reason),
