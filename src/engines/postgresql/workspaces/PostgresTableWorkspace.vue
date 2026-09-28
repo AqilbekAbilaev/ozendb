@@ -28,9 +28,6 @@ const props = defineProps({
 // follows the active tab.
 const t = shallowRef(null)
 const limitDraft = ref(0)
-const rtab = ref('Result')
-const builderOpen = ref(false)
-const builderWidth = ref(360)
 const library = ref(null)   // which view of the query library is open, if any
 // Each tab keeps its state for as long as it's open (see tableSessions), so coming
 // back to it shows it as it was; only a tab seen for the first time loads.
@@ -43,7 +40,6 @@ watch(() => props.activeTab.id, (id) => {
     return reactive(usePostgresTable({ connectionId, schema, table }, { readOnly, initial: restoredView ?? {} }))
   })
   limitDraft.value = t.value.limit
-  rtab.value = 'Result'
   if (fresh) t.value.load()
 }, { immediate: true })
 
@@ -64,7 +60,7 @@ function switchMode(mode) {
 }
 
 function explain() {
-  rtab.value = 'Explain'
+  t.value.panel.rtab = 'Explain'
   return t.value.explain()
 }
 
@@ -101,16 +97,16 @@ function copySql() {
         <span class="qbar-spacer"></span>
         <span class="qlabel limit">Limit</span>
         <NumberStepper v-model="limitDraft" :min="1" @enter="run" />
-        <BaseButton bordered icon="aggregate" class="qbar-hide-lg" :active="builderOpen" title="Visual Query Builder" @click="builderOpen = !builderOpen">Query Builder</BaseButton>
+        <BaseButton bordered icon="aggregate" class="qbar-hide-lg" :active="t.panel.builderOpen" title="Visual Query Builder" @click="t.panel.builderOpen = !t.panel.builderOpen">Query Builder</BaseButton>
       </div>
 
       <div class="pg-body">
         <div class="pg-main">
           <div class="rtabs">
-            <TabStrip v-model="rtab" :options="rtabs" />
+            <TabStrip v-model="t.panel.rtab" :options="rtabs" />
           </div>
 
-          <template v-if="rtab === 'Result'">
+          <template v-if="t.panel.rtab === 'Result'">
             <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
             <!-- Once the grid has columns, a failure (usually a filter value the column's type
                  can't read) keeps it on screen, so the filter can be corrected in place. -->
@@ -137,7 +133,7 @@ function copySql() {
               @apply-filters="run"
             />
           </template>
-          <div v-else-if="rtab === 'Query Code'" class="qcode">
+          <div v-else-if="t.panel.rtab === 'Query Code'" class="qcode">
             <div class="qcode-bar">
               <span>Generated from the column filters</span>
               <span class="spacer"></span>
@@ -147,17 +143,17 @@ function copySql() {
             <CodeEditor :model-value="t.currentSql" readonly language="sql" class="qcode-sql" />
           </div>
           <PostgresPlan
-            v-else-if="rtab === 'Explain'"
+            v-else-if="t.panel.rtab === 'Explain'"
             :plan="t.explainState.plan"
             :error="t.explainState.planError"
             :explaining="t.explainState.explaining"
           />
           <PostgresMessages v-else :messages="t.messages" />
         </div>
-        <Resizer v-if="builderOpen && t.columns.length" v-model="builderWidth" axis="x" invert :min="280" :max="760" />
+        <Resizer v-if="t.panel.builderOpen && t.columns.length" v-model="t.panel.builderWidth" axis="x" invert :min="280" :max="760" />
         <PostgresQueryBuilder
-          v-if="builderOpen && t.columns.length"
-          :style="{ width: builderWidth + 'px' }"
+          v-if="t.panel.builderOpen && t.columns.length"
+          :style="{ width: t.panel.builderWidth + 'px' }"
           :table="activeTab.table"
           :columns="t.keys"
           :column-info="t.columnInfo"
