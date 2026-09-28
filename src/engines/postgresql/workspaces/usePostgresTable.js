@@ -9,6 +9,7 @@ import { runSql, explainSql } from './runSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
 import { useBuilderPauses } from './builderPauses.js'
+import { createTableState } from './tableState.js'
 import { tableErrorText } from './tableError.js'
 
 const JSON_TYPES = ['json', 'jsonb']
@@ -16,37 +17,38 @@ const JSON_TYPES = ['json', 'jsonb']
 /**
  * One table-browse tab's state: a page of rows, the row count, sorting, and editing a
  * cell by the row's primary key. `target` is `{ connectionId, schema, table }`;
- * `initial` is a snapshot() to start from — a tab restored after a restart.
+ * `initial` is a table state to start from (tableState.js) — a tab restored after a restart.
  */
-export function usePostgresTable(target, { pageSize = 100, readOnly = false, initial = {} } = {}) {
+export function usePostgresTable(target, { pageSize = 100, readOnly = false, initial = createTableState({ limit: pageSize }) } = {}) {
+  const saved = initial.query
   const columns = ref([])
   const rows = ref([])
   const total = ref(null)
   const elapsedMs = ref(null)
   const offset = ref(0)
-  const limit = ref(initial.limit ?? pageSize)
+  const limit = ref(saved.limit)
   // One entry per load, newest last: `{ at, ok, text, ms }`.
   const messages = ref([])
   // `{ version, encoding }` for the footer, read once; stays null if it can't be.
   const server = ref(null)
-  const orderBy = ref(initial.orderBy ?? null)
-  const descending = ref(initial.descending ?? false)
+  const orderBy = ref(saved.orderBy)
+  const descending = ref(saved.descending)
   const loading = ref(false)
   const error = ref(null)
   const editError = ref(null)
   // What each header box holds, by column, and the filters last applied from them:
   // typing edits the boxes, and only applying reloads.
-  const filterText = ref(initial.filterText ?? {})
+  const filterText = ref(saved.filterText)
   // Applied filters as `{ key, op, value }`; sent with each column's table position.
-  const filters = ref(initial.filters ?? [])
+  const filters = ref(saved.filters)
   // The columns the grid shows, in order; empty shows them all. Rows are still read
   // whole, so a hidden primary key can identify a row for editing.
-  const shownColumns = ref(initial.shownColumns ?? [])
+  const shownColumns = ref(saved.shownColumns)
   // SQL mode: an editor seeded with the SQL the filters amount to. Going back reads
   // edited SQL into the boxes, or says why they can't show it.
-  const mode = ref(initial.mode ?? 'filter')
+  const mode = ref(initial.mode)
   const filterRefusal = ref(null)
-  const sqlState = reactive({ connectionId: target.connectionId, sql: initial.sql ?? '', result: null, error: null, running: false })
+  const sqlState = reactive({ connectionId: target.connectionId, sql: initial.sql, result: null, error: null, running: false })
   let builtSql = null
   // Filter mode's Explain: the plan for currentSql, kept like SQL mode's result.
   const explainState = reactive({ connectionId: target.connectionId, plan: null, planError: null, explaining: false })
@@ -57,17 +59,16 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   // The browsed table's column metadata (type, primary key), fetched once, and its
   // joins, each `{ key, schema, table, kind, on, columns }`: matched where every
   // `{ column, equals }` in `on` holds — its `column` equals the column keyed
-  // `equals` — with its own columns' metadata. A
-  // join's key never changes, so removing one leaves the others' columns keyed as
-  // they were. Filters, sort, shown columns and edits name a column by its key (see
+  // `equals` — with its own columns' metadata (null until fetched, for a restored
+  // join). A join's key never changes, so removing one leaves the others' columns keyed
+  // as they were. Filters, sort, shown columns and edits name a column by its key (see
   // columnRefs.js).
   const mainColumns = ref(null)
-  // A tab saved before joins matched on several columns held one `column`/`equals` pair.
-  const joins = ref((initial.joins ?? []).map(({ column, equals, ...j }) => (j.on ? j : { ...j, on: [{ column, equals }] })))
-  let joinCount = Math.max(0, ...joins.value.map(j => Number(j.key.slice(1))))
+  const joins = ref(saved.joins.map(j => ({ ...j, columns: null })))
+  let joinCount = saved.nextJoin - 1
   // Foreign keys by `schema.table`, fetched as each table enters the tab.
   const foreignKeys = ref({})
-  const refs = computed(() => columnRefs(mainColumns.value
+  const refs = computed(() => columnRefs(mainColumns.value && joins.value.every(j => j.columns)
     ? [{ key: '', columns: mainColumns.value }, ...joins.value.map(j => ({ key: j.key, columns: j.columns }))]
     : []))
   const refByKey = computed(() => Object.fromEntries(refs.value.map(r => [r.key, r])))
@@ -144,6 +145,12 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
         const info = await listColumns(target)
         if (mine !== generation) return
         mainColumns.value = info
+      }
+      const missing = joins.value.filter(j => !j.columns)
+      if (missing.length) {
+        const lists = await Promise.all(missing.map(({ schema, table }) => listColumns({ connectionId: target.connectionId, schema, table })))
+        if (mine !== generation) return
+        joins.value = joins.value.map(j => (j.columns ? j : { ...j, columns: lists[missing.indexOf(j)] }))
       }
       const [page, count] = await Promise.all([
         browseTable(target, {
@@ -395,11 +402,17 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
 
   // What a restart brings back: the tab's settings, never its rows or results.
   function snapshot() {
-    return {
-      mode: mode.value, sql: sqlState.sql, limit: limit.value,
+    const state = createTableState()
+    // The page and paused parts aren't saved yet: restoring them is a change of its own.
+    state.query = {
+      ...state.query,
       filterText: filterText.value, filters: filters.value, shownColumns: shownColumns.value,
-      orderBy: orderBy.value, descending: descending.value, joins: joins.value,
+      joins: joins.value.map(({ columns: _, ...j }) => j), nextJoin: joinCount + 1,
+      orderBy: orderBy.value, descending: descending.value, limit: limit.value,
     }
+    state.mode = mode.value
+    state.sql = sqlState.sql
+    return state
   }
 
   return {

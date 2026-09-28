@@ -7,6 +7,7 @@ import { restoreWorkspace } from '../workspaces/lifecycle'
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 import { getWorkspaceDefinition } from '../workspaces/registry'
 import { legacy, expected, sessions } from './sessionMigration.fixtures'
+import { migrateTableState } from '../engines/postgresql/workspaces/tableState'
 
 registerWorkspaceDefinitions()
 
@@ -354,7 +355,7 @@ describe('PostgreSQL tabs across a restart', () => {
     expect(restored).toMatchObject({
       id: 't1', type: 'postgresql.table_browse', title: 'merchants', color: 'green', target: tableTarget,
       kind: 'pgTable', connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
-      restoredView: view,
+      restoredState: migrateTableState({ view }),
     })
   })
 
@@ -369,7 +370,8 @@ describe('PostgreSQL tabs across a restart', () => {
     const table = getWorkspaceDefinition('postgresql.table_browse')
     const query = getWorkspaceDefinition('postgresql.query')
     expect(query.serialize({ sql: 'SELECT 2', result: { rows: [] } })).toEqual({ sql: 'SELECT 2' })
-    expect(table.serialize({ id: 'never-opened', restoredView: view })).toEqual({ view })
+    const state = migrateTableState({ view })
+    expect(table.serialize({ id: 'never-opened', restoredState: state })).toEqual({ state })
     const raw = { schemaVersion: 2, activeTabId: 't1', tabs: [{ id: 't1', type: 'postgresql.table_browse', title: 'merchants', target: tableTarget, state: { view } }] }
     const result = migrateSession(raw, { connections: new Set(['p1']) })
     expect(result.ok).toBe(true)
