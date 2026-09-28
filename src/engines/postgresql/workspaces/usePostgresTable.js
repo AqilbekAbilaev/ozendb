@@ -202,6 +202,21 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     return reload()
   }
 
+  // What a join's pairs can match: its own columns, by name, and the keys of the
+  // tables before it.
+  function joinChoices(key) {
+    const n = joins.value.findIndex(j => j.key === key) + 1
+    return {
+      own: joins.value[n - 1].columns.map(c => c.name),
+      earlier: refs.value.filter(r => r.table < n).map(r => r.key),
+    }
+  }
+
+  function setJoinOn(key, index, pair) {
+    joins.value = joins.value.map(j => (j.key === key ? { ...j, on: j.on.map((p, i) => (i === index ? pair : p)) } : j))
+    return reload()
+  }
+
   // Removes the join and any join matched on its columns, with everything that
   // names their columns.
   function removeJoin(key) {
@@ -381,7 +396,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     snapshot, explainState, explain, pauses,
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, openSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
-    keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin,
+    keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin, joinChoices, setJoinOn,
     setFilterText, replaceFilterText, setSort, shownColumns, setShownColumns, view, applyFilters, clearFilters, canEdit, editText, saveCell,
   }
 }

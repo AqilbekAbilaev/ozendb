@@ -216,6 +216,16 @@ describe('joins', () => {
     expect(t.canEdit('name')).toBe(true)
   })
 
+  it('changes the columns a join matches on, offering only its own and earlier tables\' columns', async () => {
+    const t = await joined()
+    expect(t.joinChoices('j1')).toEqual({ own: ['id', 'name'], earlier: ['id', 'name', 'tags', 'meta'] })
+    await t.setJoinOn('j1', 0, { column: 'name', equals: 'name' })
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({
+      joins: [expect.objectContaining({ on: [{ column: 'name', equals: { table: 0, column: 'name' } }] })],
+      offset: 0,
+    }))
+  })
+
   it('switches a join between keeping every row and only matches', async () => {
     const t = await joined()
     await t.setJoinKind('j1', 'inner')
