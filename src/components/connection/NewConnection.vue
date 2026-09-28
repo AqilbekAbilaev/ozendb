@@ -63,7 +63,7 @@ useMomentumScroll(bodyEl)
   <ConnectionIntro v-if="step === 'intro'" :engine="engine" :engine-locked="isEditMode" @close="$emit('close')" @next="startForm" />
 
   <!-- ── Form step ──────────────────────────────────── -->
-  <BaseModal v-else :title="isEditMode ? 'Edit Connection' : 'New Connection'" width="720px" max-width="94vw" height="600px" max-height="92vh" @close="$emit('close')">
+  <BaseModal v-else class="nc-editor" :title="isEditMode ? 'Edit Connection' : 'New Connection'" width="720px" max-width="94vw" height="600px" max-height="92vh" @close="$emit('close')">
 
       <!-- Name row -->
       <div class="nc-top">
@@ -188,4 +188,4 @@ useMomentumScroll(bodyEl)
   </BaseModal>
 </template>
 
-<style src="./NewConnection.css" scoped></style>
+<style src="./NewConnection.css"></style>

@@ -25,8 +25,8 @@
 .nci-uri:disabled { opacity: .5; }
 .nci-error { margin: 12px 0 0; line-height: 1.5; }
 
-/* Duplicated from NewConnection.css rather than shared: both stylesheets are `scoped`,
-   so the form step's copy can't reach this component's markup. */
+/* Duplicated from NewConnection.css rather than shared: that sheet's rules only apply
+   inside the form step's `.nc-editor` modal, and this is the intro step's. */
 .cm-footer {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 16px; border-top: 1px solid var(--border); flex: none;

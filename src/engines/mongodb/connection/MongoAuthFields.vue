@@ -56,4 +56,3 @@ const { isEditMode, authMode, username, password, authDb, oidcEnvironment, oidcT
 
 <!-- Scoped styles don't reach into child components, so each section scopes the
      editor's stylesheet itself. -->
-<style src="../../../components/connection/NewConnection.css" scoped></style>
