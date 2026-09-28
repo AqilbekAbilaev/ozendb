@@ -355,7 +355,7 @@ describe('PostgreSQL tabs across a restart', () => {
     expect(restored).toMatchObject({
       id: 't1', type: 'postgresql.table_browse', title: 'merchants', color: 'green', target: tableTarget,
       kind: 'pgTable', connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
-      restoredState: migrateTableState({ view }),
+      state: migrateTableState({ view }),
     })
   })
 
@@ -371,7 +371,7 @@ describe('PostgreSQL tabs across a restart', () => {
     const query = getWorkspaceDefinition('postgresql.query')
     expect(query.serialize({ sql: 'SELECT 2', result: { rows: [] } })).toEqual({ sql: 'SELECT 2' })
     const state = migrateTableState({ view })
-    expect(table.serialize({ id: 'never-opened', restoredState: state })).toEqual({ state })
+    expect(table.serialize({ id: 't1', state })).toEqual({ state })
     const raw = { schemaVersion: 2, activeTabId: 't1', tabs: [{ id: 't1', type: 'postgresql.table_browse', title: 'merchants', target: tableTarget, state: { view } }] }
     const result = migrateSession(raw, { connections: new Set(['p1']) })
     expect(result.ok).toBe(true)

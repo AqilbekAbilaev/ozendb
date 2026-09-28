@@ -1,11 +1,11 @@
-// PostgreSQL workspace definitions. A table tab's settings live in its tableSession
-// while it's open; they're saved as `state` (tableState.js), and a restored tab starts
-// from them (`restoredState`). Rows and results are never saved — they load again.
+// PostgreSQL workspace definitions. A table tab carries what the user built as `state`
+// and its panel as `ui` (tableState.js); a session saves the state. Rows and results
+// are never saved — they load again.
 import PostgresTableWorkspace from './PostgresTableWorkspace.vue'
 import PostgresQueryWorkspace from './PostgresQueryWorkspace.vue'
 import { createResourceRef } from '../../../utils/resourceRef'
 import { peekTableSession, dropTableSession } from './tableSessions.js'
-import { migrateTableState } from './tableState.js'
+import { createTableState, createTableUi, migrateTableState, stateToSave } from './tableState.js'
 import { abandonTransaction } from './runSql.js'
 import { showToast } from '../../../stores/toast'
 
@@ -15,7 +15,7 @@ async function rollBackOnClose(state) {
   if (state && await abandonTransaction(state)) showToast('The closed tab had a transaction open; it was rolled back.')
 }
 
-function tableWorkspace({ connectionId, connectionName, database, schema, table }) {
+function tableWorkspace({ connectionId, connectionName, database, schema, table }, state = createTableState()) {
   return {
     title: table,
     target: createResourceRef(connectionId, [
@@ -23,7 +23,7 @@ function tableWorkspace({ connectionId, connectionName, database, schema, table 
       { kind: 'schema', name: schema },
       { kind: 'table', name: table },
     ]),
-    fields: { kind: 'pgTable', connectionId, connectionName, database, schema, table },
+    fields: { kind: 'pgTable', connectionId, connectionName, database, schema, table, state, ui: createTableUi() },
   }
 }
 
@@ -43,15 +43,8 @@ export const postgresDefinitions = [
     component: PostgresTableWorkspace,
     create: (ctx) => tableWorkspace(ctx.target),
     duplicate: (workspace) => tableWorkspace(workspace),
-    // A tab restored but never opened has no session yet; its restored state stands.
-    serialize: (workspace) => {
-      const state = peekTableSession(workspace.id)?.snapshot() ?? workspace.restoredState
-      return state ? { state: JSON.parse(JSON.stringify(state)) } : {}
-    },
-    restore: (saved) => {
-      const restored = tableWorkspace(saved)
-      return { ...restored, fields: { ...restored.fields, restoredState: migrateTableState(saved) } }
-    },
+    serialize: (workspace) => ({ state: stateToSave(workspace.state) }),
+    restore: (saved) => tableWorkspace(saved, migrateTableState(saved)),
     dispose: (workspace) => {
       const state = peekTableSession(workspace.id)?.sqlState
       dropTableSession(workspace.id)

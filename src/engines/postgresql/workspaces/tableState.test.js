@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createTableState, migrateTableState, TABLE_STATE_VERSION } from './tableState.js'
+import { createTableState, createTableUi, migrateTableState, stateToSave, TABLE_STATE_VERSION } from './tableState.js'
 import { SAVED_TABLE_STATES } from './tableState.fixtures.js'
 
 const roundTrip = (value) => JSON.parse(JSON.stringify(value))
@@ -43,5 +43,26 @@ describe('migrateTableState', () => {
 
   it('starts fresh from a state a newer version of the app wrote', () => {
     expect(migrateTableState({ state: { v: TABLE_STATE_VERSION + 1, query: 'unknown' } })).toEqual(createTableState())
+  })
+})
+
+describe('createTableUi', () => {
+  it('starts with the builder closed, at its default width, on Result', () => {
+    expect(createTableUi()).toEqual({ builderOpen: false, builderWidth: 360, rtab: 'Result' })
+  })
+})
+
+describe('stateToSave', () => {
+  it('saves a copy, on the first page and with nothing paused (restoring those comes later)', () => {
+    const state = createTableState()
+    state.query.offset = 200
+    state.query.filterText = { name: 'ad' }
+    state.paused.sort = { column: 'name', desc: true }
+    const saved = stateToSave(state)
+    expect(saved.query).toMatchObject({ offset: 0, filterText: { name: 'ad' } })
+    expect(saved.paused).toEqual(createTableState().paused)
+    saved.query.filterText.name = 'changed'
+    expect(state.query.filterText.name).toBe('ad')
+    expect(state.query.offset).toBe(200)
   })
 })

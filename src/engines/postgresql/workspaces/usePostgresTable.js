@@ -1,4 +1,4 @@
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, toRef } from 'vue'
 import { browseTable, countTable, updateRow, readTableSelect, runQuery } from '../api/queries'
 import { listColumns, listForeignKeys } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
@@ -9,67 +9,74 @@ import { runSql, explainSql } from './runSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
 import { useBuilderPauses } from './builderPauses.js'
-import { createTableState } from './tableState.js'
 import { tableErrorText } from './tableError.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
 /**
- * One table-browse tab's state: a page of rows, the row count, sorting, and editing a
- * cell by the row's primary key. `target` is `{ connectionId, schema, table }`;
- * `initial` is a table state to start from (tableState.js) — a tab restored after a restart.
+ * One table-browse tab: a page of rows, the row count, sorting, and editing a cell by
+ * the row's primary key. `tab` is the workspace: `{ connectionId, schema, table }`, and
+ * the `state` and `ui` it keeps (tableState.js), which this reads and writes in place.
  */
-export function usePostgresTable(target, { pageSize = 100, readOnly = false, initial = createTableState({ limit: pageSize }) } = {}) {
-  const saved = initial.query
+export function usePostgresTable(tab, { readOnly = false } = {}) {
+  const target = { connectionId: tab.connectionId, schema: tab.schema, table: tab.table }
+  const query = tab.state.query
   const columns = ref([])
   const rows = ref([])
   const total = ref(null)
   const elapsedMs = ref(null)
-  const offset = ref(0)
-  const limit = ref(saved.limit)
+  const offset = toRef(query, 'offset')
+  const limit = toRef(query, 'limit')
   // One entry per load, newest last: `{ at, ok, text, ms }`.
   const messages = ref([])
   // `{ version, encoding }` for the footer, read once; stays null if it can't be.
   const server = ref(null)
-  const orderBy = ref(saved.orderBy)
-  const descending = ref(saved.descending)
+  const orderBy = toRef(query, 'orderBy')
+  const descending = toRef(query, 'descending')
   const loading = ref(false)
   const error = ref(null)
   const editError = ref(null)
   // What each header box holds, by column, and the filters last applied from them:
   // typing edits the boxes, and only applying reloads.
-  const filterText = ref(saved.filterText)
+  const filterText = toRef(query, 'filterText')
   // Applied filters as `{ key, op, value }`; sent with each column's table position.
-  const filters = ref(saved.filters)
+  const filters = toRef(query, 'filters')
   // The columns the grid shows, in order; empty shows them all. Rows are still read
   // whole, so a hidden primary key can identify a row for editing.
-  const shownColumns = ref(saved.shownColumns)
+  const shownColumns = toRef(query, 'shownColumns')
   // SQL mode: an editor seeded with the SQL the filters amount to. Going back reads
   // edited SQL into the boxes, or says why they can't show it.
-  const mode = ref(initial.mode)
+  const mode = toRef(tab.state, 'mode')
   const filterRefusal = ref(null)
-  const sqlState = reactive({ connectionId: target.connectionId, sql: initial.sql, result: null, error: null, running: false })
+  // The SQL panel's run, around the tab's SQL (which is lasting state; the run isn't).
+  const sqlState = reactive({
+    connectionId: target.connectionId,
+    get sql() { return tab.state.sql },
+    set sql(text) { tab.state.sql = text },
+    result: null, error: null, running: false,
+  })
   let builtSql = null
   // Filter mode's Explain: the plan for currentSql, kept like SQL mode's result.
   const explainState = reactive({ connectionId: target.connectionId, plan: null, planError: null, explaining: false })
   const explain = () => explainSql(explainState, currentSql.value)
   // The screen around the data — the Query Builder and the result sub-tab — kept with
   // the tab, since the workspace component is unmounted whenever another kind of tab shows.
-  const panel = reactive({ builderOpen: false, builderWidth: 360, rtab: 'Result' })
+  const panel = tab.ui
   // The browsed table's column metadata (type, primary key), fetched once, and its
-  // joins, each `{ key, schema, table, kind, on, columns }`: matched where every
-  // `{ column, equals }` in `on` holds — its `column` equals the column keyed
-  // `equals` — with its own columns' metadata (null until fetched, for a restored
-  // join). A join's key never changes, so removing one leaves the others' columns keyed
-  // as they were. Filters, sort, shown columns and edits name a column by its key (see
-  // columnRefs.js).
+  // joins, each `{ key, schema, table, kind, on }`: matched where every
+  // `{ column, equals }` in `on` holds — its `column` equals the column keyed `equals`.
+  // Each join's columns' metadata is fetched into `joinColumns` by key (none yet, for a
+  // restored join). A join's key never changes, so removing one leaves the others'
+  // columns keyed as they were. Filters, sort, shown columns and edits name a column by
+  // its key (see columnRefs.js).
   const mainColumns = ref(null)
-  const joins = ref(saved.joins.map(j => ({ ...j, columns: null })))
-  let joinCount = saved.nextJoin - 1
+  const joins = toRef(query, 'joins')
+  const joinColumns = ref({})
+  const nextJoinKey = () => `j${query.nextJoin++}`
   // Foreign keys by `schema.table`, fetched as each table enters the tab.
   const foreignKeys = ref({})
-  const refs = computed(() => columnRefs(mainColumns.value && joins.value.every(j => j.columns)
-    ? [{ key: '', columns: mainColumns.value }, ...joins.value.map(j => ({ key: j.key, columns: j.columns }))]
+  const refs = computed(() => columnRefs(mainColumns.value && joins.value.every(j => joinColumns.value[j.key])
+    ? [{ key: '', columns: mainColumns.value }, ...joins.value.map(j => ({ key: j.key, columns: joinColumns.value[j.key] }))]
     : []))
   const refByKey = computed(() => Object.fromEntries(refs.value.map(r => [r.key, r])))
   const tableNames = computed(() => aliases([target.table, ...joins.value.map(j => j.table)]))
@@ -84,7 +91,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     [{ key: '', schema: target.schema, table: target.table }, ...joins.value],
     foreignKeys.value,
   ))
-  const pauses = useBuilderPauses({ shownColumns, orderBy, descending, setShownColumns, setSort })
+  const pauses = useBuilderPauses({ shownColumns, orderBy, descending, setShownColumns, setSort }, tab.state.paused)
   // Only the latest load may write back: a sort clicked while a page is loading
   // must not be overwritten by that older page.
   let generation = 0
@@ -146,11 +153,11 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
         if (mine !== generation) return
         mainColumns.value = info
       }
-      const missing = joins.value.filter(j => !j.columns)
+      const missing = joins.value.filter(j => !joinColumns.value[j.key])
       if (missing.length) {
         const lists = await Promise.all(missing.map(({ schema, table }) => listColumns({ connectionId: target.connectionId, schema, table })))
         if (mine !== generation) return
-        joins.value = joins.value.map(j => (j.columns ? j : { ...j, columns: lists[missing.indexOf(j)] }))
+        joinColumns.value = { ...joinColumns.value, ...Object.fromEntries(missing.map((j, i) => [j.key, lists[i]])) }
       }
       const [page, count] = await Promise.all([
         browseTable(target, {
@@ -198,7 +205,9 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   async function addJoin({ schema, table, on }) {
     try {
       const columns = await listColumns({ connectionId: target.connectionId, schema, table })
-      joins.value = [...joins.value, { key: `j${++joinCount}`, schema, table, kind: 'left', on, columns }]
+      const key = nextJoinKey()
+      joinColumns.value = { ...joinColumns.value, [key]: columns }
+      joins.value = [...joins.value, { key, schema, table, kind: 'left', on }]
     } catch (e) {
       error.value = errMessage(e)
       return
@@ -217,7 +226,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   function joinChoices(key) {
     const n = joins.value.findIndex(j => j.key === key) + 1
     return {
-      own: joins.value[n - 1].columns.map(c => c.name),
+      own: joinColumns.value[key].map(c => c.name),
       earlier: refs.value.filter(r => r.table < n).map(r => r.key),
     }
   }
@@ -317,7 +326,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   async function adopt({ joins: readJoins, columns: shown, filters: read, orderBy: order, descending: desc, limit: rowsPerPage, offset: at }) {
     if (rowsPerPage == null) return 'the filter view shows a page at a time, so it needs a LIMIT.'
     const nextJoins = await Promise.all(readJoins.map(async ({ schema, table, kind, on }) => ({
-      key: `j${++joinCount}`, schema, table, kind, on,
+      key: nextJoinKey(), schema, table, kind, on,
       columns: await listColumns({ connectionId: target.connectionId, schema, table }),
     })))
     const keyOf = ({ table, column }) => (table ? `${nextJoins[table - 1].key}.${column}` : column)
@@ -333,7 +342,8 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
       texts[key] = text
     }
     pauses.forget(new Set(refs.value.filter(r => r.table).map(r => r.key)))
-    joins.value = nextJoins.map(j => ({ ...j, on: j.on.map(p => ({ column: p.column, equals: keyOf(p.equals) })) }))
+    joinColumns.value = Object.fromEntries(nextJoins.map(j => [j.key, j.columns]))
+    joins.value = nextJoins.map(({ columns: _, ...j }) => ({ ...j, on: j.on.map(p => ({ column: p.column, equals: keyOf(p.equals) })) }))
     nextJoins.forEach(loadForeignKeys)
     filterText.value = texts
     filters.value = read.map(f => ({ key: keyOf(f), op: f.op, value: f.value }))
@@ -400,23 +410,8 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     }
   }
 
-  // What a restart brings back: the tab's settings, never its rows or results.
-  function snapshot() {
-    const state = createTableState()
-    // The page and paused parts aren't saved yet: restoring them is a change of its own.
-    state.query = {
-      ...state.query,
-      filterText: filterText.value, filters: filters.value, shownColumns: shownColumns.value,
-      joins: joins.value.map(({ columns: _, ...j }) => j), nextJoin: joinCount + 1,
-      orderBy: orderBy.value, descending: descending.value, limit: limit.value,
-    }
-    state.mode = mode.value
-    state.sql = sqlState.sql
-    return state
-  }
-
   return {
-    snapshot, explainState, explain, pauses, panel,
+    explainState, explain, pauses, panel,
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, openSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin, joinChoices, setJoinOn,

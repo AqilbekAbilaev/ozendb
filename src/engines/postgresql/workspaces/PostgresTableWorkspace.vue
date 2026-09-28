@@ -32,12 +32,11 @@ const library = ref(null)   // which view of the query library is open, if any
 // Each tab keeps its state for as long as it's open (see tableSessions), so coming
 // back to it shows it as it was; only a tab seen for the first time loads.
 watch(() => props.activeTab.id, (id) => {
-  const { connectionId, schema, table, restoredState } = props.activeTab
-  const readOnly = !!openConnections.value.find(c => c.id === connectionId)?.read_only
+  const readOnly = !!openConnections.value.find(c => c.id === props.activeTab.connectionId)?.read_only
   let fresh = false
   t.value = tableSession(id, () => {
     fresh = true
-    return reactive(usePostgresTable({ connectionId, schema, table }, { readOnly, initial: restoredState ?? undefined }))
+    return reactive(usePostgresTable(props.activeTab, { readOnly }))
   })
   limitDraft.value = t.value.limit
   if (fresh) t.value.load()
