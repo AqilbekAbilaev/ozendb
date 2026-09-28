@@ -69,7 +69,7 @@ useMomentumScroll(bodyEl)
       <div class="nc-top">
         <label class="nc-namelbl">Connection name</label>
         <BaseInput class="nc-name" v-model="connName" />
-        <BaseButton v-if="editor.supportsUri" bordered @click="step = 'intro'">
+        <BaseButton bordered @click="step = 'intro'">
           <BaseIcon name="uri" :size="15" /> From URI
         </BaseButton>
       </div>

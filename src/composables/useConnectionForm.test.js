@@ -388,3 +388,17 @@ describe('testConnection', () => {
     expect(f.status.value.type).toBe('success')
   })
 })
+
+describe('applyParsed for PostgreSQL', () => {
+  it('fills the shared fields and the database, and leaves MongoDB\'s alone', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('postgresql')
+    f.applyParsed({
+      username: 'app', password: 'pw', hosts: [{ host: 'db', port: 5433 }], database: 'payments',
+      tls: true, tlsAllowInvalidCerts: true, tlsCaFile: null,
+    })
+    expect(f.database.value).toBe('payments')
+    const fields = f.formFields()
+    expect(fields).toMatchObject({ username: 'app', password: 'pw', hosts: [{ host: 'db', port: 5433 }], tls: true, tlsAllowInvalidCertificates: true })
+  })
+})

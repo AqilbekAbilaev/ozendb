@@ -25,9 +25,14 @@ describe('CONNECTION_EDITORS', () => {
     }
   })
 
-  it('gives PostgreSQL no Advanced tab and no connection-string import', () => {
+  it('gives PostgreSQL no Advanced tab', () => {
     expect(CONNECTION_EDITORS.postgresql.tabs.map(([tab]) => tab)).not.toContain('advanced')
-    expect(CONNECTION_EDITORS.postgresql.supportsUri).toBe(false)
-    expect(CONNECTION_EDITORS.mongodb.supportsUri).toBe(true)
+  })
+
+  it('reads each engine\'s own connection strings, and only those', () => {
+    expect(CONNECTION_EDITORS.postgresql.parseUri('postgresql://u@h/db').database).toBe('db')
+    expect(CONNECTION_EDITORS.postgresql.parseUri('mongodb://h')).toBe(null)
+    expect(CONNECTION_EDITORS.mongodb.parseUri('mongodb://h')).not.toBe(null)
+    expect(CONNECTION_EDITORS.mongodb.parseUri('postgresql://u@h/db')).toBe(null)
   })
 })
