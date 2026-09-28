@@ -37,7 +37,7 @@ const serialize = (tab) => JSON.parse(JSON.stringify(getWorkspaceDefinition(TYPE
 async function load(tab) {
   const t = tableSession(tab.id, () => reactive(usePostgresTable(
     { connectionId: tab.connectionId, schema: tab.schema, table: tab.table },
-    { initial: tab.restoredView ?? {} },
+    { initial: tab.restoredState ?? undefined },
   )))
   await t.load()
   return { mode: t.mode, sql: t.sqlState.sql, filterText: t.filterText, shownColumns: t.shownColumns }

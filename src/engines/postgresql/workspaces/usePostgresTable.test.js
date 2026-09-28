@@ -13,6 +13,7 @@ vi.mock('../api/resources', () => ({ listColumns, listForeignKeys }))
 vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
+const { createTableState } = await import('./tableState.js')
 
 const target = { connectionId: 'c1', schema: 'public', table: 'users' }
 const COLUMNS = [
@@ -320,15 +321,18 @@ describe('snapshot and restore', () => {
   })
 
   it('brings SQL mode back with its SQL, and keys new joins after the restored ones', async () => {
-    const t = usePostgresTable(target, { initial: { mode: 'sql', sql: 'SELECT 1', joins: [{ key: 'j3', schema: 'public', table: 'r', kind: 'left', column: 'id', equals: 'id', columns: [] }] } })
+    const initial = createTableState()
+    initial.mode = 'sql'
+    initial.sql = 'SELECT 1'
+    initial.query.joins = [{ key: 'j3', schema: 'public', table: 'r', kind: 'left', on: [{ column: 'id', equals: 'id' }] }]
+    initial.query.nextJoin = 4
+    const t = usePostgresTable(target, { initial })
     await t.load()
     expect(t.mode.value).toBe('sql')
     expect(t.sqlState.sql).toBe('SELECT 1')
     listColumns.mockResolvedValue([])
     await t.addJoin({ schema: 'public', table: 's', on: [{ column: 'id', equals: 'id' }] })
     expect(t.joins.value.map(j => j.key)).toEqual(['j3', 'j4'])
-    // A tab saved before joins matched on several columns comes back with its one pair.
-    expect(t.joins.value[0].on).toEqual([{ column: 'id', equals: 'id' }])
   })
 })
 

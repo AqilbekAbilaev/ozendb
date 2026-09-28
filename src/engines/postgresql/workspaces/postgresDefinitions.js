@@ -1,10 +1,11 @@
 // PostgreSQL workspace definitions. A table tab's settings live in its tableSession
-// while it's open; they're saved as `view`, and a restored tab starts from them
-// (`restoredView`). Rows and results are never saved — they load again.
+// while it's open; they're saved as `state` (tableState.js), and a restored tab starts
+// from them (`restoredState`). Rows and results are never saved — they load again.
 import PostgresTableWorkspace from './PostgresTableWorkspace.vue'
 import PostgresQueryWorkspace from './PostgresQueryWorkspace.vue'
 import { createResourceRef } from '../../../utils/resourceRef'
 import { peekTableSession, dropTableSession } from './tableSessions.js'
+import { migrateTableState } from './tableState.js'
 import { abandonTransaction } from './runSql.js'
 import { showToast } from '../../../stores/toast'
 
@@ -42,14 +43,14 @@ export const postgresDefinitions = [
     component: PostgresTableWorkspace,
     create: (ctx) => tableWorkspace(ctx.target),
     duplicate: (workspace) => tableWorkspace(workspace),
-    // A tab restored but never opened has no session yet; its restored view stands.
+    // A tab restored but never opened has no session yet; its restored state stands.
     serialize: (workspace) => {
-      const view = peekTableSession(workspace.id)?.snapshot() ?? workspace.restoredView
-      return view ? { view: JSON.parse(JSON.stringify(view)) } : {}
+      const state = peekTableSession(workspace.id)?.snapshot() ?? workspace.restoredState
+      return state ? { state: JSON.parse(JSON.stringify(state)) } : {}
     },
     restore: (saved) => {
       const restored = tableWorkspace(saved)
-      return { ...restored, fields: { ...restored.fields, restoredView: saved.view ?? null } }
+      return { ...restored, fields: { ...restored.fields, restoredState: migrateTableState(saved) } }
     },
     dispose: (workspace) => {
       const state = peekTableSession(workspace.id)?.sqlState
