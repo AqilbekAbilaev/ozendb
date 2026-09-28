@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { reactive } from 'vue'
 
 const browseTable = vi.fn()
 const countTable = vi.fn()
@@ -13,7 +14,7 @@ vi.mock('../api/resources', () => ({ listColumns, listForeignKeys }))
 vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
-const { createTableState } = await import('./tableState.js')
+const { createTableState, createTableUi } = await import('./tableState.js')
 
 const target = { connectionId: 'c1', schema: 'public', table: 'users' }
 const COLUMNS = [
@@ -37,8 +38,13 @@ beforeEach(() => {
   })
 })
 
+// A table tab as the workspace holds it, with the state it starts from.
+const tabOf = ({ pageSize, initial } = {}) =>
+  reactive({ ...target, state: initial ?? createTableState({ limit: pageSize }), ui: createTableUi() })
+const table = ({ readOnly, ...start } = {}) => usePostgresTable(tabOf(start), { readOnly })
+
 async function loaded(options) {
-  const t = usePostgresTable(target, options)
+  const t = table(options)
   await t.load()
   return t
 }
@@ -295,19 +301,23 @@ describe('explain', () => {
 })
 
 describe('snapshot and restore', () => {
-  it('snapshots the settings a restart should bring back, and starts again from them', async () => {
-    const t = await loaded()
+  it('keeps what the user builds in the tab\'s state, which a new view of the tab starts from', async () => {
+    const tab = tabOf()
+    const t = usePostgresTable(tab)
+    await t.load()
     t.setFilterText('name', 'ad')
     await t.applyFilters(25)
     await t.sortBy('name')
     t.setShownColumns(['name', 'id'])
     listColumns.mockResolvedValue([{ name: 'id', dataType: 'integer', isPrimaryKey: true }])
     await t.addJoin({ schema: 'public', table: 'regions', on: [{ column: 'id', equals: 'id' }] })
-    const snap = JSON.parse(JSON.stringify(t.snapshot()))
+    const snap = JSON.parse(JSON.stringify(tab.state))
+    expect(snap.query).toMatchObject({ filterText: { name: 'ad' }, limit: 25, orderBy: 'name', shownColumns: ['name', 'id'], nextJoin: 2 })
+    expect(snap.query.joins).toEqual([{ key: 'j1', schema: 'public', table: 'regions', kind: 'left', on: [{ column: 'id', equals: 'id' }] }])
 
     browseTable.mockClear()
     listColumns.mockResolvedValue(COLUMNS)
-    const again = usePostgresTable(target, { initial: snap })
+    const again = table({ initial: snap })
     await again.load()
     expect(again.filterText.value).toEqual({ name: 'ad' })
     expect(again.limit.value).toBe(25)
@@ -326,7 +336,7 @@ describe('snapshot and restore', () => {
     initial.sql = 'SELECT 1'
     initial.query.joins = [{ key: 'j3', schema: 'public', table: 'r', kind: 'left', on: [{ column: 'id', equals: 'id' }] }]
     initial.query.nextJoin = 4
-    const t = usePostgresTable(target, { initial })
+    const t = table({ initial })
     await t.load()
     expect(t.mode.value).toBe('sql')
     expect(t.sqlState.sql).toBe('SELECT 1')
@@ -576,15 +586,26 @@ describe('review fixes', () => {
 describe('a table that is gone or unreadable', () => {
   it('says so, rather than showing only the server\'s line', async () => {
     browseTable.mockRejectedValue({ code: 'missing', message: 'relation "public.users" does not exist' })
-    const t = usePostgresTable(target)
+    const t = table()
     await t.load()
     expect(t.error.value).toMatch(/^This table can't be found/)
   })
 })
 
 describe('panel state', () => {
-  it('keeps the builder and result sub-tab with the tab, starting closed on Result', () => {
-    const t = usePostgresTable(target)
+  it('keeps the builder and result sub-tab in the tab\'s ui, starting closed on Result', () => {
+    const tab = tabOf()
+    const t = usePostgresTable(tab)
     expect(t.panel).toEqual({ builderOpen: false, builderWidth: 360, rtab: 'Result' })
+    t.panel.builderOpen = true
+    expect(tab.ui.builderOpen).toBe(true)
+  })
+
+  it('writes the SQL and the mode into the tab\'s state', async () => {
+    const tab = tabOf()
+    const t = usePostgresTable(tab)
+    await t.load()
+    t.openSql('SELECT 2')
+    expect(tab.state).toMatchObject({ mode: 'sql', sql: 'SELECT 2' })
   })
 })

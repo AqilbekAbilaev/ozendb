@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { useBuilderPauses } from './builderPauses.js'
 
 function setup({ shown = [], orderBy = null, descending = false } = {}) {
   const table = { shownColumns: ref(shown), orderBy: ref(orderBy), descending: ref(descending) }
   table.setShownColumns = vi.fn(list => { table.shownColumns.value = list })
   table.setSort = vi.fn((column, desc) => { table.orderBy.value = column; table.descending.value = desc })
-  return { table, pauses: useBuilderPauses(table) }
+  const paused = reactive({ conditions: {}, columns: null, sort: null })
+  return { table, paused, pauses: useBuilderPauses(table, paused) }
 }
 
 describe('Query Builder pauses', () => {
@@ -60,5 +61,15 @@ describe('Query Builder pauses', () => {
     expect(pauses.sortOn.value).toBe(true)
     pauses.toggleColumns()
     expect(pauses.columnsOn.value).toBe(true)
+  })
+})
+
+describe('where pauses are kept', () => {
+  it('in the paused part of the tab\'s state, so they go wherever the state goes', () => {
+    const { paused, pauses } = setup({ orderBy: 'name', shown: ['id'] })
+    pauses.toggleSort()
+    pauses.toggleColumns()
+    pauses.conditions.value = { id: '>1' }
+    expect(paused).toEqual({ conditions: { id: '>1' }, columns: ['id'], sort: { column: 'name', desc: false } })
   })
 })

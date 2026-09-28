@@ -1,12 +1,13 @@
-import { ref, computed } from 'vue'
+import { toRef, computed } from 'vue'
 
 // Query Builder parts switched off without being lost, as its checkboxes do:
 // conditions (filter-box text by column key, kept out of the boxes), the shown columns,
-// and the sort. A part counts as on again once the grid sets it anew.
-export function useBuilderPauses({ shownColumns, orderBy, descending, setShownColumns, setSort }) {
-  const conditions = ref({})
-  const columns = ref(null)
-  const sort = ref(null)
+// and the sort. A part counts as on again once the grid sets it anew. They're kept in
+// `paused`, the tab state's `{ conditions, columns, sort }`.
+export function useBuilderPauses({ shownColumns, orderBy, descending, setShownColumns, setSort }, paused) {
+  const conditions = toRef(paused, 'conditions')
+  const columns = toRef(paused, 'columns')
+  const sort = toRef(paused, 'sort')
 
   const columnsOn = computed(() => shownColumns.value.length > 0 || !columns.value)
   const sortOn = computed(() => orderBy.value != null || !sort.value)

@@ -7,6 +7,7 @@ vi.mock('../../../stores/toast', () => ({ showToast }))
 
 const { postgresDefinitions } = await import('./postgresDefinitions.js')
 const { tableSession } = await import('./tableSessions.js')
+const { createTableState, createTableUi } = await import('./tableState.js')
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -27,7 +28,7 @@ describe('postgresql.table_browse', () => {
         { kind: 'table', name: 'users' },
       ],
     })
-    expect(created.fields).toEqual({ kind: 'pgTable', ...target })
+    expect(created.fields).toEqual({ kind: 'pgTable', ...target, state: createTableState(), ui: createTableUi() })
   })
 
   it('duplicates onto the same table', () => {

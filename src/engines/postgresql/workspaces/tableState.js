@@ -24,6 +24,20 @@ export function createTableState({ limit } = {}) {
   }
 }
 
+// This device's view of the tab: saved with it, never shared.
+export function createTableUi() {
+  return { builderOpen: false, builderWidth: 360, rtab: 'Result' }
+}
+
+// What a session writes for the tab: a copy, for now without the page and the paused
+// parts — bringing those back after a restart is a change of its own (ozendb-3sb.2).
+export function stateToSave(state) {
+  const saved = JSON.parse(JSON.stringify(state))
+  saved.query.offset = 0
+  saved.paused = createTableState().paused
+  return saved
+}
+
 // A join as saved: before joins matched on several columns it held one `column` /
 // `equals` pair, and every saved join carried its table's column list, which is
 // catalog data fetched again on load.

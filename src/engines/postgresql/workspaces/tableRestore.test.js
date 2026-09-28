@@ -35,10 +35,7 @@ const serialize = (tab) => JSON.parse(JSON.stringify(getWorkspaceDefinition(TYPE
 // The one place these specs reach into how a tab holds its state; the plan's steps
 // (postgresql-tab-objects.md) change only this, never the fixtures or expectations.
 async function load(tab) {
-  const t = tableSession(tab.id, () => reactive(usePostgresTable(
-    { connectionId: tab.connectionId, schema: tab.schema, table: tab.table },
-    { initial: tab.restoredState ?? undefined },
-  )))
+  const t = tableSession(tab.id, () => reactive(usePostgresTable(reactive(tab))))
   await t.load()
   return { mode: t.mode, sql: t.sqlState.sql, filterText: t.filterText, shownColumns: t.shownColumns }
 }
