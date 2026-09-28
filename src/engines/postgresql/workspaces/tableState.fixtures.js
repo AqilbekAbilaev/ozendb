@@ -76,4 +76,21 @@ export const SAVED_TABLE_STATES = [
     },
     tab: { mode: 'sql', sql: 'SELECT 1', filterText: {}, shownColumns: [] },
   },
+  {
+    name: 'the current shape, on page 3 with its sort paused',
+    state: {
+      state: {
+        v: 1,
+        query: {
+          filterText: {}, filters: [], joins: [], nextJoin: 1, shownColumns: [],
+          orderBy: null, descending: false, limit: 50, offset: 100,
+        },
+        mode: 'filter', sql: '',
+        paused: { conditions: { name: 'ad' }, columns: null, sort: { column: 'id', desc: true } },
+      },
+      ui: { builderOpen: true, builderWidth: 420, rtab: 'Messages' },
+    },
+    browse: { ...DEFAULT_BROWSE, limit: 50, offset: 100 },
+    tab: { mode: 'filter', sql: '', filterText: {}, shownColumns: [] },
+  },
 ]

@@ -31,9 +31,38 @@ describe('postgresql.table_browse', () => {
     expect(created.fields).toEqual({ kind: 'pgTable', ...target, state: createTableState(), ui: createTableUi(), runtime: createTableRuntime('c1') })
   })
 
-  it('duplicates onto the same table', () => {
-    const tab = { ...def.create({ target }).fields, title: 'users' }
-    expect(def.duplicate(tab)).toEqual(def.create({ target }))
+  // A table tab with a query built, on page 3, a sort paused and the builder open.
+  function built() {
+    const tab = { ...def.create({ target }).fields, id: 't1', title: 'users' }
+    tab.state.query.filterText = { name: 'ad' }
+    tab.state.query.offset = 100
+    tab.state.paused.sort = { column: 'id', desc: true }
+    tab.ui.builderOpen = true
+    tab.runtime.rows = [[1, 'Ada']]
+    return tab
+  }
+
+  it('duplicates onto the same table, with its query and panel but none of its rows', () => {
+    const tab = built()
+    const copy = def.duplicate(tab)
+    expect(copy.fields.state).toEqual(tab.state)
+    expect(copy.fields.ui).toEqual(tab.ui)
+    expect(copy.fields.runtime).toEqual(createTableRuntime('c1'))
+    copy.fields.state.query.filterText.name = 'changed'
+    expect(tab.state.query.filterText.name).toBe('ad')
+  })
+
+  it('saves the page, the pauses and the panel, and brings them back', () => {
+    const tab = built()
+    const saved = JSON.parse(JSON.stringify(def.serialize(tab)))
+    expect(saved).toEqual({ state: tab.state, ui: tab.ui })
+    const restored = def.restore({ ...target, ...saved })
+    expect(restored.fields.state).toEqual(tab.state)
+    expect(restored.fields.ui).toEqual(tab.ui)
+  })
+
+  it('opens a tab saved without its panel with the panel closed', () => {
+    expect(def.restore({ ...target, view: {} }).fields.ui).toEqual(createTableUi())
   })
 })
 
