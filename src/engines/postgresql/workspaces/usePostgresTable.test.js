@@ -167,7 +167,7 @@ describe('shown columns', () => {
     t.setShownColumns(['name'])
     expect(t.currentSql.value).toMatch(/^SELECT "name"\n/)
     await t.toSql()
-    t.sqlState.sql = 'edited'
+    t.sql.value = 'edited'
     readTableSelect.mockResolvedValue({ joins: [], columns: [{ table: 0, column: 'id' }], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 })
     await t.toFilters()
     expect(t.shownColumns.value).toEqual(['id'])
@@ -258,7 +258,7 @@ describe('joins', () => {
     const t = await joined()
     expect(t.currentSql.value).toContain('LEFT JOIN "public"."regions" ON "regions"."id" = "users"."id"')
     await t.toSql()
-    t.sqlState.sql = 'edited'
+    t.sql.value = 'edited'
     readTableSelect.mockResolvedValue({
       joins: [{ schema: 'public', table: 'regions', kind: 'inner', on: [{ column: 'id', equals: { table: 0, column: 'id' } }] }],
       columns: [{ table: 0, column: 'name' }, { table: 1, column: 'name' }],
@@ -282,7 +282,7 @@ describe('joins', () => {
   it('drops the joins when edited SQL no longer has them', async () => {
     const t = await joined()
     await t.toSql()
-    t.sqlState.sql = 'edited'
+    t.sql.value = 'edited'
     readTableSelect.mockResolvedValue({ joins: [], columns: [], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 })
     await t.toFilters()
     expect(t.joins.value).toEqual([])
@@ -296,7 +296,7 @@ describe('explain', () => {
     const t = await loaded()
     await t.explain()
     expect(explainQuery).toHaveBeenCalledWith('c1', t.currentSql.value)
-    expect(t.explainState.plan).toEqual([{ Plan: {} }])
+    expect(t.explainRun.plan).toEqual([{ Plan: {} }])
   })
 })
 
@@ -339,7 +339,7 @@ describe('snapshot and restore', () => {
     const t = table({ initial })
     await t.load()
     expect(t.mode.value).toBe('sql')
-    expect(t.sqlState.sql).toBe('SELECT 1')
+    expect(t.sql.value).toBe('SELECT 1')
     listColumns.mockResolvedValue([])
     await t.addJoin({ schema: 'public', table: 's', on: [{ column: 'id', equals: 'id' }] })
     expect(t.joins.value.map(j => j.key)).toEqual(['j3', 'j4'])
@@ -359,7 +359,7 @@ describe('limit, messages and server details', () => {
   it('takes an edited query\'s LIMIT as the new limit', async () => {
     const t = await loaded({ pageSize: 100 })
     await t.toSql()
-    t.sqlState.sql = 'edited'
+    t.sql.value = 'edited'
     readTableSelect.mockResolvedValue({ joins: [], columns: [], filters: [], orderBy: [], descending: false, limit: 5, offset: 0 })
     await t.toFilters()
     expect(t.limit.value).toBe(5)
@@ -398,8 +398,8 @@ describe('SQL mode', () => {
 
     await t.toSql()
     expect(t.mode.value).toBe('sql')
-    expect(t.sqlState.sql).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC\nLIMIT 100 OFFSET 100;')
-    expect(runQuery).toHaveBeenCalledWith('c1', t.sqlState.sql, expect.any(String), null)
+    expect(t.sql.value).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC\nLIMIT 100 OFFSET 100;')
+    expect(runQuery).toHaveBeenCalledWith('c1', t.sql.value, expect.any(String), null)
   })
 
   it('opens given SQL — a saved or earlier query — without running it', async () => {
@@ -407,14 +407,14 @@ describe('SQL mode', () => {
     runQuery.mockClear()
     t.openSql('DELETE FROM users')
     expect(t.mode.value).toBe('sql')
-    expect(t.sqlState.sql).toBe('DELETE FROM users')
+    expect(t.sql.value).toBe('DELETE FROM users')
     expect(runQuery).not.toHaveBeenCalled()
   })
 
   it('orders by the primary key when nothing is sorted, as browsing does', async () => {
     const t = await loaded()
     await t.toSql()
-    expect(t.sqlState.sql).toContain('ORDER BY "id" ASC')
+    expect(t.sql.value).toContain('ORDER BY "id" ASC')
   })
 
   it('goes straight back to the filters while the SQL is the one they built', async () => {
@@ -428,7 +428,7 @@ describe('SQL mode', () => {
   it('reads edited SQL back into the filter boxes, sort and page', async () => {
     const t = await loaded({ pageSize: 100 })
     await t.toSql()
-    t.sqlState.sql = 'edited'
+    t.sql.value = 'edited'
     readTableSelect.mockResolvedValue({
       filters: [{ column: 'name', op: 'contains', value: 'ad' }, { column: 'id', op: 'gte', value: '2' }],
       joins: [], columns: [], orderBy: [{ table: 0, column: 'name' }], descending: true, limit: 100, offset: 100,
@@ -446,7 +446,7 @@ describe('SQL mode', () => {
   it('stays in SQL with the reason when the grid could not show that SQL', async () => {
     const t = await loaded({ pageSize: 100 })
     await t.toSql()
-    t.sqlState.sql = 'edited'
+    t.sql.value = 'edited'
     const read = { joins: [], columns: [], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 }
 
     readTableSelect.mockRejectedValue({ code: 'sql', message: 'only SELECT * can be shown as filters' })
@@ -473,7 +473,7 @@ describe('SQL mode', () => {
   it('treats ORDER BY the primary key as no sort, as browsing does', async () => {
     const t = await loaded()
     await t.toSql()
-    t.sqlState.sql = 'edited'
+    t.sql.value = 'edited'
     readTableSelect.mockResolvedValue({ joins: [], columns: [], filters: [], orderBy: [{ table: 0, column: 'id' }], descending: false, limit: 100, offset: 0 })
     await t.toFilters()
     expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: null }))

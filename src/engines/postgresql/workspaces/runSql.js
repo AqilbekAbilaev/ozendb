@@ -2,59 +2,70 @@ import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, com
 import { pushHistory } from '../api/library'
 import { errMessage } from '../../../utils/errors'
 
-const log = (tab, ok, text, ms) => { tab.messages = [...(tab.messages ?? []), { at: new Date(), ok, text, ms }] }
-
-// Runs a query tab's SQL — or `sql`, a selection of it — and keeps the outcome on the
-// tab, so it survives switching tabs, with a line per run in `tab.messages`. A second
-// run while one is in flight is ignored; the one in flight can be cancelled. A run
-// that succeeds joins the connection's history. With `tab.txn` 'manual', runs go into
-// the tab's transaction (`tab.txId`), begun by the first of them.
-export async function runSql(tab, sql = tab.sql) {
-  if (tab.running) return
-  tab.running = true
-  tab.error = null
-  tab.runId = crypto.randomUUID()
-  try {
-    if (tab.txn === 'manual' && !tab.txId) await begin(tab)
-    tab.result = await runQuery(tab.connectionId, sql, tab.runId, tab.txId ?? null)
-    log(tab, true, outcome(tab.result), tab.result.elapsedMs)
-    pushHistory(tab.connectionId, sql).catch(() => {})
-  } catch (e) {
-    tab.error = errMessage(e)
-    tab.result = null
-    log(tab, false, tab.error)
-  } finally {
-    tab.running = false
-    tab.runId = null
+// A SQL editor's runs against one connection: the last result, a line per run, the plan
+// Explain found, and the Manual-mode transaction. Runtime only — the SQL itself is the
+// tab's lasting state, passed in to each call.
+export function createSqlRun(connectionId) {
+  return {
+    connectionId,
+    result: null, error: null, running: false, runId: null, messages: [],
+    txn: 'auto', txId: null,
+    plan: null, planError: null, explaining: false,
   }
 }
 
-async function begin(tab) {
-  const txId = crypto.randomUUID()
-  await beginTransaction(tab.connectionId, txId)
-  tab.txId = txId
+const log = (run, ok, text, ms) => { run.messages = [...run.messages, { at: new Date(), ok, text, ms }] }
+
+// Runs `sql` and keeps the outcome on `run`, with a line per run in its messages. A
+// second run while one is in flight is ignored; the one in flight can be cancelled. A
+// run that succeeds joins the connection's history. With `run.txn` 'manual', runs go
+// into its transaction (`run.txId`), begun by the first of them.
+export async function runSql(run, sql) {
+  if (run.running) return
+  run.running = true
+  run.error = null
+  run.runId = crypto.randomUUID()
+  try {
+    if (run.txn === 'manual' && !run.txId) await begin(run)
+    run.result = await runQuery(run.connectionId, sql, run.runId, run.txId ?? null)
+    log(run, true, outcome(run.result), run.result.elapsedMs)
+    pushHistory(run.connectionId, sql).catch(() => {})
+  } catch (e) {
+    run.error = errMessage(e)
+    run.result = null
+    log(run, false, run.error)
+  } finally {
+    run.running = false
+    run.runId = null
+  }
 }
 
-// Commits (or rolls back) the tab's transaction. It's over either way — a failed
+async function begin(run) {
+  const txId = crypto.randomUUID()
+  await beginTransaction(run.connectionId, txId)
+  run.txId = txId
+}
+
+// Commits (or rolls back) the run's transaction. It's over either way — a failed
 // commit included, which the backend has rolled back.
-export async function endTransaction(tab, commit) {
-  const txId = tab.txId
+export async function endTransaction(run, commit) {
+  const txId = run.txId
   if (!txId) return
-  tab.txId = null
+  run.txId = null
   try {
     await (commit ? commitTransaction : rollbackTransaction)(txId)
-    log(tab, true, commit ? 'COMMIT' : 'ROLLBACK')
+    log(run, true, commit ? 'COMMIT' : 'ROLLBACK')
   } catch (e) {
-    log(tab, false, errMessage(e))
+    log(run, false, errMessage(e))
   }
 }
 
 // For a tab going away: rolls back its open transaction, if any, and says whether
 // there was one.
-export async function abandonTransaction(tab) {
-  const txId = tab.txId
+export async function abandonTransaction(run) {
+  const txId = run?.txId
   if (!txId) return false
-  tab.txId = null
+  run.txId = null
   try {
     await rollbackTransaction(txId)
   } catch {
@@ -70,31 +81,29 @@ export function outcome({ rows, rowsAffected }) {
 }
 
 // The run then ends with a "cancelled" error, handled like any other.
-export function cancelSql(tab) {
-  if (tab.runId) return cancelQuery(tab.connectionId, tab.runId)
+export function cancelSql(run) {
+  if (run.runId) return cancelQuery(run.connectionId, run.runId)
 }
 
-// Explains the tab's SQL — or `sql` — keeping the plan (or why there isn't one) on it.
-export async function explainSql(tab, sql = tab.sql) {
-  tab.explaining = true
-  tab.planError = null
+// Explains `sql`, keeping the plan (or why there isn't one) on the run.
+export async function explainSql(run, sql) {
+  run.explaining = true
+  run.planError = null
   try {
-    tab.plan = await explainQuery(tab.connectionId, sql)
+    run.plan = await explainQuery(run.connectionId, sql)
   } catch (e) {
-    tab.plan = null
-    tab.planError = errMessage(e)
+    run.plan = null
+    run.planError = errMessage(e)
   } finally {
-    tab.explaining = false
+    run.explaining = false
   }
 }
 
-// Formats the tab's SQL in place. SQL that can't be formatted stays as typed, and the
-// reason is returned.
-export async function formatSql(tab) {
+// `sql` laid out, or — for SQL that can't be formatted — as typed, with the reason.
+export async function formatSql(sql) {
   try {
-    tab.sql = await formatQuery(tab.sql)
-    return null
+    return { sql: await formatQuery(sql), reason: null }
   } catch (e) {
-    return errMessage(e)
+    return { sql, reason: errMessage(e) }
   }
 }

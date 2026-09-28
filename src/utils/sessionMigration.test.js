@@ -363,13 +363,13 @@ describe('PostgreSQL tabs across a restart', () => {
     const target = { connectionId: 'p1', segments: [{ kind: 'database', name: 'payments' }] }
     const v2 = { id: 'q1', type: 'postgresql.query', engine: 'postgresql', title: 'SQL: payments', color: null, target, state: { sql: 'SELECT 1' } }
     const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
-    expect(restored).toMatchObject({ id: 'q1', type: 'postgresql.query', kind: 'pgQuery', database: 'payments', sql: 'SELECT 1', result: null, target })
+    expect(restored).toMatchObject({ id: 'q1', type: 'postgresql.query', kind: 'pgQuery', database: 'payments', state: { sql: 'SELECT 1' }, runtime: { run: { result: null } }, target })
   })
 
   it('saves what the tabs need, and keeps them through a load', () => {
     const table = getWorkspaceDefinition('postgresql.table_browse')
     const query = getWorkspaceDefinition('postgresql.query')
-    expect(query.serialize({ sql: 'SELECT 2', result: { rows: [] } })).toEqual({ sql: 'SELECT 2' })
+    expect(query.serialize({ state: { sql: 'SELECT 2' }, runtime: { run: { result: { rows: [] } } } })).toEqual({ sql: 'SELECT 2' })
     const state = migrateTableState({ view })
     expect(table.serialize({ id: 't1', state })).toEqual({ state })
     const raw = { schemaVersion: 2, activeTabId: 't1', tabs: [{ id: 't1', type: 'postgresql.table_browse', title: 'merchants', target: tableTarget, state: { view } }] }
