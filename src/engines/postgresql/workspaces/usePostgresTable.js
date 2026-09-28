@@ -51,6 +51,9 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   // Filter mode's Explain: the plan for currentSql, kept like SQL mode's result.
   const explainState = reactive({ connectionId: target.connectionId, plan: null, planError: null, explaining: false })
   const explain = () => explainSql(explainState, currentSql.value)
+  // The screen around the data — the Query Builder and the result sub-tab — kept with
+  // the tab, since the workspace component is unmounted whenever another kind of tab shows.
+  const panel = reactive({ builderOpen: false, builderWidth: 360, rtab: 'Result' })
   // The browsed table's column metadata (type, primary key), fetched once, and its
   // joins, each `{ key, schema, table, kind, on, columns }`: matched where every
   // `{ column, equals }` in `on` holds — its `column` equals the column keyed
@@ -400,7 +403,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   }
 
   return {
-    snapshot, explainState, explain, pauses,
+    snapshot, explainState, explain, pauses, panel,
     columns, columnInfo, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
     filterText, activeFilters, mode, sqlState, filterRefusal, toSql, openSql, limit, messages, server, currentSql, toFilters, hasPrev, hasNext, load, refresh, nextPage, prevPage, sortBy,
     keys, joins, joinOffers, tableNames, addJoin, setJoinKind, removeJoin, joinChoices, setJoinOn,

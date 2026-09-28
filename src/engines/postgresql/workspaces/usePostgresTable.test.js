@@ -577,3 +577,10 @@ describe('a table that is gone or unreadable', () => {
     expect(t.error.value).toMatch(/^This table can't be found/)
   })
 })
+
+describe('panel state', () => {
+  it('keeps the builder and result sub-tab with the tab, starting closed on Result', () => {
+    const t = usePostgresTable(target)
+    expect(t.panel).toEqual({ builderOpen: false, builderWidth: 360, rtab: 'Result' })
+  })
+})
