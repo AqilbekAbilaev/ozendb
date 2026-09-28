@@ -20,7 +20,7 @@ export const SAVED_TABLE_STATES = [
     name: 'no view (saved before tabs kept their state, or never opened)',
     state: {},
     browse: DEFAULT_BROWSE,
-    tab: { mode: 'filter', sql: '', filterText: {}, shownColumns: [] },
+    tab: { mode: 'filter', sql: '', filterText: {}, shownColumns: [], columnOrder: null },
   },
   {
     name: 'filters, sort, limit and shown columns',
@@ -36,7 +36,7 @@ export const SAVED_TABLE_STATES = [
       ...DEFAULT_BROWSE, limit: 25, descending: true, orderBy: { table: 0, column: 'name' },
       filters: [{ table: 0, column: 'name', op: 'contains', value: 'ad' }, { table: 0, column: 'id', op: 'gt', value: '1' }],
     },
-    tab: { mode: 'filter', sql: '', filterText: { name: 'ad', id: '>1' }, shownColumns: ['name', 'id'] },
+    tab: { mode: 'filter', sql: '', filterText: { name: 'ad', id: '>1' }, shownColumns: ['name', 'id'], columnOrder: null },
   },
   {
     name: 'a join saved as one column / equals pair (before joins took several)',
@@ -53,7 +53,7 @@ export const SAVED_TABLE_STATES = [
       joins: [{ schema: 'public', table: 'regions', kind: 'left', on: [{ column: 'id', equals: { table: 0, column: 'region_id' } }] }],
       filters: [{ table: 1, column: 'name', op: 'contains', value: 'no' }],
     },
-    tab: { mode: 'filter', sql: '', filterText: { 'j1.name': 'no' }, shownColumns: [] },
+    tab: { mode: 'filter', sql: '', filterText: { 'j1.name': 'no' }, shownColumns: [], columnOrder: null },
   },
   {
     name: 'a join over several column pairs, in SQL mode',
@@ -74,10 +74,10 @@ export const SAVED_TABLE_STATES = [
         on: [{ column: 'id', equals: { table: 0, column: 'region_id' } }, { column: 'name', equals: { table: 0, column: 'name' } }],
       }],
     },
-    tab: { mode: 'sql', sql: 'SELECT 1', filterText: {}, shownColumns: [] },
+    tab: { mode: 'sql', sql: 'SELECT 1', filterText: {}, shownColumns: [], columnOrder: null },
   },
   {
-    name: 'the current shape, on page 3 with its sort paused',
+    name: 'the first versioned shape (v1), on page 3 with its sort paused',
     state: {
       state: {
         v: 1,
@@ -91,6 +91,23 @@ export const SAVED_TABLE_STATES = [
       ui: { builderOpen: true, builderWidth: 420, rtab: 'Messages' },
     },
     browse: { ...DEFAULT_BROWSE, limit: 50, offset: 100 },
-    tab: { mode: 'filter', sql: '', filterText: {}, shownColumns: [] },
+    tab: { mode: 'filter', sql: '', filterText: {}, shownColumns: [], columnOrder: null },
+  },
+  {
+    name: 'the current shape (v2), its columns dragged into another order',
+    state: {
+      state: {
+        v: 2,
+        query: {
+          filterText: {}, filters: [], joins: [], nextJoin: 1, shownColumns: [], columnOrder: ['name', 'id'],
+          orderBy: null, descending: false, limit: 100, offset: 0,
+        },
+        mode: 'filter', sql: '',
+        paused: { conditions: {}, columns: null, sort: null },
+      },
+      ui: { builderOpen: false, builderWidth: 360, rtab: 'Result' },
+    },
+    browse: DEFAULT_BROWSE,
+    tab: { mode: 'filter', sql: '', filterText: {}, shownColumns: [], columnOrder: ['name', 'id'] },
   },
 ]

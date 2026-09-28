@@ -179,11 +179,13 @@ export function useColumnReorder({
     dropIndicator.value = null
   }
 
-  // mousedown on a header cell starts a potential reorder. Skips the resize handle; commits any
-  // open inline edit before preventDefault (which would otherwise swallow the editor's blur).
+  // mousedown on a header cell starts a potential reorder. Skips the resize handle and a
+  // header's input (a filter box, which the preventDefault below would keep from focusing);
+  // commits any open inline edit before preventDefault (which would otherwise swallow the
+  // editor's blur).
   function onHeaderMouseDown(e, target) {
     if (e.button !== 0) return
-    if (e.target.closest('.col-resize-handle')) return
+    if (e.target.closest('.col-resize-handle, input')) return
     if (onBeforePress) onBeforePress()
     e.preventDefault()  // suppress native text-selection of the header label
     col = target

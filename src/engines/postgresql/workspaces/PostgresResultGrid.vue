@@ -5,6 +5,7 @@ import ContextMenu from '../../../components/base/ContextMenu.vue'
 import { formatCell, cellKind } from './formatCell.js'
 import { valueText, rowsAsTsv, rowsAsJson } from './copyText.js'
 import { useColumnResize } from '../../../composables/useColumnResize'
+import { useColumnReorder } from '../../../composables/useColumnReorder'
 import { useRowSelection } from '../../../composables/useRowSelection'
 import { useGridCells } from '../../../composables/useGridCells'
 import { useResultKeyboard } from '../../../composables/useResultKeyboard'
@@ -24,12 +25,14 @@ const props = defineProps({
   orderBy:    { type: String,   default: null },
   descending: { type: Boolean,  default: false },
   sortable:   { type: Boolean,  default: false },
+  // Headers drag to reorder, reported as `move-column`; the table tab keeps the order.
+  reorderable: { type: Boolean, default: false },
   // The table tab's per-column filter boxes; typing reports the text, Enter applies.
   filterText: { type: Object,   default: null },
   canEdit:    { type: Function, default: () => false },
   editText:   { type: Function, default: (column, value) => (value === null ? '' : formatCell(value)) },
 })
-const emit = defineEmits(['sort', 'save', 'filter-text', 'apply-filters'])
+const emit = defineEmits(['sort', 'save', 'filter-text', 'apply-filters', 'move-column'])
 
 const PLACEHOLDERS = { num: 'e.g. >100', date: 'e.g. 2026-09', bool: 'true / false', enum: 'e.g. a, b' }
 
@@ -76,6 +79,23 @@ function cellCtxPick(action) {
 }
 
 const gridWrapRef = ref(null)
+
+// A drag that ends on the header it began on still clicks it; that click mustn't sort.
+let draggedHeader = false
+function onThClick(column) {
+  if (draggedHeader) draggedHeader = false
+  else if (props.sortable) emit('sort', column)
+}
+
+const { onHeaderMouseDown, dragging: reordering, dropIndicator, ghost } = useColumnReorder({
+  columns: () => props.columns,
+  moveColumn: (column, insertBefore) => emit('move-column', column, insertBefore),
+  tableRef, gridWrapRef,
+  headerLabel: (column) => props.columnInfo[column]?.name ?? column,
+  onBeforePress: commit,
+  onReordered: () => { draggedHeader = true },
+})
+
 useResultKeyboard({
   selection: () => props.selection, rows: rowSelection, cellCtx, copySelection, tableRef, gridWrapRef,
   rowCount: () => props.rows.length, columns: () => props.columns, editing: () => !!editing.value,
@@ -122,7 +142,8 @@ function setNull() {
             :key="c"
             :class="{ sortable }"
             :style="thWidthStyle(column)"
-            @click="sortable && emit('sort', column)"
+            @click="onThClick(column)"
+            @mousedown="reorderable && onHeaderMouseDown($event, column)"
           >
             <span class="th-name">
               <BaseIcon v-if="columnInfo[column]?.isPrimaryKey" name="key" :size="12" class="pk" />
@@ -186,6 +207,13 @@ function setNull() {
       </tbody>
     </table>
   </div>
+
+  <div v-if="reordering" class="drag-ghost" :style="{ left: ghost.x + 14 + 'px', top: ghost.y + 14 + 'px' }">{{ ghost.label }}</div>
+  <div
+    v-if="dropIndicator"
+    class="drop-indicator"
+    :style="{ left: dropIndicator.left + 'px', top: dropIndicator.top + 'px', height: dropIndicator.height + 'px' }"
+  ></div>
 
   <ContextMenu
     v-if="cellCtx"
@@ -256,6 +284,15 @@ tbody tr.selrow td { background: var(--bg-selected); }
 /* An accent bar down the gutter marks the selected rows, as in the MongoDB grid. */
 tbody tr.selrow td.rownum { color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 td.selcell { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* A dragged header's label follows the pointer; a line marks where it will land. */
+.drag-ghost {
+  position: fixed; z-index: 200; pointer-events: none;
+  padding: 4px 9px; border-radius: 6px;
+  background: var(--accent); color: #fff;
+  font-size: 12px; white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
+}
+.drop-indicator { position: fixed; z-index: 10; width: 2px; background: var(--accent); pointer-events: none; }
 td { color: var(--text); }
 td.null { color: var(--text-faint); font-style: italic; font-size: 11.5px; }
 td.num  { color: var(--warn); text-align: right; font-family: var(--mono); }

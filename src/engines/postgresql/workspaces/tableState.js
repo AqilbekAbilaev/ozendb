@@ -5,7 +5,7 @@
 import { createSqlRun } from './runSql.js'
 import { createSelection } from '../../../composables/useRowSelection'
 
-export const TABLE_STATE_VERSION = 1
+export const TABLE_STATE_VERSION = 2
 
 export function createTableState({ limit } = {}) {
   return {
@@ -16,6 +16,8 @@ export function createTableState({ limit } = {}) {
       joins: [],
       nextJoin: 1,
       shownColumns: [],
+      // The order the grid's columns were dragged into; null keeps the order they come in.
+      columnOrder: null,
       orderBy: null,
       descending: false,
       limit: limit ?? 100,
@@ -70,9 +72,13 @@ function fromView(view) {
   return state
 }
 
+// v1, before columns could be dragged into another order.
+const fromV1 = (state) => ({ ...state, v: 2, query: { ...state.query, columnOrder: null } })
+
 // Whatever a session holds for a table tab, as the current state. A state from a newer
 // version of the app can't be read safely, so the tab starts fresh instead.
 export function migrateTableState(saved = {}) {
-  if (saved.state) return saved.state.v === TABLE_STATE_VERSION ? saved.state : createTableState()
-  return fromView(saved.view ?? {})
+  if (!saved.state) return fromView(saved.view ?? {})
+  if (saved.state.v === 1) return fromV1(saved.state)
+  return saved.state.v === TABLE_STATE_VERSION ? saved.state : createTableState()
 }
