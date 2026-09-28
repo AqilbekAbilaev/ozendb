@@ -13,6 +13,7 @@ const BY_KIND = {
   num: [...COMPARE, 'in'],
   date: ['contains', ...COMPARE, 'in'],
   bool: ['eq'],
+  enum: ['eq', 'ne', 'in'],
 }
 
 // The operators a column of cellKind `kind` can take, as `{ op, label }`.

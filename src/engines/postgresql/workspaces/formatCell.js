@@ -14,7 +14,9 @@ const KINDS = [
   [/^(timestamp|date|time|interval)\b/, 'date'],
   [/^boolean$/, 'bool'],
 ]
-export function cellKind(dataType) {
+// An enum column (one listing its labels) is its own kind, whatever its type's name.
+export function cellKind(dataType, enumValues) {
+  if (enumValues?.length) return 'enum'
   if (!dataType || dataType.endsWith('[]')) return null
   return KINDS.find(([pattern]) => pattern.test(dataType))?.[1] ?? null
 }

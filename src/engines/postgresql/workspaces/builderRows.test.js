@@ -8,6 +8,7 @@ describe('operatorsFor', () => {
     expect(ops('date')).toEqual(['contains', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'isNull', 'notNull'])
     expect(ops('str')).toEqual(['contains', 'startsWith', 'eq', 'ne', 'in', 'isNull', 'notNull'])
     expect(ops('bool')).toEqual(['eq', 'isNull', 'notNull'])
+    expect(ops('enum')).toEqual(['eq', 'ne', 'in', 'isNull', 'notNull'])
     expect(ops(null)).toEqual(['contains', 'startsWith', 'eq', 'ne', 'in', 'isNull', 'notNull'])
   })
 })

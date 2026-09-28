@@ -43,7 +43,7 @@ const kindOptions = computed(() => [
 ])
 const offerOptions = computed(() => props.joinOffers.map((o, i) => ({ value: i, label: o.label })))
 
-const kinds = computed(() => Object.fromEntries(props.columns.map(c => [c, cellKind(props.columnInfo[c]?.dataType)])))
+const kinds = computed(() => Object.fromEntries(props.columns.map(c => [c, cellKind(props.columnInfo[c]?.dataType, props.columnInfo[c]?.enumValues)])))
 
 // Rows are kept here rather than derived, so a condition still missing its value
 // survives; they're re-read only when the boxes change from outside the panel.
@@ -80,6 +80,7 @@ function pickColumn(i, column) {
 const columnOptions = (current) => props.columns.map(c => ({ value: c, label: label(c), disabled: c !== current && used.value.includes(c) }))
 const opOptions = (column) => operatorsFor(kinds.value[column]).map(o => ({ value: o.op, label: o.label }))
 const needsValue = (op) => op !== 'isNull' && op !== 'notNull'
+const enumOptions = (column) => props.columnInfo[column].enumValues.map(v => ({ value: v, label: v }))
 
 // Ticking keeps the table's own column order; ticking none shows them all.
 function toggleColumn(column) {
@@ -138,8 +139,17 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
           </div>
           <div class="cond-line">
             <span class="pill type-pill" :title="columnInfo[r.column]?.dataType">{{ columnInfo[r.column]?.dataType }}</span>
+            <BaseSelect
+              v-if="kinds[r.column] === 'enum' && (r.op === 'eq' || r.op === 'ne')"
+              class="grow"
+              size="sm"
+              :model-value="r.value"
+              :options="enumOptions(r.column)"
+              placeholder="Pick a value"
+              @update:model-value="update(i, { value: $event })"
+            />
             <BaseInput
-              v-if="needsValue(r.op)"
+              v-else-if="needsValue(r.op)"
               class="pill grow cond-val"
               :model-value="r.value"
               :placeholder="r.op === 'in' ? 'a, b, c, then Enter' : 'value, then Enter'"

@@ -145,6 +145,8 @@ pub struct PgColumnInfo {
     pub nullable: bool,
     pub is_primary_key: bool,
     pub default: Option<String>,
+    /// An enum column's labels, in their declared order; None for any other type.
+    pub enum_values: Option<Vec<String>>,
 }
 
 pub(crate) async fn list_columns_impl(
@@ -152,13 +154,14 @@ pub(crate) async fn list_columns_impl(
     schema: &str,
     table: &str,
 ) -> Result<Vec<PgColumnInfo>, AppError> {
-    let rows: Vec<(String, String, bool, Option<String>)> = match sqlx::query_as(
+    let rows: Vec<(String, String, bool, Option<String>, Option<Vec<String>>)> = match sqlx::query_as(
         r#"
         SELECT
             a.attname,
             format_type(a.atttypid, a.atttypmod),
             NOT a.attnotnull,
-            pg_get_expr(ad.adbin, ad.adrelid)
+            pg_get_expr(ad.adbin, ad.adrelid),
+            (SELECT array_agg(e.enumlabel::text ORDER BY e.enumsortorder) FROM pg_enum e WHERE e.enumtypid = a.atttypid)
         FROM pg_attribute a
         JOIN pg_class c ON c.oid = a.attrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -181,12 +184,13 @@ pub(crate) async fn list_columns_impl(
 
     Ok(rows
         .into_iter()
-        .map(|(name, data_type, nullable, default)| PgColumnInfo {
+        .map(|(name, data_type, nullable, default, enum_values)| PgColumnInfo {
             is_primary_key: pk.contains(&name),
             name,
             data_type,
             nullable,
             default,
+            enum_values,
         })
         .collect())
 }

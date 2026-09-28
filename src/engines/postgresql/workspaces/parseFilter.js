@@ -1,10 +1,10 @@
 // A header filter box's text as `{ op, value }` for the backend, or null when there
-// is nothing to apply. `kind` is the column's cellKind: numbers and booleans match
+// is nothing to apply. `kind` is the column's cellKind: numbers, booleans and enums match
 // exactly unless an operator says otherwise, everything else by contains. `^abc` is
 // starts with; a comma list where the box would match exactly (`1, 2`, `=a, b`) is any
 // of — a comma in a text search stays part of the text.
 const OPERATORS = [['>=', 'gte'], ['<=', 'lte'], ['!=', 'ne'], ['<>', 'ne'], ['>', 'gt'], ['<', 'lt'], ['=', 'eq']]
-const EXACT_KINDS = ['num', 'bool']
+const EXACT_KINDS = ['num', 'bool', 'enum']
 
 export function parseFilter(text, kind) {
   const trimmed = text.trim()
