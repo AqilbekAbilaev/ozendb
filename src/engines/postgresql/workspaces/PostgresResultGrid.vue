@@ -2,6 +2,7 @@
 import { ref, computed, nextTick } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import { formatCell, cellKind } from './formatCell.js'
+import { useColumnResize } from '../../../composables/useColumnResize'
 
 // Rows arrive as arrays aligned to `columns` — keys, which `columnInfo` names (with
 // their table, when the tab joins others) — so a repeated column name stays its own
@@ -26,6 +27,8 @@ const PLACEHOLDERS = { num: 'e.g. >100', date: 'e.g. 2026-09', bool: 'true / fal
 
 const filtering = computed(() => Object.values(props.filterText ?? {}).some(text => text?.trim()))
 const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType, props.columnInfo[c]?.enumValues)))
+
+const { tableRef, startResize, autoFitColumn, thWidthStyle } = useColumnResize({ gridColumns: () => props.columns })
 
 const editing = ref(null)   // { row, column, text, seed }
 const input = ref(null)
@@ -57,7 +60,7 @@ function setNull() {
 
 <template>
   <div class="pg-grid">
-    <table>
+    <table ref="tableRef">
       <thead>
         <tr>
           <th class="rownum">
@@ -67,6 +70,7 @@ function setNull() {
             v-for="(column, c) in columns"
             :key="c"
             :class="{ sortable }"
+            :style="thWidthStyle(column)"
             @click="sortable && emit('sort', column)"
           >
             <span class="th-name">
@@ -86,6 +90,7 @@ function setNull() {
               @input="emit('filter-text', column, $event.target.value)"
               @keydown.enter="emit('apply-filters')"
             >
+            <div class="col-resize-handle" @click.stop @mousedown="startResize($event, column)" @dblclick="autoFitColumn($event, column)"></div>
           </th>
         </tr>
       </thead>
@@ -100,6 +105,7 @@ function setNull() {
             v-for="(value, c) in row"
             :key="c"
             :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c]) }]"
+            :style="thWidthStyle(columns[c])"
             @dblclick="startEdit(r, columns[c], value)"
           >
             <span v-if="editing && editing.row === r && editing.column === columns[c]" class="pg-editing">
@@ -152,6 +158,13 @@ th {
   vertical-align: top;
 }
 th.sortable { cursor: pointer; }
+/* Straddles the column's right border; the sticky th is its containing block. */
+.col-resize-handle {
+  position: absolute; top: 0; right: 0; z-index: 1;
+  width: 12px; height: 100%;
+  transform: translateX(50%);
+  cursor: col-resize;
+}
 .th-name { display: flex; align-items: center; gap: 5px; }
 .th-tbl { font-weight: 400; color: var(--text-faint); }
 .th-type { display: block; margin-top: 1px; font: 400 10.5px var(--mono); color: var(--text-faint); }

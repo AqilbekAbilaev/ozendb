@@ -7,6 +7,9 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 // `gridColumns` is a getter rather than a ref because the component builds its column
 // list further down its own setup than this is called — the same shape useColumnReorder
 // takes for its inputs. It's only read during a gesture, long after setup has finished.
+//
+// `cellData` is for a virtualized grid, whose columns must be pinned from the start (see
+// colDefaultWidths). Without it the table keeps auto layout until a column is resized.
 export function useColumnResize({ gridColumns, cellData }) {
   const tableRef  = ref(null)
   const colWidths = ref({})   // col name → px; empty = auto layout
@@ -53,33 +56,39 @@ export function useColumnResize({ gridColumns, cellData }) {
     e.stopPropagation()
     if (!tableRef.value) return
 
-    const cols = gridColumns()
     // +2: child 1 is the rownum column, data columns start at child 2
-    const nthChild = cols.indexOf(col) + 2
+    const nthChild = gridColumns().indexOf(col) + 2
     if (nthChild < 2) return
 
-    // Header: measure label text with a throwaway element that inherits the th's computed font.
-    // Can't use th.scrollWidth — in fixed layout it equals offsetWidth when cell > content.
-    const th = tableRef.value.querySelector(`thead th:nth-child(${nthChild})`)
-    let maxW = 40
-    if (th) {
-      const probe = document.createElement('span')
-      probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${getComputedStyle(th).font}`
-      probe.textContent = col === '_id' ? '{Document id}' : col
-      document.body.appendChild(probe)
-      maxW = probe.offsetWidth + 24  // 12px left + 12px right padding from th CSS
-      document.body.removeChild(probe)
-    }
-
-    // Body cells: .tcell is display:inline-flex so its offsetWidth = intrinsic content size,
-    // independent of how wide or narrow the parent td currently is.
     // Virtualized: only the mounted (visible) rows can be measured — the standard
     // trade-off. Auto-fit sizes to what's on screen, which is what the user sees.
-    tableRef.value.querySelectorAll(`tbody tr.datarow td:nth-child(${nthChild}) .tcell`).forEach(tcell => {
-      maxW = Math.max(maxW, tcell.offsetWidth + 24)  // 12px left + 12px right padding from td CSS
-    })
+    // A colspan cell (spacer, "no rows" message) belongs to no one column.
+    const cells = tableRef.value.querySelectorAll(
+      `thead th:nth-child(${nthChild}), tbody td:nth-child(${nthChild}):not([colspan])`)
+    colWidths.value[col] = Math.max(40, naturalWidth(cells))
+  }
 
-    colWidths.value[col] = Math.ceil(maxW)
+  // The widest of `cells` at the size its content wants, padding and border included. The
+  // cells themselves can't say: one in a narrowed column reports that column's width. So
+  // each one's content is cloned into an off-screen probe with the cell's own font and
+  // edges, and the probe — sized to its widest line — is laid out once for the lot. An
+  // input (a header's filter box) fills whatever it's given, so it counts at its min-width.
+  function naturalWidth(cells) {
+    const probe = document.createElement('div')
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;width:max-content'
+    for (const cell of cells) {
+      const s = getComputedStyle(cell)
+      const line = document.createElement('div')
+      line.style.cssText = `font:${s.font};padding:0 ${s.paddingRight} 0 ${s.paddingLeft};` +
+        `border:solid transparent;border-width:0 ${s.borderRightWidth} 0 ${s.borderLeftWidth}`
+      line.append(...[...cell.childNodes].map(node => node.cloneNode(true)))
+      line.querySelectorAll('input').forEach(input => { input.style.width = '0' })
+      probe.appendChild(line)
+    }
+    document.body.appendChild(probe)
+    const width = Math.ceil(probe.getBoundingClientRect().width)
+    probe.remove()
+    return width
   }
 
   // Virtualization mounts only the visible rows, so auto table-layout would resize columns
@@ -104,6 +113,7 @@ export function useColumnResize({ gridColumns, cellData }) {
   }
 
   const colDefaultWidths = computed(() => {
+    if (!cellData) return {}
     const cols = gridColumns()
     const rows = cellData()
     const out  = {}
@@ -125,8 +135,7 @@ export function useColumnResize({ gridColumns, cellData }) {
     return w ? { minWidth: w + 'px', maxWidth: w + 'px' } : {}
   }
 
-
-  onMounted(measureCharW)
+  if (cellData) onMounted(measureCharW)
 
   return { tableRef, colWidths, startResize, autoFitColumn, headerLabel, thWidthStyle }
 }
