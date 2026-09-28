@@ -1,6 +1,7 @@
 import { browseTable, countTable, runQuery } from '../api/queries'
 import { listColumns, listForeignKeys } from '../api/resources'
 import { tableErrorText } from './tableError.js'
+import { createSelection } from '../../../composables/useRowSelection'
 
 // Loading a table tab's page and count, and what the view fetches once: the server's
 // version, and each table's foreign keys. Only the latest load may write back
@@ -57,6 +58,7 @@ export function useTableLoad(t) {
       if (mine !== runtime.generation) return
       columns.value = page.columns
       rows.value = page.rows
+      runtime.selection = createSelection()
       elapsedMs.value = page.elapsedMs
       total.value = count
       log(true, `SELECT ${page.rows.length}`, page.elapsedMs)
@@ -65,6 +67,7 @@ export function useTableLoad(t) {
       error.value = tableErrorText(e)
       log(false, error.value)
       rows.value = []
+      runtime.selection = createSelection()
     } finally {
       if (mine === runtime.generation) loading.value = false
     }

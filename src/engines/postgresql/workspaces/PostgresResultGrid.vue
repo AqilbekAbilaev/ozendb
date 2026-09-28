@@ -1,16 +1,24 @@
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
+import ContextMenu from '../../../components/base/ContextMenu.vue'
 import { formatCell, cellKind } from './formatCell.js'
+import { valueText, rowsAsTsv, rowsAsJson } from './copyText.js'
 import { useColumnResize } from '../../../composables/useColumnResize'
+import { useRowSelection } from '../../../composables/useRowSelection'
+import { useGridCells } from '../../../composables/useGridCells'
+import { useResultKeyboard } from '../../../composables/useResultKeyboard'
 
 // Rows arrive as arrays aligned to `columns` — keys, which `columnInfo` names (with
 // their table, when the tab joins others) — so a repeated column name stays its own
 // column. Sorting and editing are opt-in: the query tab shows results read-only, and
 // without `columnInfo` (types, primary keys), since a query's columns aren't a table's.
+// `selection` is kept by whatever holds the rows (createSelection), which starts a fresh
+// one with each new result.
 const props = defineProps({
   columns:    { type: Array,    required: true },
   rows:       { type: Array,    required: true },
+  selection:  { type: Object,   required: true },
   columnInfo: { type: Object,   default: () => ({}) },
   rowOffset:  { type: Number,   default: 0 },
   orderBy:    { type: String,   default: null },
@@ -29,6 +37,49 @@ const filtering = computed(() => Object.values(props.filterText ?? {}).some(text
 const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType, props.columnInfo[c]?.enumValues)))
 
 const { tableRef, startResize, autoFitColumn, thWidthStyle } = useColumnResize({ gridColumns: () => props.columns })
+
+const rowSelection = useRowSelection({ activeTab: () => props.selection })
+const { selectedCol, anchorRow, isRowSelected } = rowSelection
+const { cellCtx, onCellClick, selectRow, openCellCtx } = useGridCells({ rows: rowSelection })
+
+// Mounting again, or being handed another tab's selection, picks up where it was left.
+watch(() => props.selection, (held) => {
+  selectedCol.value = held.selectedField
+  anchorRow.value = held.selectedRow
+}, { immediate: true })
+
+const isSelectedCell = (r, column) => selectedCol.value === column && props.selection.selectedRow === r
+const valueAt = (r, column) => props.rows[r]?.[props.columns.indexOf(column)]
+const copy = (text) => navigator.clipboard.writeText(text)
+
+// Cmd/Ctrl+C: the selected cell's value, or the selected rows when there's no one cell.
+function copySelection() {
+  const { selectedRow, selectedRows } = props.selection
+  const indexes = selectedRows.length ? selectedRows : [selectedRow]
+  if (indexes.length === 1 && selectedCol.value) copy(valueText(valueAt(selectedRow, selectedCol.value)))
+  else copy(rowsAsTsv(indexes.map(r => props.rows[r])))
+}
+
+const CELL_MENU = [
+  { label: 'Copy Value', value: 'value', icon: 'copy', shortcut: '⌘C' },
+  { sep: true },
+  { label: 'Copy Row', value: 'row' },
+  { label: 'Copy Row as JSON', value: 'json' },
+]
+
+function cellCtxPick(action) {
+  const { row, col } = cellCtx.value
+  if (action === 'value') copy(valueText(valueAt(row, col)))
+  else if (action === 'row') copy(rowsAsTsv([props.rows[row]]))
+  else copy(rowsAsJson(props.columns, [props.rows[row]]))
+  cellCtx.value = null
+}
+
+const gridWrapRef = ref(null)
+useResultKeyboard({
+  selection: () => props.selection, rows: rowSelection, cellCtx, copySelection, tableRef, gridWrapRef,
+  rowCount: () => props.rows.length, columns: () => props.columns, editing: () => !!editing.value,
+})
 
 const editing = ref(null)   // { row, column, text, seed }
 const input = ref(null)
@@ -59,7 +110,7 @@ function setNull() {
 </script>
 
 <template>
-  <div class="pg-grid">
+  <div ref="gridWrapRef" class="pg-grid">
     <table ref="tableRef">
       <thead>
         <tr>
@@ -99,13 +150,15 @@ function setNull() {
           <td></td>
           <td :colspan="columns.length">No rows match these filters</td>
         </tr>
-        <tr v-for="(row, r) in rows" :key="r">
-          <td class="rownum">{{ rowOffset + r + 1 }}</td>
+        <tr v-for="(row, r) in rows" :key="r" :class="{ selrow: isRowSelected(r) }">
+          <td class="rownum" @click="selectRow($event, r)">{{ rowOffset + r + 1 }}</td>
           <td
             v-for="(value, c) in row"
             :key="c"
-            :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c]) }]"
+            :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c]), selcell: isSelectedCell(r, columns[c]) }]"
             :style="thWidthStyle(columns[c])"
+            @click="onCellClick($event, r, columns[c])"
+            @contextmenu="openCellCtx($event, r, columns[c])"
             @dblclick="startEdit(r, columns[c], value)"
           >
             <span v-if="editing && editing.row === r && editing.column === columns[c]" class="pg-editing">
@@ -133,6 +186,13 @@ function setNull() {
       </tbody>
     </table>
   </div>
+
+  <ContextMenu
+    v-if="cellCtx"
+    :menu="{ x: cellCtx.x, y: cellCtx.y, items: CELL_MENU }"
+    @pick="cellCtxPick"
+    @close="cellCtx = null"
+  />
 </template>
 
 <style scoped>
@@ -191,7 +251,11 @@ th.rownum { z-index: 3; vertical-align: bottom; padding-bottom: 10px; }
 .funnel.on { color: var(--accent); }
 tbody tr:nth-child(even) td { background: var(--bg-row-alt); }
 tbody tr:hover td { background: var(--bg-hover); }
-tbody tr td.rownum { background: var(--bg-panel-2); }
+tbody tr td.rownum { background: var(--bg-panel-2); cursor: pointer; }
+tbody tr.selrow td { background: var(--bg-selected); }
+/* An accent bar down the gutter marks the selected rows, as in the MongoDB grid. */
+tbody tr.selrow td.rownum { color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+td.selcell { outline: 2px solid var(--accent); outline-offset: -2px; }
 td { color: var(--text); }
 td.null { color: var(--text-faint); font-style: italic; font-size: 11.5px; }
 td.num  { color: var(--warn); text-align: right; font-family: var(--mono); }

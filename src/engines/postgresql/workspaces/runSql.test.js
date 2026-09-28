@@ -32,6 +32,18 @@ describe('runSql', () => {
     expect(t).toMatchObject({ result, error: null, running: false })
   })
 
+  it('selects nothing in a fresh result, or once a run fails', async () => {
+    runQuery.mockResolvedValue({ columns: ['n'], rows: [[1], [2]], truncated: false, elapsedMs: 1 })
+    const t = newRun()
+    t.selection.selectedRow = 1
+    await runSql(t, 'SELECT 1')
+    expect(t.selection.selectedRow).toBe(-1)
+    t.selection.selectedRow = 0
+    runQuery.mockRejectedValue({ code: 'postgres', message: 'nope' })
+    await runSql(t, 'SELECT 1')
+    expect(t.selection.selectedRow).toBe(-1)
+  })
+
   it('adds the SQL it ran to the connection\'s history, but not a failed run', async () => {
     runQuery.mockResolvedValueOnce({ columns: [], rows: [], truncated: false, elapsedMs: 1 })
     await runSql(newRun(), 'SELECT 2')

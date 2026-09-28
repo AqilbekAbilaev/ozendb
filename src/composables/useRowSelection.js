@@ -1,5 +1,9 @@
 import { ref, watch } from 'vue'
 
+// What a selection is kept in: a MongoDB tab carries these fields itself, a PostgreSQL
+// table tab's runtime and each SQL run one of these.
+export const createSelection = () => ({ selectedRow: -1, selectedRows: [], selectedField: null })
+
 // Row and cell selection for the result grid. The selection itself lives on the tab
 // (`selectedRow`, `selectedRows`, `selectedField`) rather than here, because the native
 // menu's gates are driven from tab state — this owns the gestures that maintain it, plus

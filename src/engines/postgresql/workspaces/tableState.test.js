@@ -65,4 +65,11 @@ describe('createTableRuntime', () => {
     })
     expect(runtime.sqlRun).not.toBe(runtime.explainRun)
   })
+
+  it('selects nothing, apart from what its SQL run selects', () => {
+    const runtime = createTableRuntime('c1')
+    expect(runtime.selection).toEqual({ selectedRow: -1, selectedRows: [], selectedField: null })
+    expect(runtime.sqlRun.selection).toEqual(runtime.selection)
+    expect(runtime.sqlRun.selection).not.toBe(runtime.selection)
+  })
 })

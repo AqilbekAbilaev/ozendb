@@ -71,6 +71,25 @@ describe('loading', () => {
     expect(t.rows.value).toEqual([])
     expect(t.loading.value).toBe(false)
   })
+
+  it('selects nothing in a fresh page, loaded or failed: its rows are other rows', async () => {
+    const t = await loaded()
+    t.selection.value.selectedRow = 1
+    await t.load()
+    expect(t.selection.value.selectedRow).toBe(-1)
+    t.selection.value.selectedRow = 1
+    browseTable.mockRejectedValue({ code: 'postgres', message: 'gone' })
+    await t.load()
+    expect(t.selection.value.selectedRow).toBe(-1)
+  })
+
+  it('keeps the selection through a cell edit, which changes no row\'s place', async () => {
+    updateRow.mockResolvedValue(1)
+    const t = await loaded()
+    t.selection.value.selectedRow = 1
+    await t.saveCell(1, 'name', 'Linus T')
+    expect(t.selection.value.selectedRow).toBe(1)
+  })
 })
 
 describe('paging and sorting', () => {

@@ -112,6 +112,7 @@ function copySql() {
               v-else
               :columns="t.view.columns"
               :rows="t.view.rows"
+              :selection="t.selection"
               :column-info="t.columnInfo"
               :row-offset="t.offset"
               :order-by="t.orderBy"
