@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { joinOffers } from './joinOffers.js'
 
 const fk = (from, to) => {
-  const [fromSchema, fromTable, fromColumn] = from.split('.')
-  const [toSchema, toTable, toColumn] = to.split('.')
-  return { fromSchema, fromTable, fromColumn, toSchema, toTable, toColumn }
+  const [fromSchema, fromTable, fromColumns] = from.split('.')
+  const [toSchema, toTable, toColumns] = to.split('.')
+  return { fromSchema, fromTable, fromColumns: fromColumns.split('+'), toSchema, toTable, toColumns: toColumns.split('+') }
 }
 const merchants = { key: '', schema: 'public', table: 'merchants' }
 const keysByTable = {
@@ -22,16 +22,23 @@ const keysByTable = {
 describe('joinOffers', () => {
   it('offers each table linked to the browsed one, whichever side holds the key', () => {
     expect(joinOffers([merchants], keysByTable)).toEqual([
-      { schema: 'public', table: 'regions', column: 'id', equals: 'region_id', label: 'regions (linked by merchants.region_id)' },
-      { schema: 'billing', table: 'payments', column: 'merchant_id', equals: 'id', label: 'billing.payments (linked by payments.merchant_id)' },
+      { schema: 'public', table: 'regions', on: [{ column: 'id', equals: 'region_id' }], label: 'regions (linked by merchants.region_id)' },
+      { schema: 'billing', table: 'payments', on: [{ column: 'merchant_id', equals: 'id' }], label: 'billing.payments (linked by payments.merchant_id)' },
     ])
   })
 
   it('follows keys from joined tables too, and never offers a table already in the tab', () => {
     const regions = { key: 'j1', schema: 'public', table: 'regions' }
-    expect(joinOffers([merchants, regions], keysByTable).map(o => [o.table, o.equals])).toEqual([
+    expect(joinOffers([merchants, regions], keysByTable).map(o => [o.table, o.on[0].equals])).toEqual([
       ['payments', 'id'],
       ['countries', 'j1.country_code'],
+    ])
+  })
+
+  it('matches a key over several columns on every pair', () => {
+    const keys = { 'public.refs': [fk('public.refs.a+b', 'public.pairs.x+y')] }
+    expect(joinOffers([{ key: '', schema: 'public', table: 'refs' }], keys)).toEqual([
+      { schema: 'public', table: 'pairs', on: [{ column: 'x', equals: 'a' }, { column: 'y', equals: 'b' }], label: 'pairs (linked by refs.a, b)' },
     ])
   })
 

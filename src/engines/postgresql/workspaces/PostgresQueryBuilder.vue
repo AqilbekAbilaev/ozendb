@@ -107,8 +107,10 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
           <div class="cond-line">
             <BaseSelect class="grow" size="sm" :model-value="j.kind" :options="kindOptions" @update:model-value="emit('join-kind', j.key, $event)" />
           </div>
-          <div class="cond-line"><span class="onl">where</span><span class="pill grow onv">{{ joinName(i) }}.{{ j.column }}</span></div>
-          <div class="cond-line"><span class="onl">equals</span><span class="pill grow onv">{{ label(j.equals) }}</span></div>
+          <template v-for="(p, n) in j.on" :key="n">
+            <div class="cond-line"><span class="onl">{{ n ? 'and' : 'where' }}</span><span class="pill grow onv">{{ joinName(i) }}.{{ p.column }}</span></div>
+            <div class="cond-line"><span class="onl">equals</span><span class="pill grow onv">{{ label(p.equals) }}</span></div>
+          </template>
         </div>
         <BaseSelect
           v-if="joinOffers.length"

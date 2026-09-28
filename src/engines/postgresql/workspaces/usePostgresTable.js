@@ -52,13 +52,15 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   const explainState = reactive({ connectionId: target.connectionId, plan: null, planError: null, explaining: false })
   const explain = () => explainSql(explainState, currentSql.value)
   // The browsed table's column metadata (type, primary key), fetched once, and its
-  // joins, each `{ key, schema, table, kind, column, equals, columns }`: matched where
-  // its `column` equals the column keyed `equals`, with its own columns' metadata. A
+  // joins, each `{ key, schema, table, kind, on, columns }`: matched where every
+  // `{ column, equals }` in `on` holds — its `column` equals the column keyed
+  // `equals` — with its own columns' metadata. A
   // join's key never changes, so removing one leaves the others' columns keyed as
   // they were. Filters, sort, shown columns and edits name a column by its key (see
   // columnRefs.js).
   const mainColumns = ref(null)
-  const joins = ref(initial.joins ?? [])
+  // A tab saved before joins matched on several columns held one `column`/`equals` pair.
+  const joins = ref((initial.joins ?? []).map(({ column, equals, ...j }) => (j.on ? j : { ...j, on: [{ column, equals }] })))
   let joinCount = Math.max(0, ...joins.value.map(j => Number(j.key.slice(1))))
   // Foreign keys by `schema.table`, fetched as each table enters the tab.
   const foreignKeys = ref({})
@@ -72,8 +74,8 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     [r.key, joins.value.length ? { ...r.info, tableLabel: tableNames.value[r.table] } : r.info])))
   const columnOf = (key) => ({ table: refByKey.value[key].table, column: refByKey.value[key].name })
   const wireFilters = computed(() => filters.value.map(({ key, ...filter }) => ({ ...columnOf(key), ...filter })))
-  const wireJoins = computed(() => joins.value.map(({ schema, table, kind, column, equals }) =>
-    ({ schema, table, kind, column, equals: columnOf(equals) })))
+  const wireJoins = computed(() => joins.value.map(({ schema, table, kind, on }) =>
+    ({ schema, table, kind, on: on.map(({ column, equals }) => ({ column, equals: columnOf(equals) })) })))
   const joinOffers = computed(() => offersFor(
     [{ key: '', schema: target.schema, table: target.table }, ...joins.value],
     foreignKeys.value,
@@ -183,10 +185,10 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
     return goTo(0)
   }
 
-  async function addJoin({ schema, table, column, equals }) {
+  async function addJoin({ schema, table, on }) {
     try {
       const columns = await listColumns({ connectionId: target.connectionId, schema, table })
-      joins.value = [...joins.value, { key: `j${++joinCount}`, schema, table, kind: 'left', column, equals, columns }]
+      joins.value = [...joins.value, { key: `j${++joinCount}`, schema, table, kind: 'left', on, columns }]
     } catch (e) {
       error.value = errMessage(e)
       return
@@ -205,7 +207,7 @@ export function usePostgresTable(target, { pageSize = 100, readOnly = false, ini
   function removeJoin(key) {
     const gone = new Set([key])
     const ownerOf = (columnKey) => joins.value[refByKey.value[columnKey].table - 1]?.key
-    for (const j of joins.value) if (gone.has(ownerOf(j.equals))) gone.add(j.key)
+    for (const j of joins.value) if (j.on.some(p => gone.has(ownerOf(p.equals)))) gone.add(j.key)
     const dropped = new Set(refs.value.filter(r => r.table && gone.has(joins.value[r.table - 1].key)).map(r => r.key))
     joins.value = joins.value.filter(j => !gone.has(j.key))
     filters.value = filters.value.filter(f => !dropped.has(f.key))

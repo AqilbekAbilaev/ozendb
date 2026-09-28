@@ -95,7 +95,7 @@ export function isOpenTable(tab, connectionId, schema, table) {
 // `table.column` a column's foreign key points at (schema-qualified when it's in
 // another schema), or null.
 function referenceOf(keys, schema, table, column) {
-  const fk = keys.find(k => k.fromSchema === schema && k.fromTable === table && k.fromColumn === column)
+  const fk = keys.find(k => k.fromSchema === schema && k.fromTable === table && k.fromColumns.includes(column))
   if (!fk) return null
-  return `${fk.toSchema === schema ? '' : fk.toSchema + '.'}${fk.toTable}.${fk.toColumn}`
+  return `${fk.toSchema === schema ? '' : fk.toSchema + '.'}${fk.toTable}.${fk.toColumns[fk.fromColumns.indexOf(column)]}`
 }
