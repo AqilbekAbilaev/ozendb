@@ -161,7 +161,7 @@ describe('shown columns', () => {
     expect(t.currentSql.value).toMatch(/^SELECT "name"\n/)
     await t.toSql()
     t.sqlState.sql = 'edited'
-    readTableSelect.mockResolvedValue({ columns: ['id'], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 })
+    readTableSelect.mockResolvedValue({ joins: [], columns: [{ table: 0, column: 'id' }], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 })
     await t.toFilters()
     expect(t.shownColumns.value).toEqual(['id'])
   })
@@ -247,15 +247,39 @@ describe('joins', () => {
     }))
   })
 
-  it('writes the joins into the SQL, and keeps edited joined SQL in SQL mode', async () => {
+  it('writes the joins into the SQL, and reads edited joined SQL back into the builder', async () => {
     const t = await joined()
     expect(t.currentSql.value).toContain('LEFT JOIN "public"."regions" ON "regions"."id" = "users"."id"')
     await t.toSql()
     t.sqlState.sql = 'edited'
+    readTableSelect.mockResolvedValue({
+      joins: [{ schema: 'public', table: 'regions', kind: 'inner', on: [{ column: 'id', equals: { table: 0, column: 'id' } }] }],
+      columns: [{ table: 0, column: 'name' }, { table: 1, column: 'name' }],
+      filters: [{ table: 1, column: 'name', op: 'contains', value: 'no' }],
+      orderBy: [{ table: 1, column: 'name' }], descending: false, limit: 50, offset: 0,
+    })
     await t.toFilters()
-    expect(readTableSelect).not.toHaveBeenCalled()
-    expect(t.filterRefusal.value).toMatch(/join/)
-    expect(t.mode.value).toBe('sql')
+    expect(t.filterRefusal.value).toBe(null)
+    expect(t.mode.value).toBe('filter')
+    expect(listColumns).toHaveBeenLastCalledWith({ connectionId: 'c1', schema: 'public', table: 'regions' })
+    expect(t.joins.value.map(j => [j.key, j.kind, j.on])).toEqual([['j2', 'inner', [{ column: 'id', equals: 'id' }]]])
+    expect(t.shownColumns.value).toEqual(['name', 'j2.name'])
+    expect(t.filterText.value).toEqual({ 'j2.name': 'no' })
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({
+      joins: [{ schema: 'public', table: 'regions', kind: 'inner', on: [{ column: 'id', equals: { table: 0, column: 'id' } }] }],
+      filters: [{ table: 1, column: 'name', op: 'contains', value: 'no' }],
+      orderBy: { table: 1, column: 'name' }, limit: 50,
+    }))
+  })
+
+  it('drops the joins when edited SQL no longer has them', async () => {
+    const t = await joined()
+    await t.toSql()
+    t.sqlState.sql = 'edited'
+    readTableSelect.mockResolvedValue({ joins: [], columns: [], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 })
+    await t.toFilters()
+    expect(t.joins.value).toEqual([])
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ joins: [] }))
   })
 })
 
@@ -322,7 +346,7 @@ describe('limit, messages and server details', () => {
     const t = await loaded({ pageSize: 100 })
     await t.toSql()
     t.sqlState.sql = 'edited'
-    readTableSelect.mockResolvedValue({ filters: [], orderBy: [], descending: false, limit: 5, offset: 0 })
+    readTableSelect.mockResolvedValue({ joins: [], columns: [], filters: [], orderBy: [], descending: false, limit: 5, offset: 0 })
     await t.toFilters()
     expect(t.limit.value).toBe(5)
     expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ limit: 5 }))
@@ -393,7 +417,7 @@ describe('SQL mode', () => {
     t.sqlState.sql = 'edited'
     readTableSelect.mockResolvedValue({
       filters: [{ column: 'name', op: 'contains', value: 'ad' }, { column: 'id', op: 'gte', value: '2' }],
-      orderBy: ['name'], descending: true, limit: 100, offset: 100,
+      joins: [], columns: [], orderBy: [{ table: 0, column: 'name' }], descending: true, limit: 100, offset: 100,
     })
 
     await t.toFilters()
@@ -409,7 +433,7 @@ describe('SQL mode', () => {
     const t = await loaded({ pageSize: 100 })
     await t.toSql()
     t.sqlState.sql = 'edited'
-    const read = { filters: [], orderBy: [], descending: false, limit: 100, offset: 0 }
+    const read = { joins: [], columns: [], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 }
 
     readTableSelect.mockRejectedValue({ code: 'sql', message: 'only SELECT * can be shown as filters' })
     await t.toFilters()
@@ -423,7 +447,7 @@ describe('SQL mode', () => {
     await t.toFilters()
     expect(t.filterRefusal.value).toMatch(/"id"/)
 
-    readTableSelect.mockResolvedValue({ ...read, orderBy: ['name', 'meta'] })
+    readTableSelect.mockResolvedValue({ ...read, orderBy: [{ table: 0, column: 'name' }, { table: 0, column: 'meta' }] })
     await t.toFilters()
     expect(t.filterRefusal.value).toMatch(/one column/)
 
@@ -436,7 +460,7 @@ describe('SQL mode', () => {
     const t = await loaded()
     await t.toSql()
     t.sqlState.sql = 'edited'
-    readTableSelect.mockResolvedValue({ filters: [], orderBy: ['id'], descending: false, limit: 100, offset: 0 })
+    readTableSelect.mockResolvedValue({ joins: [], columns: [], filters: [], orderBy: [{ table: 0, column: 'id' }], descending: false, limit: 100, offset: 0 })
     await t.toFilters()
     expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: null }))
   })
