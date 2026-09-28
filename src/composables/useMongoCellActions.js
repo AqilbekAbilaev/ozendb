@@ -6,48 +6,20 @@ import { dbRefOf, idFilterString } from '../utils/dbRef'
 import { errText } from '../utils/errors'
 import { formatCell, guessType } from '../utils/resultGrid'
 
-export function useGridCellActions({
+// What a MongoDB grid's cells do beyond being clicked (see useGridCells): drill into a
+// nested value, follow a DBRef, copy a value / document / selection, and edit in place.
+// `cells` is the grid's useGridCells; `selectedCol` its useRowSelection's.
+export function useMongoCellActions({
   activeTab,
   drillPath,
   readonly,
   gridDocs,
   selectedCol,
-  suppressNextClick,
-  setSingleRow,
-  selectRangeTo,
-  toggleRow,
-  applyRowGesture,
+  cells,
   emit,
 }) {
-  const cellCtx = ref(null)
+  const { cellCtx } = cells
   const inlineEdit = ref(null)
-
-  function onCellClick(event, rowIdx, col) {
-    if (suppressNextClick.value) {
-      suppressNextClick.value = false
-      return
-    }
-    if (event.shiftKey) selectRangeTo(rowIdx)
-    else if (event.metaKey || event.ctrlKey) toggleRow(rowIdx)
-    else {
-      selectCell(rowIdx, col)
-      return
-    }
-    selectedCol.value = null
-    cellCtx.value = null
-  }
-
-  function selectRow(event, rowIdx) {
-    applyRowGesture(event, rowIdx)
-    selectedCol.value = null
-    cellCtx.value = null
-  }
-
-  function selectCell(rowIdx, col) {
-    setSingleRow(rowIdx)
-    selectedCol.value = col
-    cellCtx.value = null
-  }
 
   function openCellDrill(rowIdx, col) {
     const tab = activeTab()
@@ -95,15 +67,10 @@ export function useGridCellActions({
     navigator.clipboard.writeText(JSON.stringify(documents, null, 2))
   }
 
-  function openCellCtx(event, rowIdx, col) {
-    event.preventDefault()
-    selectCell(rowIdx, col)
-    cellCtx.value = { x: event.clientX, y: event.clientY, row: rowIdx, col }
-  }
-
   function cellCtxPick(action) {
     const documents = gridDocs()
     const value = documents[cellCtx.value?.row]?.[cellCtx.value?.col]
+    if (action === 'follow-reference') return followReference()
     if (action === 'copy-value') {
       navigator.clipboard.writeText(valueToClipboard(value))
     } else if (action === 'copy-json') {
@@ -119,6 +86,16 @@ export function useGridCellActions({
     const value = gridDocs()[cellCtx.value.row]?.[cellCtx.value.col]
     return dbRefOf(value)
   })
+
+  const cellMenuItems = computed(() => [
+    ...(cellRef.value
+      ? [{ label: `Follow Reference → ${cellRef.value.ref}`, value: 'follow-reference', icon: 'aggregate' }, { sep: true }]
+      : []),
+    { label: 'Copy Value', value: 'copy-value', icon: 'copy', shortcut: '⌘C' },
+    { label: 'Copy as JSON', value: 'copy-json' },
+    { sep: true },
+    { label: 'Copy Document', value: 'copy-doc' },
+  ])
 
   function followReference() {
     const reference = cellRef.value
@@ -198,19 +175,13 @@ export function useGridCellActions({
   }
 
   return {
-    cellCtx,
     inlineEdit,
-    cellRef,
+    cellMenuItems,
     copySelection,
-    openCellCtx,
     cellCtxPick,
-    followReference,
     startInlineEdit,
     commitInlineEdit,
     cancelInlineEdit,
-    onCellClick,
-    selectRow,
-    selectCell,
     openCellDrill,
     goToDrillLevel,
   }

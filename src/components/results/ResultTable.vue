@@ -9,10 +9,12 @@ import { useColumnResize } from '../../composables/useColumnResize'
 import { useRowSelection } from '../../composables/useRowSelection'
 import { useFieldDrag } from '../../composables/useFieldDrag'
 import { useMomentumScroll } from '../../composables/useMomentumScroll'
-import { useGridCellActions } from '../../composables/useGridCellActions'
+import { useGridCells } from '../../composables/useGridCells'
+import { useMongoCellActions } from '../../composables/useMongoCellActions'
 import { useResultKeyboard } from '../../composables/useResultKeyboard'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
+import ContextMenu from '../base/ContextMenu.vue'
 import SearchBar from '../base/SearchBar.vue'
 
 const props = defineProps({
@@ -95,26 +97,22 @@ const {
 })
 
 // ── row / cell selection ──────────────────────────────
-const {
-  selectedCol, anchorRow, isRowSelected,
-  setSingleRow, selectRangeTo, toggleRow, applyRowGesture,
-} = useRowSelection({ activeTab: () => props.activeTab })
+const rowSelection = useRowSelection({ activeTab: () => props.activeTab })
+const { selectedCol, anchorRow, isRowSelected, setSingleRow, selectRangeTo } = rowSelection
+
+const cells = useGridCells({ rows: rowSelection, suppressNextClick })
+const { cellCtx, onCellClick, selectRow, openCellCtx } = cells
 
 const {
-  cellCtx, inlineEdit, cellRef, copySelection, openCellCtx, cellCtxPick,
-  followReference, startInlineEdit, commitInlineEdit, cancelInlineEdit,
-  onCellClick, selectRow, openCellDrill, goToDrillLevel,
-} = useGridCellActions({
+  inlineEdit, cellMenuItems, copySelection, cellCtxPick,
+  startInlineEdit, commitInlineEdit, cancelInlineEdit, openCellDrill, goToDrillLevel,
+} = useMongoCellActions({
   activeTab:  () => props.activeTab,
   drillPath:  () => props.drillPath,
   readonly:   () => props.readonly,
   gridDocs:   () => gridDocs.value,
   selectedCol: selectedCol,
-  suppressNextClick: suppressNextClick,
-  setSingleRow: setSingleRow,
-  selectRangeTo: selectRangeTo,
-  toggleRow: toggleRow,
-  applyRowGesture: applyRowGesture,
+  cells:      cells,
   emit:       emit,
 })
 
@@ -438,33 +436,12 @@ watch([() => props.activeTab?.id, () => props.activeTab?.results, () => props.dr
     </div>
   </div>
 
-  <!-- Cell right-click context menu -->
-  <template v-if="cellCtx">
-    <div class="cell-ctx-backdrop" @mousedown="cellCtx = null"></div>
-    <div class="cell-ctx-menu" :style="{ left: cellCtx.x + 'px', top: cellCtx.y + 'px' }">
-      <template v-if="cellRef">
-        <div class="cell-ctx-item" @click="followReference()">
-          <span class="cell-ctx-ic"><BaseIcon name="aggregate" :size="14" /></span>
-          Follow Reference → {{ cellRef.ref }}
-        </div>
-        <div class="cell-ctx-sep"></div>
-      </template>
-      <div class="cell-ctx-item" @click="cellCtxPick('copy-value')">
-        <span class="cell-ctx-ic"><BaseIcon name="copy" :size="14" /></span>
-        Copy Value
-        <span class="cell-ctx-sc">⌘C</span>
-      </div>
-      <div class="cell-ctx-item" @click="cellCtxPick('copy-json')">
-        <span class="cell-ctx-ic"></span>
-        Copy as JSON
-      </div>
-      <div class="cell-ctx-sep"></div>
-      <div class="cell-ctx-item" @click="cellCtxPick('copy-doc')">
-        <span class="cell-ctx-ic"></span>
-        Copy Document
-      </div>
-    </div>
-  </template>
+  <ContextMenu
+    v-if="cellCtx"
+    :menu="{ x: cellCtx.x, y: cellCtx.y, items: cellMenuItems }"
+    @pick="cellCtxPick"
+    @close="cellCtx = null"
+  />
 
   <!-- Floating label that follows the pointer while dragging a cell into the VQB -->
   <div
