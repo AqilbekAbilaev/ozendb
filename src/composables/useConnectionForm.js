@@ -151,7 +151,8 @@ export function useConnectionForm(editConn) {
     set(useTls, parsed.tls)
     set(tlsAllowInvalidCerts, parsed.tlsAllowInvalidCerts)
     set(tlsCaFile, parsed.tlsCaFile)
-    mongo.applyParsed(parsed)
+    if (engine.value === 'postgresql') set(database, parsed.database)
+    else mongo.applyParsed(parsed)
   }
 
   async function testConnection() {

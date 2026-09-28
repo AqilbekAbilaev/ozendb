@@ -179,27 +179,22 @@ pub fn list_connections(ctx: State<'_, AppContext>) -> Vec<ConnectionConfig> {
     ctx.storage.load()
 }
 
-/// Assemble the MongoDB connection string for a saved connection. The password is
-/// deliberately omitted — credentials live in the OS keychain and are never handed
-/// to the frontend; the URI carries the username + auth/TLS options only.
+/// Assemble the connection string for a saved connection, in its engine's dialect. The
+/// password is deliberately omitted — credentials live in the OS keychain and are never
+/// handed to the frontend; the URI carries the username + auth/TLS options only.
 #[tauri::command]
 pub fn connection_uri(ctx: State<'_, AppContext>, id: String) -> Result<String, AppError> {
     let config = match ctx.storage.find(&id) {
         Some(val) => val,
         None => return Err(AppError::UnknownConnection(id)),
     };
-    // MongoDB-only by definition — it returns a `mongodb://` string. A Postgres
-    // connection has no MongoDB settings to build one from, so this says so rather
-    // than inventing a URI in the wrong dialect.
-    let mongo = match config.engine.as_mongo() {
-        Some(mongo) => mongo,
-        None => {
-            return Err(AppError::Validation(
-                "A connection string is only available for MongoDB connections.".to_string(),
-            ))
-        }
-    };
-    Ok(crate::uri::build_uri(&config, mongo, None))
+    if let Some(postgres) = config.engine.as_postgres() {
+        return Ok(crate::pg_uri::connection_string(&config, postgres));
+    }
+    match config.engine.as_mongo() {
+        Some(mongo) => Ok(crate::uri::build_uri(&config, mongo, None)),
+        None => Err(AppError::Validation("This connection's engine has no connection string.".to_string())),
+    }
 }
 
 /// The three keychain keys a connection may hold a secret under. Secrets are keyed by

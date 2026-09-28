@@ -144,3 +144,26 @@ fn build_options_to_targets_the_given_host_and_port_instead_of_the_configs() {
     assert_eq!(options.get_host(), "127.0.0.1");
     assert_eq!(options.get_port(), 15432);
 }
+
+#[test]
+fn connection_string_names_everything_but_the_password() {
+    let mut config = base_config();
+    config.username = Some(String::from("app user"));
+    config.tls = true;
+    let postgres = PostgresConfig { database: Some(String::from("pay/ments")) };
+    assert_eq!(connection_string(&config, &postgres), "postgresql://app%20user@db.example.com:5433/pay%2Fments?sslmode=verify-full");
+}
+
+#[test]
+fn connection_string_spells_out_the_tls_mode_and_ca() {
+    let mut config = base_config();
+    assert_eq!(connection_string(&config, &base_postgres()), "postgresql://admin@db.example.com:5433/postgres?sslmode=disable");
+    config.tls = true;
+    config.tls_allow_invalid_certificates = true;
+    assert!(connection_string(&config, &base_postgres()).ends_with("?sslmode=require"));
+    config.tls_allow_invalid_certificates = false;
+    config.tls_ca_file = Some(String::from("/etc/ca.pem"));
+    assert!(connection_string(&config, &base_postgres()).ends_with("?sslmode=verify-full&sslrootcert=%2Fetc%2Fca.pem"));
+    config.hosts = vec![HostEntry { host: String::from("::1"), port: 5432 }];
+    assert!(connection_string(&config, &base_postgres()).starts_with("postgresql://admin@[::1]:5432/"));
+}

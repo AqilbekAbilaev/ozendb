@@ -5,8 +5,7 @@ import BaseButton from '../base/BaseButton.vue'
 import BaseTextarea from '../base/BaseTextarea.vue'
 import FieldError from '../base/FieldError.vue'
 import SegmentedControl from '../base/SegmentedControl.vue'
-import { KNOWN_OPTION_KEYS, ENGINE_OPTIONS } from '../../data/connectionOptions.js'
-import { parseConnectionUri } from '../../utils/connectionUri.js'
+import { ENGINE_OPTIONS } from '../../data/connectionOptions.js'
 import { CONNECTION_EDITORS } from '../../engines/connectionEditor.js'
 
 const props = defineProps({
@@ -20,13 +19,10 @@ const mode      = ref('uri')
 const pastedUri = ref('')
 const uriError  = ref('')
 const engine    = ref(props.engine)
-const supportsUri = computed(() => CONNECTION_EDITORS[engine.value].supportsUri)
-if (!supportsUri.value) mode.value = 'manual'
+const editor = computed(() => CONNECTION_EDITORS[engine.value])
 
-// An engine without connection-string parsing can only be configured by hand.
 function pickEngine(next) {
   engine.value = next
-  mode.value = supportsUri.value ? 'uri' : 'manual'
   uriError.value = ''
 }
 
@@ -45,9 +41,9 @@ function goNext() {
     return
   }
 
-  const parsed = parseConnectionUri(raw, KNOWN_OPTION_KEYS)
+  const parsed = editor.value.parseUri(raw)
   if (!parsed) {
-    uriError.value = 'That doesn’t look like a MongoDB connection string (expected mongodb:// or mongodb+srv://).'
+    uriError.value = editor.value.uriRefusal
     return
   }
 
@@ -64,17 +60,14 @@ function goNext() {
         <SegmentedControl :model-value="engine" :options="ENGINE_OPTIONS" @update:model-value="pickEngine" />
       </div>
 
-      <p v-if="!supportsUri" class="nci-lead">
-        Pasting a PostgreSQL connection string isn't supported yet — configure the connection by hand.
-      </p>
-      <p v-else class="nci-lead">
-        If you have a connection string (SRV or standard), e.g. for your MongoDB deployment,
-        you can paste it here and OzenDB will auto-configure your connection settings for you.
+      <p class="nci-lead">
+        If you have a connection string, you can paste it here and OzenDB will
+        auto-configure your connection settings for you.
       </p>
 
-      <label class="nci-radio" :class="{ off: !supportsUri }" @click="supportsUri && (mode = 'uri')">
+      <label class="nci-radio" @click="mode = 'uri'">
         <span class="radio" :class="{ on: mode === 'uri' }"></span>
-        <span class="nci-radio-lbl">Paste your connection string (SRV or standard) here:</span>
+        <span class="nci-radio-lbl">Paste your connection string here:</span>
       </label>
       <div class="nci-uri-wrap">
         <span class="nci-uri-lbl">URI:</span>
@@ -82,7 +75,7 @@ function goNext() {
           class="nci-uri"
           :disabled="mode !== 'uri'"
           v-model="pastedUri"
-          placeholder="mongodb+srv://user:password@cluster.mongodb.net/"
+          :placeholder="editor.uriExample"
         />
       </div>
 

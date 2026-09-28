@@ -121,6 +121,33 @@ fn options_for(
     Ok(options)
 }
 
+/// The saved connection as a `postgresql://` string, for Copy URI: the same host, database
+/// and TLS mode `build_options` connects with, but never the password — that stays in
+/// the keychain, as it does for MongoDB's.
+pub fn connection_string(config: &ConnectionConfig, postgres: &PostgresConfig) -> String {
+    use crate::uri::percent_encode;
+    let (host, port) = match config.hosts.first() {
+        Some(entry) => (entry.host.as_str(), entry.port),
+        None => ("localhost", DEFAULT_PORT),
+    };
+    let host = if host.contains(':') { format!("[{host}]") } else { host.to_string() };
+    let user = match config.username.as_deref().filter(|s| !s.is_empty()) {
+        Some(user) => format!("{}@", percent_encode(user)),
+        None => String::new(),
+    };
+    let database = postgres.database.as_deref().filter(|s| !s.is_empty()).unwrap_or(DEFAULT_DATABASE);
+    let mode = match (config.tls, config.tls_allow_invalid_certificates) {
+        (false, _) => "disable",
+        (true, true) => "require",
+        (true, false) => "verify-full",
+    };
+    let mut uri = format!("postgresql://{user}{host}:{port}/{}?sslmode={mode}", percent_encode(database));
+    if let Some(ca) = config.tls_ca_file.as_deref().filter(|s| config.tls && !s.is_empty()) {
+        uri.push_str(&format!("&sslrootcert={}", percent_encode(ca)));
+    }
+    uri
+}
+
 /// Performs an async TCP probe against the options' host:port, the same way
 /// `uri::tcp_probe` does for a MongoDB URI — see `uri::probe_host_port` for the
 /// shared DNS/timeout/retry core.
