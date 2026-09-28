@@ -31,15 +31,6 @@ export function createTableUi() {
   return { builderOpen: false, builderWidth: 360, rtab: 'Result' }
 }
 
-// What a session writes for the tab: a copy, for now without the page and the paused
-// parts — bringing those back after a restart is a change of its own (ozendb-3sb.2).
-export function stateToSave(state) {
-  const saved = JSON.parse(JSON.stringify(state))
-  saved.query.offset = 0
-  saved.paused = createTableState().paused
-  return saved
-}
-
 // What the tab works out and fetches as it's used: rebuilt fresh, never saved.
 // `generation` counts loads, so only the latest may write back; 0 means never loaded.
 export function createTableRuntime(connectionId) {

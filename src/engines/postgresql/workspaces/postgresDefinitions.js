@@ -4,7 +4,7 @@
 import PostgresTableWorkspace from './PostgresTableWorkspace.vue'
 import PostgresQueryWorkspace from './PostgresQueryWorkspace.vue'
 import { createResourceRef } from '../../../utils/resourceRef'
-import { createTableState, createTableUi, createTableRuntime, migrateTableState, stateToSave } from './tableState.js'
+import { createTableState, createTableUi, createTableRuntime, migrateTableState } from './tableState.js'
 import { abandonTransaction, createSqlRun } from './runSql.js'
 import { showToast } from '../../../stores/toast'
 
@@ -14,7 +14,10 @@ async function rollBackOnClose(run) {
   if (await abandonTransaction(run)) showToast('The closed tab had a transaction open; it was rolled back.')
 }
 
-function tableWorkspace({ connectionId, connectionName, database, schema, table }, state = createTableState()) {
+// Tabs are reactive, which structuredClone can't copy; state and ui are JSON-only.
+const copy = (value) => JSON.parse(JSON.stringify(value))
+
+function tableWorkspace({ connectionId, connectionName, database, schema, table }, state = createTableState(), ui = createTableUi()) {
   return {
     title: table,
     target: createResourceRef(connectionId, [
@@ -24,7 +27,7 @@ function tableWorkspace({ connectionId, connectionName, database, schema, table 
     ]),
     fields: {
       kind: 'pgTable', connectionId, connectionName, database, schema, table,
-      state, ui: createTableUi(), runtime: createTableRuntime(connectionId),
+      state, ui, runtime: createTableRuntime(connectionId),
     },
   }
 }
@@ -48,9 +51,10 @@ export const postgresDefinitions = [
     engine: 'postgresql',
     component: PostgresTableWorkspace,
     create: (ctx) => tableWorkspace(ctx.target),
-    duplicate: (workspace) => tableWorkspace(workspace),
-    serialize: (workspace) => ({ state: stateToSave(workspace.state) }),
-    restore: (saved) => tableWorkspace(saved, migrateTableState(saved)),
+    // A copy keeps the query and the panel; rows load again.
+    duplicate: (workspace) => tableWorkspace(workspace, copy(workspace.state), copy(workspace.ui)),
+    serialize: (workspace) => copy({ state: workspace.state, ui: workspace.ui }),
+    restore: (saved) => tableWorkspace(saved, migrateTableState(saved), { ...createTableUi(), ...saved.ui }),
     dispose: (workspace) => rollBackOnClose(workspace.runtime.sqlRun),
   },
   {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createTableState, createTableUi, createTableRuntime, migrateTableState, stateToSave, TABLE_STATE_VERSION } from './tableState.js'
+import { createTableState, createTableUi, createTableRuntime, migrateTableState, TABLE_STATE_VERSION } from './tableState.js'
 import { createSqlRun } from './runSql.js'
 import { SAVED_TABLE_STATES } from './tableState.fixtures.js'
 
@@ -53,20 +53,6 @@ describe('createTableUi', () => {
   })
 })
 
-describe('stateToSave', () => {
-  it('saves a copy, on the first page and with nothing paused (restoring those comes later)', () => {
-    const state = createTableState()
-    state.query.offset = 200
-    state.query.filterText = { name: 'ad' }
-    state.paused.sort = { column: 'name', desc: true }
-    const saved = stateToSave(state)
-    expect(saved.query).toMatchObject({ offset: 0, filterText: { name: 'ad' } })
-    expect(saved.paused).toEqual(createTableState().paused)
-    saved.query.filterText.name = 'changed'
-    expect(state.query.filterText.name).toBe('ad')
-    expect(state.query.offset).toBe(200)
-  })
-})
 
 describe('createTableRuntime', () => {
   it('starts with nothing loaded, and its own SQL and Explain runs on the connection', () => {
