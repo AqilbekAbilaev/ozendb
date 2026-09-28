@@ -50,7 +50,7 @@ pub struct ColumnFilter {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum JoinKind {
     /// Keeps every row of the tables before it, matched or not.
@@ -61,7 +61,7 @@ pub enum JoinKind {
 
 /// One pair a join matches on: its own `column` equals `equals`, a column of a table
 /// before it.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct JoinOn {
     pub column: String,
     pub equals: ColumnRef,
@@ -69,7 +69,7 @@ pub struct JoinOn {
 
 /// A table joined into a browse, matched where every pair in `on` holds — more than one
 /// for a foreign key over several columns.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TableJoin {
     pub schema: String,
     pub table: String,
