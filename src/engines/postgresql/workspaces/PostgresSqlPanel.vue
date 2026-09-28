@@ -139,7 +139,7 @@ const summary = computed(() => {
       <template v-else-if="run.result">
         <StateMessage v-if="run.result.rowsAffected != null" mode="empty" :label="outcome(run.result)" />
         <StateMessage v-else-if="!run.result.rows.length" mode="empty" label="The query returned no rows" />
-        <PostgresResultGrid v-else :columns="run.result.columns" :rows="run.result.rows" />
+        <PostgresResultGrid v-else :columns="run.result.columns" :rows="run.result.rows" :selection="run.selection" />
       </template>
       <StateMessage v-else mode="empty" label="Run a query to see its results (⌘↵)" />
     </div>

@@ -1,6 +1,7 @@
 import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction } from '../api/queries'
 import { pushHistory } from '../api/library'
 import { errMessage } from '../../../utils/errors'
+import { createSelection } from '../../../composables/useRowSelection'
 
 // A SQL editor's runs against one connection: the last result, a line per run, the plan
 // Explain found, and the Manual-mode transaction. Runtime only — the SQL itself is the
@@ -11,6 +12,7 @@ export function createSqlRun(connectionId) {
     result: null, error: null, running: false, runId: null, messages: [],
     txn: 'auto', txId: null,
     plan: null, planError: null, explaining: false,
+    selection: createSelection(),
   }
 }
 
@@ -37,6 +39,7 @@ export async function runSql(run, sql) {
   } finally {
     run.running = false
     run.runId = null
+    run.selection = createSelection()
   }
 }
 

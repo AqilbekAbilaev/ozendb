@@ -30,6 +30,8 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   const loading = toRef(runtime, 'loading')
   const error = toRef(runtime, 'error')
   const editError = toRef(runtime, 'editError')
+  // The grid's selected rows and cell; a load starts a fresh one.
+  const selection = toRef(runtime, 'selection')
   // What each header box holds, by column, and the filters last applied from them:
   // typing edits the boxes, and only applying reloads.
   const filterText = toRef(query, 'filterText')
@@ -79,7 +81,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
 
   return {
     explainRun, explain, panel, sql, sqlRun,
-    columns, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError,
+    columns, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError, selection,
     filterText, mode, filterRefusal, limit, messages, server, joins, shownColumns,
     ...pick(t, 'pauses', 'columnInfo', 'activeFilters', 'currentSql', 'hasPrev', 'hasNext', 'keys', 'joinOffers',
       'tableNames', 'view', 'toSql', 'openSql', 'toFilters', 'load', 'refresh', 'nextPage', 'prevPage', 'sortBy',

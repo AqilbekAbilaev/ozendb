@@ -3,6 +3,7 @@
 // column info, SQL text and rows are worked out from it. See
 // .local-docs/postgresql-tab-objects.md.
 import { createSqlRun } from './runSql.js'
+import { createSelection } from '../../../composables/useRowSelection'
 
 export const TABLE_STATE_VERSION = 1
 
@@ -38,7 +39,7 @@ export function createTableRuntime(connectionId) {
     mainColumns: null, joinColumns: {}, foreignKeys: {}, server: null,
     columns: [], rows: [], total: null, elapsedMs: null,
     loading: false, error: null, editError: null, filterRefusal: null, messages: [],
-    generation: 0, builtSql: null,
+    generation: 0, builtSql: null, selection: createSelection(),
     sqlRun: createSqlRun(connectionId), explainRun: createSqlRun(connectionId),
   }
 }
