@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { vqbOpen } from '../../stores/visualQueryBuilder'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { guessType, TYPE_CLASS, formatCell, columns, getAtPath } from '../../utils/resultGrid'
@@ -98,7 +98,7 @@ const {
 
 // ── row / cell selection ──────────────────────────────
 const rowSelection = useRowSelection({ activeTab: () => props.activeTab })
-const { selectedCol, anchorRow, isRowSelected, setSingleRow, selectRangeTo } = rowSelection
+const { selectedCol, anchorRow, isRowSelected } = rowSelection
 
 const cells = useGridCells({ rows: rowSelection, suppressNextClick })
 const { cellCtx, onCellClick, selectRow, openCellCtx } = cells
@@ -282,7 +282,12 @@ const padBottom = computed(() => {
   const rows = virtualRows.value
   return rows.length ? totalSize.value - rows[rows.length - 1].end : 0
 })
-useResultKeyboard({ activeTab: () => props.activeTab, gridDocs, gridColumns, inlineEdit, cellCtx, selectedCol, anchorRow, copySelection, setSingleRow, selectRangeTo, emit, rowVirtualizer, tableRef, gridWrapRef, measureRowH })
+useResultKeyboard({
+  selection: () => props.activeTab, rows: rowSelection, cellCtx, copySelection, tableRef, gridWrapRef,
+  rowCount: () => gridDocs.value.length, columns: () => gridColumns.value, editing: () => !!inlineEdit.value,
+  onPaste: () => emit('paste-documents'), scrollToRow: (row) => rowVirtualizer.value.scrollToIndex(row, { align: 'auto' }),
+})
+onMounted(() => { nextTick(measureRowH) })
 
 // Return to the top when the underlying document set changes (new page, drill in/out,
 // tab switch). An inline edit splices `results` in place — same array reference — so it
@@ -301,7 +306,6 @@ watch([() => props.activeTab?.id, () => props.activeTab?.results, () => props.dr
       anchorRow.value = tab.selectedRow ?? -1
     }
   }, { flush: 'post' })
-
 
 </script>
 
