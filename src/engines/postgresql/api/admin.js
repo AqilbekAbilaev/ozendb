@@ -23,3 +23,18 @@ export function routines(connectionId, schema = null) {
 export function routineSource(connectionId, oid) {
   return invoke('pg_routine_source', { id: connectionId, oid })
 }
+
+// Every session on the server, as pg_stat_activity reports it.
+export function sessions(connectionId) {
+  return invoke('pg_sessions', { id: connectionId })
+}
+
+// Ask a backend to stop its current statement; the session survives.
+export function cancelBackend(connectionId, pid) {
+  return invoke('pg_cancel_backend', { id: connectionId, pid })
+}
+
+// Close a backend's whole session, rolling back whatever it was doing.
+export function terminateBackend(connectionId, pid) {
+  return invoke('pg_terminate_backend', { id: connectionId, pid })
+}
