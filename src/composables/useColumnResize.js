@@ -1,5 +1,10 @@
 import { ref, computed, nextTick, onMounted } from 'vue'
 
+// A width a column takes from its content — auto-fit, or the virtualized grid's default:
+// never so wide that one long value pushes everything after it off-screen. 360px is the
+// widest the grids show a cell (their CSS max-width); a drag can still go wider.
+export const fitWidth = (width) => Math.min(360, Math.max(40, width))
+
 // Drag-to-resize and double-click-to-auto-fit for the result grid's columns. Owns the
 // width map the table renders from; `{}` means auto layout, an entry pins that column
 // to a pixel width.
@@ -65,7 +70,7 @@ export function useColumnResize({ gridColumns, cellData }) {
     // A colspan cell (spacer, "no rows" message) belongs to no one column.
     const cells = tableRef.value.querySelectorAll(
       `thead th:nth-child(${nthChild}), tbody td:nth-child(${nthChild}):not([colspan])`)
-    colWidths.value[col] = Math.max(40, naturalWidth(cells))
+    colWidths.value[col] = fitWidth(naturalWidth(cells))
   }
 
   // The widest of `cells` at the size its content wants, padding and border included. The
@@ -123,7 +128,7 @@ export function useColumnResize({ gridColumns, cellData }) {
         const len = row[c].display.length
         if (len > maxLen) maxLen = len
       }
-      out[cols[c]] = Math.min(360, Math.max(40, Math.ceil(maxLen * charW.value) + 24))
+      out[cols[c]] = fitWidth(Math.ceil(maxLen * charW.value) + 24)
     }
     return out
   })
