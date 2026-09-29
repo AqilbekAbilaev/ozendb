@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computed, reactive } from 'vue'
-import { mergeColumnOrder, moveInOrder, findDropIndex, useDrillColumnOrder } from './useColumnReorder'
+import { mergeColumnOrder, moveInOrder, findDropIndex, useDrillColumnOrder, swallowNextClick } from './useColumnReorder'
 
 describe('mergeColumnOrder', () => {
   it('returns the derived list unchanged when there is no custom order', () => {
@@ -97,5 +97,31 @@ describe('useDrillColumnOrder', () => {
     g.drillPath.push('nested')
     expect(g.gridColumns.value).toEqual(['_id', 'a', 'b'])
     expect(g.tab.colOrder).toEqual({ '': ['b', '_id', 'a'] })
+  })
+})
+
+describe('swallowNextClick', () => {
+  const click = () => new Event('click', { cancelable: true })
+
+  it('stops the click a drag ends with, and only that one', () => {
+    const target = new EventTarget()
+    swallowNextClick(target, () => {})
+    const first = click()
+    target.dispatchEvent(first)
+    expect(first.cancelBubble).toBe(true)
+    expect(first.defaultPrevented).toBe(true)
+    const second = click()
+    target.dispatchEvent(second)
+    expect(second.defaultPrevented).toBe(false)
+  })
+
+  it('leaves a later click alone when the drag sent none', () => {
+    const target = new EventTarget()
+    let tick
+    swallowNextClick(target, (fn) => { tick = fn })
+    tick()
+    const later = click()
+    target.dispatchEvent(later)
+    expect(later.defaultPrevented).toBe(false)
   })
 })

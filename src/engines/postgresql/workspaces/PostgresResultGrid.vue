@@ -80,20 +80,12 @@ function cellCtxPick(action) {
 
 const gridWrapRef = ref(null)
 
-// A drag that ends on the header it began on still clicks it; that click mustn't sort.
-let draggedHeader = false
-function onThClick(column) {
-  if (draggedHeader) draggedHeader = false
-  else if (props.sortable) emit('sort', column)
-}
-
 const { onHeaderMouseDown, dragging: reordering, dropIndicator, ghost } = useColumnReorder({
   columns: () => props.columns,
   moveColumn: (column, insertBefore) => emit('move-column', column, insertBefore),
   tableRef, gridWrapRef,
   headerLabel: (column) => props.columnInfo[column]?.name ?? column,
   onBeforePress: commit,
-  onReordered: () => { draggedHeader = true },
 })
 
 useResultKeyboard({
@@ -142,7 +134,7 @@ function setNull() {
             :key="c"
             :class="{ sortable }"
             :style="thWidthStyle(column)"
-            @click="onThClick(column)"
+            @click="sortable && emit('sort', column)"
             @mousedown="reorderable && onHeaderMouseDown($event, column)"
           >
             <span class="th-name">
