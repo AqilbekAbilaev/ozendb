@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { collectionStats, databaseStats } from '../engines/mongodb/api/admin'
+import { tableStats } from '../engines/postgresql/api/resources'
 import { errText } from '../utils/errors'
 import { fmtClock } from '../utils/format'
 
@@ -19,6 +20,18 @@ const OFFSET_Y = -8
 // "just before" and "just after" against the real values rather than copies of them.
 export const HOVER_DELAY = 500
 export const HOVER_GRACE = 200
+
+// Exported for their spec: what a hovered row is called, and which set of numbers
+// its card should show.
+export function tipKind(target) {
+  if (target.engine === 'postgresql') return 'pgTable'
+  return target.collName ? 'collection' : 'database'
+}
+
+export function tipLabel(target) {
+  if (target.engine === 'postgresql') return `${target.schema}.${target.table}`
+  return target.collName ? `${target.dbName}.${target.collName}` : target.dbName
+}
 
 export function useStatsTip({ delay = HOVER_DELAY, grace = HOVER_GRACE } = {}) {
   // null when nothing is hovered; otherwise { label, kind, x, y, stats, fetchedAt, error }
@@ -40,11 +53,20 @@ export function useStatsTip({ delay = HOVER_DELAY, grace = HOVER_GRACE } = {}) {
     if (pending) pending = { x: e.clientX, y: e.clientY }
   }
 
+  // Which command answers for this row. A PostgreSQL target names its schema and
+  // table; a MongoDB one names a collection, or nothing beyond the database.
+  function read(target) {
+    if (target.engine === 'postgresql') {
+      return tableStats({ connectionId: target.connId, schema: target.schema, table: target.table })
+    }
+    return target.collName
+      ? collectionStats({ connectionId: target.connId, database: target.dbName, collection: target.collName })
+      : databaseStats({ connectionId: target.connId, database: target.dbName })
+  }
+
   async function load(target, mine) {
     try {
-      const stats = target.collName
-        ? await collectionStats({ connectionId: target.connId, database: target.dbName, collection: target.collName })
-        : await databaseStats({ connectionId: target.connId, database: target.dbName })
+      const stats = await read(target)
       if (mine === seq) tip.value = { ...tip.value, stats: stats, fetchedAt: fmtClock(), error: null }
     } catch (e) {
       if (mine === seq) tip.value = { ...tip.value, error: errText(e) }
@@ -58,8 +80,8 @@ export function useStatsTip({ delay = HOVER_DELAY, grace = HOVER_GRACE } = {}) {
     timer = setTimeout(() => {
       current = target
       tip.value = {
-        label: target.collName ? `${target.dbName}.${target.collName}` : target.dbName,
-        kind: target.collName ? 'collection' : 'database',
+        label: tipLabel(target),
+        kind: tipKind(target),
         x: pending.x + OFFSET_X,
         y: pending.y + OFFSET_Y,
         stats: null, fetchedAt: null, error: null,

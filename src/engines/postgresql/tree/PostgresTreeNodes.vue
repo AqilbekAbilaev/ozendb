@@ -8,19 +8,28 @@ import { contextMenu, contextActiveNodeKey, pgNodeKey } from '../../../stores/co
 import { PG_MENUS } from './contextMenus.js'
 import { tagOverrides } from '../../../stores/nodeTags'
 import { colorHex, nodeTagName } from '../../../utils/tabColor.js'
-import { formatCompact } from '../../../utils/format'
+import { formatCompact, fmtBytes } from '../../../utils/format'
 
 const props = defineProps({
   conn: { type: Object, required: true },
   schemas: { type: Array, required: true },
+  // ConnectionTree owns the hover card (it renders the single StatsTip), so the
+  // handlers come down rather than a second instance being created here.
+  statsTip: { type: Object, required: true },
 })
 
-const { toggleTable, isTableOpen, columnsOf, databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables } =
+const { toggleTable, isTableOpen, columnsOf, databaseSizes, databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables } =
   usePostgresTree(props.conn.id)
 // A refresh brings a new schema list; the open schemas' tables are re-read with it.
 watch(() => props.schemas, reloadTables)
 const shown = computed(() => visibleSchemas(props.schemas, showSystem.value))
 const database = computed(() => props.conn.database || 'postgres')
+// Read when the database row opens (see usePostgresTree); null until then, and null
+// for a database this role may not connect to.
+const databaseSize = computed(() => {
+  const bytes = databaseSizes.value[database.value]
+  return bytes ? fmtBytes(bytes) : null
+})
 
 function openQuery() {
   openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: database.value })
@@ -65,6 +74,7 @@ function openTable(schema, table) {
     <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
     <span class="tt">{{ database }}</span>
     <span v-if="shown.length" class="cnt">({{ shown.length }})</span>
+    <span v-if="databaseSize" class="cnt" :title="`${database} is ${databaseSize} on disk`">{{ databaseSize }}</span>
     <span
       class="row-action push"
       :class="{ on: showSystem }"
@@ -120,6 +130,9 @@ function openTable(schema, table) {
             style="padding-left: 66px"
             @dblclick="openTable(schema.name, table.name)"
             @contextmenu.prevent="onContext($event, 'table', table.name, { schema: schema.name, table: table.name })"
+            @mouseenter="table.kind !== 'view' && statsTip.show($event, { connId: conn.id, engine: 'postgresql', schema: schema.name, table: table.name })"
+            @mousemove="statsTip.move"
+            @mouseleave="statsTip.hideSoon"
           >
             <span class="tw" @click.stop="toggleTable(schema.name, table.name)">
               <BaseIcon :name="isTableOpen(schema.name, table.name) ? 'caretDown' : 'caret'" :size="12" />
