@@ -142,7 +142,7 @@ function setNull() {
               <span><span v-if="columnInfo[column]?.tableLabel" class="th-tbl">{{ columnInfo[column].tableLabel }}.</span>{{ columnInfo[column]?.name ?? column }}</span>
               <span v-if="sortable && orderBy === column" class="dir">{{ descending ? '▼' : '▲' }}</span>
             </span>
-            <span v-if="columnInfo[column]" class="th-type">{{ columnInfo[column].dataType }}</span>
+            <span v-if="columnInfo[column]?.dataType" class="th-type">{{ columnInfo[column].dataType }}</span>
             <input
               v-if="filterText"
               class="th-filter"
