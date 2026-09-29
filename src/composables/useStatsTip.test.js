@@ -4,7 +4,7 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 import { invoke } from '@tauri-apps/api/core'
-import { useStatsTip, HOVER_DELAY, HOVER_GRACE } from './useStatsTip'
+import { useStatsTip, tipKind, tipLabel, HOVER_DELAY, HOVER_GRACE } from './useStatsTip'
 
 // The hover card exists to answer "how big is this collection?" without opening it.
 // Everything worth pinning is timing: a cursor passing over a row must cost nothing,
@@ -199,5 +199,37 @@ describe('useStatsTip — hover intent', () => {
     await vi.advanceTimersByTimeAsync(HOVER_DELAY)
     expect(tip.value.stats).toBe(null)
     expect(tip.value.error).toBe('not authorized')
+  })
+})
+
+// One card serves both engines, so which numbers it asks for — and what it calls the
+// row — is decided from the target alone.
+describe('useStatsTip — which engine a target belongs to', () => {
+  it('reads a MongoDB collection target', () => {
+    expect(tipKind({ connId: 'c1', dbName: 'shop', collName: 'orders' })).toBe('collection')
+    expect(tipLabel({ dbName: 'shop', collName: 'orders' })).toBe('shop.orders')
+  })
+
+  it('reads a MongoDB database target', () => {
+    expect(tipKind({ connId: 'c1', dbName: 'shop' })).toBe('database')
+    expect(tipLabel({ dbName: 'shop' })).toBe('shop')
+  })
+
+  it('reads a PostgreSQL table target, qualified by schema rather than database', () => {
+    const target = { connId: 'c1', engine: 'postgresql', dbName: 'shop', schema: 'public', table: 'users' }
+    expect(tipKind(target)).toBe('pgTable')
+    expect(tipLabel(target)).toBe('public.users')
+  })
+
+  it('asks PostgreSQL for a table\'s stats, not MongoDB for a collection\'s', async () => {
+    vi.useFakeTimers()
+    invoke.mockReset()
+    invoke.mockResolvedValue({ totalSizeBytes: 8192, indexes: [] })
+    const { tip, show } = useStatsTip()
+    show(AT, { connId: 'c1', engine: 'postgresql', schema: 'public', table: 'users' })
+    await vi.advanceTimersByTimeAsync(HOVER_DELAY)
+    expect(invoke).toHaveBeenCalledWith('pg_table_stats', { id: 'c1', schema: 'public', table: 'users' })
+    expect(tip.value).toMatchObject({ label: 'public.users', kind: 'pgTable' })
+    vi.useRealTimers()
   })
 })

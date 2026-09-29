@@ -8,11 +8,17 @@ use super::{primary_key_columns, AppContext};
 #[serde(rename_all = "camelCase")]
 pub struct PgDatabaseInfo {
     pub name: String,
+    /// Total on-disk size. None where the role may not connect: `pg_database_size`
+    /// raises on those, and one unreadable database must not fail the listing.
+    pub size_bytes: Option<i64>,
 }
 
 pub(crate) async fn list_databases_impl(pool: &sqlx::PgPool) -> Result<Vec<PgDatabaseInfo>, AppError> {
-    let rows: Vec<(String,)> = match sqlx::query_as(
-        "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname",
+    let rows: Vec<(String, Option<i64>)> = match sqlx::query_as(
+        "SELECT datname, \
+                CASE WHEN has_database_privilege(datname, 'CONNECT') \
+                     THEN pg_database_size(datname) END \
+         FROM pg_database WHERE datistemplate = false ORDER BY datname",
     )
     .fetch_all(pool)
     .await
@@ -20,7 +26,7 @@ pub(crate) async fn list_databases_impl(pool: &sqlx::PgPool) -> Result<Vec<PgDat
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
     };
-    Ok(rows.into_iter().map(|(name,)| PgDatabaseInfo { name }).collect())
+    Ok(rows.into_iter().map(|(name, size_bytes)| PgDatabaseInfo { name, size_bytes }).collect())
 }
 
 /// Every non-template database on the server this connection points at — the

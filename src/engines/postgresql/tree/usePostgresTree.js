@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { listTables, listColumns, listForeignKeys } from '../api/resources'
+import { listDatabases, listTables, listColumns, listForeignKeys } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 
 // PostgreSQL's own schemas (pg_catalog, information_schema, …) are in every database
@@ -23,6 +23,21 @@ export function usePostgresTree(connectionId) {
   const openTables = ref({})    // table key → boolean
   const tableColumns = ref({})  // table key → column rows
   const tableKey = (schema, table) => JSON.stringify([schema, table])
+  // The connection's own database size, read once. A failure leaves it null: a missing
+  // size is worth less than the tree, and must never keep the tree from drawing.
+  const databaseSizes = ref({})   // database name → bytes
+  let sizesRead = false
+
+  async function loadDatabaseSizes() {
+    if (sizesRead) return
+    sizesRead = true
+    try {
+      const databases = await listDatabases(connectionId)
+      databaseSizes.value = Object.fromEntries(databases.map(d => [d.name, d.sizeBytes]))
+    } catch {
+      databaseSizes.value = {}
+    }
+  }
 
   function toggleSystem() {
     showSystem.value = !showSystem.value
@@ -30,6 +45,7 @@ export function usePostgresTree(connectionId) {
 
   function toggleDatabase() {
     databaseOpen.value = !databaseOpen.value
+    if (databaseOpen.value) loadDatabaseSizes()
   }
 
   async function toggleSchema(schema) {
@@ -41,6 +57,9 @@ export function usePostgresTree(connectionId) {
   // After a refresh: the open schemas' tables are re-read, the closed ones' dropped
   // so they're fetched fresh when next opened. Columns are re-read on next open too.
   function reloadTables() {
+    // A refresh re-reads the size too: rows have changed, so the number on the row has.
+    sizesRead = false
+    if (databaseOpen.value) loadDatabaseSizes()
     tables.value = {}
     tableColumns.value = {}
     openTables.value = {}
@@ -84,7 +103,7 @@ export function usePostgresTree(connectionId) {
   const isTableOpen = (schema, table) => !!openTables.value[tableKey(schema, table)]
   const columnsOf = (schema, table) => tableColumns.value[tableKey(schema, table)] ?? null
 
-  return { toggleTable, isTableOpen, columnsOf, databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables }
+  return { toggleTable, isTableOpen, columnsOf, databaseSizes, databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables }
 }
 
 // Whether `tab` (the active one) is browsing this table — the row the tree highlights.

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { fmtBytes, fmtBytesExact, fmtNum } from '../../utils/format'
+import { statsRows } from '../../utils/statsRows'
 import { showToast } from '../../stores/toast'
 
 // The hover card for a sidebar row: how big a database or collection is without opening
@@ -23,38 +23,18 @@ function copyValue(label, value) {
     .catch(() => showToast('Copy to clipboard failed'))
 }
 
-// collStats is normalized into snake_case by the Rust command; dbStats is passed through
-// raw, so its fields keep the server's camelCase names.
-const rows = computed(() => {
-  const s = props.tip && props.tip.stats
-  if (!s) return []
-  if (props.tip.kind === 'database') {
-    return [
-      ['Collections',  fmtNum(s.collections)],
-      ['Objects',      fmtNum(s.objects)],
-      ['Data Size',    fmtBytesExact(s.dataSize)],
-      ['Storage Size', fmtBytesExact(s.storageSize)],
-      ['Avg Object',   fmtBytes(s.avgObjSize)],
-      ['Indexes',      fmtNum(s.indexes)],
-      ['Index Size',   fmtBytesExact(s.indexSize)],
-    ]
-  }
-  return [
-    ['Count',            fmtNum(s.count)],
-    ['Size',             fmtBytesExact(s.size)],
-    ['Storage Size',     fmtBytesExact(s.storage_size)],
-    ['Avg Document',     fmtBytes(s.avg_obj_size)],
-    ['Indexes',          fmtNum(s.nindexes)],
-    ['Total Index Size', fmtBytesExact(s.total_index_size)],
-  ]
-})
+const rows = computed(() => statsRows(props.tip?.kind, props.tip?.stats))
 
 // Anchored to the row, but never off the bottom of the screen — collections sit at the
 // deepest level of the tree, so the hovered row is often the last one visible.
-const CARD_HEIGHT = 224   // the taller of the two: a database card measures 221 at seven rows
+// Enough for the tallest card: a PostgreSQL table's seven fixed rows plus its indexes.
+// Clamped so a long index list still opens on screen rather than off the bottom.
+const CARD_HEIGHT = 224
+const rowHeight = 18
 const style = computed(() => {
   if (!props.tip) return null
-  const top = Math.min(props.tip.y, window.innerHeight - CARD_HEIGHT - 8)
+  const height = CARD_HEIGHT + Math.max(0, rows.value.length - 7) * rowHeight
+  const top = Math.min(props.tip.y, window.innerHeight - height - 8)
   return { left: `${props.tip.x}px`, top: `${Math.max(8, top)}px` }
 })
 </script>

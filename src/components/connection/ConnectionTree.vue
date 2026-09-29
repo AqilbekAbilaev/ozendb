@@ -157,6 +157,7 @@ const { tip, ...statsTip } = useStatsTip()
           v-if="expandedConns[conn.id] && connDatabases[conn.id] && conn.engine === 'postgresql'"
           :conn="conn"
           :schemas="connDatabases[conn.id]"
+          :stats-tip="statsTip"
         />
         <template v-else-if="expandedConns[conn.id] && connDatabases[conn.id]">
           <template v-for="db in connDatabases[conn.id]" :key="db.name">
