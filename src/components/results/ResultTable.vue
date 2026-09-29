@@ -171,7 +171,6 @@ const {
   gridWrapRef:    gridWrapRef,
   headerLabel:    headerLabel,
   onBeforePress:  () => { if (inlineEdit.value) commitInlineEdit() },
-  onReordered:    () => { suppressNextClick.value = true },
 })
 
 // ── per-cell display data (memoized) ────────────────────

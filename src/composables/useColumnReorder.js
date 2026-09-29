@@ -72,6 +72,15 @@ export function useDrillColumnOrder({
   return { gridColumns, moveColumn }
 }
 
+// The click a drag's mouseup produces belongs to the drag, not to whatever it lands on — the
+// header it began on, or the row two headers share. Caught before it reaches the grid, and
+// only straight away: a mouseup that sends no click leaves nothing waiting for the next one.
+export function swallowNextClick(target = window, nextTick = setTimeout) {
+  const swallow = (e) => { e.stopPropagation(); e.preventDefault() }
+  target.addEventListener('click', swallow, { capture: true, once: true })
+  nextTick(() => target.removeEventListener('click', swallow, { capture: true }))
+}
+
 export function useColumnReorder({
   columns,          // () => the columns in the order the header shows them
   moveColumn,       // (col, insertBefore) => keep the new order
@@ -79,7 +88,6 @@ export function useColumnReorder({
   gridWrapRef,      // ref to the scroll container (for auto-scroll + indicator bounds)
   headerLabel,      // (col) => display label, used for the drag ghost
   onBeforePress,    // optional: run before preventDefault on mousedown (e.g. commit inline edit)
-  onReordered,      // optional: called after a real reorder drag (e.g. swallow the trailing click)
 }) {
   const pressed       = ref(false)  // mousedown → release: drives the `grabbing` cursor
   const dragging      = ref(false)  // past the drag threshold: drives the ghost
@@ -172,7 +180,7 @@ export function useColumnReorder({
     if (dragging.value && col) {
       const insertBefore = findDropIndex(e.clientX, headerRects())
       if (insertBefore >= 0) moveColumn(col, insertBefore)
-      if (onReordered) onReordered()
+      swallowNextClick()
     }
     col = null
     dragging.value = false
