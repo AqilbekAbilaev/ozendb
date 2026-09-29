@@ -15,7 +15,7 @@ export const fitWidth = (width) => Math.min(360, Math.max(40, width))
 //
 // `cellData` is for a virtualized grid, whose columns must be pinned from the start (see
 // colDefaultWidths). Without it the table keeps auto layout until a column is resized.
-export function useColumnResize({ gridColumns, cellData }) {
+export function useColumnResize({ gridColumns, cellData, headerLabel: labelOf }) {
   const tableRef  = ref(null)
   const colWidths = ref({})   // col name → px; empty = auto layout
 
@@ -112,7 +112,10 @@ export function useColumnResize({ gridColumns, cellData }) {
   }
 
   // Header label for a column (mirrors the template) so its width is counted too.
+  // Overridable: each engine renders its headers differently, and a width measured
+  // against the wrong text is a column that doesn't fit its own title.
   function headerLabel(col) {
+    if (labelOf) return labelOf(col)
     if (col === '_id') return '{Document id}'
     return /^\d+$/.test(col) ? `[${col}]` : col
   }

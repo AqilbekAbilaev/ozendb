@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import ContextMenu from '../../../components/base/ContextMenu.vue'
 import { formatCell, cellKind } from './formatCell.js'
@@ -9,6 +9,7 @@ import { useColumnReorder } from '../../../composables/useColumnReorder'
 import { useRowSelection } from '../../../composables/useRowSelection'
 import { useGridCells } from '../../../composables/useGridCells'
 import { useResultKeyboard } from '../../../composables/useResultKeyboard'
+import { useRowVirtualizer } from '../../../composables/useRowVirtualizer'
 
 // Rows arrive as arrays aligned to `columns` — keys, which `columnInfo` names (with
 // their table, when the tab joins others) — so a repeated column name stays its own
@@ -39,7 +40,21 @@ const PLACEHOLDERS = { num: 'e.g. >100', date: 'e.g. 2026-09', bool: 'true / fal
 const filtering = computed(() => Object.values(props.filterText ?? {}).some(text => text?.trim()))
 const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType, props.columnInfo[c]?.enumValues)))
 
-const { tableRef, startResize, autoFitColumn, thWidthStyle } = useColumnResize({ gridColumns: () => props.columns })
+// Virtualized rows mount as you scroll, so auto table-layout would resize the columns
+// under the pointer. The widths are pinned from the content instead, sampled from the
+// first rows rather than all of them: a page can be 10,000 rows, and the widest value
+// in the first few hundred is a good enough column width. The estimate assumes the
+// monospace grid font, so a proportional text column comes out a little wide — steady
+// and slightly roomy beats exact and jittering.
+const WIDTH_SAMPLE = 200
+const cellData = computed(() =>
+  props.rows.slice(0, WIDTH_SAMPLE).map(row => row.map(value => ({ display: formatCell(value) }))))
+
+const { tableRef, startResize, autoFitColumn, thWidthStyle } = useColumnResize({
+  gridColumns: () => props.columns,
+  cellData: () => cellData.value,
+  headerLabel: (column) => props.columnInfo[column]?.name ?? column,
+})
 
 const rowSelection = useRowSelection({ activeTab: () => props.selection })
 const { selectedCol, anchorRow, isRowSelected } = rowSelection
@@ -88,9 +103,27 @@ const { onHeaderMouseDown, pressed, dragging: reordering, dropIndicator, ghost }
   onBeforePress: commit,
 })
 
+// Only the rows near the viewport are mounted: a 10,000-row result renders about
+// thirty. Shared with MongoDB's grid (see useRowVirtualizer).
+const { virtualRows, padTop, padBottom, remeasure, scrollToRow } = useRowVirtualizer({
+  count: () => props.rows.length,
+  scrollElement: () => gridWrapRef.value,
+  rowElement: () => tableRef.value?.querySelector('tbody tr.datarow'),
+  estimate: 28,
+})
+
+// A new result is a new set of rows: back to the top, and re-measure, since a result
+// whose columns show enum pills has taller rows than one that doesn't.
+watch(() => props.rows, () => {
+  if (gridWrapRef.value) gridWrapRef.value.scrollTop = 0
+  remeasure()
+})
+onMounted(remeasure)
+
 useResultKeyboard({
   selection: () => props.selection, rows: rowSelection, cellCtx, copySelection, tableRef, gridWrapRef,
   rowCount: () => props.rows.length, columns: () => props.columns, editing: () => !!editing.value,
+  scrollToRow: scrollToRow,
 })
 
 const editing = ref(null)   // { row, column, text, seed }
@@ -163,18 +196,27 @@ function setNull() {
           <td></td>
           <td :colspan="columns.length">No rows match these filters</td>
         </tr>
-        <tr v-for="(row, r) in rows" :key="r" :class="{ selrow: isRowSelected(r) }">
-          <td class="rownum" @click="selectRow($event, r)">{{ rowOffset + r + 1 }}</td>
+        <!-- Spacers reserve the scroll extent of the rows above and below the window. -->
+        <tr v-if="padTop > 0" class="vspacer" aria-hidden="true">
+          <td :colspan="columns.length + 1" :style="{ height: padTop + 'px' }"></td>
+        </tr>
+        <tr
+          v-for="vrow in virtualRows"
+          :key="vrow.index"
+          class="datarow"
+          :class="{ selrow: isRowSelected(vrow.index), stripe: vrow.index % 2 === 1 }"
+        >
+          <td class="rownum" @click="selectRow($event, vrow.index)">{{ rowOffset + vrow.index + 1 }}</td>
           <td
-            v-for="(value, c) in row"
+            v-for="(value, c) in rows[vrow.index]"
             :key="c"
-            :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c]), selcell: isSelectedCell(r, columns[c]) }]"
+            :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c]), selcell: isSelectedCell(vrow.index, columns[c]) }]"
             :style="thWidthStyle(columns[c])"
-            @click="onCellClick($event, r, columns[c])"
-            @contextmenu="openCellCtx($event, r, columns[c])"
-            @dblclick="startEdit(r, columns[c], value)"
+            @click="onCellClick($event, vrow.index, columns[c])"
+            @contextmenu="openCellCtx($event, vrow.index, columns[c])"
+            @dblclick="startEdit(vrow.index, columns[c], value)"
           >
-            <span v-if="editing && editing.row === r && editing.column === columns[c]" class="pg-editing">
+            <span v-if="editing && editing.row === vrow.index && editing.column === columns[c]" class="pg-editing">
               <input
                 ref="input"
                 v-model="editing.text"
@@ -195,6 +237,9 @@ function setNull() {
             <span v-else-if="kinds[c] === 'enum' && value !== null" class="enum-pill">{{ value }}</span>
             <template v-else>{{ formatCell(value) }}</template>
           </td>
+        </tr>
+        <tr v-if="padBottom > 0" class="vspacer" aria-hidden="true">
+          <td :colspan="columns.length + 1" :style="{ height: padBottom + 'px' }"></td>
         </tr>
       </tbody>
     </table>
@@ -271,7 +316,10 @@ table.pressed thead th, table.pressed .col-resize-handle { cursor: grabbing; }
 th.rownum { z-index: 3; vertical-align: bottom; padding-bottom: 10px; }
 .funnel { display: block; margin-left: auto; color: var(--text-faint); }
 .funnel.on { color: var(--accent); }
-tbody tr:nth-child(even) td { background: var(--bg-row-alt); }
+/* Keyed off the row index rather than nth-child: the two spacer rows flip the
+   parity, so every scroll would otherwise restripe the whole grid. */
+tbody tr.stripe td { background: var(--bg-row-alt); }
+.vspacer td { padding: 0; border: none; background: none; }
 tbody tr:hover td { background: var(--bg-hover); }
 tbody tr td.rownum { background: var(--bg-panel-2); cursor: pointer; }
 tbody tr.selrow td { background: var(--bg-selected); }
@@ -298,15 +346,19 @@ td.editable { cursor: text; }
   display: inline-block; padding: 0 7px; border-radius: 9px; font-size: 11.5px; line-height: 17px;
   background: var(--bg-active); color: var(--text); border: 1px solid var(--border-soft);
 }
-.pg-editing { display: flex; align-items: center; gap: 4px; }
+/* The editor has to fit inside an ordinary row's height. The virtualizer estimates
+   every row from one measurement, so a row that grows while it is edited drifts the
+   scroll extent under it — hence the negative margins, which buy the input's border
+   back out of the cell's padding instead of out of the row. */
+.pg-editing { display: flex; align-items: center; gap: 4px; margin: -3px 0; }
 .pg-null {
-  flex: none; padding: 1px 6px; border-radius: 3px; cursor: pointer;
+  flex: none; height: 22px; padding: 0 6px; border-radius: 3px; cursor: pointer;
   background: var(--bg-input); color: var(--text-faint); border: 1px solid var(--border-soft);
   font: italic 11px var(--mono);
 }
 .pg-null:hover { color: var(--text); border-color: var(--accent); }
 .pg-edit {
-  width: 100%; min-width: 120px;
+  width: 100%; min-width: 120px; height: 22px;
   background: var(--bg-input); color: var(--text);
   border: 1px solid var(--accent); border-radius: 3px;
   font: inherit; padding: 1px 4px;
