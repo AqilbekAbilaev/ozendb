@@ -234,8 +234,11 @@ export function openPostgresTable({ connectionId, connectionName, database, sche
 }
 
 // A SQL editor against a PostgreSQL connection's database; a new tab every time.
-export function openPostgresQuery({ connectionId, connectionName, database }) {
+// `sql` seeds the editor — used when a tab is opened to edit something that already
+// exists, such as a function's CREATE OR REPLACE statement.
+export function openPostgresQuery({ connectionId, connectionName, database, sql = '' }) {
   const tab = newWorkspace('postgresql.query', { target: { connectionId, connectionName, database } })
+  if (sql) tab.state.sql = sql
   tabs.value.push(tab)
   activateTab(tab.id)
 }

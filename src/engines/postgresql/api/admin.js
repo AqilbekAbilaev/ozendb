@@ -12,3 +12,14 @@ export function serverInfo(connectionId) {
 export function serverSettings(connectionId) {
   return invoke('pg_server_settings', { id: connectionId })
 }
+
+// Every function and procedure in one schema, or in all the user schemas when the
+// schema is omitted. Aggregates and window functions are left out (see routines.rs).
+export function routines(connectionId, schema = null) {
+  return invoke('pg_routines', { id: connectionId, schema })
+}
+
+// One routine's CREATE statement, keyed by oid because names overload.
+export function routineSource(connectionId, oid) {
+  return invoke('pg_routine_source', { id: connectionId, oid })
+}
