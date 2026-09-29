@@ -1,6 +1,6 @@
 # OzenDB
 
-An open-source, free alternative to [Studio-3T](https://studio3t.com/) — a desktop GUI for managing MongoDB, with PostgreSQL support in progress on `main` (not yet in a release). Built with [Tauri](https://tauri.app/) (Rust backend) and [Vue.js](https://vuejs.org/) (front-end). Still a work in progress.
+An open-source, free alternative to [Studio-3T](https://studio3t.com/) — a desktop GUI for managing MongoDB, with PostgreSQL support in preview. Built with [Tauri](https://tauri.app/) (Rust backend) and [Vue.js](https://vuejs.org/) (front-end). Still a work in progress.
 
 ![OzenDB querying a collection](img/ozendb.png)
 

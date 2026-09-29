@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.2.0
+
+- **PostgreSQL (preview)** — OzenDB now connects to PostgreSQL as well as
+  MongoDB. Pick the engine in the connection editor, or paste a
+  `postgresql://` connection string; SSH tunnels work for both. It is a
+  preview: expect rough edges, and please report what you hit.
+  - Browse schemas, tables and their columns in the sidebar, with estimated
+    row counts. PostgreSQL's own schemas can be shown or hidden.
+  - Open a table in its own tab: filter from boxes under the column headers,
+    sort, page, pick which columns to show, and edit cells in place —
+    including arrays, enums (as a dropdown) and setting a value to NULL.
+  - Join related tables through their foreign keys, including keys over
+    several columns, from the Query Builder.
+  - Switch any table tab to SQL and back; edited SQL is read back into the
+    filters and the Query Builder where it can be.
+  - A SQL tab runs any statement — queries, INSERT/UPDATE and DDL — with
+    Format SQL, Explain with the real plan and timings, Cancel, saved
+    queries and run history. Manual transactions hold open across runs until
+    you Commit or Roll back. Statements stop after five minutes.
+  - The results grid supports cell and row selection, keyboard navigation,
+    copy, column resize, auto-fit and drag-to-reorder.
+  - Only the database named in the connection can be browsed for now; other
+    databases on the server are listed but can't be opened yet.
+- **Current Operations is now a live tab** — filter by namespace, age and
+  kind, see plan, app, user and waiting details, switch to JSON or Tree view,
+  and kill an operation. Several can be open at once, and they survive a
+  restart.
+- **Report a problem from the Help menu** — OzenDB records its own errors so
+  a bug report can include them, with your home folder scrubbed from paths.
+- **Query timing is measured on the server**, not the round trip, and the
+  footer counts up while a query runs.
+- **Refresh shortcuts** — Ctrl/Cmd+R refreshes the active tab, and
+  Ctrl/Cmd+Shift+R refreshes every connection.
+- **Middle-click closes a tab**, and each connection in the sidebar shows an
+  engine badge.
+- **Editing a connection that is open** no longer silently points it at a
+  different server — you're offered to save it as a new connection instead,
+  which keeps its password.
+- **Fixed** — a read-only connection now blocks every way of writing, and
+  its lock is remembered between sessions.
+- **Fixed** — Test Connection tests the connection exactly as it will be
+  opened, including over SSH.
+- **Fixed** — tabs pointing at a renamed collection follow the rename, and
+  tabs that are already open aren't restored a second time.
+- **Fixed** — you're told when the saved session couldn't be restored,
+  instead of starting empty without a word.
+- **Fixed** — Cancel stops a query even when the server has nothing left to
+  kill.
+- **Fixed** — the macOS app icon is the same size as other apps' icons, and
+  the Linux AppImage shows its icon.
+
 ## v0.1.4
 
 - **Automatic updates** — OzenDB now checks for new versions on launch and from
