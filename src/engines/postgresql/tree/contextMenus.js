@@ -16,6 +16,7 @@ export const PG_MENUS = {
     NEW_SQL,
     { sep: true },
     { label: 'Server Info', icon: 'info' },
+    { label: 'Server Activity…', icon: 'clock' },
     { sep: true },
     COPY_NAME,
     { sep: true },
@@ -33,6 +34,7 @@ export const PG_MENUS = {
 
 export const PG_ACTIONS = {
   'Server Info': (n) => openModal('pgServerInfo', n),
+  'Server Activity…': (n) => openModal('pgActivity', n),
   'Functions & Procedures…': (n) => openModal('pgRoutines', n),
   'New SQL Query': (n) => openPostgresQuery({ connectionId: n.connId, connectionName: n.connName, database: n.database }),
   'Open Table': (n) => openPostgresTable({

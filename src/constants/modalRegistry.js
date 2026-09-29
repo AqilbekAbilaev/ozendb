@@ -33,6 +33,7 @@ export const MODALS = {
   pgServerInfo: { component: lazy(() => import('../engines/postgresql/admin/PostgresServerInfoModal.vue')), level: 'connection' },
   // Opened from a database node (every user schema) or a schema node (just that one).
   pgRoutines:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRoutinesModal.vue')),   level: 'database' },
+  pgActivity:   { component: lazy(() => import('../engines/postgresql/admin/PostgresActivityModal.vue')),   level: 'connection' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },
