@@ -80,7 +80,7 @@ function cellCtxPick(action) {
 
 const gridWrapRef = ref(null)
 
-const { onHeaderMouseDown, dragging: reordering, dropIndicator, ghost } = useColumnReorder({
+const { onHeaderMouseDown, pressed, dragging: reordering, dropIndicator, ghost } = useColumnReorder({
   columns: () => props.columns,
   moveColumn: (column, insertBefore) => emit('move-column', column, insertBefore),
   tableRef, gridWrapRef,
@@ -123,7 +123,7 @@ function setNull() {
 
 <template>
   <div ref="gridWrapRef" class="pg-grid">
-    <table ref="tableRef">
+    <table ref="tableRef" :class="{ pressed }">
       <thead>
         <tr>
           <th class="rownum">
@@ -238,6 +238,8 @@ th {
   vertical-align: top;
 }
 th.sortable { cursor: pointer; }
+/* A held header shows the closed hand across the headers, over sorting's pointer. */
+table.pressed thead th, table.pressed .col-resize-handle { cursor: grabbing; }
 /* Straddles the column's right border; the sticky th is its containing block. */
 .col-resize-handle {
   position: absolute; top: 0; right: 0; z-index: 1;
