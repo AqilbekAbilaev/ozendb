@@ -41,6 +41,8 @@ mod pg_error_integration_tests;
 #[cfg(test)]
 mod pg_ssh_integration_tests;
 #[cfg(test)]
+mod pg_serverinfo_integration_tests;
+#[cfg(test)]
 mod pg_stats_integration_tests;
 #[cfg(test)]
 mod pg_integration_tests;
@@ -209,6 +211,8 @@ pub fn run() {
             list_pg_columns,
             list_pg_foreign_keys,
             pg_table_stats,
+            pg_server_info,
+            pg_server_settings,
             run_pg_query,
             cancel_pg_query,
             explain_pg_query,

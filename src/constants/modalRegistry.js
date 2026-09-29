@@ -28,6 +28,9 @@ export const MODALS = {
   // on top of the node fields (see openServerInfo), so it opens directly, not via modalFeature.
   serverInfo:   { component: lazy(() => import('../components/admin/ServerInfoModal.vue')),   level: 'connection' },
   addDatabase:  { component: lazy(() => import('../components/admin/AddDatabaseModal.vue')),  level: 'connection' },
+  // PostgreSQL's own read-only diagnostics; opened from its tree menu with the node
+  // itself as the target, so it takes no seeding of its own.
+  pgServerInfo: { component: lazy(() => import('../engines/postgresql/admin/PostgresServerInfoModal.vue')), level: 'connection' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },

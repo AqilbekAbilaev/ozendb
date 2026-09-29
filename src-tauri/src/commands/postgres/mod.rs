@@ -4,6 +4,7 @@ pub(super) use super::AppContext;
 
 pub mod schema;
 pub mod stats;
+pub mod serverinfo;
 pub mod query;
 pub mod browse;
 pub mod read_select;
@@ -17,6 +18,7 @@ mod array_literal;
 
 pub use schema::*;
 pub use stats::*;
+pub use serverinfo::*;
 pub use query::*;
 pub use browse::*;
 pub use read_select::*;

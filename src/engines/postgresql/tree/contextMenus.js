@@ -1,4 +1,5 @@
 import { openPostgresQuery, openPostgresTable } from '../../../stores/tabCreators'
+import { openModal } from '../../../stores/modals'
 
 // The right-click menus for PostgreSQL's sidebar rows, in the same shape as
 // constants/contextMenus.js. A node here is `{ connId, connName, engine, database,
@@ -12,6 +13,8 @@ const NEW_SQL = { label: 'New SQL Query', icon: 'sql' }
 export const PG_MENUS = {
   connection: [
     NEW_SQL,
+    { sep: true },
+    { label: 'Server Info', icon: 'info' },
     { sep: true },
     COPY_NAME,
     { sep: true },
@@ -28,6 +31,7 @@ export const PG_MENUS = {
 }
 
 export const PG_ACTIONS = {
+  'Server Info': (n) => openModal('pgServerInfo', n),
   'New SQL Query': (n) => openPostgresQuery({ connectionId: n.connId, connectionName: n.connName, database: n.database }),
   'Open Table': (n) => openPostgresTable({
     connectionId: n.connId, connectionName: n.connName, database: n.database, schema: n.schema, table: n.table,
