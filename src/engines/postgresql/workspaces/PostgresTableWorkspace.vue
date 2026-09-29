@@ -18,6 +18,7 @@ import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { usePostgresTable } from './usePostgresTable.js'
 import { openConnections } from '../../../stores/openConnections'
 import { showToast } from '../../../stores/toast'
+import { refreshRequest } from '../../../stores/menuRequests'
 
 const props = defineProps({
   activeTab: { type: Object, required: true },
@@ -35,6 +36,8 @@ watch(() => props.activeTab.id, () => {
   limitDraft.value = t.value.limit
   if (props.activeTab.runtime.generation === 0) t.value.load()
 }, { immediate: true })
+// View → Refresh, which only reaches Filter mode (see canRefreshWorkspace).
+watch(refreshRequest, () => t.value.refresh())
 
 const MODES = [{ value: 'filter', label: 'Filter' }, { value: 'sql', label: 'SQL' }]
 const rtabs = computed(() => [

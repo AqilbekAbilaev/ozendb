@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { analyzeSchema, exportSchema } from '../../engines/mongodb/api/schema'
 import { errText, errCode } from '../../utils/errors'
+import { refreshRequest } from '../../stores/menuRequests'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -53,6 +54,7 @@ async function analyze() {
 }
 
 onMounted(analyze)
+watch(refreshRequest, analyze)
 // Re-analyze if this tab is retargeted at a different collection.
 watch(() => props.activeTab.connectionId + ':' + props.activeTab.dbName + ':' + props.activeTab.collectionName, () => {
   analyze()

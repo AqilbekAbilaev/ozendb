@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { duplicateWorkspace, restoreWorkspace, disposeWorkspace, deepClone, affectedByResource, retargetResource } from './lifecycle'
+import { duplicateWorkspace, restoreWorkspace, disposeWorkspace, canRefreshWorkspace, deepClone, affectedByResource, retargetResource } from './lifecycle'
 import { registerWorkspaceDefinition } from './registry'
 import { registerWorkspaceDefinitions } from './registerDefinitions'
 import { createResourceRef } from '../utils/resourceRef'
@@ -279,5 +279,25 @@ describe('retargetResource', () => {
     retargetResource(orders, sales)(custom)
     expect(untouched.title).toBe('sales')
     expect(custom.title).toBe('my working set')
+  })
+})
+
+describe('canRefreshWorkspace', () => {
+  it('reloads the views that only read', () => {
+    for (const type of ['mongodb.find', 'mongodb.indexes', 'mongodb.schema', 'mongodb.current_operations']) {
+      expect(canRefreshWorkspace({ type }), type).toBe(true)
+    }
+  })
+
+  it('never re-runs what can change data, nor a tab with nothing to reload', () => {
+    const types = ['mongodb.aggregate', 'mongodb.sql_to_mql', 'mongodb.shell', 'mongodb.import', 'mongodb.export',
+      'mongodb.search', 'postgresql.query', 'app.quickstart']
+    for (const type of types) expect(canRefreshWorkspace({ type }), type).toBe(false)
+    expect(canRefreshWorkspace(null)).toBe(false)
+  })
+
+  it('reloads a PostgreSQL table tab in Filter mode, never its SQL', () => {
+    expect(canRefreshWorkspace({ type: 'postgresql.table_browse', state: { mode: 'filter' } })).toBe(true)
+    expect(canRefreshWorkspace({ type: 'postgresql.table_browse', state: { mode: 'sql' } })).toBe(false)
   })
 })

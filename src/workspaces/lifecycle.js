@@ -89,6 +89,13 @@ export function disposeWorkspace(workspace) {
   }
 }
 
+// Whether Refresh may reload this workspace: only a view that reads, never one whose
+// re-run could change data. A definition opts in with `canRefresh(workspace)`.
+export function canRefreshWorkspace(workspace) {
+  if (!workspace?.type) return false
+  return !!getWorkspaceDefinition(workspace.type).canRefresh?.(workspace)
+}
+
 // Predicate for closeWhere: a workspace is affected by dropping `resource` when its
 // target is the resource itself or anything under it. Containment, not equality —
 // dropping a database also closes the collection-scoped tabs inside it, and a

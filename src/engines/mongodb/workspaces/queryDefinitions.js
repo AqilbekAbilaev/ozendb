@@ -147,6 +147,8 @@ export const queryDefinitions = [
     type: 'mongodb.find',
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.collection,
+    // A find only reads, so Refresh may run it again; the other query modes can write.
+    canRefresh: () => true,
     create(ctx) {
       return createCollection(ctx, 'find')
     },

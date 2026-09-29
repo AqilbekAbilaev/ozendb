@@ -12,8 +12,10 @@ export const historyRequest           = ref(null)   // View → History Manager
 export const saveQueryRequest         = ref(null)   // File → Save
 export const savedQueryBrowserRequest = ref(null)   // File → Load
 export const docMenuRequest           = ref(null)   // Document/Collection menu: { action }
+export const refreshRequest           = ref(null)   // View → Refresh: the active tab reloads
 
 export const requestHistory           = () => signal(historyRequest)
 export const requestSaveQuery         = () => signal(saveQueryRequest)
 export const requestSavedQueryBrowser = () => signal(savedQueryBrowserRequest)
 export const requestDocAction         = (action) => signal(docMenuRequest, { action })
+export const requestRefresh           = () => signal(refreshRequest)
