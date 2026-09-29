@@ -25,13 +25,15 @@ export function createWorkspace(type, context = {}) {
       session: supplied.session ? supplied.session : () => (crypto.randomUUID ? crypto.randomUUID() : workspaceId),
     },
   })
-  return {
-    ...created.fields,
+  // Assigned onto the fields, not spread with them: a definition may define accessors
+  // over its fields (see engines/mongodb/workspaces/collectionState.js), and a spread
+  // would copy their current values and lose the accessors themselves.
+  return Object.assign(created.fields, {
     id: workspaceId,
     type: def.type,
     engine: def.engine,
     title: created.title,
     color: null,
     target: created.target ?? null,
-  }
+  })
 }

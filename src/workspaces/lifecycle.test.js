@@ -301,3 +301,46 @@ describe('canRefreshWorkspace', () => {
     expect(canRefreshWorkspace({ type: 'postgresql.table_browse', state: { mode: 'sql' } })).toBe(false)
   })
 })
+
+// A definition whose fields are more than plain data re-establishes them with
+// `hydrate`, because the deep clone every duplicate and restore goes through keeps
+// values and drops everything else.
+describe('the hydrate hook', () => {
+  const type = 'test.hydrating'
+  registerWorkspaceDefinition({
+    type,
+    engine: 'test',
+    component: {},
+    duplicate: (workspace) => ({ title: 'copy', target: null, fields: withAccessor({ box: { n: workspace.n } }) }),
+    hydrate: (fields) => withAccessor(fields),
+  })
+
+  function withAccessor(fields) {
+    Object.defineProperty(fields, 'n', {
+      get() { return this.box.n },
+      set(v) { this.box.n = v },
+      enumerable: false, configurable: true,
+    })
+    return fields
+  }
+
+  it('re-establishes an accessor the clone would have dropped', () => {
+    const copy = duplicateWorkspace({ id: 'h1', type, engine: 'test', n: 7, box: { n: 7 } })
+    expect(copy.box.n).toBe(7)
+    expect(copy.n).toBe(7)          // gone without the hook: structuredClone drops it
+    copy.n = 9
+    expect(copy.box.n).toBe(9)      // and it still writes through
+  })
+
+  it('leaves the envelope on the hydrated object', () => {
+    const copy = duplicateWorkspace({ id: 'h1', type, engine: 'test', n: 1, box: { n: 1 } })
+    expect(copy).toMatchObject({ type, engine: 'test', title: 'copy' })
+    expect(copy.id).toBeTruthy()
+    expect(copy.n).toBe(1)          // the envelope must not have been spread over it
+  })
+
+  it('is optional — a definition without one is cloned as before', () => {
+    const copy = duplicateWorkspace(FIND, { ids: { workspace: () => 'dup' } })
+    expect(copy.filter).toBe('{ "a": 1 }')
+  })
+})
