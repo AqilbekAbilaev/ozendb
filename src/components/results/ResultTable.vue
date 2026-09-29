@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { vqbOpen } from '../../stores/visualQueryBuilder'
-import { useVirtualizer } from '@tanstack/vue-virtual'
 import { guessType, TYPE_CLASS, formatCell, columns, getAtPath } from '../../utils/resultGrid'
 import { useResultSearch } from '../../composables/useResultSearch'
 import { useColumnReorder, useDrillColumnOrder } from '../../composables/useColumnReorder'
@@ -12,6 +11,7 @@ import { useMomentumScroll } from '../../composables/useMomentumScroll'
 import { useGridCells } from '../../composables/useGridCells'
 import { useMongoCellActions } from '../../composables/useMongoCellActions'
 import { useResultKeyboard } from '../../composables/useResultKeyboard'
+import { useRowVirtualizer } from '../../composables/useRowVirtualizer'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import ContextMenu from '../base/ContextMenu.vue'
@@ -201,7 +201,7 @@ const cellData = computed(() => {
 function scrollToMatch() {
   const m = searchMatches.value[searchIdx.value]
   if (!m) return
-  rowVirtualizer.value.scrollToIndex(m.row, { align: 'auto' })
+  scrollToRow(m.row)
   nextTick(() => {
     const td = tableRef.value?.querySelector(`td[data-match="${m.row},${m.col}"]`)
     if (td) td.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -249,44 +249,22 @@ function isMatchCell(row, col) {
   return matchSet.value.has(row + ',' + col)
 }
 
-// ── row virtualization (@tanstack/vue-virtual) ──────────
-// Only the rows in (and just beyond) the viewport are mounted; TanStack owns the scroll
-// maths, overscan, viewport-resize handling and window updates. A 1000-row result mounts
-// ~30 rows. `gridWrapRef` is the scroll container; `rowH` (measured from a real row) is
-// the size estimate — rows are uniform (monospace, single line) so a fixed estimate is
-// exact and no per-row measurement is needed.
-const rowH = ref(FILLER_ROW_HEIGHT)
-function measureRowH() {
-  const tr = tableRef.value?.querySelector('tbody tr.datarow')
-  if (!tr) return
-  const h = tr.getBoundingClientRect().height
-  if (h > 0 && Math.abs(h - rowH.value) > 0.25) rowH.value = h
-}
-
-const rowVirtualizer = useVirtualizer(computed(() => {
-  const size = rowH.value  // read so the options object recomputes when it's measured
-  return {
-    count: cellData.value.length,
-    getScrollElement: () => gridWrapRef.value,
-    estimateSize: () => size,
-    overscan: 12,
-  }
-}))
-
-const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems())
-const totalSize   = computed(() => rowVirtualizer.value.getTotalSize())
-// Spacer heights that reserve the scroll extent of the un-mounted rows above / below.
-const padTop    = computed(() => (virtualRows.value.length ? virtualRows.value[0].start : 0))
-const padBottom = computed(() => {
-  const rows = virtualRows.value
-  return rows.length ? totalSize.value - rows[rows.length - 1].end : 0
+// ── row virtualization ─────────────────────────────────
+// The wiring lives in useRowVirtualizer, shared with the PostgreSQL grid; what stays
+// here is what this grid measures it against.
+const { virtualRows, padTop, padBottom, remeasure, scrollToRow } = useRowVirtualizer({
+  count: () => cellData.value.length,
+  scrollElement: () => gridWrapRef.value,
+  rowElement: () => tableRef.value?.querySelector('tbody tr.datarow'),
+  estimate: FILLER_ROW_HEIGHT,
 })
+
 useResultKeyboard({
   selection: () => props.activeTab, rows: rowSelection, cellCtx, copySelection, tableRef, gridWrapRef,
   rowCount: () => gridDocs.value.length, columns: () => gridColumns.value, editing: () => !!inlineEdit.value,
-  onPaste: () => emit('paste-documents'), scrollToRow: (row) => rowVirtualizer.value.scrollToIndex(row, { align: 'auto' }),
+  onPaste: () => emit('paste-documents'), scrollToRow: scrollToRow,
 })
-onMounted(() => { nextTick(measureRowH) })
+onMounted(remeasure)
 
 // Return to the top when the underlying document set changes (new page, drill in/out,
 // tab switch). An inline edit splices `results` in place — same array reference — so it
@@ -295,7 +273,7 @@ onMounted(() => { nextTick(measureRowH) })
 watch([() => props.activeTab?.id, () => props.activeTab?.results, () => props.drillPath],
   () => {
     if (gridWrapRef.value) gridWrapRef.value.scrollTop = 0
-    nextTick(measureRowH)
+    remeasure()
     // The row set just changed (requery/drill/tab switch): drop any multi-row selection,
     // whose indices may no longer line up, collapsing back to the single active row so we
     // never carry stale indices into a copy/delete.
