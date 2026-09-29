@@ -31,6 +31,17 @@ function idSource(context, workspaceId) {
   return ids.session ? ids.session : () => (crypto.randomUUID ? crypto.randomUUID() : workspaceId)
 }
 
+// `deepClone` is a structural copy: it keeps data and drops everything else, which
+// includes accessors a definition defines over its fields. A definition that needs
+// something re-established on the copy says so with `hydrate(fields)`, called on the
+// cloned fields before the envelope is put back on. Without it, a definition whose
+// fields are more than plain data works when created and breaks when duplicated —
+// which is exactly the kind of bug that only shows up two steps later.
+function hydrated(def, fields) {
+  const cloned = deepClone(fields)
+  return def.hydrate ? def.hydrate(cloned) : cloned
+}
+
 export function duplicateWorkspace(workspace, context = {}) {
   const def = getWorkspaceDefinition(workspace.type)
   if (!def.duplicate) return null
@@ -40,15 +51,17 @@ export function duplicateWorkspace(workspace, context = {}) {
     ids: { workspace: () => id, session: idSource(context, id) },
   })
   if (result === null) return null
-  return {
-    ...deepClone(result.fields),
+  // The envelope is assigned onto the fields rather than spread with them: a spread
+  // would build a new object and leave any accessor `hydrate` just re-established
+  // behind, which is the bug this hook exists to prevent.
+  return Object.assign(hydrated(def, result.fields), {
     id: id,
     type: def.type,
     engine: def.engine,
     title: result.title,
     color: workspace.color ?? null,
     target: result.target !== undefined ? deepClone(result.target) : null,
-  }
+  })
 }
 
 // Restore reconstructs a fresh runtime workspace from a projected saved record.
@@ -65,15 +78,14 @@ export function restoreWorkspace(saved, context = {}) {
     ids: { session: idSource(context, saved.id) },
   })
   if (!result) return null
-  return {
-    ...deepClone(result.fields),
+  return Object.assign(hydrated(def, result.fields), {
     id: saved.id,
     type: def.type,
     engine: def.engine,
     title: result.title,
     color: saved.color ?? null,
     target: result.target !== undefined ? deepClone(result.target) : null,
-  }
+  })
 }
 
 // Disposal is best-effort by contract: the caller fires it and forgets it, failures
