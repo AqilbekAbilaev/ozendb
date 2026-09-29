@@ -9,6 +9,7 @@ import { openModal } from '../../../stores/modals'
 const REFRESH = { label: 'Refresh' }
 const COPY_NAME = { label: 'Copy Name', shortcut: '⌥⌘C' }
 const NEW_SQL = { label: 'New SQL Query', icon: 'sql' }
+const ROUTINES = { label: 'Functions & Procedures…', icon: 'aggregate' }
 
 export const PG_MENUS = {
   connection: [
@@ -25,13 +26,14 @@ export const PG_MENUS = {
     { label: 'Disconnect Others' },
     { label: 'Disconnect All' },
   ],
-  database: [NEW_SQL, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
-  schema: [COPY_NAME, { sep: true }, REFRESH],
+  database: [NEW_SQL, ROUTINES, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
+  schema: [ROUTINES, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
   table: [{ label: 'Open Table', icon: 'table', shortcut: '↵' }, NEW_SQL, { sep: true }, COPY_NAME],
 }
 
 export const PG_ACTIONS = {
   'Server Info': (n) => openModal('pgServerInfo', n),
+  'Functions & Procedures…': (n) => openModal('pgRoutines', n),
   'New SQL Query': (n) => openPostgresQuery({ connectionId: n.connId, connectionName: n.connName, database: n.database }),
   'Open Table': (n) => openPostgresTable({
     connectionId: n.connId, connectionName: n.connName, database: n.database, schema: n.schema, table: n.table,

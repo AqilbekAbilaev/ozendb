@@ -31,6 +31,8 @@ export const MODALS = {
   // PostgreSQL's own read-only diagnostics; opened from its tree menu with the node
   // itself as the target, so it takes no seeding of its own.
   pgServerInfo: { component: lazy(() => import('../engines/postgresql/admin/PostgresServerInfoModal.vue')), level: 'connection' },
+  // Opened from a database node (every user schema) or a schema node (just that one).
+  pgRoutines:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRoutinesModal.vue')),   level: 'database' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },
