@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const openPostgresQuery = vi.fn()
 const openPostgresTable = vi.fn()
 vi.mock('../../../stores/tabCreators', () => ({ openPostgresQuery, openPostgresTable }))
+const openModal = vi.fn()
+vi.mock('../../../stores/modals', () => ({ openModal }))
 
 const { PG_MENUS, PG_ACTIONS } = await import('./contextMenus.js')
 
@@ -29,8 +31,20 @@ describe('PostgreSQL right-click menus', () => {
 
   it('offers no MongoDB-only action', () => {
     const labels = Object.values(PG_MENUS).flat().map(i => i.label).filter(Boolean)
-    for (const mongoOnly of ['Open IntelliShell', 'Server Info', 'Current Operations', 'Add Database…', 'Import…', 'Export…', 'Search in…']) {
+    // Server Info was on this list until PostgreSQL grew diagnostics of its own; the
+    // rest have no PostgreSQL equivalent yet, so they must not appear.
+    for (const mongoOnly of ['Open IntelliShell', 'Current Operations', 'Add Database…', 'Import…', 'Export…', 'Search in…']) {
       expect(labels).not.toContain(mongoOnly)
     }
+  })
+
+  it('opens its own Server Info, not MongoDB\'s', () => {
+    expect(PG_MENUS.connection.map(i => i.label)).toContain('Server Info')
+    // Only the connection level has one: a schema or table has no server to report on.
+    for (const level of ['database', 'schema', 'table']) {
+      expect(PG_MENUS[level].map(i => i.label)).not.toContain('Server Info')
+    }
+    PG_ACTIONS['Server Info']({ connId: 'p1', connName: 'Payments PG' })
+    expect(openModal).toHaveBeenCalledWith('pgServerInfo', { connId: 'p1', connName: 'Payments PG' })
   })
 })
