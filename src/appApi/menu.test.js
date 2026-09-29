@@ -21,6 +21,7 @@ describe('setMenuContext', () => {
       hasField:      true,
       hasIndex:      false,
       readOnly:      true,
+      canRefreshTab: true,
     }
     await setMenuContext(context)
     expect(invoke).toHaveBeenCalledWith('set_menu_context', context)

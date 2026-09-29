@@ -24,7 +24,7 @@ describe('deriveMenuContext', () => {
   it('is all-false with no tab, no selection, no connections', () => {
     expect(deriveMenuContext(null, null, 0)).toEqual({
       hasConnection: false, hasDatabase: false, hasCollection: false, anyConnection: false,
-      hasDocument: false, hasField: false, hasIndex: false, readOnly: false,
+      hasDocument: false, hasField: false, hasIndex: false, readOnly: false, canRefreshTab: false,
     })
   })
 
@@ -105,6 +105,12 @@ describe('deriveMenuContext', () => {
     expect(deriveMenuContext(null, null, 0, false).hasIndex).toBe(false)
     // An index selected → on, regardless of the tab/tree selection.
     expect(deriveMenuContext(null, null, 0, true).hasIndex).toBe(true)
+  })
+
+  it('enables Refresh as the active tab says, whatever the sidebar holds', () => {
+    const sel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+    expect(deriveMenuContext(collectionTab, sel, 1, false, true).canRefreshTab).toBe(true)
+    expect(deriveMenuContext(quickstart, sel, 1, false, false).canRefreshTab).toBe(false)
   })
 
   it('readOnly comes from the active tab, never the sidebar', () => {

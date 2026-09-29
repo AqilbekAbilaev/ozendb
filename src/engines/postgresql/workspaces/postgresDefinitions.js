@@ -51,6 +51,8 @@ export const postgresDefinitions = [
     engine: 'postgresql',
     component: PostgresTableWorkspace,
     create: (ctx) => tableWorkspace(ctx.target),
+    // Filter mode only reads; SQL mode runs whatever SQL the user wrote.
+    canRefresh: (workspace) => workspace.state.mode === 'filter',
     // A copy keeps the query and the panel; rows load again.
     duplicate: (workspace) => tableWorkspace(workspace, copy(workspace.state), copy(workspace.ui)),
     serialize: (workspace) => copy({ state: workspace.state, ui: workspace.ui }),

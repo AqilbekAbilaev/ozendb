@@ -41,7 +41,8 @@ function depth(ref) {
 //   treeSelection  the tree's selection payload, carrying `resource` | null
 //   connectionCount  number of connections open in the tree
 //   indexSelected  whether an index row is selected in the open Indexes dialog
-export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false) {
+//   canRefresh     whether the active tab can reload (workspaces/lifecycle's canRefreshWorkspace)
+export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false) {
   const tab = activeTab || null
   const tabDepth = depth(mongoResource(tab, resourceFromLegacyTab(tab)))
   const selDepth = depth(mongoResource(treeSelection, treeSelection?.resource))
@@ -69,6 +70,8 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     // The active tab's read-only lock disables the write actions (see writable.js).
     // Only the tab can carry it — the sidebar selection never locks anything.
     readOnly: !!(tab && tab.readOnly),
+    // Refresh reloads the active tab, never the sidebar selection.
+    canRefreshTab: !!canRefresh,
   }
 }
 

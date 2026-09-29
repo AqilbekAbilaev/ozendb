@@ -18,6 +18,7 @@ import { setCollectionQueryMode } from '../../../../utils/queryMode'
 import { runTranslatedSql } from '../../../../utils/sqlWorkspace'
 import { beginWorkspaceRequest } from '../../../../utils/workspaceRequest'
 import { useInitialFindRun } from './useInitialFindRun'
+import { refreshRequest } from '../../../../stores/menuRequests'
 
 const props = defineProps({
   activeTab:        { type: Object, required: true },
@@ -275,6 +276,9 @@ async function applyFromBrowser(entry) {
   await nextTick()
   run(tab)
 }
+
+// View → Refresh, which only reaches a find (see canRefreshWorkspace).
+watch(refreshRequest, () => run())
 
 watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
   const request = props.savedQueryRequest

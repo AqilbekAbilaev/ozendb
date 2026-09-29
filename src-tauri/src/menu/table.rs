@@ -148,7 +148,7 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
         (
             "View",
             vec![
-                Spec::Action { id: "view:refresh", label: "Refresh", accel: Some("CmdOrCtrl+R"), gate: Some(Gate::AnyConnection) },
+                Spec::Action { id: "view:refresh", label: "Refresh", accel: Some("CmdOrCtrl+R"), gate: Some(Gate::RefreshableTab) },
                 Spec::Action { id: "view:refresh_all", label: "Refresh All Connections", accel: Some("CmdOrCtrl+Shift+R"), gate: Some(Gate::AnyConnection) },
                 // Re-runs the active collection tab's query to refresh its results.
                 Spec::Action { id: "view:refresh_document", label: "Refresh Document", accel: None, gate: Some(Gate::Collection) },

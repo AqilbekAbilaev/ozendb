@@ -11,6 +11,7 @@ import JsonResultView from '../results/JsonResultView.vue'
 import TreeResultView from '../results/TreeResultView.vue'
 import { useCurrentOps, FREQUENCIES, RETENTIONS, SLOW_THRESHOLDS } from '../../composables/useCurrentOps'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
+import { refreshRequest } from '../../stores/menuRequests'
 
 // The Current Operations tab: what the server is doing right now, refreshed on a timer.
 // The list itself, the poll and the retention of finished ops live in useCurrentOps;
@@ -24,6 +25,7 @@ const {
   frequency, retention, ownOnly, showSys, slowOnly, slowSecs, dbName, collName, view,
   selectedOpid, retainedCount, idleCount, load, kill,
 } = useCurrentOps(() => props.activeTab)
+watch(refreshRequest, () => load())
 
 // The grid owns the drill-down path, kept on the tab like every other collection grid.
 const drillPath = computed({

@@ -2,12 +2,13 @@ import { nextTick, onMounted, onUnmounted } from 'vue'
 import { showToast } from '../stores/toast'
 import { openCollectionTab, openQuickstart } from '../stores/tabCreators'
 import { useZoom } from './useZoom'
-import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction } from '../stores/menuRequests'
+import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh } from '../stores/menuRequests'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
-import { tabs, activeTabId, closeTab, cycleTab } from '../stores/tabs'
+import { tabs, activeTabId, activeTab, closeTab, cycleTab } from '../stores/tabs'
+import { canRefreshWorkspace } from '../workspaces/lifecycle'
 import { openModal, openModals } from '../stores/modals'
 import { checkNow as checkForUpdates } from '../stores/updater'
 import { vqbOpen } from '../stores/visualQueryBuilder'
@@ -169,7 +170,12 @@ export function useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll
         requestDocMenuAction(id); return
 
       // --- view ---
+      // Refresh reloads the active tab when it only reads; the native menu is disabled
+      // otherwise, but on Linux the key arrives here regardless (see onGlobalKeydown).
       case 'view:refresh':
+        if (canRefreshWorkspace(activeTab.value)) requestRefresh()
+        else showToast('Nothing to refresh in this tab')
+        return
       case 'view:refresh_all':
         return refreshAll()
 

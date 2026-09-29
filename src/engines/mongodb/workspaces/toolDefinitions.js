@@ -61,6 +61,7 @@ export const toolDefinitions = [
     type: 'mongodb.indexes',
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.indexes,
+    canRefresh: () => true,
     create(ctx) {
       return {
         title: 'Index Manager: ' + ctx.target.collName,
@@ -75,6 +76,7 @@ export const toolDefinitions = [
     type: 'mongodb.schema',
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.schema,
+    canRefresh: () => true,
     create(ctx) {
       return {
         title: 'Schema: ' + ctx.target.collName,
@@ -331,6 +333,7 @@ export const toolDefinitions = [
     type: 'mongodb.current_operations',
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.currentOps,
+    canRefresh: () => true,
     create(ctx) {
       return {
         title: 'Current Operations: ' + ctx.target.connName,

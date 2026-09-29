@@ -50,6 +50,9 @@ pub enum Gate {
     // An index row is selected in the open Indexes dialog (the Index-menu actions,
     // which all operate on the selected index).
     Index,
+    // The active tab is a view that only reads, so reloading it can't change data
+    // (Refresh; see canRefreshWorkspace in the frontend's workspaces/lifecycle.js).
+    RefreshableTab,
 }
 
 // The live selection context, mirrored from the frontend's `menuContext`.
@@ -62,6 +65,7 @@ pub struct MenuContext {
     pub has_field: bool,
     pub has_index: bool,
     pub read_only: bool,
+    pub can_refresh_tab: bool,
 }
 
 // Whether an item with the given gate should be enabled in the given context.
@@ -76,6 +80,7 @@ pub fn gate_enabled(gate: Gate, context: &MenuContext) -> bool {
         Gate::Document => context.has_document,
         Gate::DocumentField => context.has_field,
         Gate::Index => context.has_index,
+        Gate::RefreshableTab => context.can_refresh_tab,
     }
 }
 
@@ -146,6 +151,7 @@ pub fn set_menu_context(
     has_field: bool,
     has_index: bool,
     read_only: bool,
+    can_refresh_tab: bool,
 ) -> Result<(), String> {
     let context = MenuContext {
         has_connection: has_connection,
@@ -156,6 +162,7 @@ pub fn set_menu_context(
         has_field: has_field,
         has_index: has_index,
         read_only: read_only,
+        can_refresh_tab: can_refresh_tab,
     };
     let guard = match items.0.lock() {
         Ok(val) => val,
@@ -190,6 +197,7 @@ mod tests {
             has_field: false,
             has_index: false,
             read_only: false,
+            can_refresh_tab: false,
         }
     }
 
@@ -204,6 +212,7 @@ mod tests {
             has_field: has_field,
             has_index: false,
             read_only: false,
+            can_refresh_tab: false,
         }
     }
 
@@ -218,6 +227,7 @@ mod tests {
             has_field: false,
             has_index: has_index,
             read_only: false,
+            can_refresh_tab: false,
         }
     }
 
@@ -232,6 +242,7 @@ mod tests {
             has_field: true,
             has_index: false,
             read_only: true,
+            can_refresh_tab: false,
         }
     }
 
@@ -371,12 +382,21 @@ mod tests {
     }
 
     #[test]
-    fn refresh_enables_on_any_connection_even_without_active_tab_context() {
-        // The original bug: Refresh acts on every tree connection, so it must
-        // enable whenever a connection exists — not only when the active tab has
-        // one. AnyConnection captures that.
+    fn refresh_all_enables_on_any_connection_even_without_active_tab_context() {
+        // Refresh All acts on every tree connection, so it must enable whenever a
+        // connection exists — not only when the active tab has one.
         let only_any = context(false, false, false, true);
-        assert!(gate_enabled(gate_of("view:refresh"), &only_any));
+        assert!(gate_enabled(gate_of("view:refresh_all"), &only_any));
+    }
+
+    #[test]
+    fn refresh_enables_only_on_a_tab_that_can_reload() {
+        // Refresh reloads the active tab, so a connection alone isn't enough: an
+        // aggregation or SQL editor mustn't be re-run by it.
+        let mut ctx = context(true, true, true, true);
+        assert!(!gate_enabled(gate_of("view:refresh"), &ctx));
+        ctx.can_refresh_tab = true;
+        assert!(gate_enabled(gate_of("view:refresh"), &ctx));
     }
 
     #[test]
@@ -407,7 +427,7 @@ mod tests {
 
     #[test]
     fn menu_gates_match_the_expected_map() {
-        assert_eq!(gate_of("view:refresh"), Gate::AnyConnection);
+        assert_eq!(gate_of("view:refresh"), Gate::RefreshableTab);
         assert_eq!(gate_of("file:server_status"), Gate::Connection);
         assert_eq!(gate_of("file:intellishell"), Gate::Database);
         assert_eq!(gate_of("db:add_collection"), Gate::Database);

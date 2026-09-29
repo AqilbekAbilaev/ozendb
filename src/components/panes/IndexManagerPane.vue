@@ -14,6 +14,7 @@ import { errText, errMessage } from '../../utils/errors'
 import { fmtBytes } from '../../utils/format'
 import { useIndexPaneLifecycle } from '../../composables/useIndexPaneLifecycle'
 import { showToast } from '../../stores/toast'
+import { refreshRequest } from '../../stores/menuRequests'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 
 // Each Index Manager tab manages its own index list, selection, and metrics
@@ -250,6 +251,7 @@ onUnmounted(() => {
 watch(() => idx.indexesRevision.value, () => {
   loadIndexes(props.activeTab)
 })
+watch(refreshRequest, () => loadIndexes())
 
 // Paste: create an index from a JSON spec on the clipboard
 async function pasteIndex() {
