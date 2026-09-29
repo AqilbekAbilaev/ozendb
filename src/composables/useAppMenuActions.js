@@ -170,6 +170,7 @@ export function useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll
 
       // --- view ---
       case 'view:refresh':
+      case 'view:refresh_all':
         return refreshAll()
 
       // Tab navigation/closing. Close Tab and Close Tab (No Prompt) behave the same

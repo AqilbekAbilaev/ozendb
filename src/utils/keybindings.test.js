@@ -99,6 +99,10 @@ describe('matchBinding', () => {
     expect(matchBinding(evt({ key: 'z', ctrl: true }), bindings)).toBeNull()
   })
 
+  it('refreshes every connection on Ctrl/Cmd+Shift+R', () => {
+    expect(matchBinding(evt({ key: 'r', ctrl: true, shift: true }), mergeBindings(null))).toBe('view:refresh_all')
+  })
+
   it('matches Ctrl+Tab / Ctrl+Shift+Tab for next/prev tab', () => {
     const bindings = mergeBindings(null)
     expect(matchBinding(evt({ key: 'Tab', ctrl: true }), bindings)).toBe('view:next_tab')
@@ -106,9 +110,9 @@ describe('matchBinding', () => {
   })
 
   it('follows a rebind', () => {
-    const bindings = mergeBindings({ 'view:refresh': 'CmdOrCtrl+Shift+R' })
+    const bindings = mergeBindings({ 'view:refresh': 'CmdOrCtrl+Alt+R' })
     expect(matchBinding(evt({ key: 'r', ctrl: true }), bindings)).toBeNull()
-    expect(matchBinding(evt({ key: 'r', ctrl: true, shift: true }), bindings)).toBe('view:refresh')
+    expect(matchBinding(evt({ key: 'r', ctrl: true, alt: true }), bindings)).toBe('view:refresh')
   })
 })
 
