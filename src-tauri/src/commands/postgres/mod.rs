@@ -3,6 +3,7 @@ use crate::error::AppError;
 pub(super) use super::AppContext;
 
 pub mod schema;
+pub mod stats;
 pub mod query;
 pub mod browse;
 pub mod read_select;
@@ -15,6 +16,7 @@ pub mod transaction;
 mod array_literal;
 
 pub use schema::*;
+pub use stats::*;
 pub use query::*;
 pub use browse::*;
 pub use read_select::*;
