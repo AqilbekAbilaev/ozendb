@@ -11,6 +11,7 @@ import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
 import PostgresMessages from './PostgresMessages.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
+import { resultColumns } from './resultColumns.js'
 import { runSql, cancelSql, explainSql, formatSql, outcome, endTransaction } from './runSql.js'
 import { showToast } from '../../../stores/toast'
 import PostgresPlan from './PostgresPlan.vue'
@@ -38,6 +39,8 @@ const txnOptions = computed(() => {
     { value: 'manual', label: 'Manual', disabled: !!props.run.txId, title },
   ]
 })
+
+const columns = computed(() => props.run.result && resultColumns(props.run.result.columns))
 
 const editor = ref(null)
 const editorHeight = ref(180)
@@ -139,7 +142,7 @@ const summary = computed(() => {
       <template v-else-if="run.result">
         <StateMessage v-if="run.result.rowsAffected != null" mode="empty" :label="outcome(run.result)" />
         <StateMessage v-else-if="!run.result.rows.length" mode="empty" label="The query returned no rows" />
-        <PostgresResultGrid v-else :columns="run.result.columns" :rows="run.result.rows" :selection="run.selection" />
+        <PostgresResultGrid v-else :columns="columns.keys" :column-info="columns.info" :rows="run.result.rows" :selection="run.selection" />
       </template>
       <StateMessage v-else mode="empty" label="Run a query to see its results (⌘↵)" />
     </div>
