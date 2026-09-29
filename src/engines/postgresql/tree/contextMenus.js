@@ -5,7 +5,7 @@ import { openPostgresQuery, openPostgresTable } from '../../../stores/tabCreator
 // schema?, table? }`. PG_ACTIONS runs the PostgreSQL-only items; every other label
 // (Copy Name, Refresh, Choose Color, Disconnect…) is the shared handler in
 // useFeatures, which works the same for either engine.
-const REFRESH = { label: 'Refresh', shortcut: '⌘R' }
+const REFRESH = { label: 'Refresh' }
 const COPY_NAME = { label: 'Copy Name', shortcut: '⌥⌘C' }
 const NEW_SQL = { label: 'New SQL Query', icon: 'sql' }
 

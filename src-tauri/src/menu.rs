@@ -38,8 +38,8 @@ pub enum Gate {
     Database,
     // A collection is resolvable.
     Collection,
-    // At least one connection is open in the tree (used by Refresh, whose handler
-    // refreshes every connection rather than one specific node).
+    // At least one connection is open in the tree (used by Refresh All Connections,
+    // which refreshes every connection rather than one specific node).
     AnyConnection,
     // A document row is selected in the active collection's results view (the
     // Document-menu actions that operate on a whole document).
@@ -377,6 +377,15 @@ mod tests {
         // one. AnyConnection captures that.
         let only_any = context(false, false, false, true);
         assert!(gate_enabled(gate_of("view:refresh"), &only_any));
+    }
+
+    #[test]
+    fn refresh_all_has_its_own_key_and_enables_on_any_connection() {
+        assert_eq!(gate_of("view:refresh_all"), Gate::AnyConnection);
+        match spec_of("view:refresh_all") {
+            Some(Spec::Action { accel, .. }) => assert_eq!(accel, Some("CmdOrCtrl+Shift+R")),
+            _ => panic!("expected view:refresh_all to be an action"),
+        }
     }
 
     #[test]
