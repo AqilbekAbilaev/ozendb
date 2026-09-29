@@ -74,7 +74,7 @@ function cellCtxPick(action) {
   const { row, col } = cellCtx.value
   if (action === 'value') copy(valueText(valueAt(row, col)))
   else if (action === 'row') copy(rowsAsTsv([props.rows[row]]))
-  else copy(rowsAsJson(props.columns, [props.rows[row]]))
+  else if (action === 'json') copy(rowsAsJson(props.columns, [props.rows[row]]))
   cellCtx.value = null
 }
 

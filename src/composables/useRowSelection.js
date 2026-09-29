@@ -70,11 +70,6 @@ export function useRowSelection({ activeTab }) {
   }
 
   // Mirror the selected field onto the active tab so App.vue's menu context (and the
-  // Document menu's field-scoped gates) can see it — ResultTable owns cell selection,
-  // but the native menu is driven from tab state. Kept in sync with selectedCol so the
-  // menu's "a field is selected" state always matches the highlighted cell.
-
-  // Mirror the selected field onto the active tab so App.vue's menu context (and the
   // Document menu's field-scoped gates) can see it — this composable owns cell selection,
   // but the native menu is driven from tab state. Kept in sync with selectedCol so the
   // menu's "a field is selected" state always matches the highlighted cell.
