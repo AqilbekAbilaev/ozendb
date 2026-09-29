@@ -57,6 +57,9 @@ export function usePostgresTree(connectionId) {
   // After a refresh: the open schemas' tables are re-read, the closed ones' dropped
   // so they're fetched fresh when next opened. Columns are re-read on next open too.
   function reloadTables() {
+    // A refresh re-reads the size too: rows have changed, so the number on the row has.
+    sizesRead = false
+    if (databaseOpen.value) loadDatabaseSizes()
     tables.value = {}
     tableColumns.value = {}
     openTables.value = {}
