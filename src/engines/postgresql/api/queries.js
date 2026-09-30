@@ -67,6 +67,14 @@ export function deleteRows({ connectionId, schema, table }, rows, txId = null) {
   return invoke('delete_pg_rows', { id: connectionId, schema, table, rows, txId })
 }
 
+// `values` holds one entry per column to set on the new row — an identity or stored
+// generated column must never appear here. Resolves to how many rows were inserted
+// (always 1); the caller re-reads the page to see the row as the server actually
+// stored it. `txId` as above.
+export function insertRow({ connectionId, schema, table }, values, txId = null) {
+  return invoke('insert_pg_row', { id: connectionId, schema, table, values, txId })
+}
+
 // A table tab's SQL as `{ filters, orderBy, descending, limit, offset }`; rejects,
 // with the reason, SQL the filter boxes can't show.
 export function readTableSelect({ schema, table }, sql) {

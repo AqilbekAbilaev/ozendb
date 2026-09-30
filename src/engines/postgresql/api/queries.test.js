@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction, browseTable, countTable, updateRow, deleteRows, readTableSelect } from './queries'
+import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction, browseTable, countTable, updateRow, deleteRows, insertRow, readTableSelect } from './queries'
 
 const table = { connectionId: 'c1', schema: 'public', table: 'users' }
 
@@ -95,5 +95,17 @@ describe('PostgreSQL queries', () => {
     const rows = [[{ column: 'id', value: 1 }], [{ column: 'id', value: 2 }]]
     await deleteRows(table, rows)
     expect(invoke).toHaveBeenCalledWith('delete_pg_rows', { id: 'c1', schema: 'public', table: 'users', rows, txId: null })
+  })
+
+  it('inserts a row from its column/value pairs', async () => {
+    const values = [{ column: 'name', value: 'Ada' }]
+    await insertRow(table, values)
+    expect(invoke).toHaveBeenCalledWith('insert_pg_row', { id: 'c1', schema: 'public', table: 'users', values, txId: null })
+  })
+
+  it('inserts a row inside a held transaction', async () => {
+    const values = [{ column: 'name', value: 'Ada' }]
+    await insertRow(table, values, 'tx-1')
+    expect(invoke).toHaveBeenCalledWith('insert_pg_row', { id: 'c1', schema: 'public', table: 'users', values, txId: 'tx-1' })
   })
 })
