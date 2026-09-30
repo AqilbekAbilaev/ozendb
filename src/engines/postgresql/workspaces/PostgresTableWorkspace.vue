@@ -143,6 +143,13 @@ async function saveChanges() {
         <BaseButton v-if="t.activeFilters" variant="ghost" icon="close" title="Show every row again" @click="t.clearFilters">
           Clear ({{ t.activeFilters }})
         </BaseButton>
+        <BaseButton
+          variant="ghost"
+          icon="lock"
+          :active="t.tabReadOnly"
+          :title="t.tabReadOnly ? 'Read-only mode is on — click to allow edits' : 'Read-only mode (block accidental edits)'"
+          @click="t.tabReadOnly = !t.tabReadOnly"
+        />
         <span class="qbar-spacer"></span>
         <span class="qlabel limit">Limit</span>
         <NumberStepper v-model="limitDraft" :min="1" @enter="run" />
@@ -150,15 +157,18 @@ async function saveChanges() {
       </div>
 
       <div class="stagebar">
-        <BaseButton variant="ghost" icon="plus" title="Add a new row" @click="t.addRow()">Add row</BaseButton>
-        <BaseButton variant="ghost" icon="duplicate" :disabled="!canDuplicate" title="Duplicate the selected row" @click="duplicateSelection">Duplicate</BaseButton>
-        <BaseButton variant="ghost" icon="trash" :disabled="!selectedRowIndexes.length" title="Mark the selected row(s) for deletion" @click="deleteSelection">Delete</BaseButton>
+        <BaseButton variant="ghost" icon="plus" :disabled="t.tabReadOnly" title="Add a new row" @click="t.addRow()">Add row</BaseButton>
+        <BaseButton variant="ghost" icon="duplicate" :disabled="t.tabReadOnly || !canDuplicate" title="Duplicate the selected row" @click="duplicateSelection">Duplicate</BaseButton>
+        <BaseButton variant="ghost" icon="trash" :disabled="t.tabReadOnly || !selectedRowIndexes.length" title="Mark the selected row(s) for deletion" @click="deleteSelection">Delete</BaseButton>
         <BaseButton variant="ghost" icon="undo" :disabled="!selectedRowIndexes.length" title="Undo the selected row's pending change" @click="restoreSelection">Restore</BaseButton>
         <span v-if="t.deletedCount" class="stage-deleted"><BaseIcon name="trash" :size="12" /> {{ t.deletedCount }} deleted</span>
         <span class="qbar-spacer"></span>
         <BaseButton variant="ghost" icon="sql" :disabled="!t.pendingCount" title="Preview the SQL a save will run" @click="reviewSqlOpen = true">Review SQL</BaseButton>
         <BaseButton variant="ghost" icon="close" :disabled="!t.pendingCount" title="Drop every pending change" @click="t.discardAll()">Discard</BaseButton>
-        <BaseButton variant="primary" icon="save" :disabled="!t.pendingCount || saving" title="Run every pending change" @click="saveChanges">
+        <BaseButton
+          variant="primary" icon="save" :disabled="!t.pendingCount || saving || t.tabReadOnly"
+          :title="t.tabReadOnly ? 'This tab is read-only' : 'Run every pending change'" @click="saveChanges"
+        >
           {{ saving ? 'Saving…' : `Save changes${t.pendingCount ? ' (' + t.pendingCount + ')' : ''}` }}
         </BaseButton>
       </div>

@@ -13,6 +13,7 @@ describe('createTableState', () => {
       query: { filterText: {}, filters: [], joins: [], nextJoin: 1, shownColumns: [], columnOrder: null, orderBy: null, descending: false, limit: 50, offset: 0 },
       mode: 'filter', sql: '',
       paused: { conditions: {}, columns: null, sort: null },
+      readOnly: false,
     })
     expect(roundTrip(state)).toEqual(state)
     expect(createTableState().query.limit).toBe(100)

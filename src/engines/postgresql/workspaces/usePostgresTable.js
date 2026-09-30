@@ -44,6 +44,10 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   // SQL mode: an editor seeded with the SQL the filters amount to. Going back reads
   // edited SQL into the boxes, or says why they can't show it.
   const mode = toRef(tab.state, 'mode')
+  // Accidental-edit protection — the tab's own lock (tableState.js), independent of
+  // `readOnly` below (the connection's backend-enforced flag, static for the tab's
+  // life). Reactive, since the lock toggles while the tab stays open.
+  const tabReadOnly = toRef(tab.state, 'readOnly')
   const filterRefusal = toRef(runtime, 'filterRefusal')
   // SQL mode's text is lasting state; its runs aren't.
   const sql = toRef(tab.state, 'sql')
@@ -70,7 +74,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   // what each part adds for the parts after it.
   const t = {
     target, runtime, columns, rows, total, elapsedMs, offset, limit, messages, server, orderBy, descending,
-    loading, error, editError, filterText, filters, shownColumns, columnOrder, mode, filterRefusal, sql, sqlRun,
+    loading, error, editError, filterText, filters, shownColumns, columnOrder, mode, tabReadOnly, filterRefusal, sql, sqlRun,
     mainColumns, joins, joinColumns, nextJoinKey, foreignKeys,
   }
   Object.assign(t, useTableDerived(t))
@@ -83,7 +87,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   return {
     explainRun, explain, panel, sql, sqlRun,
     columns, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError, selection,
-    filterText, mode, filterRefusal, limit, messages, server, joins, shownColumns, columnOrder,
+    filterText, mode, tabReadOnly, filterRefusal, limit, messages, server, joins, shownColumns, columnOrder,
     ...pick(t, 'pauses', 'columnInfo', 'activeFilters', 'currentSql', 'hasPrev', 'hasNext', 'keys', 'keyColumns',
       'joinOffers', 'tableNames', 'view', 'toSql', 'openSql', 'toFilters', 'load', 'refresh', 'nextPage', 'prevPage',
       'sortBy', 'addJoin', 'setJoinKind', 'removeJoin', 'joinChoices', 'setJoinOn', 'setFilterText', 'replaceFilterText',

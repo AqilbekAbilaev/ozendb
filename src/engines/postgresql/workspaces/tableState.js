@@ -26,6 +26,10 @@ export function createTableState({ limit } = {}) {
     mode: 'filter',
     sql: '',
     paused: { conditions: {}, columns: null, sort: null },
+    // Accidental-edit protection — the tab's own lock, independent of the
+    // connection's read_only flag (a backend refusal, enforced either way). Mirrors
+    // MongoDB's tab.readOnly (see writable.js's canWriteTab).
+    readOnly: false,
   }
 }
 
