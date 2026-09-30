@@ -29,7 +29,7 @@ export const PG_MENUS = {
     { label: 'Disconnect All' },
   ],
   database: [NEW_SQL, ROUTINES, { sep: true }, { label: 'Create Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
-  schema: [ROUTINES, { sep: true }, { label: 'Drop Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
+  schema: [ROUTINES, { sep: true }, { label: 'Create Table…', icon: 'table' }, { label: 'Drop Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
   table: [
     { label: 'Open Table', icon: 'table', shortcut: '↵' }, NEW_SQL,
     { sep: true }, { label: 'Rename Table…' }, { label: 'Drop Table…' },
@@ -44,6 +44,7 @@ export const PG_ACTIONS = {
   'Functions & Procedures…': (n) => openModal('pgRoutines', n),
   'Create Schema…': (n) => openModal('pgCreateSchema', n),
   'Drop Schema…': (n) => openModal('pgDrop', n),
+  'Create Table…': (n) => openModal('pgCreateTable', n),
   'Rename Table…': (n) => openModal('pgRenameTable', n),
   'Drop Table…': (n) => openModal('pgDrop', n),
   'New SQL Query': (n) => openPostgresQuery({ connectionId: n.connId, connectionName: n.connName, database: n.database }),

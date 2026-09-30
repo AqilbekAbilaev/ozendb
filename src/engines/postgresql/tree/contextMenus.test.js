@@ -51,7 +51,7 @@ describe('PostgreSQL right-click menus', () => {
   it('offers each schema change on the node it applies to', () => {
     const labels = (level) => PG_MENUS[level].map(i => i.label)
     expect(labels('database')).toContain('Create Schema…')
-    expect(labels('schema')).toContain('Drop Schema…')
+    expect(labels('schema')).toEqual(expect.arrayContaining(['Create Table…', 'Drop Schema…']))
     expect(labels('table')).toEqual(expect.arrayContaining(['Rename Table…', 'Drop Table…']))
     PG_ACTIONS['Drop Table…'](table)
     expect(openModal).toHaveBeenCalledWith('pgDrop', table)
