@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use tauri::State;
 
 use super::query::{run_wrapped_on, PgQueryResult};
+use super::row_write::execute_write;
 use super::statement::caller_sql;
 use super::AppContext;
 
@@ -49,6 +50,24 @@ impl PgTransactions {
         let mut held = held.lock().await;
         let tx = held.tx.as_mut().ok_or_else(ended)?;
         let result = run_wrapped_on(tx, sql, &[], run_id).await;
+        if matches!(result, Err(AppError::Postgres(_))) {
+            held.failed = true;
+        }
+        result
+    }
+
+    /// Runs a pre-built write (from `build_update`/`build_delete`) against this
+    /// held transaction instead of the pool — `run`'s sibling for a statement
+    /// that already has its own binds rather than arbitrary caller SQL.
+    pub async fn execute(&self, tx_id: &str, sql: String, binds: Vec<Option<String>>) -> Result<u64, AppError> {
+        let held = self.held(tx_id)?;
+        let mut held = held.lock().await;
+        let tx = held.tx.as_mut().ok_or_else(ended)?;
+        // `execute_write` is generic over `Executor`, which sqlx implements for
+        // `&mut PgConnection` but not `&mut Transaction` directly (unlike the
+        // concrete `&mut PgConnection` parameter `run_wrapped_on` takes above,
+        // where the same coercion happens implicitly) — so the deref is explicit.
+        let result = execute_write(sql, binds, &mut **tx).await;
         if matches!(result, Err(AppError::Postgres(_))) {
             held.failed = true;
         }

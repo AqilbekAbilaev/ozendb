@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction, browseTable, countTable, updateRow, readTableSelect } from './queries'
+import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction, browseTable, countTable, updateRow, deleteRows, readTableSelect } from './queries'
 
 const table = { connectionId: 'c1', schema: 'public', table: 'users' }
 
@@ -81,6 +81,19 @@ describe('PostgreSQL queries', () => {
     const set = [{ column: 'name', value: 'Ada' }]
     const where = [{ column: 'id', value: 1 }]
     await updateRow(table, set, where)
-    expect(invoke).toHaveBeenCalledWith('update_pg_row', { id: 'c1', schema: 'public', table: 'users', set, where })
+    expect(invoke).toHaveBeenCalledWith('update_pg_row', { id: 'c1', schema: 'public', table: 'users', set, where, txId: null })
+  })
+
+  it('updates one row inside a held transaction', async () => {
+    const set = [{ column: 'name', value: 'Ada' }]
+    const where = [{ column: 'id', value: 1 }]
+    await updateRow(table, set, where, 'tx-1')
+    expect(invoke).toHaveBeenCalledWith('update_pg_row', { id: 'c1', schema: 'public', table: 'users', set, where, txId: 'tx-1' })
+  })
+
+  it('deletes a batch of rows, each identified by its key columns', async () => {
+    const rows = [[{ column: 'id', value: 1 }], [{ column: 'id', value: 2 }]]
+    await deleteRows(table, rows)
+    expect(invoke).toHaveBeenCalledWith('delete_pg_rows', { id: 'c1', schema: 'public', table: 'users', rows, txId: null })
   })
 })

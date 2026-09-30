@@ -27,6 +27,8 @@ mod persist;
 #[cfg(test)]
 mod pg_command_integration_tests;
 #[cfg(test)]
+mod pg_delete_integration_tests;
+#[cfg(test)]
 mod pg_browse_integration_tests;
 #[cfg(test)]
 mod pg_cancel_integration_tests;
@@ -246,6 +248,7 @@ pub fn run() {
             count_pg_table,
             read_pg_table_select,
             update_pg_row,
+            delete_pg_rows,
             create_collection,
             drop_database,
             drop_collection,
