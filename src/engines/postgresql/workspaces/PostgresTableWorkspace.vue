@@ -127,7 +127,7 @@ function copySql() {
               :filter-text="t.filterText"
               @sort="t.sortBy"
               @move-column="t.moveColumn"
-              @save="t.saveCell"
+              @save="t.stageEdit"
               @filter-text="t.setFilterText"
               @apply-filters="run"
             />
