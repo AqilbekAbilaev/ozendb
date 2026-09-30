@@ -698,7 +698,7 @@ describe('saveChanges', () => {
 
     const calls = []
     for (const fn of [beginTransaction, insertRow, updateRow, deleteRows, commitTransaction]) {
-      fn.mockImplementation((...args) => { calls.push(fn); return Promise.resolve(fn === insertRow || fn === updateRow || fn === deleteRows ? 1 : undefined) })
+      fn.mockImplementation(() => { calls.push(fn); return Promise.resolve(fn === insertRow || fn === updateRow || fn === deleteRows ? 1 : undefined) })
     }
 
     expect(await t.saveChanges()).toBe(true)
