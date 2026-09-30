@@ -49,6 +49,8 @@ mod pg_routines_integration_tests;
 #[cfg(test)]
 mod pg_serverinfo_integration_tests;
 #[cfg(test)]
+mod pg_schema_integration_tests;
+#[cfg(test)]
 mod pg_stats_integration_tests;
 #[cfg(test)]
 mod pg_integration_tests;
