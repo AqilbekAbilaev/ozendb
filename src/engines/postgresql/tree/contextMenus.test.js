@@ -47,4 +47,15 @@ describe('PostgreSQL right-click menus', () => {
     PG_ACTIONS['Server Info']({ connId: 'p1', connName: 'Payments PG' })
     expect(openModal).toHaveBeenCalledWith('pgServerInfo', { connId: 'p1', connName: 'Payments PG' })
   })
+
+  it('offers each schema change on the node it applies to', () => {
+    const labels = (level) => PG_MENUS[level].map(i => i.label)
+    expect(labels('database')).toContain('Create Schema…')
+    expect(labels('schema')).toContain('Drop Schema…')
+    expect(labels('table')).toEqual(expect.arrayContaining(['Rename Table…', 'Drop Table…']))
+    PG_ACTIONS['Drop Table…'](table)
+    expect(openModal).toHaveBeenCalledWith('pgDrop', table)
+    PG_ACTIONS['Rename Table…'](table)
+    expect(openModal).toHaveBeenCalledWith('pgRenameTable', table)
+  })
 })

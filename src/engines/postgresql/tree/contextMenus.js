@@ -28,9 +28,13 @@ export const PG_MENUS = {
     { label: 'Disconnect Others' },
     { label: 'Disconnect All' },
   ],
-  database: [NEW_SQL, ROUTINES, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
-  schema: [ROUTINES, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
-  table: [{ label: 'Open Table', icon: 'table', shortcut: '↵' }, NEW_SQL, { sep: true }, COPY_NAME],
+  database: [NEW_SQL, ROUTINES, { sep: true }, { label: 'Create Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
+  schema: [ROUTINES, { sep: true }, { label: 'Drop Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
+  table: [
+    { label: 'Open Table', icon: 'table', shortcut: '↵' }, NEW_SQL,
+    { sep: true }, { label: 'Rename Table…' }, { label: 'Drop Table…' },
+    { sep: true }, COPY_NAME,
+  ],
 }
 
 export const PG_ACTIONS = {
@@ -38,6 +42,10 @@ export const PG_ACTIONS = {
   'Server Activity…': (n) => openModal('pgActivity', n),
   'Roles…': (n) => openModal('pgRoles', n),
   'Functions & Procedures…': (n) => openModal('pgRoutines', n),
+  'Create Schema…': (n) => openModal('pgCreateSchema', n),
+  'Drop Schema…': (n) => openModal('pgDrop', n),
+  'Rename Table…': (n) => openModal('pgRenameTable', n),
+  'Drop Table…': (n) => openModal('pgDrop', n),
   'New SQL Query': (n) => openPostgresQuery({ connectionId: n.connId, connectionName: n.connName, database: n.database }),
   'Open Table': (n) => openPostgresTable({
     connectionId: n.connId, connectionName: n.connName, database: n.database, schema: n.schema, table: n.table,
