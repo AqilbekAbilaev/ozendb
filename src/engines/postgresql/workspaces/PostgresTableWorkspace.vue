@@ -156,27 +156,31 @@ async function saveChanges() {
         <BaseButton bordered icon="aggregate" class="qbar-hide-lg" :active="t.panel.builderOpen" title="Visual Query Builder" @click="t.panel.builderOpen = !t.panel.builderOpen">Query Builder</BaseButton>
       </div>
 
-      <div class="stagebar">
-        <BaseButton variant="ghost" icon="plus" :disabled="t.tabReadOnly" title="Add a new row" @click="t.addRow()">Add row</BaseButton>
-        <BaseButton variant="ghost" icon="duplicate" :disabled="t.tabReadOnly || !canDuplicate" title="Duplicate the selected row" @click="duplicateSelection">Duplicate</BaseButton>
-        <BaseButton variant="ghost" icon="trash" :disabled="t.tabReadOnly || !selectedRowIndexes.length" title="Mark the selected row(s) for deletion" @click="deleteSelection">Delete</BaseButton>
-        <BaseButton variant="ghost" icon="undo" :disabled="!selectedRowIndexes.length" title="Undo the selected row's pending change" @click="restoreSelection">Restore</BaseButton>
-        <span v-if="t.deletedCount" class="stage-deleted"><BaseIcon name="trash" :size="12" /> {{ t.deletedCount }} deleted</span>
-        <span class="qbar-spacer"></span>
-        <BaseButton variant="ghost" icon="sql" :disabled="!t.pendingCount" title="Preview the SQL a save will run" @click="reviewSqlOpen = true">Review SQL</BaseButton>
-        <BaseButton variant="ghost" icon="close" :disabled="!t.pendingCount" title="Drop every pending change" @click="t.discardAll()">Discard</BaseButton>
-        <BaseButton
-          variant="primary" icon="save" :disabled="!t.pendingCount || saving || t.tabReadOnly"
-          :title="t.tabReadOnly ? 'This tab is read-only' : 'Run every pending change'" @click="saveChanges"
-        >
-          {{ saving ? 'Saving…' : `Save changes${t.pendingCount ? ' (' + t.pendingCount + ')' : ''}` }}
-        </BaseButton>
-      </div>
-
       <div class="pg-body">
         <div class="pg-main">
           <div class="rtabs">
             <TabStrip v-model="t.panel.rtab" :options="rtabs" />
+          </div>
+
+          <div class="stagebar">
+            <BaseButton icon="first" :icon-size="18" disabled title="First page" />
+            <BaseButton icon="prev" :icon-size="18" disabled title="Previous page" />
+            <BaseButton icon="next" :icon-size="18" disabled title="Next page" />
+            <BaseButton icon="last" :icon-size="18" disabled title="Last page" />
+            <BaseButton icon="plus" :icon-size="18" :disabled="t.tabReadOnly" title="Add a new row" @click="t.addRow()" />
+            <BaseButton icon="duplicate" :icon-size="18" :disabled="t.tabReadOnly || !canDuplicate" title="Duplicate the selected row" @click="duplicateSelection" />
+            <BaseButton icon="trash" :icon-size="18" :disabled="t.tabReadOnly || !selectedRowIndexes.length" title="Mark the selected row(s) for deletion" @click="deleteSelection" />
+            <BaseButton icon="undo" :icon-size="18" :disabled="!selectedRowIndexes.length" title="Undo the selected row's pending change" @click="restoreSelection" />
+            <span v-if="t.deletedCount" class="stage-deleted"><BaseIcon name="trash" :size="12" /> {{ t.deletedCount }} deleted</span>
+            <span class="qbar-spacer"></span>
+            <BaseButton icon="sql" :icon-size="18" :disabled="!t.pendingCount" title="Preview the SQL a save will run" @click="reviewSqlOpen = true" />
+            <BaseButton icon="close" :icon-size="18" :disabled="!t.pendingCount" title="Drop every pending change" @click="t.discardAll()" />
+            <BaseButton
+              variant="primary" icon="save" :disabled="!t.pendingCount || saving || t.tabReadOnly"
+              :title="t.tabReadOnly ? 'This tab is read-only' : 'Run every pending change'" @click="saveChanges"
+            >
+              {{ saving ? 'Saving…' : `Save changes${t.pendingCount ? ' (' + t.pendingCount + ')' : ''}` }}
+            </BaseButton>
           </div>
 
           <template v-if="t.panel.rtab === 'Result'">
@@ -289,8 +293,8 @@ async function saveChanges() {
   color: var(--danger-text); background: var(--danger-bg);
 }
 /* Staged-changes row (Add row/Duplicate/Delete/Restore, Review SQL/Discard/Save
-   changes) — a second toolbar row under .qbar, same look, its own concern. */
-.stagebar { display: flex; align-items: center; gap: 2px; padding: 4px 10px; border-bottom: 1px solid var(--border); flex: none; flex-wrap: wrap; }
+   changes) — a second toolbar row under .rtabs, same look, its own concern. */
+.stagebar { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-bottom: 1px solid var(--border); flex: none; }
 .stage-deleted { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--danger-text); margin-left: 6px; }
 </style>
 <style scoped src="../../../components/workspace/WorkspaceToolbar.css"></style>
