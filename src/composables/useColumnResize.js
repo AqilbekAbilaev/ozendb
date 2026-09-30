@@ -15,7 +15,11 @@ export const fitWidth = (width) => Math.min(360, Math.max(40, width))
 //
 // `cellData` is for a virtualized grid, whose columns must be pinned from the start (see
 // colDefaultWidths). Without it the table keeps auto layout until a column is resized.
-export function useColumnResize({ gridColumns, cellData, headerLabel: labelOf }) {
+// `minWidth` is a getter for the narrowest a column may be pinned to. A header that
+// holds a control — PostgreSQL's per-column filter box, which has a min-width of its
+// own — needs more than the content estimate, or the estimate pins the column
+// narrower than its own header can be drawn.
+export function useColumnResize({ gridColumns, cellData, headerLabel: labelOf, minWidth }) {
   const tableRef  = ref(null)
   const colWidths = ref({})   // col name → px; empty = auto layout
 
@@ -131,7 +135,7 @@ export function useColumnResize({ gridColumns, cellData, headerLabel: labelOf })
         const len = row[c].display.length
         if (len > maxLen) maxLen = len
       }
-      out[cols[c]] = fitWidth(Math.ceil(maxLen * charW.value) + 24)
+      out[cols[c]] = Math.max(minWidth ? minWidth() : 0, fitWidth(Math.ceil(maxLen * charW.value) + 24))
     }
     return out
   })

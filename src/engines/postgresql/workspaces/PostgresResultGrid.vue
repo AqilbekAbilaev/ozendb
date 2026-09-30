@@ -50,10 +50,27 @@ const WIDTH_SAMPLE = 200
 const cellData = computed(() =>
   props.rows.slice(0, WIDTH_SAMPLE).map(row => row.map(value => ({ display: formatCell(value) }))))
 
+// A header here is three lines deep: the name (with its table's prefix when the tab
+// joins others), the type under it, and the filter box under that. The width estimate
+// measures one string, so it gets whichever of the first two is longer — comparing
+// character counts across two font sizes is rough, but erring wide is harmless here
+// and erring narrow clips the type.
+function headerText(column) {
+  const info = props.columnInfo[column]
+  const name = (info?.tableLabel ? info.tableLabel + '.' : '') + (info?.name ?? column)
+  const type = info?.dataType ?? ''
+  return name.length >= type.length ? name : type
+}
+
+// The filter box's own min-width (92px) plus the cell's padding: with filters showing,
+// no column can usefully be narrower than its own input.
+const FILTER_MIN_WIDTH = 116
+
 const { tableRef, startResize, autoFitColumn, thWidthStyle } = useColumnResize({
   gridColumns: () => props.columns,
   cellData: () => cellData.value,
-  headerLabel: (column) => props.columnInfo[column]?.name ?? column,
+  headerLabel: headerText,
+  minWidth: () => (props.filterText ? FILTER_MIN_WIDTH : 0),
 })
 
 const rowSelection = useRowSelection({ activeTab: () => props.selection })
