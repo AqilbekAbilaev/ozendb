@@ -38,3 +38,17 @@ export function cancelBackend(connectionId, pid) {
 export function terminateBackend(connectionId, pid) {
   return invoke('pg_terminate_backend', { id: connectionId, pid })
 }
+
+// Every role on the server, with its attributes and the roles it belongs to.
+export function roles(connectionId) {
+  return invoke('pg_roles', { id: connectionId })
+}
+
+// Create a role. `role` is { name, password, canLogin, superuser, createDb, createRole }.
+export function createRole(connectionId, role) {
+  return invoke('create_pg_role', { id: connectionId, role })
+}
+
+export function dropRole(connectionId, name) {
+  return invoke('drop_pg_role', { id: connectionId, name })
+}
