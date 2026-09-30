@@ -825,6 +825,47 @@ describe('review fixes', () => {
   })
 })
 
+describe('the tab\'s own read-only lock', () => {
+  it('blocks editing, staging inserts and deletes, and saving once toggled on', async () => {
+    const t = await loaded()
+    expect(t.canEdit('name')).toBe(true)
+
+    t.tabReadOnly.value = true
+    expect(t.canEdit('name')).toBe(false)
+    expect(t.canEditInsertColumn('name')).toBe(false)
+    expect(t.addRow()).toBe(null)
+    expect(t.duplicateRow(0)).toBe(null)
+    t.toggleDelete([0])
+    expect(t.isDeleted(0)).toBe(false)
+    expect(t.deletedCount.value).toBe(0)
+  })
+
+  it('refuses to save pre-existing staged changes once locked, leaving them staged', async () => {
+    const t = await loaded()
+    t.stageEdit(0, 'name', 'Ada L.')
+    t.tabReadOnly.value = true
+
+    expect(await t.saveChanges()).toBe(false)
+    expect(t.editError.value).toMatch(/read-only/)
+    expect(t.pendingCount.value).toBe(1)
+    expect(beginTransaction).not.toHaveBeenCalled()
+  })
+
+  it('unlocking live restores editing, independent of the connection\'s own flag', async () => {
+    const t = await loaded()
+    t.tabReadOnly.value = true
+    expect(t.canEdit('name')).toBe(false)
+    t.tabReadOnly.value = false
+    expect(t.canEdit('name')).toBe(true)
+  })
+
+  it('a read-only connection locks even when the tab\'s own toggle is off', async () => {
+    const t = await loaded({ readOnly: true })
+    expect(t.tabReadOnly.value).toBe(false)
+    expect(t.canEdit('name')).toBe(false)
+  })
+})
+
 describe('a table that is gone or unreadable', () => {
   it('says so, rather than showing only the server\'s line', async () => {
     browseTable.mockRejectedValue({ code: 'missing', message: 'relation "public.users" does not exist' })

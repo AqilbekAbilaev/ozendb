@@ -26,9 +26,14 @@ function sqlLiteral(value) {
 // until saveChanges runs every pending change in one transaction. Cell edits still
 // show immediately (the row's displayed value is updated in place), but only as a
 // local draft — reverted by restoreRow or a plain refresh, never auto-committed.
-export function useTableStage(t, readOnly) {
-  const { target, rows, columns, view, editError, refByKey, columnInfo, keyColumns, at, refresh } = t
+export function useTableStage(t, connectionReadOnly) {
+  const { target, rows, columns, view, editError, refByKey, columnInfo, keyColumns, at, refresh, tabReadOnly } = t
   const staged = t.runtime.staged
+
+  // Locked either way: `connectionReadOnly` is the backend's own refusal (static for
+  // the tab's life — the connection can't change while it's open), `tabReadOnly` is
+  // the tab's own accidental-edit lock (tableState.js), toggled live.
+  const locked = () => connectionReadOnly || tabReadOnly.value
 
   // A staged insert as the grid renders it: one row array in the same column order as
   // everything else, appended after the loaded page — so a grid row index past
@@ -46,14 +51,14 @@ export function useTableStage(t, readOnly) {
     const ref = refByKey.value[key]
     const column = ref?.info?.name ?? key
     if (rowIndex >= rows.value.length) return canEditInsertColumn(column)
-    if (readOnly || keyColumns.value.length === 0 || ref?.table !== 0) return false
+    if (locked() || keyColumns.value.length === 0 || ref?.table !== 0) return false
     return canEditInsertColumn(column)
   }
 
   // The same identity/generated exclusion, for a staged insert's draft cells — which
   // have no `refByKey` entry to read it from, since they aren't part of the loaded page.
   function canEditInsertColumn(column) {
-    if (readOnly) return false
+    if (locked()) return false
     const info = columnInfo.value[column]
     return !(info?.identity === 'always' || info?.generated === 'stored')
   }
@@ -118,6 +123,7 @@ export function useTableStage(t, readOnly) {
   // Flips whether these grid rows are staged for deletion. A row that's also been
   // edited drops that edit — there's nothing to save on a row about to be removed.
   function toggleDelete(indexes) {
+    if (locked()) return
     for (const i of indexes) {
       const row = rows.value[i]
       if (!row) continue
@@ -153,6 +159,7 @@ export function useTableStage(t, readOnly) {
   // A blank staged draft, appended to the pending inserts — rendering it into the
   // grid, and populating its cells, is the caller's job (stageInsertValue below).
   function addRow() {
+    if (locked()) return null
     const key = crypto.randomUUID()
     staged.inserts.push({ key, values: {} })
     return key
@@ -162,6 +169,7 @@ export function useTableStage(t, readOnly) {
   // values — identity/generated columns are left out, exactly as addRow leaves them
   // for the server to fill in.
   function duplicateRow(rowIndex) {
+    if (locked()) return null
     const row = rows.value[rowIndex]
     if (!row) return null
     const values = {}
@@ -223,6 +231,10 @@ export function useTableStage(t, readOnly) {
   async function saveChanges() {
     editError.value = null
     if (!pendingCount.value) return true
+    if (locked()) {
+      editError.value = 'This tab is read-only.'
+      return false
+    }
     const txId = crypto.randomUUID()
     try {
       await beginTransaction(target.connectionId, txId)
