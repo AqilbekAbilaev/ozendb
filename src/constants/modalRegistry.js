@@ -36,6 +36,11 @@ export const MODALS = {
   pgActivity:   { component: lazy(() => import('../engines/postgresql/admin/PostgresActivityModal.vue')),   level: 'connection' },
   // Roles are cluster-wide in Postgres, so this is connection level, not database.
   pgRoles:      { component: lazy(() => import('../engines/postgresql/admin/PostgresRolesModal.vue')),      level: 'connection' },
+  // Schema changes, opened from a database, schema or table node with the node as target.
+  pgCreateSchema: { component: lazy(() => import('../engines/postgresql/admin/PostgresCreateSchemaModal.vue')), level: 'database' },
+  pgCreateTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresCreateTableModal.vue')),  level: 'database' },
+  pgDrop:         { component: lazy(() => import('../engines/postgresql/admin/PostgresDropModal.vue')),         level: 'database' },
+  pgRenameTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresRenameTableModal.vue')),  level: 'database' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },

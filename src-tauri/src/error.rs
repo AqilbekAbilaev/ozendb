@@ -210,6 +210,10 @@ fn postgres_message(e: &sqlx::Error) -> String {
                 String::from("The query was cancelled.")
             }
         }
+        // lock_not_available: a schema change gave up waiting on its `lock_timeout`.
+        sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("55P03") => String::from(
+            "The table is in use by an open transaction, in another tab or session. Commit or roll it back, then try again.",
+        ),
         sqlx::Error::Database(db_err) => db_err.message().to_string(),
         _ => e.to_string(),
     }
