@@ -34,6 +34,8 @@ export const MODALS = {
   // Opened from a database node (every user schema) or a schema node (just that one).
   pgRoutines:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRoutinesModal.vue')),   level: 'database' },
   pgActivity:   { component: lazy(() => import('../engines/postgresql/admin/PostgresActivityModal.vue')),   level: 'connection' },
+  // Roles are cluster-wide in Postgres, so this is connection level, not database.
+  pgRoles:      { component: lazy(() => import('../engines/postgresql/admin/PostgresRolesModal.vue')),      level: 'connection' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },
