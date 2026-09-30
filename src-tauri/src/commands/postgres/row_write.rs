@@ -319,6 +319,88 @@ pub async fn delete_pg_rows(
     }
 }
 
+/// Builds the `INSERT INTO ... (cols) VALUES (...)` statement and its binds, without
+/// running it — the same build/execute split `build_update`/`build_delete` use, for
+/// the same reason (the transaction branch below).
+async fn build_insert(
+    pool: &sqlx::PgPool,
+    schema: &str,
+    table: &str,
+    values: &[ColumnValue],
+) -> Result<(String, Vec<Option<String>>), AppError> {
+    if values.is_empty() {
+        return Err(AppError::Validation("Nothing to insert.".to_string()));
+    }
+
+    let types = column_types(pool, schema, table).await?;
+    let qualified = format!("{}.{}", quote_ident(schema)?, quote_ident(table)?);
+
+    let mut columns = Vec::with_capacity(values.len());
+    let mut placeholders = Vec::with_capacity(values.len());
+    let mut binds: Vec<Option<String>> = Vec::new();
+    for (i, item) in values.iter().enumerate() {
+        let pg_type = column_cast(&types, &item.column)?;
+        columns.push(quote_ident(&item.column)?);
+        placeholders.push(format!("${}::{pg_type}", i + 1));
+        binds.push(stringify_param(&item.value, pg_type));
+    }
+
+    let sql = format!(
+        "INSERT INTO {qualified} ({}) VALUES ({})",
+        columns.join(", "),
+        placeholders.join(", "),
+    );
+
+    Ok((sql, binds))
+}
+
+pub(crate) async fn insert_row_impl(
+    pool: &sqlx::PgPool,
+    schema: &str,
+    table: &str,
+    values: &[ColumnValue],
+) -> Result<u64, AppError> {
+    let (sql, binds) = build_insert(pool, schema, table, values).await?;
+    execute_write(sql, binds, pool).await
+}
+
+/// Inserts one row from the column/value pairs in `values` — typically every
+/// NOT-NULL column without a default, plus whatever optional ones the caller filled
+/// in. An identity-always or stored-generated column (see `list_pg_columns`'s
+/// `identity`/`generated`) must never appear here, or Postgres refuses it (428C9 for
+/// identity; a generated column can't be targeted at all).
+///
+/// Returns 1 on success rather than decoding a `RETURNING` clause: the caller
+/// refreshes its page after a save either way (an insert is one of possibly several
+/// staged changes committed together), which reads the row back through the same
+/// safe, already-typed browse path everything else in the grid uses — simpler than a
+/// second, insert-specific JSON decode with its own numeric-precision handling to get
+/// right (see `wrap_for_json`'s `text_cast` in query.rs for why that's not free).
+///
+/// Same `tx_id`/read-only handling as `update_pg_row`/`delete_pg_rows`.
+#[tauri::command]
+pub async fn insert_pg_row(
+    ctx: State<'_, AppContext>,
+    txs: State<'_, super::PgTransactions>,
+    id: String,
+    schema: String,
+    table: String,
+    values: Vec<ColumnValue>,
+    tx_id: Option<String>,
+) -> Result<u64, AppError> {
+    match tx_id {
+        Some(tx_id) => {
+            let pool = ctx.pg_pool(&id).await?;
+            let (sql, binds) = build_insert(&pool, &schema, &table, &values).await?;
+            txs.execute(&tx_id, sql, binds).await
+        }
+        None => {
+            let pool = ctx.pg_pool_for_write(&id).await?;
+            insert_row_impl(&pool, &schema, &table, &values).await
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "row_write.test.rs"]
 mod tests;
