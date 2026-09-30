@@ -82,6 +82,54 @@ async fn commit_after_an_error_says_nothing_was_committed_rather_than_pretend() 
 }
 
 #[tokio::test]
+async fn a_bound_write_through_a_held_transaction_is_undone_by_rollback() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP TABLE IF EXISTS ozendb_it_tx_bound",
+        "CREATE TABLE ozendb_it_tx_bound (id INT PRIMARY KEY, n INT NOT NULL)",
+        "INSERT INTO ozendb_it_tx_bound (id, n) VALUES (1, 1)",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap();
+    }
+    let txs = PgTransactions::default();
+
+    // `execute` is `PgTransactions::run`'s sibling for a pre-built, bound statement
+    // (what `update_pg_row`/`delete_pg_rows` hand it) rather than raw caller SQL —
+    // exercised here the same way `run`'s tests exercise arbitrary SQL above.
+    txs.begin(&pool, "tx-bound", false).await.unwrap();
+    let updated = txs
+        .execute("tx-bound", String::from("UPDATE ozendb_it_tx_bound SET n = $1::int WHERE id = $2::int"), vec![Some(String::from("99")), Some(String::from("1"))])
+        .await
+        .unwrap();
+    assert_eq!(updated, 1);
+    let inserted = txs
+        .execute("tx-bound", String::from("DELETE FROM ozendb_it_tx_bound WHERE id = $1::int"), vec![Some(String::from("1"))])
+        .await
+        .unwrap();
+    assert_eq!(inserted, 1);
+
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM ozendb_it_tx_bound").fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 1, "the update and delete are invisible outside the held transaction");
+
+    txs.finish("tx-bound", false).await.unwrap();
+    let (n, count): (i32, i64) = (
+        sqlx::query_scalar("SELECT n FROM ozendb_it_tx_bound WHERE id = 1").fetch_one(&pool).await.unwrap(),
+        sqlx::query_scalar("SELECT count(*) FROM ozendb_it_tx_bound").fetch_one(&pool).await.unwrap(),
+    );
+    assert_eq!(n, 1, "rollback undid the update");
+    assert_eq!(count, 1, "rollback undid the delete");
+
+    sqlx::query("DROP TABLE ozendb_it_tx_bound").execute(&pool).await.unwrap();
+}
+
+#[tokio::test]
 async fn a_read_only_connection_holds_a_read_only_transaction() {
     let config = match test_config() {
         Some(val) => val,

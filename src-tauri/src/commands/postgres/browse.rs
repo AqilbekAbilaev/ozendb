@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tauri::State;
 
-use super::query::{column_types, run_wrapped, PgQueryResult, ROW_RESULT_CAP};
+use super::query::{run_wrapped, PgQueryResult, ROW_RESULT_CAP};
+use super::row_write::column_types;
 use super::array_literal::array_literal;
 use super::{primary_key_columns, quote_ident, AppContext};
 

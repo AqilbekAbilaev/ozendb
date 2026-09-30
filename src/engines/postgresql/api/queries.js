@@ -55,9 +55,16 @@ export function countTable({ connectionId, schema, table }, filters = [], joins 
   return invoke('count_pg_table', { id: connectionId, schema, table, joins, filters })
 }
 
-// `where` holds the row's primary-key columns and their original values.
-export function updateRow({ connectionId, schema, table }, set, where) {
-  return invoke('update_pg_row', { id: connectionId, schema, table, set, where })
+// `where` holds the row's primary-key columns and their original values. `txId` runs
+// it in a transaction held open by beginTransaction, the same as runQuery.
+export function updateRow({ connectionId, schema, table }, set, where, txId = null) {
+  return invoke('update_pg_row', { id: connectionId, schema, table, set, where, txId })
+}
+
+// `rows` holds one entry per row to delete, each its primary-key columns and their
+// original values — the same shape `where` above takes, one per row. `txId` as above.
+export function deleteRows({ connectionId, schema, table }, rows, txId = null) {
+  return invoke('delete_pg_rows', { id: connectionId, schema, table, rows, txId })
 }
 
 // A table tab's SQL as `{ filters, orderBy, descending, limit, offset }`; rejects,
