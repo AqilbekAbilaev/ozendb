@@ -43,7 +43,7 @@ export function useRowVirtualizer({ count, scrollElement, rowElement, estimate =
     return rows.length ? totalSize.value - rows[rows.length - 1].end : 0
   })
 
-  const scrollToRow = (row) => rowVirtualizer.value.scrollToIndex(row, { align: 'auto' })
+  const scrollToRow = (row, align = 'auto') => rowVirtualizer.value.scrollToIndex(row, { align })
   // After the rows on screen have changed: measure once they're painted.
   const remeasure = () => nextTick(measureRowH)
 

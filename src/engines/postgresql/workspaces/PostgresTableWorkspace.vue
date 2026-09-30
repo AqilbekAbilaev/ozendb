@@ -84,6 +84,14 @@ const selectedRowIndexes = computed(() => {
 })
 const canDuplicate = computed(() => selectedRowIndexes.value.length === 1 && selectedRowIndexes.value[0] < t.value.rows.length)
 
+const resultGridRef = ref(null)
+function onAddRow() {
+  const key = t.value.addRow()
+  if (key == null) return
+  const rowIndex = t.value.rows.length + t.value.insertDrafts.length - 1
+  resultGridRef.value?.focusNewRow(rowIndex)
+}
+
 function deleteSelection() {
   t.value.toggleDelete(selectedRowIndexes.value)
 }
@@ -167,7 +175,7 @@ async function saveChanges() {
             <BaseButton icon="prev" :icon-size="18" disabled title="Previous page" />
             <BaseButton icon="next" :icon-size="18" disabled title="Next page" />
             <BaseButton icon="last" :icon-size="18" disabled title="Last page" />
-            <BaseButton icon="plus" :icon-size="18" :disabled="t.tabReadOnly" title="Add a new row" @click="t.addRow()" />
+            <BaseButton icon="plus" :icon-size="18" :disabled="t.tabReadOnly" title="Add a new row" @click="onAddRow" />
             <BaseButton icon="duplicate" :icon-size="18" :disabled="t.tabReadOnly || !canDuplicate" title="Duplicate the selected row" @click="duplicateSelection" />
             <BaseButton icon="trash" :icon-size="18" :disabled="t.tabReadOnly || !selectedRowIndexes.length" title="Mark the selected row(s) for deletion" @click="deleteSelection" />
             <BaseButton icon="undo" :icon-size="18" :disabled="!selectedRowIndexes.length" title="Undo the selected row's pending change" @click="restoreSelection" />
@@ -194,6 +202,7 @@ async function saveChanges() {
             <StateMessage v-else-if="!t.rows.length && !t.activeFilters && !t.error" mode="empty" label="This table has no rows" />
             <PostgresResultGrid
               v-else
+              ref="resultGridRef"
               :columns="t.view.columns"
               :rows="gridRows"
               :selection="t.selection"

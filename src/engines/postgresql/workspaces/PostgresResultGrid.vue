@@ -78,7 +78,7 @@ const { tableRef, startResize, autoFitColumn, thWidthStyle } = useColumnResize({
 
 const rowSelection = useRowSelection({ activeTab: () => props.selection })
 const { selectedCol, anchorRow, isRowSelected } = rowSelection
-const { cellCtx, onCellClick, selectRow, openCellCtx } = useGridCells({ rows: rowSelection })
+const { cellCtx, onCellClick, selectRow, selectCell, openCellCtx } = useGridCells({ rows: rowSelection })
 
 // Mounting again, or being handed another tab's selection, picks up where it was left.
 watch(() => props.selection, (held) => {
@@ -172,6 +172,30 @@ function setNull() {
   editing.value = null
   emit('save', row, column, null)
 }
+
+// A row added off the loaded page's end lands past the viewport with nothing to draw
+// attention to it — scroll it into view and open its first editable cell. Two ticks:
+// scrollToRow's scroll event re-renders virtualRows asynchronously, so the target row
+// isn't mounted yet on the first one.
+async function focusNewRow(rowIndex) {
+  // 'center', not 'end': the row height used for this scroll is still the last
+  // measurement (remeasure() hasn't run for it yet), so an 'end' alignment flush
+  // against the viewport's bottom edge has no margin for that estimate being off —
+  // a few px under and the row lands clipped behind the footer. Centering leaves
+  // slack on both sides. 'auto' (the keyboard-nav default) is worse still — it stops
+  // at the first sliver of visibility.
+  scrollToRow(rowIndex, 'center')
+  await nextTick()
+  await nextTick()
+  const column = props.columns.find(c => props.canEdit(c, rowIndex))
+  if (column) {
+    selectCell(rowIndex, column)
+    startEdit(rowIndex, column, null)
+  } else {
+    rowSelection.setSingleRow(rowIndex)
+  }
+}
+defineExpose({ focusNewRow })
 </script>
 
 <template>
