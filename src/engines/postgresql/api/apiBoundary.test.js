@@ -9,7 +9,7 @@ const POSTGRES_COMMANDS = [
   // resources.js
   'list_pg_schemas', 'list_pg_tables', 'list_pg_columns', 'list_pg_foreign_keys',
   // queries.js
-  'run_pg_query', 'cancel_pg_query', 'explain_pg_query', 'format_pg_sql', 'begin_pg_transaction', 'commit_pg_transaction', 'rollback_pg_transaction', 'browse_pg_table', 'count_pg_table', 'update_pg_row', 'delete_pg_rows', 'read_pg_table_select',
+  'run_pg_query', 'cancel_pg_query', 'explain_pg_query', 'format_pg_sql', 'begin_pg_transaction', 'commit_pg_transaction', 'rollback_pg_transaction', 'browse_pg_table', 'count_pg_table', 'update_pg_row', 'delete_pg_rows', 'insert_pg_row', 'read_pg_table_select',
   // ddl.js
   'create_pg_schema', 'drop_pg_schema', 'create_pg_table', 'drop_pg_table', 'rename_pg_table',
   // library.js
