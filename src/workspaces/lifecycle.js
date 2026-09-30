@@ -142,6 +142,10 @@ export function retargetResource(from, to) {
       if (segment.kind === 'collection' && workspace.collectionName !== undefined) {
         workspace.collectionName = segment.name
       }
+      // PostgreSQL tabs spell the same identity as database / schema / table.
+      if (segment.kind === 'database' && workspace.database !== undefined) workspace.database = segment.name
+      if (segment.kind === 'schema' && workspace.schema !== undefined) workspace.schema = segment.name
+      if (segment.kind === 'table' && workspace.table !== undefined) workspace.table = segment.name
     }
 
     // A tab the user renamed by hand keeps its title; only a default one follows.

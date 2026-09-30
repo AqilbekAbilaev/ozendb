@@ -271,6 +271,22 @@ describe('retargetResource', () => {
     expect(t.collectionName).toBe('orders')
   })
 
+  // A PostgreSQL table tab queries by its flat schema/table, so a stale copy would
+  // keep reading the old name after a rename.
+  it('moves a PostgreSQL table tab to the renamed table and schema', () => {
+    const at = (schema, table) => createResourceRef(conn, [
+      { kind: 'database', name: 'app' }, { kind: 'schema', name: schema }, { kind: 'table', name: table },
+    ])
+    const pg = { kind: 'pgTable', target: at('public', 'users'), title: 'users', database: 'app', schema: 'public', table: 'users' }
+    retargetResource(at('public', 'users'), at('public', 'people'))(pg)
+    expect([pg.schema, pg.table, pg.title]).toEqual(['public', 'people', 'people'])
+
+    const schemaOnly = (name) => createResourceRef(conn, [{ kind: 'database', name: 'app' }, { kind: 'schema', name }])
+    retargetResource(schemaOnly('public'), schemaOnly('crm'))(pg)
+    expect([pg.database, pg.schema, pg.table]).toEqual(['app', 'crm', 'people'])
+    expect(pg.target).toEqual(at('crm', 'people'))
+  })
+
   // A tab the user renamed by hand keeps its title; only the default one follows.
   it('retitles only when the title still matches the old name', () => {
     const untouched = tab({ title: 'orders' })
