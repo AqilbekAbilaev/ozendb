@@ -22,6 +22,9 @@ const range = computed(() => {
     <span v-if="t.activeFilters" class="fitem">
       <BaseIcon name="filter" :size="13" /> {{ t.activeFilters }} filter{{ t.activeFilters > 1 ? 's' : '' }}
     </span>
+    <span v-if="t.pendingCount" class="fitem stage-pending">
+      <BaseIcon name="save" :size="13" /> {{ t.pendingCount }} unsaved change{{ t.pendingCount > 1 ? 's' : '' }}
+    </span>
     <span>Auto-commit</span>
     <span class="spacer"></span>
     <span class="paging">
@@ -42,6 +45,7 @@ const range = computed(() => {
   border-top: 1px solid var(--border); background: var(--bg-panel);
 }
 .fitem { display: flex; align-items: center; gap: 6px; }
+.stage-pending { color: var(--warn); }
 .paging { display: flex; gap: 2px; }
 .spacer { flex: 1; }
 </style>

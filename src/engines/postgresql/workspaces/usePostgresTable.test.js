@@ -668,6 +668,32 @@ describe('staged inserting', () => {
     t.removeInsert(key)
     expect(t.pendingCount.value).toBe(0)
   })
+
+  it('insertRows renders each draft as a row in the grid\'s column order', async () => {
+    const t = await loaded()
+    const key = t.addRow()
+    t.stageInsertValue(key, 'name', 'New')
+    expect(t.insertRows.value).toEqual([[null, 'New', null, null]])
+  })
+
+  it('a draft row is editable by column, with no primary-key requirement, but not an identity/generated column', async () => {
+    listColumns.mockResolvedValue([...COLUMNS, { name: 'seq', dataType: 'integer', isPrimaryKey: false, identity: 'always' }])
+    const t = await loaded()
+    t.addRow()
+    const draftIndex = t.rows.value.length
+    expect(t.canEdit('name', draftIndex)).toBe(true)
+    expect(t.canEdit('seq', draftIndex)).toBe(false)
+  })
+
+  it('stageEdit on a draft row\'s grid index routes to the insert draft, not a loaded row', async () => {
+    const t = await loaded()
+    t.addRow()
+    const draftIndex = t.rows.value.length
+    expect(t.stageEdit(draftIndex, 'name', 'Grace')).toBe(true)
+    expect(t.insertRows.value[0]).toEqual([null, 'Grace', null, null])
+    // The draft isn't spliced into the loaded page — it stays a separate row.
+    expect(t.rows.value).toHaveLength(2)
+  })
 })
 
 describe('reviewSql', () => {

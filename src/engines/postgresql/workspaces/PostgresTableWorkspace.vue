@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, shallowRef, watch, computed } from 'vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
 import CodeEditor from '../../../components/base/CodeEditor.vue'
 import NumberStepper from '../../../components/base/NumberStepper.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
@@ -10,6 +11,7 @@ import PostgresPlan from './PostgresPlan.vue'
 import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
 import PostgresQueryBuilder from './PostgresQueryBuilder.vue'
 import PostgresResultGrid from './PostgresResultGrid.vue'
+import PostgresReviewSqlModal from './PostgresReviewSqlModal.vue'
 import PostgresSqlPanel from './PostgresSqlPanel.vue'
 import PostgresTableFooter from './PostgresTableFooter.vue'
 import PostgresTableHeader from './PostgresTableHeader.vue'
@@ -63,6 +65,57 @@ function explain() {
 function copySql() {
   navigator.clipboard.writeText(t.value.currentSql).then(() => showToast('SQL copied')).catch(() => {})
 }
+
+// The loaded page plus any staged draft rows, appended after it — a draft's grid
+// index is always past the loaded page's own length (see tableStage.js's canEdit/
+// stageEdit, which route on that same boundary).
+const gridRows = computed(() => [...t.value.view.rows, ...t.value.insertRows])
+
+function rowStatus(rowIndex) {
+  if (rowIndex >= t.value.rows.length) return 'inserted'
+  return t.value.isDeleted(rowIndex) ? 'deleted' : null
+}
+
+// Rows the grid currently has selected, whether a range/multi-select or just the one
+// active cell's row — the same fallback the grid's own copySelection uses.
+const selectedRowIndexes = computed(() => {
+  const sel = t.value.selection
+  return sel.selectedRows.length ? sel.selectedRows : (sel.selectedRow >= 0 ? [sel.selectedRow] : [])
+})
+const canDuplicate = computed(() => selectedRowIndexes.value.length === 1 && selectedRowIndexes.value[0] < t.value.rows.length)
+
+function deleteSelection() {
+  t.value.toggleDelete(selectedRowIndexes.value)
+}
+
+function duplicateSelection() {
+  if (canDuplicate.value) t.value.duplicateRow(selectedRowIndexes.value[0])
+}
+
+// One row or several, loaded or draft — restoreRow/removeInsert both already no-op
+// safely on a row with nothing staged, so this doesn't need to know which kind first.
+function restoreSelection() {
+  for (const idx of selectedRowIndexes.value) {
+    if (idx >= t.value.rows.length) {
+      const draft = t.value.insertDrafts[idx - t.value.rows.length]
+      if (draft) t.value.removeInsert(draft.key)
+    } else {
+      t.value.restoreRow(idx)
+    }
+  }
+}
+
+const reviewSqlOpen = ref(false)
+const saving = ref(false)
+async function saveChanges() {
+  if (saving.value) return
+  saving.value = true
+  try {
+    if (await t.value.saveChanges()) showToast('Changes saved')
+  } finally {
+    saving.value = false
+  }
+}
 </script>
 
 <template>
@@ -96,6 +149,20 @@ function copySql() {
         <BaseButton bordered icon="aggregate" class="qbar-hide-lg" :active="t.panel.builderOpen" title="Visual Query Builder" @click="t.panel.builderOpen = !t.panel.builderOpen">Query Builder</BaseButton>
       </div>
 
+      <div class="stagebar">
+        <BaseButton variant="ghost" icon="plus" title="Add a new row" @click="t.addRow()">Add row</BaseButton>
+        <BaseButton variant="ghost" icon="duplicate" :disabled="!canDuplicate" title="Duplicate the selected row" @click="duplicateSelection">Duplicate</BaseButton>
+        <BaseButton variant="ghost" icon="trash" :disabled="!selectedRowIndexes.length" title="Mark the selected row(s) for deletion" @click="deleteSelection">Delete</BaseButton>
+        <BaseButton variant="ghost" icon="undo" :disabled="!selectedRowIndexes.length" title="Undo the selected row's pending change" @click="restoreSelection">Restore</BaseButton>
+        <span v-if="t.deletedCount" class="stage-deleted"><BaseIcon name="trash" :size="12" /> {{ t.deletedCount }} deleted</span>
+        <span class="qbar-spacer"></span>
+        <BaseButton variant="ghost" icon="sql" :disabled="!t.pendingCount" title="Preview the SQL a save will run" @click="reviewSqlOpen = true">Review SQL</BaseButton>
+        <BaseButton variant="ghost" icon="close" :disabled="!t.pendingCount" title="Drop every pending change" @click="t.discardAll()">Discard</BaseButton>
+        <BaseButton variant="primary" icon="save" :disabled="!t.pendingCount || saving" title="Run every pending change" @click="saveChanges">
+          {{ saving ? 'Saving…' : `Save changes${t.pendingCount ? ' (' + t.pendingCount + ')' : ''}` }}
+        </BaseButton>
+      </div>
+
       <div class="pg-body">
         <div class="pg-main">
           <div class="rtabs">
@@ -114,7 +181,7 @@ function copySql() {
             <PostgresResultGrid
               v-else
               :columns="t.view.columns"
-              :rows="t.view.rows"
+              :rows="gridRows"
               :selection="t.selection"
               :column-info="t.columnInfo"
               :row-offset="t.offset"
@@ -124,6 +191,7 @@ function copySql() {
               reorderable
               :can-edit="t.canEdit"
               :edit-text="t.editText"
+              :row-status="rowStatus"
               :filter-text="t.filterText"
               @sort="t.sortBy"
               @move-column="t.moveColumn"
@@ -186,6 +254,7 @@ function copySql() {
         @load="t.openSql"
         @close="library = null"
       />
+      <PostgresReviewSqlModal v-if="reviewSqlOpen" :sql="t.reviewSql" @close="reviewSqlOpen = false" />
     </template>
   </div>
 </template>
@@ -209,5 +278,9 @@ function copySql() {
   padding: 6px 10px; font-size: 12.5px;
   color: var(--danger-text); background: var(--danger-bg);
 }
+/* Staged-changes row (Add row/Duplicate/Delete/Restore, Review SQL/Discard/Save
+   changes) — a second toolbar row under .qbar, same look, its own concern. */
+.stagebar { display: flex; align-items: center; gap: 2px; padding: 4px 10px; border-bottom: 1px solid var(--border); flex: none; flex-wrap: wrap; }
+.stage-deleted { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--danger-text); margin-left: 6px; }
 </style>
 <style scoped src="../../../components/workspace/WorkspaceToolbar.css"></style>

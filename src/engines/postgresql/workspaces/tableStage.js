@@ -27,17 +27,27 @@ function sqlLiteral(value) {
 // show immediately (the row's displayed value is updated in place), but only as a
 // local draft — reverted by restoreRow or a plain refresh, never auto-committed.
 export function useTableStage(t, readOnly) {
-  const { target, rows, columns, editError, refByKey, columnInfo, keyColumns, at, refresh } = t
+  const { target, rows, columns, view, editError, refByKey, columnInfo, keyColumns, at, refresh } = t
   const staged = t.runtime.staged
+
+  // A staged insert as the grid renders it: one row array in the same column order as
+  // everything else, appended after the loaded page — so a grid row index past
+  // `rows.value.length` is draft number `index - rows.value.length`, no separate
+  // rendering path needed.
+  const insertRows = computed(() => staged.inserts.map(draft => view.value.columns.map(column => draft.values[column] ?? null)))
+  const insertDrafts = computed(() => staged.inserts)
 
   // Only the browsed table's own cells are editable, by its primary key — and never
   // an identity-always or stored-generated column, which Postgres never accepts a
   // value for. Arrays aren't editable yet: their text form (`{a,b}`) isn't what the
-  // grid shows.
-  function canEdit(key) {
+  // grid shows. A draft insert row (rowIndex past the loaded page) skips the
+  // primary-key gate entirely — an insert needs no WHERE clause.
+  function canEdit(key, rowIndex) {
     const ref = refByKey.value[key]
+    const column = ref?.info?.name ?? key
+    if (rowIndex >= rows.value.length) return canEditInsertColumn(column)
     if (readOnly || keyColumns.value.length === 0 || ref?.table !== 0) return false
-    return canEditInsertColumn(ref.info?.name ?? key)
+    return canEditInsertColumn(column)
   }
 
   // The same identity/generated exclusion, for a staged insert's draft cells — which
@@ -77,8 +87,13 @@ export function useTableStage(t, readOnly) {
 
   // Stages one cell's edit — no network call. Keeps the column's first-seen original
   // value alongside whatever's newest, so restoreRow has something to revert to even
-  // after several edits to the same cell.
+  // after several edits to the same cell. A draft insert row (past the loaded page)
+  // routes to stageInsertValue instead — same grid gesture, different staged bucket.
   function stageEdit(rowIndex, key, text) {
+    if (rowIndex >= rows.value.length) {
+      const draft = staged.inserts[rowIndex - rows.value.length]
+      return draft ? stageInsertValue(draft.key, refByKey.value[key]?.info?.name ?? key, text) : false
+    }
     editError.value = null
     const row = rows.value[rowIndex]
     try {
@@ -253,7 +268,7 @@ export function useTableStage(t, readOnly) {
 
   return {
     canEdit, canEditInsertColumn, editText, stageEdit, isDeleted, toggleDelete, restoreRow,
-    addRow, duplicateRow, stageInsertValue, removeInsert,
+    addRow, duplicateRow, stageInsertValue, removeInsert, insertRows, insertDrafts,
     pendingCount, deletedCount, reviewSql, saveChanges, discardAll,
   }
 }

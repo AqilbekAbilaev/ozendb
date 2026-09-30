@@ -89,7 +89,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
       'sortBy', 'addJoin', 'setJoinKind', 'removeJoin', 'joinChoices', 'setJoinOn', 'setFilterText', 'replaceFilterText',
       'setSort', 'setShownColumns', 'moveColumn', 'applyFilters', 'clearFilters',
       'canEdit', 'canEditInsertColumn', 'editText', 'stageEdit', 'isDeleted', 'toggleDelete', 'restoreRow',
-      'addRow', 'duplicateRow', 'stageInsertValue', 'removeInsert',
+      'addRow', 'duplicateRow', 'stageInsertValue', 'removeInsert', 'insertRows', 'insertDrafts',
       'pendingCount', 'deletedCount', 'reviewSql', 'saveChanges', 'discardAll'),
   }
 }
