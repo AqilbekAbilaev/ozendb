@@ -32,6 +32,9 @@ const props = defineProps({
   filterText: { type: Object,   default: null },
   canEdit:    { type: Function, default: () => false },
   editText:   { type: Function, default: (column, value) => (value === null ? '' : formatCell(value)) },
+  // 'deleted' | 'inserted' | null for a grid row index — staged, unsaved state the row
+  // is styled for (strikethrough / a positive tint). Absent means an ordinary loaded row.
+  rowStatus:  { type: Function, default: () => null },
 })
 const emit = defineEmits(['sort', 'save', 'filter-text', 'apply-filters', 'move-column'])
 
@@ -147,7 +150,7 @@ const editing = ref(null)   // { row, column, text, seed }
 const input = ref(null)
 
 async function startEdit(rowIndex, column, value) {
-  if (!props.canEdit(column)) return
+  if (!props.canEdit(column, rowIndex)) return
   const seed = props.editText(column, value)
   editing.value = { row: rowIndex, column, text: seed, seed }
   await nextTick()
@@ -221,13 +224,16 @@ function setNull() {
           v-for="vrow in virtualRows"
           :key="vrow.index"
           class="datarow"
-          :class="{ selrow: isRowSelected(vrow.index), stripe: vrow.index % 2 === 1 }"
+          :class="{
+            selrow: isRowSelected(vrow.index), stripe: vrow.index % 2 === 1,
+            'pending-delete': rowStatus(vrow.index) === 'deleted', 'pending-insert': rowStatus(vrow.index) === 'inserted',
+          }"
         >
           <td class="rownum" @click="selectRow($event, vrow.index)">{{ rowOffset + vrow.index + 1 }}</td>
           <td
             v-for="(value, c) in rows[vrow.index]"
             :key="c"
-            :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c]), selcell: isSelectedCell(vrow.index, columns[c]) }]"
+            :class="[value === null ? 'null' : kinds[c], { editable: canEdit(columns[c], vrow.index), selcell: isSelectedCell(vrow.index, columns[c]) }]"
             :style="thWidthStyle(columns[c])"
             @click="onCellClick($event, vrow.index, columns[c])"
             @contextmenu="openCellCtx($event, vrow.index, columns[c])"
@@ -343,6 +349,10 @@ tbody tr.selrow td { background: var(--bg-selected); }
 /* An accent bar down the gutter marks the selected rows, as in the MongoDB grid. */
 tbody tr.selrow td.rownum { color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 td.selcell { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Staged, unsaved row state (tableStage.js) — nothing here has reached the server yet. */
+tbody tr.pending-delete td { background: var(--danger-bg); color: var(--danger-text); text-decoration: line-through; }
+tbody tr.pending-delete td.rownum { text-decoration: none; }
+tbody tr.pending-insert td { background: var(--success-bg); }
 /* A dragged header's label follows the pointer; a line marks where it will land. */
 .drag-ghost {
   position: fixed; z-index: 200; pointer-events: none;
