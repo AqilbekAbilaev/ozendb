@@ -43,6 +43,10 @@ export function createTableRuntime(connectionId) {
     loading: false, error: null, editError: null, filterRefusal: null, messages: [],
     generation: 0, builtSql: null, selection: createSelection(),
     sqlRun: createSqlRun(connectionId), explainRun: createSqlRun(connectionId),
+    // Staged edits/deletes/inserts, sent to the server only by saveChanges — never
+    // saved with the tab, same as a Manual-mode SQL transaction isn't (rolled back on
+    // tab close instead). See tableStage.js.
+    staged: { edits: {}, deletedKeys: [], inserts: [] },
   }
 }
 

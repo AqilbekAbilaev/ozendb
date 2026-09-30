@@ -4,12 +4,20 @@ import { reactive } from 'vue'
 const browseTable = vi.fn()
 const countTable = vi.fn()
 const updateRow = vi.fn()
+const deleteRows = vi.fn()
+const insertRow = vi.fn()
+const beginTransaction = vi.fn()
+const commitTransaction = vi.fn()
+const rollbackTransaction = vi.fn()
 const listColumns = vi.fn()
 const listForeignKeys = vi.fn()
 const runQuery = vi.fn()
 const readTableSelect = vi.fn()
 const explainQuery = vi.fn()
-vi.mock('../api/queries', () => ({ browseTable, countTable, updateRow, runQuery, readTableSelect, explainQuery }))
+vi.mock('../api/queries', () => ({
+  browseTable, countTable, updateRow, deleteRows, insertRow, beginTransaction, commitTransaction, rollbackTransaction,
+  runQuery, readTableSelect, explainQuery,
+}))
 vi.mock('../api/resources', () => ({ listColumns, listForeignKeys }))
 vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 
@@ -30,6 +38,9 @@ beforeEach(() => {
   listForeignKeys.mockResolvedValue([])
   runQuery.mockResolvedValue({ columns: ['version', 'encoding'], rows: [['16.2', 'UTF8']] })
   countTable.mockResolvedValue(250)
+  beginTransaction.mockResolvedValue()
+  commitTransaction.mockResolvedValue()
+  rollbackTransaction.mockResolvedValue()
   browseTable.mockResolvedValue({
     columns: ['id', 'name', 'tags', 'meta'],
     rows: [[1, 'Ada', ['a'], { x: 1 }], [2, 'Linus', [], null]],
@@ -83,11 +94,10 @@ describe('loading', () => {
     expect(t.selection.value.selectedRow).toBe(-1)
   })
 
-  it('keeps the selection through a cell edit, which changes no row\'s place', async () => {
-    updateRow.mockResolvedValue(1)
+  it('keeps the selection through a staged cell edit, which changes no row\'s place', async () => {
     const t = await loaded()
     t.selection.value.selectedRow = 1
-    await t.saveCell(1, 'name', 'Linus T')
+    t.stageEdit(1, 'name', 'Linus T')
     expect(t.selection.value.selectedRow).toBe(1)
   })
 })
@@ -214,11 +224,9 @@ describe('shown columns', () => {
   })
 
   it('still edits a cell by its hidden primary key', async () => {
-    updateRow.mockResolvedValue(1)
     const t = await loaded()
     t.setShownColumns(['name'])
-    await t.saveCell(0, 'name', 'Ada L.')
-    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'Ada L.' }], [{ column: 'id', value: 1 }])
+    t.stageEdit(0, 'name', 'Ada L.')
     expect(t.view.value.rows[0]).toEqual(['Ada L.'])
   })
 })
@@ -520,7 +528,7 @@ describe('SQL mode', () => {
   })
 })
 
-describe('editing', () => {
+describe('staged editing', () => {
   it('only edits tables with a primary key', async () => {
     const t = await loaded()
     expect(['id', 'name', 'tags', 'meta'].map(t.canEdit)).toEqual([true, true, true, true])
@@ -530,56 +538,224 @@ describe('editing', () => {
     expect(keyless.canEdit('name')).toBe(false)
   })
 
-  it('updates one cell by the row\'s primary key and shows the new value', async () => {
-    updateRow.mockResolvedValue(1)
+  it('never allows editing an identity-always or stored-generated column', async () => {
+    listColumns.mockResolvedValue([
+      ...COLUMNS,
+      { name: 'seq', dataType: 'integer', isPrimaryKey: false, identity: 'always' },
+      { name: 'doubled', dataType: 'integer', isPrimaryKey: false, generated: 'stored' },
+    ])
     const t = await loaded()
-
-    expect(await t.saveCell(1, 'name', 'Torvalds')).toBe(true)
-    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'Torvalds' }], [{ column: 'id', value: 2 }])
-    expect(t.rows.value[1][1]).toBe('Torvalds')
+    expect(t.canEdit('seq')).toBe(false)
+    expect(t.canEdit('doubled')).toBe(false)
+    expect(t.canEditInsertColumn('seq')).toBe(false)
+    expect(t.canEditInsertColumn('doubled')).toBe(false)
+    expect(t.canEditInsertColumn('name')).toBe(true)
   })
 
-  it('parses a JSON column\'s text before saving it', async () => {
-    updateRow.mockResolvedValue(1)
+  it('stages a cell edit locally, with no network call', async () => {
     const t = await loaded()
 
-    await t.saveCell(0, 'meta', '{"y": 2}')
-    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'meta', value: { y: 2 } }], [{ column: 'id', value: 1 }])
+    expect(t.stageEdit(1, 'name', 'Torvalds')).toBe(true)
+    expect(t.rows.value[1][1]).toBe('Torvalds')
+    expect(updateRow).not.toHaveBeenCalled()
+    expect(t.pendingCount.value).toBe(1)
+  })
 
-    expect(await t.saveCell(0, 'meta', '{broken')).toBe(false)
+  it('parses a JSON column\'s text before staging it', async () => {
+    const t = await loaded()
+
+    t.stageEdit(0, 'meta', '{"y": 2}')
+    expect(t.rows.value[0][3]).toEqual({ y: 2 })
+
+    expect(t.stageEdit(0, 'meta', '{broken')).toBe(false)
     expect(t.editError.value).toMatch(/JSON/)
   })
 
   it('edits an array column as the JSON list the grid shows', async () => {
-    updateRow.mockResolvedValue(1)
     const t = await loaded()
     expect(t.editText('tags', ['a', 'b c'])).toBe('["a","b c"]')
 
-    expect(await t.saveCell(0, 'tags', '["x", null]')).toBe(true)
-    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'tags', value: ['x', null] }], [{ column: 'id', value: 1 }])
+    expect(t.stageEdit(0, 'tags', '["x", null]')).toBe(true)
+    expect(t.rows.value[0][2]).toEqual(['x', null])
 
-    expect(await t.saveCell(0, 'tags', '{"a": 1}')).toBe(false)
+    expect(t.stageEdit(0, 'tags', '{"a": 1}')).toBe(false)
     expect(t.editError.value).toMatch(/list/)
-    expect(await t.saveCell(0, 'tags', 'x')).toBe(false)
+    expect(t.stageEdit(0, 'tags', 'x')).toBe(false)
   })
 
   it('sets a cell to NULL when asked for NULL rather than for text', async () => {
-    updateRow.mockResolvedValue(1)
     const t = await loaded()
     for (const [column, at] of [['name', 1], ['tags', 2], ['meta', 3]]) {
-      expect(await t.saveCell(0, column, null), column).toBe(true)
-      expect(updateRow).toHaveBeenLastCalledWith(target, [{ column, value: null }], [{ column: 'id', value: 1 }])
+      expect(t.stageEdit(0, column, null), column).toBe(true)
       expect(t.rows.value[0][at], column).toBe(null)
     }
   })
 
-  it('reports a row that changed or vanished since it was loaded', async () => {
-    updateRow.mockResolvedValue(0)
+  it('restoreRow reverts a staged edit back to its loaded value', async () => {
+    const t = await loaded()
+    t.stageEdit(0, 'name', 'first')
+    t.stageEdit(0, 'name', 'second')
+    expect(t.rows.value[0][1]).toBe('second')
+
+    t.restoreRow(0)
+    expect(t.rows.value[0][1]).toBe('Ada')
+    expect(t.pendingCount.value).toBe(0)
+  })
+})
+
+describe('staged deleting', () => {
+  it('marks rows deleted without removing them or calling the server', async () => {
     const t = await loaded()
 
-    expect(await t.saveCell(0, 'name', 'x')).toBe(false)
+    t.toggleDelete([0, 1])
+    expect(t.isDeleted(0)).toBe(true)
+    expect(t.isDeleted(1)).toBe(true)
+    expect(t.rows.value).toHaveLength(2)
+    expect(deleteRows).not.toHaveBeenCalled()
+    expect(t.pendingCount.value).toBe(2)
+    expect(t.deletedCount.value).toBe(2)
+  })
+
+  it('toggling twice un-marks it', async () => {
+    const t = await loaded()
+    t.toggleDelete([0])
+    t.toggleDelete([0])
+    expect(t.isDeleted(0)).toBe(false)
+    expect(t.deletedCount.value).toBe(0)
+  })
+
+  it('marking a row deleted drops any staged edit on it', async () => {
+    const t = await loaded()
+    t.stageEdit(0, 'name', 'edited')
+    t.toggleDelete([0])
+    expect(t.pendingCount.value).toBe(1)
+  })
+
+  it('restoreRow un-deletes a row', async () => {
+    const t = await loaded()
+    t.toggleDelete([0])
+    t.restoreRow(0)
+    expect(t.isDeleted(0)).toBe(false)
+    expect(t.pendingCount.value).toBe(0)
+  })
+})
+
+describe('staged inserting', () => {
+  it('addRow stages a blank draft', async () => {
+    const t = await loaded()
+    const key = t.addRow()
+    expect(typeof key).toBe('string')
+    expect(t.pendingCount.value).toBe(1)
+  })
+
+  it('stageInsertValue fills in a draft\'s columns', async () => {
+    const t = await loaded()
+    const key = t.addRow()
+    expect(t.stageInsertValue(key, 'name', 'New')).toBe(true)
+    expect(t.stageInsertValue('missing', 'name', 'x')).toBe(false)
+  })
+
+  it('duplicateRow seeds a draft from a loaded row, leaving identity/generated columns out', async () => {
+    listColumns.mockResolvedValue([...COLUMNS, { name: 'seq', dataType: 'integer', isPrimaryKey: false, identity: 'always' }])
+    const t = await loaded()
+    t.duplicateRow(0)
+    expect(t.pendingCount.value).toBe(1)
+  })
+
+  it('removeInsert drops a staged draft', async () => {
+    const t = await loaded()
+    const key = t.addRow()
+    t.removeInsert(key)
+    expect(t.pendingCount.value).toBe(0)
+  })
+})
+
+describe('reviewSql', () => {
+  it('lists one statement per pending change', async () => {
+    const t = await loaded()
+    const key = t.addRow()
+    t.stageInsertValue(key, 'name', 'New')
+    t.stageEdit(0, 'name', 'Ada L.')
+    t.toggleDelete([1])
+
+    const sql = t.reviewSql.value
+    expect(sql).toContain("INSERT INTO public.users (name) VALUES ('New');")
+    expect(sql).toContain("UPDATE public.users SET name = 'Ada L.' WHERE id = 1;")
+    expect(sql).toContain('DELETE FROM public.users WHERE (id) IN ((2));')
+  })
+})
+
+describe('saveChanges', () => {
+  it('runs every pending change in one transaction, in insert/update/delete order, then refreshes', async () => {
+    insertRow.mockResolvedValue(1)
+    updateRow.mockResolvedValue(1)
+    deleteRows.mockResolvedValue(1)
+    const t = await loaded()
+    const key = t.addRow()
+    t.stageInsertValue(key, 'name', 'New')
+    t.stageEdit(0, 'name', 'Ada L.')
+    t.toggleDelete([1])
+
+    const calls = []
+    for (const fn of [beginTransaction, insertRow, updateRow, deleteRows, commitTransaction]) {
+      fn.mockImplementation(() => { calls.push(fn); return Promise.resolve(fn === insertRow || fn === updateRow || fn === deleteRows ? 1 : undefined) })
+    }
+
+    expect(await t.saveChanges()).toBe(true)
+    expect(calls).toEqual([beginTransaction, insertRow, updateRow, deleteRows, commitTransaction])
+    expect(insertRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'New' }], expect.any(String))
+    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'Ada L.' }], [{ column: 'id', value: 1 }], expect.any(String))
+    expect(deleteRows).toHaveBeenCalledWith(target, [[{ column: 'id', value: 2 }]], expect.any(String))
+    expect(rollbackTransaction).not.toHaveBeenCalled()
+    // Cleared, and the page reloaded.
+    expect(t.pendingCount.value).toBe(0)
+    expect(browseTable).toHaveBeenCalledTimes(2)
+  })
+
+  it('rolls back and keeps every pending change staged when one write fails', async () => {
+    insertRow.mockResolvedValue(1)
+    updateRow.mockRejectedValue({ code: 'postgres', message: 'constraint violated' })
+    const t = await loaded()
+    t.addRow()
+    t.stageEdit(0, 'name', 'Ada L.')
+
+    expect(await t.saveChanges()).toBe(false)
+    expect(rollbackTransaction).toHaveBeenCalled()
+    expect(commitTransaction).not.toHaveBeenCalled()
+    expect(t.editError.value).toBe('constraint violated')
+    expect(t.pendingCount.value).toBe(2)
+    // No refresh after a failure — the staged state (and its optimistic display) stands.
+    expect(browseTable).toHaveBeenCalledTimes(1)
+  })
+
+  it('a stale row (0 affected) rolls back the whole batch as a conflict', async () => {
+    updateRow.mockResolvedValue(0)
+    const t = await loaded()
+    t.stageEdit(0, 'name', 'Ada L.')
+
+    expect(await t.saveChanges()).toBe(false)
+    expect(rollbackTransaction).toHaveBeenCalled()
     expect(t.editError.value).toMatch(/changed or was deleted/)
-    expect(t.rows.value[0][1]).toBe('Ada')
+    expect(t.pendingCount.value).toBe(1)
+  })
+
+  it('does nothing when there is nothing staged', async () => {
+    const t = await loaded()
+    expect(await t.saveChanges()).toBe(true)
+    expect(beginTransaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('discardAll', () => {
+  it('clears every staged change and refreshes', async () => {
+    const t = await loaded()
+    t.addRow()
+    t.stageEdit(0, 'name', 'Ada L.')
+    t.toggleDelete([1])
+
+    await t.discardAll()
+    expect(t.pendingCount.value).toBe(0)
+    expect(browseTable).toHaveBeenCalledTimes(2)
   })
 })
 

@@ -4,7 +4,7 @@ import { useTableDerived } from './tableDerived.js'
 import { useTableLoad } from './tableLoad.js'
 import { useTableQuery } from './tableQuery.js'
 import { useTableSqlMode } from './tableSqlMode.js'
-import { useTableEdit } from './tableEdit.js'
+import { useTableStage } from './tableStage.js'
 
 /**
  * One table-browse tab: a page of rows, the row count, sorting, and editing a cell by
@@ -77,17 +77,20 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   Object.assign(t, useTableLoad(t))
   Object.assign(t, useTableQuery(t, tab.state.paused))
   Object.assign(t, useTableSqlMode(t))
-  Object.assign(t, useTableEdit(t, readOnly))
+  Object.assign(t, useTableStage(t, readOnly))
   const explain = () => explainSql(explainRun, t.currentSql.value)
 
   return {
     explainRun, explain, panel, sql, sqlRun,
     columns, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError, selection,
     filterText, mode, filterRefusal, limit, messages, server, joins, shownColumns, columnOrder,
-    ...pick(t, 'pauses', 'columnInfo', 'activeFilters', 'currentSql', 'hasPrev', 'hasNext', 'keys', 'joinOffers',
-      'tableNames', 'view', 'toSql', 'openSql', 'toFilters', 'load', 'refresh', 'nextPage', 'prevPage', 'sortBy',
-      'addJoin', 'setJoinKind', 'removeJoin', 'joinChoices', 'setJoinOn', 'setFilterText', 'replaceFilterText',
-      'setSort', 'setShownColumns', 'moveColumn', 'applyFilters', 'clearFilters', 'canEdit', 'editText', 'saveCell'),
+    ...pick(t, 'pauses', 'columnInfo', 'activeFilters', 'currentSql', 'hasPrev', 'hasNext', 'keys', 'keyColumns',
+      'joinOffers', 'tableNames', 'view', 'toSql', 'openSql', 'toFilters', 'load', 'refresh', 'nextPage', 'prevPage',
+      'sortBy', 'addJoin', 'setJoinKind', 'removeJoin', 'joinChoices', 'setJoinOn', 'setFilterText', 'replaceFilterText',
+      'setSort', 'setShownColumns', 'moveColumn', 'applyFilters', 'clearFilters',
+      'canEdit', 'canEditInsertColumn', 'editText', 'stageEdit', 'isDeleted', 'toggleDelete', 'restoreRow',
+      'addRow', 'duplicateRow', 'stageInsertValue', 'removeInsert',
+      'pendingCount', 'deletedCount', 'reviewSql', 'saveChanges', 'discardAll'),
   }
 }
 
