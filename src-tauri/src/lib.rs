@@ -41,6 +41,8 @@ mod pg_error_integration_tests;
 #[cfg(test)]
 mod pg_ssh_integration_tests;
 #[cfg(test)]
+mod pg_roles_integration_tests;
+#[cfg(test)]
 mod pg_activity_integration_tests;
 #[cfg(test)]
 mod pg_routines_integration_tests;
@@ -222,6 +224,9 @@ pub fn run() {
             pg_sessions,
             pg_cancel_backend,
             pg_terminate_backend,
+            pg_roles,
+            create_pg_role,
+            drop_pg_role,
             run_pg_query,
             cancel_pg_query,
             explain_pg_query,
