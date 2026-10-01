@@ -5,7 +5,7 @@ const listColumns = vi.fn()
 const listForeignKeys = vi.fn()
 vi.mock('../api/resources', () => ({ listTables, listColumns, listForeignKeys }))
 
-const { usePostgresTree, visibleSchemas, isOpenTable } = await import('./usePostgresTree.js')
+const { usePostgresTree, visibleSchemas, isOpenTable, activeTableSchema } = await import('./usePostgresTree.js')
 
 beforeEach(() => vi.resetAllMocks())
 
@@ -29,6 +29,16 @@ describe('isOpenTable', () => {
     expect(isOpenTable(tab, 'c1', 'audit', 'users')).toBe(false)
     expect(isOpenTable({ ...tab, type: 'postgresql.query' }, 'c1', 'public', 'users')).toBe(false)
     expect(isOpenTable(null, 'c1', 'public', 'users')).toBe(false)
+  })
+})
+
+describe('activeTableSchema', () => {
+  const tab = { type: 'postgresql.table_browse', connectionId: 'c1', schema: 'public', table: 'users' }
+  it('is the schema the tree must open for the active tab\'s row to be visible', () => {
+    expect(activeTableSchema(tab, 'c1')).toBe('public')
+    expect(activeTableSchema(tab, 'c2')).toBeNull()
+    expect(activeTableSchema({ ...tab, type: 'postgresql.query' }, 'c1')).toBeNull()
+    expect(activeTableSchema(null, 'c1')).toBeNull()
   })
 })
 
