@@ -6,6 +6,10 @@
 // stays consistent across both. Only the ids listed here are customizable; each
 // one is a menu-action id already handled by handleMenuAction.
 
+// Next/Previous Tab's default differs by platform — kept in step with
+// src-tauri/src/menu/table.rs's cfg!(target_os = "macos") branch there.
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '')
+
 export const SHORTCUT_COMMANDS = [
   { id: 'file:connect',      label: 'Connect…',                  group: 'File',       default: 'CmdOrCtrl+N' },
   { id: 'file:intellishell', label: 'Open IntelliShell',         group: 'File',       default: 'CmdOrCtrl+L' },
@@ -18,9 +22,9 @@ export const SHORTCUT_COMMANDS = [
   { id: 'doc:edit_json',     label: 'Edit Document (JSON)…',     group: 'Document',   default: 'CmdOrCtrl+J' },
   { id: 'view:refresh',      label: 'Refresh',                   group: 'View',       default: 'CmdOrCtrl+R' },
   { id: 'view:refresh_all',  label: 'Refresh All Connections',   group: 'View',       default: 'CmdOrCtrl+Shift+R' },
-  // Ctrl, not CmdOrCtrl — see the note on the same two items in src-tauri/src/menu/table.rs.
-  { id: 'view:next_tab',    label: 'Next Tab',                 group: 'View',       default: 'Ctrl+Tab' },
-  { id: 'view:prev_tab',    label: 'Previous Tab',             group: 'View',       default: 'Ctrl+Shift+Tab' },
+  // Not CmdOrCtrl — see the note on the same two items in src-tauri/src/menu/table.rs.
+  { id: 'view:next_tab',    label: 'Next Tab',                 group: 'View',       default: IS_MAC ? 'Cmd+Shift+]' : 'Ctrl+Tab' },
+  { id: 'view:prev_tab',    label: 'Previous Tab',             group: 'View',       default: IS_MAC ? 'Cmd+Shift+[' : 'Ctrl+Shift+Tab' },
   // `=` / `-` / `0` rather than "Plus"/"Minus": those are the literal names the native
   // accelerator parser accepts *and* what `event.key` reports, so one string serves both.
   { id: 'view:zoom_in',     label: 'Zoom In',                  group: 'View',       default: 'CmdOrCtrl+=' },
@@ -118,6 +122,7 @@ export function accelToTokens(accel, isMac) {
     if (part === '') continue
     const low = part.toLowerCase()
     if (low === 'cmdorctrl') tokens.push(isMac ? '⌘' : 'Ctrl')
+    else if (low === 'cmd') tokens.push(isMac ? '⌘' : 'Cmd')
     else if (low === 'shift') tokens.push(isMac ? '⇧' : 'Shift')
     else if (low === 'alt') tokens.push(isMac ? '⌥' : 'Alt')
     else tokens.push(part.length === 1 ? part.toUpperCase() : part)

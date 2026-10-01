@@ -166,12 +166,23 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
                 Spec::Separator,
                 // Tab navigation/closing act on the active tab; always enabled (they
                 // no-op safely when there are 0–1 tabs), so no gate.
-                // Ctrl, not CmdOrCtrl: ⌘Tab is the macOS app switcher and never reaches
-                // the app, so CmdOrCtrl would leave tab navigation dead there. Ctrl+Tab
-                // is what Safari/Chrome/VS Code use on macOS and it already worked on
-                // Windows/Linux, where CmdOrCtrl resolved to Ctrl.
-                Spec::Action { id: "view:next_tab", label: "Next Tab", accel: Some("Ctrl+Tab"), gate: None },
-                Spec::Action { id: "view:prev_tab", label: "Previous Tab", accel: Some("Ctrl+Shift+Tab"), gate: None },
+                // Not CmdOrCtrl: ⌘Tab is the macOS app switcher and never reaches the
+                // app, so CmdOrCtrl would leave tab navigation dead there. Ctrl+Tab
+                // (tried first, ozendb-1mz) isn't viable either — it never reached the
+                // native menu through the WKWebView-hosted window, root cause still
+                // open. Cmd+Shift+]/[ is what Safari/Chrome/VS Code actually use on
+                // macOS and sidesteps both problems; Windows/Linux keep Ctrl+Tab, which
+                // already worked there (CmdOrCtrl resolves to Ctrl, no reserved chord).
+                Spec::Action {
+                    id: "view:next_tab", label: "Next Tab",
+                    accel: Some(if cfg!(target_os = "macos") { "Cmd+Shift+]" } else { "Ctrl+Tab" }),
+                    gate: None,
+                },
+                Spec::Action {
+                    id: "view:prev_tab", label: "Previous Tab",
+                    accel: Some(if cfg!(target_os = "macos") { "Cmd+Shift+[" } else { "Ctrl+Shift+Tab" }),
+                    gate: None,
+                },
                 Spec::Action { id: "view:close_tab", label: "Close Tab", accel: None, gate: None },
                 Spec::Action { id: "view:close_tab_np", label: "Close Tab (No Prompt)", accel: None, gate: None },
                 Spec::Separator,

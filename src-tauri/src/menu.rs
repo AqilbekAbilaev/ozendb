@@ -411,13 +411,20 @@ mod tests {
     #[test]
     fn tab_navigation_avoids_the_chord_macos_reserves() {
         // ⌘Tab is the macOS app switcher and never reaches an app, so a CmdOrCtrl
-        // default here is dead on macOS while working on Windows/Linux. Ctrl works on
-        // all three. These must stay in step with keybindings.js, which drives the
-        // Linux JS path and the Preferences editor.
+        // default here is dead on macOS. Plain Ctrl+Tab isn't viable there either
+        // (ozendb-1mz: never reached the native menu through the WKWebView-hosted
+        // window). macOS gets Cmd+Shift+]/[ instead (the Safari/Chrome/VS Code
+        // convention); Windows/Linux keep Ctrl+Tab, which already works there. These
+        // must stay in step with keybindings.js, which drives the Linux JS path and
+        // the Preferences editor.
+        let expected_prefix = if cfg!(target_os = "macos") { "Cmd+" } else { "Ctrl+" };
         for id in ["view:next_tab", "view:prev_tab"] {
             match spec_of(id) {
                 Some(Spec::Action { accel: Some(accel), .. }) => {
-                    assert!(accel.starts_with("Ctrl+"), "{id} is bound to {accel}, which is Cmd on macOS")
+                    assert!(
+                        accel.starts_with(expected_prefix),
+                        "{id} is bound to {accel}, expected to start with {expected_prefix}"
+                    )
                 }
                 _ => panic!("expected {id} to be an action with an accelerator"),
             }
