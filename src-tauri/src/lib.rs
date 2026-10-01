@@ -186,16 +186,30 @@ pub fn run() {
                 Ok(val) => val,
                 Err(e) => return Err(e.into()),
             };
-            // Scope the menu to the main window so the pop-out document windows
-            // don't get their own native menu bar.
-            let main_window = match app.get_webview_window("main") {
-                Some(val) => val,
-                None => return Err("no main window to attach the menu to".into()),
-            };
-            match main_window.set_menu(native_menu) {
+            // `WebviewWindow::set_menu` is a documented no-op on macOS (its own docs:
+            // "Unsupported... use AppHandle::set_menu instead") — it returns Ok without
+            // ever attaching anything, silently leaving the OS's bare default menu in
+            // place. macOS has one shared system menu bar regardless of which window is
+            // frontmost, so app-wide is the only model there anyway — no risk of a
+            // pop-out document window getting its own menu, unlike Windows/Linux.
+            #[cfg(target_os = "macos")]
+            match app.handle().set_menu(native_menu) {
                 Ok(_val) => {}
                 Err(e) => return Err(e.into()),
             };
+            // Scope the menu to the main window so the pop-out document windows
+            // don't get their own native menu bar.
+            #[cfg(not(target_os = "macos"))]
+            {
+                let main_window = match app.get_webview_window("main") {
+                    Some(val) => val,
+                    None => return Err("no main window to attach the menu to".into()),
+                };
+                match main_window.set_menu(native_menu) {
+                    Ok(_val) => {}
+                    Err(e) => return Err(e.into()),
+                };
+            }
             app.manage(menu::MenuItems(std::sync::Mutex::new(gated_items)));
             app.on_menu_event(menu::handle_event);
 
