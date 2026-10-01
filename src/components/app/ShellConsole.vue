@@ -7,6 +7,8 @@ import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialo
 import { errText } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
+import BaseSelect from '../base/BaseSelect.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 import TabStrip from '../base/TabStrip.vue'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 import ResultTable from '../results/ResultTable.vue'
@@ -29,12 +31,11 @@ const drillPath = computed({
   set: (val) => { props.activeTab.drillPath = val },
 })
 
-const VIEWS = [['table', 'Table View'], ['json', 'JSON View'], ['tree', 'Tree View']]
-const viewMenu = ref(false)
-const viewLabel = computed(() => {
-  const found = VIEWS.find(([k]) => k === props.activeTab.resultView)
-  return found ? found[1] : 'Table View'
-})
+const VIEW_MODES = [
+  { value: 'table', label: 'Table View' },
+  { value: 'json',  label: 'JSON View' },
+  { value: 'tree',  label: 'Tree View' },
+]
 
 const resultCount = computed(() => props.activeTab.results?.length ?? 0)
 
@@ -268,7 +269,7 @@ function formatScalar(value) {
       <BaseButton variant="ghost" size="sm" @click="saveScript" title="Save the editor contents to a .js file">
         <BaseIcon name="save" :size="16" class="ic" /> Save
       </BaseButton>
-      <span class="tb-spacer"></span>
+      <FlexSpacer />
     </div>
 
     <!-- Editor: CodeMirror (JS highlighting + Mongo autocomplete) -->
@@ -285,26 +286,14 @@ function formatScalar(value) {
           @update:model-value="activeTab.resultTab = $event"
         />
 
-        <span class="rtabs-spacer"></span>
+        <FlexSpacer />
 
         <!-- view switch (Result only) -->
-        <div v-if="activeTab.resultTab === 'Result'" class="view-select-wrap">
-          <span class="view-select" @click="viewMenu = !viewMenu">
-            {{ viewLabel }} <BaseIcon name="caretDown" :size="12" />
-          </span>
-          <div v-if="viewMenu" class="view-menu">
-            <div
-              v-for="[k, label] in VIEWS"
-              :key="k"
-              class="view-menu-item"
-              :class="{ on: activeTab.resultView === k }"
-              @click="activeTab.resultView = k; viewMenu = false"
-            >
-              <BaseIcon v-if="activeTab.resultView === k" name="check" :size="13" />
-              <span>{{ label }}</span>
-            </div>
-          </div>
-        </div>
+        <BaseSelect v-if="activeTab.resultTab === 'Result'" class="view-mode-pick"
+          variant="ghost" size="sm"
+          :model-value="activeTab.resultView || 'table'"
+          :options="VIEW_MODES"
+          @update:model-value="activeTab.resultView = $event" />
       </div>
 
       <!-- Result tab -->
@@ -365,7 +354,6 @@ function formatScalar(value) {
   border: 1px solid var(--border-soft); border-radius: 4px; padding: 1px 5px; margin-left: 4px;
 }
 .tb-sep { width: 1px; align-self: stretch; background: var(--border-soft); margin: 4px 6px; }
-.tb-spacer { flex: 1; }
 
 /* history dropdown (mirrors QueryBar) */
 .hist-wrap { position: relative; }
@@ -406,25 +394,8 @@ function formatScalar(value) {
   display: flex; align-items: center;
   border-bottom: 1px solid var(--border); padding: 0 8px; flex: none;
 }
-.rtabs-spacer { flex: 1; }
 
-.view-select-wrap { position: relative; }
-.view-select {
-  display: flex; align-items: center; gap: 5px; cursor: pointer;
-  font-size: 12px; color: var(--text-dim); padding: 4px 6px;
-}
-.view-select:hover { color: var(--text); }
-.view-menu {
-  position: absolute; top: 100%; right: 0; z-index: 20;
-  background: var(--bg-panel); border: 1px solid var(--border-soft);
-  border-radius: 6px; padding: 4px; min-width: 130px; box-shadow: 0 8px 24px rgba(0,0,0,.4);
-}
-.view-menu-item {
-  display: flex; align-items: center; gap: 6px; padding: 6px 8px;
-  border-radius: 4px; font-size: 12px; color: var(--text); cursor: pointer;
-}
-.view-menu-item:hover { background: var(--bg-hover); }
-.view-menu-item.on { color: var(--accent); }
+.view-mode-pick { flex: none; }
 
 .empty { padding: 32px; color: var(--text-faint); font-size: 12px; }
 
