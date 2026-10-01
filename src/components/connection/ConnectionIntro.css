@@ -1,5 +1,9 @@
 .nci-body { padding: 22px 24px 8px; }
 .nci-engine { display: flex; align-items: center; gap: 14px; margin: 0 0 20px; }
+/* Every engine added is one more option, so the picker is a dropdown: the trigger keeps
+   one width (the menu scrolls) instead of stretching across the dialog as a segmented
+   bar would. Fixed so the row doesn't resize when a longer engine name is chosen. */
+.nci-engine-pick { width: 220px; flex: none; }
 .nci-lead { font-size: 13.5px; line-height: 1.6; color: var(--text); margin: 0 0 22px; }
 .nci-radio {
   display: flex; align-items: center; gap: 11px;
