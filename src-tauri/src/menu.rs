@@ -409,6 +409,22 @@ mod tests {
     }
 
     #[test]
+    fn tab_navigation_avoids_the_chord_macos_reserves() {
+        // ⌘Tab is the macOS app switcher and never reaches an app, so a CmdOrCtrl
+        // default here is dead on macOS while working on Windows/Linux. Ctrl works on
+        // all three. These must stay in step with keybindings.js, which drives the
+        // Linux JS path and the Preferences editor.
+        for id in ["view:next_tab", "view:prev_tab"] {
+            match spec_of(id) {
+                Some(Spec::Action { accel: Some(accel), .. }) => {
+                    assert!(accel.starts_with("Ctrl+"), "{id} is bound to {accel}, which is Cmd on macOS")
+                }
+                _ => panic!("expected {id} to be an action with an accelerator"),
+            }
+        }
+    }
+
+    #[test]
     fn sidebar_selection_enables_collection_scoped_items() {
         // A collection selected in the sidebar makes has_collection true even when
         // the active tab is Quickstart, so collection-scoped items enable.

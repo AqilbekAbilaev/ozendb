@@ -18,8 +18,9 @@ export const SHORTCUT_COMMANDS = [
   { id: 'doc:edit_json',     label: 'Edit Document (JSON)…',     group: 'Document',   default: 'CmdOrCtrl+J' },
   { id: 'view:refresh',      label: 'Refresh',                   group: 'View',       default: 'CmdOrCtrl+R' },
   { id: 'view:refresh_all',  label: 'Refresh All Connections',   group: 'View',       default: 'CmdOrCtrl+Shift+R' },
-  { id: 'view:next_tab',    label: 'Next Tab',                 group: 'View',       default: 'CmdOrCtrl+Tab' },
-  { id: 'view:prev_tab',    label: 'Previous Tab',             group: 'View',       default: 'CmdOrCtrl+Shift+Tab' },
+  // Ctrl, not CmdOrCtrl — see the note on the same two items in src-tauri/src/menu/table.rs.
+  { id: 'view:next_tab',    label: 'Next Tab',                 group: 'View',       default: 'Ctrl+Tab' },
+  { id: 'view:prev_tab',    label: 'Previous Tab',             group: 'View',       default: 'Ctrl+Shift+Tab' },
   // `=` / `-` / `0` rather than "Plus"/"Minus": those are the literal names the native
   // accelerator parser accepts *and* what `event.key` reports, so one string serves both.
   { id: 'view:zoom_in',     label: 'Zoom In',                  group: 'View',       default: 'CmdOrCtrl+=' },

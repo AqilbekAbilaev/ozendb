@@ -25,6 +25,23 @@ describe('SHORTCUT_COMMANDS', () => {
       byAccel[cmd.default] = cmd.id
     }
   })
+
+  it('never defaults a command to a chord macOS reserves', () => {
+    // CmdOrCtrl means Ctrl everywhere except macOS, where it becomes Cmd. A Cmd chord
+    // the OS owns (⌘Tab is the app switcher) never reaches the app at all, so the
+    // shortcut is dead on macOS and fine elsewhere — the worst kind of platform bug.
+    // Binding Ctrl explicitly keeps one accelerator working on all three platforms.
+    // Read the raw tokens rather than parseAccel, which folds Ctrl and CmdOrCtrl
+    // together and so cannot tell the two spellings apart.
+    const CMD_TOKENS = new Set(['cmdorctrl', 'cmd', 'command', 'meta', 'super'])
+    for (const cmd of SHORTCUT_COMMANDS) {
+      const tokens = cmd.default.toLowerCase().split('+')
+      const isCmdOnMac = tokens.some((t) => CMD_TOKENS.has(t.trim()))
+      if (!isCmdOnMac) continue
+      const plain = tokens.filter((t) => t.trim() && t.trim() !== 'shift' && !CMD_TOKENS.has(t.trim()))
+      expect(cmd.default, `${cmd.id} defaults to ${cmd.default}, which macOS reserves as Cmd+${plain.join('+')}`).not.toContain('Tab')
+    }
+  })
 })
 
 describe('shortcutGroups', () => {
