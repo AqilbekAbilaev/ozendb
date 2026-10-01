@@ -3,6 +3,7 @@ import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import HintText from '../base/HintText.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Driven entirely by App.vue: `prompt` is set for a first-contact trust request,
 // `changed` for a refused connection whose host key no longer matches. At most
@@ -35,7 +36,7 @@ defineEmits(['trust', 'cancel', 'forget', 'dismiss'])
       </div>
 
       <div class="hk-footer">
-        <span class="spacer"></span>
+        <FlexSpacer />
         <BaseButton @click="$emit('cancel')">Cancel</BaseButton>
         <BaseButton variant="primary" @click="$emit('trust')">Trust this host</BaseButton>
       </div>
@@ -67,7 +68,7 @@ defineEmits(['trust', 'cancel', 'forget', 'dismiss'])
       </div>
 
       <div class="hk-footer">
-        <span class="spacer"></span>
+        <FlexSpacer />
         <BaseButton @click="$emit('dismiss')">Dismiss</BaseButton>
         <BaseButton variant="danger" @click="$emit('forget')">Forget saved key</BaseButton>
       </div>
@@ -109,7 +110,6 @@ defineEmits(['trust', 'cancel', 'forget', 'dismiss'])
 .hk-fp-row { display: flex; flex-direction: column; gap: 4px; }
 .hk-fp-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
 
-
 .hk-footer {
   height: 48px;
   flex: none;
@@ -119,6 +119,5 @@ defineEmits(['trust', 'cancel', 'forget', 'dismiss'])
   padding: 0 16px;
   gap: 8px;
 }
-.spacer { flex: 1; }
 
 </style>

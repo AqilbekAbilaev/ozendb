@@ -8,6 +8,7 @@ import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Connection → Add Database…: MongoDB only materialises a database once it holds a
 // collection, so the first collection name is required rather than optional.
@@ -64,7 +65,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!valid || saving" @click="confirm">
         {{ saving ? 'Creating…' : 'Create' }}

@@ -8,6 +8,7 @@ import StateMessage from '../base/StateMessage.vue'
 import BaseModal from '../base/BaseModal.vue'
 import HintText from '../base/HintText.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Collection History: the app's record of single-document changes (insert / update /
 // delete) made to this collection, newest-first, each restorable — Studio-3T's
@@ -99,7 +100,7 @@ async function clearAll() {
             {{ entries.length }} recorded change{{ entries.length === 1 ? '' : 's' }}
             <span v-if="notice" class="ch-ok">· {{ notice }}</span>
           </HintText>
-          <span class="ch-spacer"></span>
+          <FlexSpacer />
           <BaseButton size="sm" bordered :disabled="loading || !entries.length" @click="clearAll">
             <BaseIcon name="trash" :size="13" /> Clear history
           </BaseButton>
@@ -133,10 +134,8 @@ async function clearAll() {
 
 <style scoped>
 
-
 .ch-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .ch-ok { color: var(--green, #2f9e63); }
-.ch-spacer { flex: 1; }
 
 .ch-list { display: flex; flex-direction: column; gap: 6px; }
 .ch-item {

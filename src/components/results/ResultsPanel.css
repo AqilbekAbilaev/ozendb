@@ -12,7 +12,6 @@
   flex: none;
 }
 .docs-range { font-size: 12px; color: var(--text-dim); margin: 0 4px; }
-.rtoolbar-spacer { flex: 1; }
 
 .page-size-pick { width: 60px; flex: none; }
 .view-mode-pick { width: 124px; flex: none; }
@@ -37,7 +36,6 @@
   flex: none;
   background: var(--bg-panel);
 }
-.spacer { flex: 1; }
 .fitem { display: flex; align-items: center; gap: 6px; }
 
 /* Dialog chrome (overlay + titled box + close ✕) lives in BaseModal.vue. The rules

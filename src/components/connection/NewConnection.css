@@ -94,7 +94,6 @@
   display: flex; align-items: center; gap: 12px;
   padding: 12px 16px; border-top: 1px solid var(--border); flex: none;
 }
-.nc-editor .spacer { flex: 1; }
 
 .nc-editor .nc-soon {
   font-size: 10.5px;

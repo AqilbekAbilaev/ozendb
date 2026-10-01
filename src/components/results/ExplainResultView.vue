@@ -6,6 +6,7 @@ import BaseSelect from '../base/BaseSelect.vue'
 import SegmentedControl from '../base/SegmentedControl.vue'
 import FieldError from '../base/FieldError.vue'
 import { buildExplainTree } from '../../utils/explainTree'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 const VERBOSITY_OPTIONS = [
   { value: 'executionStats',    label: 'Execution stats' },
@@ -45,7 +46,7 @@ const explainView = ref('graph')
           :options="[{ value: 'graph', label: 'Graph' }, { value: 'json', label: 'View JSON' }]"
           @update:model-value="explainView = $event"
         />
-        <span class="et-spacer"></span>
+        <FlexSpacer />
         <label class="et-verbosity">
           <span class="et-verbosity-label">Detail</span>
           <BaseSelect
@@ -72,7 +73,6 @@ const explainView = ref('graph')
 
 /* Graph / View JSON toggle + verbosity select */
 .explain-toolbar { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border-soft); flex: 0 0 auto; }
-.et-spacer { flex: 1; }
 .et-verbosity { display: inline-flex; align-items: center; gap: 7px; }
 .et-verbosity-label { font-size: 11px; color: var(--text-dim); }
 .et-select { min-width: 140px; }

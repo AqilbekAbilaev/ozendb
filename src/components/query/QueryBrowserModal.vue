@@ -5,6 +5,7 @@ import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 const emit = defineEmits(['close', 'apply'])
 
@@ -134,7 +135,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKey))
         <BaseButton bordered :disabled="!selected" @click="remove">
           <BaseIcon name="trash" :size="13" class="ic" /> Delete
         </BaseButton>
-        <span class="spacer" />
+        <FlexSpacer />
         <BaseButton bordered @click="emit('close')">Close</BaseButton>
         <BaseButton variant="primary" :disabled="!selected" @click="load">Load</BaseButton>
       </div>
@@ -260,6 +261,5 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKey))
   gap: 8px;
   padding: 0 16px;
 }
-.spacer { flex: 1; }
 .ic { color: inherit; }
 </style>

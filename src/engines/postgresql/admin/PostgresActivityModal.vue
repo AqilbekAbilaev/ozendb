@@ -10,6 +10,7 @@ import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseModalBody from '../../../components/base/BaseModalBody.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Opened from a PostgreSQL connection's right-click menu: every session on the server,
 // not only the ones this app opened. Refreshes on a timer like MongoDB's Current
@@ -85,7 +86,7 @@ async function signal(session, kind) {
           <BaseButton :active="filters.activeOnly" bordered icon="run" @click="filters.activeOnly = !filters.activeOnly">
             Active only
           </BaseButton>
-          <span class="pa-spacer"></span>
+          <FlexSpacer />
           <span class="pa-count">{{ shown.length }} of {{ all.length }}</span>
           <BaseButton :active="auto" bordered icon="clock" title="Re-read every few seconds" @click="auto = !auto">
             Auto
@@ -139,7 +140,7 @@ async function signal(session, kind) {
             Terminate session {{ confirming.pid }}<template v-if="confirming.user"> ({{ confirming.user }})</template>?
             Its transaction is rolled back and the client is disconnected.
           </span>
-          <span class="pa-spacer"></span>
+          <FlexSpacer />
           <BaseButton variant="ghost" @click="confirming = null">Cancel</BaseButton>
           <BaseButton variant="danger" @click="signal(confirming, 'terminate')">Terminate</BaseButton>
         </div>
@@ -150,7 +151,6 @@ async function signal(session, kind) {
 
 <style scoped>
 .pa-bar { display: flex; align-items: center; gap: 6px; margin: 12px 0 8px; }
-.pa-spacer { flex: 1; }
 .pa-count { font-size: 12px; color: var(--text-faint); }
 .pa-empty { padding: 20px 2px; color: var(--text-faint); font-size: 12.5px; }
 .pa-stale {

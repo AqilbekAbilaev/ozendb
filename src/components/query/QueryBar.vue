@@ -14,6 +14,7 @@ import SegmentedControl from '../base/SegmentedControl.vue'
 import NumberStepper from '../base/NumberStepper.vue'
 import MenuItem from '../base/MenuItem.vue'
 import FieldError from '../base/FieldError.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 const props = defineProps({
   activeTab:      { type: Object,  required: true },
@@ -295,7 +296,7 @@ watch(() => props.activeTab && props.activeTab.id, () => {
         Paste
       </BaseButton>
     </template>
-    <span class="qbar-spacer"></span>
+    <FlexSpacer />
     <BaseButton v-if="!isAggregate" bordered icon="aggregate" class="qbar-hide-lg" :active="vqbOpen" title="Visual Query Builder" @click="vqbOpen = !vqbOpen">
       Query Builder
     </BaseButton>

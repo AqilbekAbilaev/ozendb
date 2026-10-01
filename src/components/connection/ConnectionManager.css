@@ -137,7 +137,6 @@ table.cmt tr.sel .cm-key { color: rgba(255,255,255,.85); }
   border-top: 1px solid var(--border);
   flex: none;
 }
-.spacer { flex: 1; }
 
 .chk-line {
   display: flex;

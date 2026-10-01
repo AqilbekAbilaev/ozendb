@@ -12,6 +12,7 @@ import BaseInput from '../../../components/base/BaseInput.vue'
 import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseModalBody from '../../../components/base/BaseModalBody.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Opened from a PostgreSQL connection's right-click menu. Roles are cluster-wide in
 // Postgres, so this is a server-level view, not a per-database one. Per-object
@@ -112,7 +113,7 @@ async function confirmDrop() {
           <BaseButton bordered :active="filters.showSystem" title="PostgreSQL's own predefined roles" @click="filters.showSystem = !filters.showSystem">
             System
           </BaseButton>
-          <span class="pr-spacer"></span>
+          <FlexSpacer />
           <span class="pr-count">{{ shown.length }} of {{ all.length }}</span>
           <BaseButton
             variant="primary"
@@ -145,7 +146,7 @@ async function confirmDrop() {
             <template v-else>
               <div class="pr-head">
                 <span class="pr-title">{{ selected.name }}</span>
-                <span class="pr-spacer"></span>
+                <FlexSpacer />
                 <BaseButton
                   variant="ghost"
                   icon="trash"
@@ -206,7 +207,7 @@ async function confirmDrop() {
         <div v-if="confirming" class="pr-confirm">
           <BaseIcon name="warn" :size="15" />
           <span>Drop role {{ confirming.name }}? This cannot be undone.</span>
-          <span class="pr-spacer"></span>
+          <FlexSpacer />
           <BaseButton variant="ghost" @click="confirming = null">Cancel</BaseButton>
           <BaseButton variant="danger" @click="confirmDrop">Drop role</BaseButton>
         </div>
@@ -218,7 +219,6 @@ async function confirmDrop() {
 <style scoped>
 .pr-bar { display: flex; align-items: center; gap: 6px; margin: 12px 0 10px; }
 .pr-search { flex: 1; }
-.pr-spacer { flex: 1; }
 .pr-count { font-size: 12px; color: var(--text-faint); margin-right: 4px; }
 .pr-split { display: flex; gap: 12px; height: 50vh; min-height: 0; }
 .pr-list {

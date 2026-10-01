@@ -8,6 +8,7 @@ import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Database → Add GridFS Bucket…: a bucket is the pair of `<name>.files` and
 // `<name>.chunks` collections; create both so it appears in the GridFS view.
@@ -57,7 +58,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!name.trim() || saving" @click="confirm">
         {{ saving ? 'Creating…' : 'Create' }}

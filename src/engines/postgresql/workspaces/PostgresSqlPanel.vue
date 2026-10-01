@@ -16,6 +16,7 @@ import { runSql, cancelSql, explainSql, formatSql, outcome, endTransaction } fro
 import { showToast } from '../../../stores/toast'
 import PostgresPlan from './PostgresPlan.vue'
 import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // A SQL editor with its toolbar, results and status line. `sql` is the editor's text
 // (v-model:sql — the tab's lasting state); `run` is its runs (createSqlRun), written in
@@ -161,7 +162,7 @@ const summary = computed(() => {
       <span v-if="run.result" class="fitem"><BaseIcon name="clock" :size="14" /> {{ run.result.elapsedMs }} ms</span>
       <span v-if="run.txId" class="fitem txn-open">● Transaction open</span>
       <span v-else>{{ run.txn === 'manual' ? 'Manual' : 'Auto-commit' }}</span>
-      <span class="spacer"></span>
+      <FlexSpacer />
       <span>Ln {{ cursor.line }}, Col {{ cursor.col }}</span>
       <template v-if="server">
         <span>{{ server.encoding }}</span>
@@ -183,6 +184,5 @@ const summary = computed(() => {
 }
 .fitem { display: flex; align-items: center; gap: 6px; }
 .txn-open { color: var(--warn); }
-.spacer { flex: 1; }
 </style>
 <style scoped src="../../../components/workspace/WorkspaceToolbar.css"></style>

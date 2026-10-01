@@ -7,6 +7,7 @@ import BaseButton from '../base/BaseButton.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
 import StateMessage from '../base/StateMessage.vue'
 import { summarize, buildIssueUrl } from '../../utils/errorReport'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Help → Report a Problem. Lists the defects OzenDB recorded about itself and opens a
 // prefilled GitHub issue. Nothing is transmitted from here: the button opens the user's
@@ -98,7 +99,7 @@ function when(at) {
 
     <div class="er-footer">
       <BaseButton v-if="records.length" @click="clearLog">Clear log</BaseButton>
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="$emit('close')">Close</BaseButton>
       <BaseButton v-if="records.length" variant="primary" @click="report">Report on GitHub</BaseButton>
     </div>
@@ -147,5 +148,4 @@ function when(at) {
 .er-detail em { color: var(--text-faint); font-style: normal; }
 
 .er-footer { display: flex; gap: 8px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--border); }
-.spacer { flex: 1; }
 </style>

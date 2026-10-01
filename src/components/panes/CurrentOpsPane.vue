@@ -12,6 +12,7 @@ import TreeResultView from '../results/TreeResultView.vue'
 import { useCurrentOps, FREQUENCIES, RETENTIONS, SLOW_THRESHOLDS } from '../../composables/useCurrentOps'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import { refreshRequest } from '../../stores/menuRequests'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // The Current Operations tab: what the server is doing right now, refreshed on a timer.
 // The list itself, the poll and the retention of finished ops live in useCurrentOps;
@@ -171,7 +172,7 @@ const updatedText = computed(() =>
       <BaseSelect v-model="frequency" class="tb-select" size="sm" :options="FREQUENCIES" />
       <label class="tb-opt">Retain finished ops for:</label>
       <BaseSelect v-model="retention" class="tb-select" size="sm" :options="RETENTIONS" />
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseSelect v-model="view" class="tb-view" size="sm" :options="VIEWS" />
     </div>
 
@@ -199,7 +200,7 @@ const updatedText = computed(() =>
     <!-- Status bar -->
     <div class="cops-status">
       <span>Showing {{ visible.length }} of {{ rows.length }} operation{{ rows.length === 1 ? '' : 's' }}</span>
-      <span class="spacer"></span>
+      <FlexSpacer />
       <span v-if="error" class="cops-err">{{ error }}</span>
       <template v-else>
         <span v-if="noteText" class="cops-note">{{ noteText }}</span>
@@ -251,8 +252,6 @@ const updatedText = computed(() =>
   padding: 4px 12px; font-size: 12px; color: var(--text-dim);
   background: var(--bg-toolbar); border-top: 1px solid var(--border); flex: none;
 }
-.cops-status .spacer { flex: 1; }
-.cops-toolbar .spacer { flex: 1; }
 .tb-view { flex: none; width: 122px; }
 .cops-err { color: var(--danger-text); }
 .cops-note { color: var(--text-faint); }

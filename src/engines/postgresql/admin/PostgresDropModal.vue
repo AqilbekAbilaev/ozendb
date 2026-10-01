@@ -11,6 +11,7 @@ import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
 import { closeWhere } from '../../../stores/tabs'
 import { affectedByResource } from '../../../workspaces/lifecycle'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Schema or table → Drop…: the node's depth says which. Dropping closes every tab
 // inside it, which would otherwise query something gone.
@@ -57,7 +58,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="danger" :disabled="dropping" @click="confirm">
         {{ dropping ? 'Dropping…' : 'Drop' }}

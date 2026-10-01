@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseRadio from '../base/BaseRadio.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Studio-3T-style "Export source" picker: the first thing the user sees after
 // choosing Export, and the sibling of ImportFormatModal. It only decides *what* gets
@@ -90,7 +91,7 @@ function next() {
     </div>
 
     <div class="ifm-footer">
-      <span class="ifm-spacer"></span>
+      <FlexSpacer />
       <BaseButton bordered @click="$emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" @click="next">Next</BaseButton>
     </div>
@@ -132,5 +133,4 @@ function next() {
   padding: 12px 16px;
   border-top: 1px solid var(--border-soft);
 }
-.ifm-spacer { flex: 1; }
 </style>

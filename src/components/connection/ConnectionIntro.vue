@@ -7,6 +7,7 @@ import FieldError from '../base/FieldError.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import { ENGINE_OPTIONS } from '../../data/connectionOptions.js'
 import { CONNECTION_EDITORS } from '../../engines/connectionEditor.js'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 const props = defineProps({
   engine: { type: String, default: 'mongodb' },
@@ -88,7 +89,7 @@ function goNext() {
     </div>
 
     <div class="cm-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton bordered @click="$emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" @click="goNext">Next</BaseButton>
     </div>

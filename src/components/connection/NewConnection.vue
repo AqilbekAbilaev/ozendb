@@ -12,6 +12,7 @@ import { CONNECTION_EDITORS } from '../../engines/connectionEditor.js'
 import ConnectionIntro from './ConnectionIntro.vue'
 import { useConnectionForm } from '../../composables/useConnectionForm.js'
 import { useMomentumScroll } from '../../composables/useMomentumScroll.js'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 const props = defineProps({
   editConn: { type: Object, default: null },
@@ -172,7 +173,7 @@ useMomentumScroll(bodyEl)
           <BaseIcon name="connect" :size="15" />
           {{ isTesting ? 'Testing…' : 'Test Connection' }}
         </BaseButton>
-        <span class="spacer"></span>
+        <FlexSpacer />
         <BaseButton bordered @click="$emit('close')">Cancel</BaseButton>
         <BaseButton
           v-if="blockedByLiveConnection"

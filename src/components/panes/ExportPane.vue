@@ -15,6 +15,7 @@ import HintText from '../base/HintText.vue'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 import { cellText } from '../../utils/format'
 import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT } from '../../constants/dataTools'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Stepped Export wizard for a single collection: sample the collection, choose /
 // reorder / rename the fields (optionally coercing a type), pick a format, preview,
@@ -291,7 +292,7 @@ const sourceLabel = computed(() => {
 
     <div class="iew-footer">
       <BaseButton v-if="activeTab.step > 0" bordered :disabled="running" @click="back">Back</BaseButton>
-      <span class="iew-spacer"></span>
+      <FlexSpacer />
       <BaseButton
         v-if="!isLastStep"
         variant="primary"
@@ -458,5 +459,4 @@ const sourceLabel = computed(() => {
   border-top: 1px solid var(--border-soft);
   flex: none;
 }
-.iew-spacer { flex: 1; }
 </style>

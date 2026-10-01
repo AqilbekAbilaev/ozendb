@@ -12,6 +12,7 @@ import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
 import { openPostgresTable } from '../../../stores/tabCreators'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Schema → Create Table…: a name and a column list, and the new table opens in a tab.
 const props = defineProps({
@@ -77,7 +78,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!!problem || saving" @click="confirm">
         {{ saving ? 'Creating…' : 'Create' }}

@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { getVersion, getName, getTauriVersion } from '@tauri-apps/api/app'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Help → About. Shows the real application name/version reported by the Tauri
 // runtime (never hardcoded), plus the build's Tauri version.
@@ -36,7 +37,7 @@ onMounted(async () => {
       </div>
 
       <div class="ab-footer">
-        <span class="spacer"></span>
+        <FlexSpacer />
         <BaseButton variant="primary" @click="$emit('close')">Close</BaseButton>
       </div>
   </BaseModal>
@@ -60,5 +61,4 @@ onMounted(async () => {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
 }
-.ab-footer .spacer { flex: 1; }
 </style>

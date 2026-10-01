@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // The table tab's status line. `t` is the tab's usePostgresTable state.
 const props = defineProps({
@@ -26,7 +27,7 @@ const range = computed(() => {
       <BaseIcon name="save" :size="13" /> {{ t.pendingCount }} unsaved change{{ t.pendingCount > 1 ? 's' : '' }}
     </span>
     <span>Auto-commit</span>
-    <span class="spacer"></span>
+    <FlexSpacer />
     <span class="paging">
       <BaseButton icon="prev" size="sm" :disabled="!t.hasPrev || t.loading" title="Previous page" @click="t.prevPage" />
       <BaseButton icon="next" size="sm" :disabled="!t.hasNext || t.loading" title="Next page" @click="t.nextPage" />
@@ -47,5 +48,4 @@ const range = computed(() => {
 .fitem { display: flex; align-items: center; gap: 6px; }
 .stage-pending { color: var(--warn); }
 .paging { display: flex; gap: 2px; }
-.spacer { flex: 1; }
 </style>
