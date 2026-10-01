@@ -110,7 +110,7 @@ onBeforeUnmount(() => {
     <button ref="triggerEl" type="button" class="bs-trigger" :class="[`bs-${size}`, { placeholder: !selected, open }]"
       :disabled="disabled" @click="toggle">
       <span class="bs-label">{{ triggerLabel }}</span>
-      <BaseIcon :name="open ? 'caretDown' : 'caret'" :size="12" class="bs-caret" />
+      <BaseIcon name="caretDown" :size="12" class="bs-caret" />
     </button>
     <Teleport to="body">
       <div v-if="open" ref="menuEl" class="bs-menu" :style="menuStyle">
@@ -145,7 +145,10 @@ onBeforeUnmount(() => {
 .bs-trigger.open { border-color: var(--accent); }
 .bs-trigger.placeholder .bs-label { color: var(--text-faint); }
 .bs-label { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bs-caret { flex: none; color: var(--text-dim); }
+.bs-caret { flex: none; color: var(--text-dim); transition: transform .12s ease; }
+/* Rotate the down caret rather than swapping the glyph — `caret` is the right-pointing
+   chevron used for tree expanders, so a closed dropdown would read as a collapsed node. */
+.bs-trigger.open .bs-caret { transform: rotate(180deg); }
 /* Teleported to <body>; geometry is set inline. z-index clears modals (60) / banners (70). */
 .bs-menu {
   background: var(--bg-menu);
