@@ -146,8 +146,6 @@ onBeforeUnmount(() => {
 .bs-trigger.placeholder .bs-label { color: var(--text-faint); }
 .bs-label { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bs-caret { flex: none; color: var(--text-dim); transition: transform .12s ease; }
-/* Rotate the down caret rather than swapping the glyph — `caret` is the right-pointing
-   chevron used for tree expanders, so a closed dropdown would read as a collapsed node. */
 .bs-trigger.open .bs-caret { transform: rotate(180deg); }
 /* Teleported to <body>; geometry is set inline. z-index clears modals (60) / banners (70). */
 .bs-menu {
@@ -170,8 +168,6 @@ onBeforeUnmount(() => {
   font-size: 12.5px;
   color: var(--text-dim);
   cursor: pointer;
-  /* One option per row: a label that wraps reads as two entries in a one-line menu.
-     Callers with long labels widen the trigger instead. */
   white-space: nowrap;
 }
 .bs-item:hover:not(.disabled) { background: var(--bg-hover); color: var(--text); }
