@@ -89,7 +89,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
     columns, rows, total, elapsedMs, offset, orderBy, descending, loading, error, editError, selection,
     filterText, mode, tabReadOnly, filterRefusal, limit, messages, server, joins, shownColumns, columnOrder,
     ...pick(t, 'pauses', 'columnInfo', 'activeFilters', 'currentSql', 'hasPrev', 'hasNext', 'keys', 'keyColumns',
-      'joinOffers', 'tableNames', 'view', 'toSql', 'openSql', 'toFilters', 'load', 'refresh', 'nextPage', 'prevPage',
+      'joinOffers', 'tableNames', 'view', 'toSql', 'openSql', 'toFilters', 'load', 'refresh', 'nextPage', 'prevPage', 'firstPage', 'lastPage',
       'sortBy', 'addJoin', 'setJoinKind', 'removeJoin', 'joinChoices', 'setJoinOn', 'setFilterText', 'replaceFilterText',
       'setSort', 'setShownColumns', 'moveColumn', 'applyFilters', 'clearFilters',
       'canEdit', 'canEditInsertColumn', 'editText', 'stageEdit', 'isDeleted', 'toggleDelete', 'restoreRow',

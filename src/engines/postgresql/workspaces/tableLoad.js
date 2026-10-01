@@ -85,6 +85,10 @@ export function useTableLoad(t) {
   }
   const nextPage = () => goTo(offset.value + limit.value)
   const prevPage = () => goTo(offset.value - limit.value)
+  const firstPage = () => goTo(0)
+  // No-op while the count isn't known yet — same guard `hasNext` already applies
+  // to the toolbar's Last button, so there's nothing to clamp to here.
+  const lastPage = () => total.value == null ? undefined : goTo(Math.floor((total.value - 1) / limit.value) * limit.value)
 
 
   // A new join changes the rows and their count, so both are re-read from page one.
@@ -93,5 +97,5 @@ export function useTableLoad(t) {
     return goTo(0)
   }
 
-  return { loadForeignKeys, load, refresh, goTo, nextPage, prevPage, reload }
+  return { loadForeignKeys, load, refresh, goTo, nextPage, prevPage, firstPage, lastPage, reload }
 }
