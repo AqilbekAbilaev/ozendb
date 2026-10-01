@@ -21,6 +21,7 @@ pub mod format;
 mod statement;
 pub mod transaction;
 pub mod search;
+pub mod history;
 mod array_literal;
 
 pub use schema::*;
@@ -41,6 +42,7 @@ pub use library::*;
 pub use format::*;
 pub use transaction::*;
 pub use search::*;
+pub use history::*;
 
 /// Double-quotes a Postgres identifier (schema/table/column name), escaping any
 /// embedded `"` by doubling it — the standard Postgres quoted-identifier rule.

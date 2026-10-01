@@ -52,7 +52,7 @@ describe('a PostgreSQL table tab restored from a saved session', () => {
       const tab = restore(fixture.state)
       expect(tab).toMatchObject({ type: TYPE, connectionId: 'c1', database: 'app', schema: 'public', table: 'users' })
       expect(await load(tab)).toEqual(fixture.tab)
-      expect(browseTable).toHaveBeenLastCalledWith({ connectionId: 'c1', schema: 'public', table: 'users' }, fixture.browse)
+      expect(browseTable).toHaveBeenLastCalledWith({ connectionId: 'c1', database: 'app', schema: 'public', table: 'users' }, fixture.browse)
     })
 
     it(`saves it again as a shape that restores the same: ${fixture.name}`, async () => {

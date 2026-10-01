@@ -64,6 +64,7 @@ mod pg_uri;
 mod pool;
 mod saved_queries;
 mod pg_query_library;
+mod pg_row_history;
 mod settings;
 mod shell;
 mod ssh;
@@ -76,6 +77,7 @@ mod uri;
 
 use commands::*;
 use collection_history::CollectionHistoryStore;
+use pg_row_history::PgRowHistoryStore;
 use default_queries::DefaultQueryStorage;
 use export_watermarks::ExportWatermarkStorage;
 use folders::FolderStorage;
@@ -127,6 +129,7 @@ pub fn run() {
             app.manage(KeybindingStorage::new(data_dir.join("keybindings.json")));
             app.manage(ExportWatermarkStorage::new(data_dir.join("export_watermarks.json")));
             app.manage(CollectionHistoryStore::new(data_dir.join("collection_history.json")));
+            app.manage(PgRowHistoryStore::new(data_dir.join("pg_row_history.json")));
             // The host-key trust store is shared between the pool (real connect)
             // and Test Connection's temporary tunnel, so both honor the same TOFU
             // record. Managed as an Arc so the pool can own a clone.
@@ -275,6 +278,9 @@ pub fn run() {
             update_pg_row,
             delete_pg_rows,
             insert_pg_row,
+            list_pg_row_history,
+            clear_pg_row_history,
+            undo_pg_row_edit,
             create_collection,
             drop_database,
             drop_collection,

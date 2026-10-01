@@ -44,6 +44,8 @@ export const MODALS = {
   pgDrop:         { component: lazy(() => import('../engines/postgresql/admin/PostgresDropModal.vue')),         level: 'database' },
   pgRenameTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresRenameTableModal.vue')),  level: 'database' },
   pgSearch:       { component: lazy(() => import('../engines/postgresql/admin/PostgresSearchModal.vue')),       level: 'database' },
+  // Opened from a table workspace's own toolbar, not a sidebar node.
+  pgRowHistory:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRowHistoryModal.vue')),    level: 'table' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },

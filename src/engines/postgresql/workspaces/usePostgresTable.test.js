@@ -753,7 +753,7 @@ describe('saveChanges', () => {
     expect(await t.saveChanges()).toBe(true)
     expect(calls).toEqual([beginTransaction, insertRow, updateRow, deleteRows, commitTransaction])
     expect(insertRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'New' }], expect.any(String))
-    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'Ada L.' }], [{ column: 'id', value: 1 }], expect.any(String))
+    expect(updateRow).toHaveBeenCalledWith(target, [{ column: 'name', value: 'Ada L.' }], [{ column: 'name', value: 'Ada' }], [{ column: 'id', value: 1 }], expect.any(String))
     expect(deleteRows).toHaveBeenCalledWith(target, [[{ column: 'id', value: 2 }]], expect.any(String))
     expect(rollbackTransaction).not.toHaveBeenCalled()
     // Cleared, and the page reloaded.

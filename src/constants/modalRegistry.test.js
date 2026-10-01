@@ -4,8 +4,10 @@ import { MODALS } from './modalRegistry'
 // The registry is the single source of truth for registry-driven modals: adding a
 // modal means adding a row here. This guards the row shape every consumer relies on —
 // a component to render and a node level to gate/seed it.
-// null = app-level singleton (no node target); the others are node depths.
-const LEVELS = ['connection', 'database', 'collection', null]
+// null = app-level singleton (no node target); the others are node depths. `table`
+// is PostgreSQL-only (ozendb-h4y) — Postgres has no sidebar node deep enough yet
+// (ozendb-sxd) to open one from, so it's opened directly from the table workspace.
+const LEVELS = ['connection', 'database', 'collection', 'table', null]
 
 describe('modal registry', () => {
   it('has at least one modal registered', () => {

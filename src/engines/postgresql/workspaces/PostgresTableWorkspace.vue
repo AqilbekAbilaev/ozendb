@@ -21,6 +21,7 @@ import { usePostgresTable } from './usePostgresTable.js'
 import { openConnections } from '../../../stores/openConnections'
 import { showToast } from '../../../stores/toast'
 import { refreshRequest } from '../../../stores/menuRequests'
+import { openModal } from '../../../stores/modals'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 const props = defineProps({
@@ -148,6 +149,7 @@ async function saveChanges() {
         <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" title="Open a saved query" @click="library = 'saved'" />
         <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save these filters' SQL" @click="library = 'saved'" />
         <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
+        <BaseButton variant="ghost" icon="undo" class="qbar-hide-sm" title="Row edit history for this table" @click="openModal('pgRowHistory', t.target)" />
         <BaseButton variant="ghost" icon="copy" class="qbar-hide-md" title="Copy SQL" @click="copySql" />
         <BaseButton v-if="t.activeFilters" variant="ghost" icon="close" title="Show every row again" @click="t.clearFilters">
           Clear ({{ t.activeFilters }})

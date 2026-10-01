@@ -3,8 +3,10 @@
 //! helpers and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{run_query_as, PgTransactions};
+use crate::commands::postgres::ColumnValue;
 use crate::error::AppError;
 use crate::pg_integration_tests::{pool, test_config};
+use crate::pg_row_history::{PgColumnChange, PgHistoryEntry};
 
 fn shown(err: &AppError) -> String {
     serde_json::to_value(err).unwrap()["message"].as_str().unwrap().to_string()
@@ -105,12 +107,12 @@ async fn a_bound_write_through_a_held_transaction_is_undone_by_rollback() {
     // exercised here the same way `run`'s tests exercise arbitrary SQL above.
     txs.begin(&pool, "tx-bound", false).await.unwrap();
     let updated = txs
-        .execute("tx-bound", String::from("UPDATE ozendb_it_tx_bound SET n = $1::int WHERE id = $2::int"), vec![Some(String::from("99")), Some(String::from("1"))])
+        .execute("tx-bound", String::from("UPDATE ozendb_it_tx_bound SET n = $1::int WHERE id = $2::int"), vec![Some(String::from("99")), Some(String::from("1"))], None)
         .await
         .unwrap();
     assert_eq!(updated, 1);
     let inserted = txs
-        .execute("tx-bound", String::from("DELETE FROM ozendb_it_tx_bound WHERE id = $1::int"), vec![Some(String::from("1"))])
+        .execute("tx-bound", String::from("DELETE FROM ozendb_it_tx_bound WHERE id = $1::int"), vec![Some(String::from("1"))], None)
         .await
         .unwrap();
     assert_eq!(inserted, 1);
@@ -127,6 +129,71 @@ async fn a_bound_write_through_a_held_transaction_is_undone_by_rollback() {
     assert_eq!(count, 1, "rollback undid the delete");
 
     sqlx::query("DROP TABLE ozendb_it_tx_bound").execute(&pool).await.unwrap();
+}
+
+fn history_entry() -> PgHistoryEntry {
+    PgHistoryEntry {
+        id: uuid::Uuid::new_v4().to_string(),
+        conn_id: String::from("c1"),
+        database: String::from("postgres"),
+        schema: String::from("public"),
+        table: String::from("ozendb_it_tx_history"),
+        at: 0,
+        key: vec![ColumnValue { column: String::from("id"), value: serde_json::json!(1) }],
+        changes: vec![PgColumnChange {
+            column: String::from("n"),
+            before: serde_json::json!(1),
+            after: serde_json::json!(99),
+        }],
+    }
+}
+
+/// `PgTransactions::execute`'s `history` argument (ozendb-h4y): queued while the
+/// transaction is open, flushed by `finish` only on an actual commit — never on a
+/// rollback, and never on a commit that turns out to be a no-op rollback because
+/// an earlier statement failed.
+#[tokio::test]
+async fn execute_queues_history_and_finish_flushes_it_only_on_commit() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP TABLE IF EXISTS ozendb_it_tx_history",
+        "CREATE TABLE ozendb_it_tx_history (id INT PRIMARY KEY, n INT NOT NULL)",
+        "INSERT INTO ozendb_it_tx_history (id, n) VALUES (1, 1)",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap();
+    }
+    let txs = PgTransactions::default();
+
+    // Committed: the queued entry comes back.
+    txs.begin(&pool, "tx-committed", false).await.unwrap();
+    txs.execute(
+        "tx-committed",
+        String::from("UPDATE ozendb_it_tx_history SET n = $1::int WHERE id = $2::int"),
+        vec![Some(String::from("99")), Some(String::from("1"))],
+        Some(history_entry()),
+    ).await.unwrap();
+    let flushed = txs.finish("tx-committed", true).await.unwrap();
+    assert_eq!(flushed.len(), 1);
+
+    // Rolled back: nothing comes back, even though `execute` queued an entry.
+    txs.begin(&pool, "tx-rolled-back", false).await.unwrap();
+    txs.execute(
+        "tx-rolled-back",
+        String::from("UPDATE ozendb_it_tx_history SET n = $1::int WHERE id = $2::int"),
+        vec![Some(String::from("2")), Some(String::from("1"))],
+        Some(history_entry()),
+    ).await.unwrap();
+    let flushed = txs.finish("tx-rolled-back", false).await.unwrap();
+    assert!(flushed.is_empty());
+
+    sqlx::query("DROP TABLE ozendb_it_tx_history").execute(&pool).await.unwrap();
 }
 
 #[tokio::test]

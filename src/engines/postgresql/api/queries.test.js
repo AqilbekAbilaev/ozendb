@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction, browseTable, countTable, updateRow, deleteRows, insertRow, readTableSelect } from './queries'
+import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction, browseTable, countTable, updateRow, deleteRows, insertRow, readTableSelect, listRowHistory, clearRowHistory, undoRowEdit } from './queries'
 
 const table = { connectionId: 'c1', schema: 'public', table: 'users' }
 
@@ -79,16 +79,18 @@ describe('PostgreSQL queries', () => {
 
   it('updates one row, identified by its key columns', async () => {
     const set = [{ column: 'name', value: 'Ada' }]
+    const before = [{ column: 'name', value: 'Ada L.' }]
     const where = [{ column: 'id', value: 1 }]
-    await updateRow(table, set, where)
-    expect(invoke).toHaveBeenCalledWith('update_pg_row', { id: 'c1', schema: 'public', table: 'users', set, where, txId: null })
+    await updateRow(table, set, before, where)
+    expect(invoke).toHaveBeenCalledWith('update_pg_row', { id: 'c1', database: undefined, schema: 'public', table: 'users', set, before, where, txId: null })
   })
 
   it('updates one row inside a held transaction', async () => {
     const set = [{ column: 'name', value: 'Ada' }]
+    const before = [{ column: 'name', value: 'Ada L.' }]
     const where = [{ column: 'id', value: 1 }]
-    await updateRow(table, set, where, 'tx-1')
-    expect(invoke).toHaveBeenCalledWith('update_pg_row', { id: 'c1', schema: 'public', table: 'users', set, where, txId: 'tx-1' })
+    await updateRow(table, set, before, where, 'tx-1')
+    expect(invoke).toHaveBeenCalledWith('update_pg_row', { id: 'c1', database: undefined, schema: 'public', table: 'users', set, before, where, txId: 'tx-1' })
   })
 
   it('deletes a batch of rows, each identified by its key columns', async () => {
@@ -107,5 +109,15 @@ describe('PostgreSQL queries', () => {
     const values = [{ column: 'name', value: 'Ada' }]
     await insertRow(table, values, 'tx-1')
     expect(invoke).toHaveBeenCalledWith('insert_pg_row', { id: 'c1', schema: 'public', table: 'users', values, txId: 'tx-1' })
+  })
+
+  it('lists, clears and undoes row-edit history', async () => {
+    const target = { connectionId: 'c1', database: 'app', schema: 'public', table: 'users' }
+    await listRowHistory(target)
+    expect(invoke).toHaveBeenCalledWith('list_pg_row_history', { id: 'c1', database: 'app', schema: 'public', table: 'users' })
+    await clearRowHistory(target)
+    expect(invoke).toHaveBeenCalledWith('clear_pg_row_history', { id: 'c1', database: 'app', schema: 'public', table: 'users' })
+    await undoRowEdit('entry-1')
+    expect(invoke).toHaveBeenCalledWith('undo_pg_row_edit', { entryId: 'entry-1' })
   })
 })
