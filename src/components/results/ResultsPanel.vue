@@ -212,15 +212,7 @@ function toggleReadOnly() {
         @click="showDeleteDialog = true" />
       <span class="rtoolbar-spacer"></span>
 
-      <!-- View mode selector -->
-      <BaseSelect class="view-mode-pick" size="sm" v-model="viewMode" :options="VIEW_MODES">
-        <template #option="{ option, selected }">
-          <span class="vm-opt">
-            <BaseIcon name="check" :size="13" :class="{ 'vm-check-off': !selected }" />
-            <span>{{ option.label }}</span>
-          </span>
-        </template>
-      </BaseSelect>
+      <BaseSelect class="view-mode-pick" size="sm" v-model="viewMode" :options="VIEW_MODES" />
     </div>
 
     <!-- Result-tab states: error / loading / empty (shared placeholder) -->

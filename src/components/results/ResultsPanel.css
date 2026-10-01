@@ -17,14 +17,10 @@
 
 /* Page-size and view-mode pickers are BaseSelect triggers; only their footprint is ours
    (BaseSelect owns the menu, teleported to <body>). BaseSelect sizes the menu to the
-   trigger, so these are set to just fit the widest option — including the check icon in
-   the view-mode rows — rather than to the previous fixed 70px / 160px menu widths. */
+   trigger, so these are set to fit the widest option rather than to the previous fixed
+   70px / 160px menu widths. */
 .page-size-pick { width: 60px; flex: none; }
 .view-mode-pick { width: 124px; flex: none; }
-/* nowrap: an option that wraps reads as two rows in a one-line menu. The check icon is
-   always rendered (hidden when unselected) so labels stay aligned down the column. */
-.vm-opt { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.vm-check-off { visibility: hidden; }
 
 /* Striped placeholder background, shared by the "coming soon" sub-tab. */
 .empty-rows {

@@ -170,6 +170,9 @@ onBeforeUnmount(() => {
   font-size: 12.5px;
   color: var(--text-dim);
   cursor: pointer;
+  /* One option per row: a label that wraps reads as two entries in a one-line menu.
+     Callers with long labels widen the trigger instead. */
+  white-space: nowrap;
 }
 .bs-item:hover:not(.disabled) { background: var(--bg-hover); color: var(--text); }
 .bs-item.on { color: var(--accent); font-weight: 600; }
