@@ -5,7 +5,6 @@ import { parseField } from '../utils/queryParser'
 
 // Owns collection pagination and the optional server-side count shown in the results footer.
 export function useResultsPagination({ activeTab, isAggregate, requery, showToast }) {
-  const pageSizeMenu = ref(false)
   const countMenu = ref(null)
   const isCountDisabled = computed(() =>
     isAggregate() || !activeTab() || activeTab().kind !== 'collection'
@@ -47,7 +46,6 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
     const tab = activeTab()
     if (!tab) return
     tab.limit = size
-    pageSizeMenu.value = false
     requery(true)
   }
   const rangeText = computed(() => {
@@ -71,5 +69,5 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
     const tab = activeTab(); countMenu.value = null
     if (tab?.total != null) navigator.clipboard.writeText(String(tab.total)).catch(() => {})
   }
-  return { pageSizeMenu, countMenu, isCountDisabled, rangeText, countText, goFirst, goPrev, goNext, goLast, runCount, setPageSize, onCountContext, copyCountValue }
+  return { countMenu, isCountDisabled, rangeText, countText, goFirst, goPrev, goNext, goLast, runCount, setPageSize, onCountContext, copyCountValue }
 }

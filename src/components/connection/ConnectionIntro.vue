@@ -4,7 +4,7 @@ import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseTextarea from '../base/BaseTextarea.vue'
 import FieldError from '../base/FieldError.vue'
-import SegmentedControl from '../base/SegmentedControl.vue'
+import BaseSelect from '../base/BaseSelect.vue'
 import { ENGINE_OPTIONS } from '../../data/connectionOptions.js'
 import { CONNECTION_EDITORS } from '../../engines/connectionEditor.js'
 
@@ -57,7 +57,7 @@ function goNext() {
     <div class="nci-body">
       <div v-if="!engineLocked" class="nci-engine">
         <span class="nci-radio-lbl">Database engine</span>
-        <SegmentedControl :model-value="engine" :options="ENGINE_OPTIONS" @update:model-value="pickEngine" />
+        <BaseSelect class="nci-engine-pick" :model-value="engine" :options="ENGINE_OPTIONS" @update:model-value="pickEngine" />
       </div>
 
       <p class="nci-lead">

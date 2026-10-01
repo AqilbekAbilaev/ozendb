@@ -19,7 +19,7 @@ import TabStrip from '../base/TabStrip.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
 import ShortcutsPane from '../panes/ShortcutsPane.vue'
-import { PAGE_SIZES } from '../../constants/pageSizes'
+import { PAGE_SIZE_OPTIONS } from '../../constants/pageSizes'
 
 // App preferences are owned by the settings store. The form keeps local drafts until
 // Save succeeds, so cancelling or a rejected save never changes live settings.
@@ -33,7 +33,6 @@ const TABS = [
   { value: 'appearance', label: 'Appearance' },
   { value: 'keyboard', label: 'Keyboard' },
 ]
-const pageSizeOptions = PAGE_SIZES.map((sz) => ({ value: sz, label: String(sz) }))
 const THEME_OPTIONS = [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]
 const VIEW_OPTIONS = [
   { value: 'table', label: 'Table' },
@@ -90,7 +89,7 @@ async function save() {
             <div class="pf-label">Default query limit</div>
             <HintText class="pf-hint">Page size used when a collection is first opened.</HintText>
           </div>
-          <BaseSelect v-model="limit" class="pf-select" :options="pageSizeOptions" />
+          <BaseSelect v-model="limit" class="pf-select" :options="PAGE_SIZE_OPTIONS" />
         </div>
 
         <div class="pf-row">

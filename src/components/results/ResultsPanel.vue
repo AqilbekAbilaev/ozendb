@@ -17,6 +17,7 @@ import QueryCodeView from './QueryCodeView.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
+import BaseSelect from '../base/BaseSelect.vue'
 import ContextMenu from '../base/ContextMenu.vue'
 import TabStrip from '../base/TabStrip.vue'
 import Resizer from '../base/Resizer.vue'
@@ -25,7 +26,13 @@ import { useDocumentActions } from '../../composables/useDocumentActions'
 import { showToast } from '../../stores/toast'
 import { useTicker } from '../../composables/useTicker'
 import { useResultsPagination } from '../../composables/useResultsPagination'
-import { PAGE_SIZES } from '../../constants/pageSizes'
+import { PAGE_SIZE_OPTIONS } from '../../constants/pageSizes'
+
+const VIEW_MODES = [
+  { value: 'table', label: 'Table View' },
+  { value: 'json',  label: 'JSON View' },
+  { value: 'tree',  label: 'Tree View' },
+]
 
 const props = defineProps({
   activeTab:   { type: Object,  required: true },
@@ -53,7 +60,6 @@ const viewMode = computed({
     if (props.activeTab) props.activeTab.resultView = value
   },
 })
-const viewMenu     = ref(false)
 
 // Drag-to-VQB signals originate in the grid (ResultTable) and are forwarded to
 // VisualQueryBuilder, which sits beside the grid here. ResultTable owns the gesture;
@@ -69,7 +75,7 @@ const vqbWidth = ref(360)
 
 
 const {
-  pageSizeMenu, countMenu, isCountDisabled, rangeText, countText,
+  countMenu, isCountDisabled, rangeText, countText,
   goFirst, goPrev, goNext, goLast, runCount, setPageSize, onCountContext, copyCountValue,
 } = useResultsPagination({
   activeTab: () => props.activeTab,
@@ -172,20 +178,11 @@ function toggleReadOnly() {
       <BaseButton icon="last" :icon-size="18"
         :disabled="isAggregate || !activeTab.hasRun || (activeTab.results?.length ?? 0) < (activeTab.limit || 50) || activeTab.isRunning"
         @click="goLast" />
-      <div class="page-size-wrap">
-        <span class="page-size" @click="pageSizeMenu = !pageSizeMenu">
-          {{ activeTab.limit || 50 }} <BaseIcon name="caretDown" :size="12" />
-        </span>
-        <div v-if="pageSizeMenu" class="page-size-menu">
-          <div
-            v-for="sz in PAGE_SIZES"
-            :key="sz"
-            class="psm-item"
-            :class="{ on: (activeTab.limit || 50) === sz }"
-            @click="setPageSize(sz)"
-          >{{ sz }}</div>
-        </div>
-      </div>
+      <BaseSelect class="page-size-pick" size="sm"
+        :model-value="activeTab.limit || 50"
+        :options="PAGE_SIZE_OPTIONS"
+        :placeholder="String(activeTab.limit || 50)"
+        @update:model-value="setPageSize" />
       <span class="docs-range">
         Documents {{ rangeText }}
       </span>
@@ -215,25 +212,7 @@ function toggleReadOnly() {
         @click="showDeleteDialog = true" />
       <span class="rtoolbar-spacer"></span>
 
-      <!-- View mode selector -->
-      <div class="view-select-wrap">
-        <span class="view-select" @click="viewMenu = !viewMenu">
-          {{ { table: 'Table View', json: 'JSON View', tree: 'Tree View' }[viewMode] }}
-          <BaseIcon name="caretDown" :size="12" />
-        </span>
-        <div v-if="viewMenu" class="view-menu">
-          <div
-            v-for="[k, label] in [['table','Table View'],['json','JSON View'],['tree','Tree View']]"
-            :key="k"
-            class="view-menu-item"
-            :class="{ on: viewMode === k }"
-            @click="viewMode = k; viewMenu = false"
-          >
-            <BaseIcon v-if="viewMode === k" name="check" :size="13" />
-            <span>{{ label }}</span>
-          </div>
-        </div>
-      </div>
+      <BaseSelect class="view-mode-pick" size="sm" v-model="viewMode" :options="VIEW_MODES" />
     </div>
 
     <!-- Result-tab states: error / loading / empty (shared placeholder) -->
