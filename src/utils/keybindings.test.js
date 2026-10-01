@@ -82,8 +82,13 @@ describe('mergeBindings', () => {
 
 describe('parseAccel', () => {
   it('splits modifiers and the key', () => {
-    expect(parseAccel('CmdOrCtrl+Shift+L')).toEqual({ mod: true, shift: true, alt: false, key: 'L' })
-    expect(parseAccel('F4')).toEqual({ mod: false, shift: false, alt: false, key: 'F4' })
+    expect(parseAccel('CmdOrCtrl+Shift+L')).toEqual({ cmdOrCtrl: true, ctrl: false, cmd: false, shift: true, alt: false, key: 'L' })
+    expect(parseAccel('F4')).toEqual({ cmdOrCtrl: false, ctrl: false, cmd: false, shift: false, alt: false, key: 'F4' })
+  })
+
+  it('keeps a literal Ctrl and a literal Cmd distinct from each other and from CmdOrCtrl', () => {
+    expect(parseAccel('Ctrl+J')).toEqual({ cmdOrCtrl: false, ctrl: true, cmd: false, shift: false, alt: false, key: 'J' })
+    expect(parseAccel('Cmd+J')).toEqual({ cmdOrCtrl: false, ctrl: false, cmd: true, shift: false, alt: false, key: 'J' })
   })
 })
 
@@ -105,6 +110,13 @@ describe('eventMatchesAccel', () => {
   it('matches function keys with no modifier', () => {
     expect(eventMatchesAccel(evt({ key: 'F4' }), 'F4')).toBe(true)
     expect(eventMatchesAccel(evt({ key: 'F4', ctrl: true }), 'F4')).toBe(false)
+  })
+
+  it('treats a literal Ctrl and a literal Cmd as distinct, neither matching the other', () => {
+    expect(eventMatchesAccel(evt({ key: 'j', ctrl: true }), 'Ctrl+J')).toBe(true)
+    expect(eventMatchesAccel(evt({ key: 'j', meta: true }), 'Ctrl+J')).toBe(false)
+    expect(eventMatchesAccel(evt({ key: 'j', meta: true }), 'Cmd+J')).toBe(true)
+    expect(eventMatchesAccel(evt({ key: 'j', ctrl: true }), 'Cmd+J')).toBe(false)
   })
 })
 
@@ -138,11 +150,29 @@ describe('accelToTokens', () => {
     expect(accelToTokens('CmdOrCtrl+Shift+L', true)).toEqual(['⌘', '⇧', 'L'])
     expect(accelToTokens('CmdOrCtrl+Shift+L', false)).toEqual(['Ctrl', 'Shift', 'L'])
   })
+
+  it('renders a literal Ctrl the same on every platform, and a literal Cmd as a symbol only on mac', () => {
+    expect(accelToTokens('Ctrl+J', true)).toEqual(['Ctrl', 'J'])
+    expect(accelToTokens('Ctrl+J', false)).toEqual(['Ctrl', 'J'])
+    expect(accelToTokens('Cmd+J', true)).toEqual(['⌘', 'J'])
+    expect(accelToTokens('Cmd+J', false)).toEqual(['Cmd', 'J'])
+  })
 })
 
 describe('accelFromEvent', () => {
-  it('captures a modified letter', () => {
-    expect(accelFromEvent(evt({ key: 'k', ctrl: true, shift: true }))).toBe('CmdOrCtrl+Shift+K')
+  // ozendb-wpy: a physical Ctrl press must capture as 'Ctrl', not 'CmdOrCtrl' — the
+  // old behavior silently saved a Cmd binding on macOS for a Ctrl combo the user
+  // actually pressed, with no sign the two differed.
+  it('captures a physical Ctrl press as Ctrl, not CmdOrCtrl', () => {
+    expect(accelFromEvent(evt({ key: 'k', ctrl: true, shift: true }))).toBe('Ctrl+Shift+K')
+  })
+
+  it('captures a physical Cmd press as Cmd', () => {
+    expect(accelFromEvent(evt({ key: 'k', meta: true, shift: true }))).toBe('Cmd+Shift+K')
+  })
+
+  it('captures both at once when both are held', () => {
+    expect(accelFromEvent(evt({ key: 'k', ctrl: true, meta: true }))).toBe('Ctrl+Cmd+K')
   })
 
   it('captures a bare function key', () => {
@@ -155,6 +185,6 @@ describe('accelFromEvent', () => {
   })
 
   it('captures Shift+Tab reported by WebKitGTK as "Unidentified" via code', () => {
-    expect(accelFromEvent(evt({ key: 'Unidentified', code: 'Tab', ctrl: true, shift: true }))).toBe('CmdOrCtrl+Shift+Tab')
+    expect(accelFromEvent(evt({ key: 'Unidentified', code: 'Tab', ctrl: true, shift: true }))).toBe('Ctrl+Shift+Tab')
   })
 })
