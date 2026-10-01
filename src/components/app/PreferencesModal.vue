@@ -20,6 +20,7 @@ import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
 import ShortcutsPane from '../panes/ShortcutsPane.vue'
 import { PAGE_SIZE_OPTIONS } from '../../constants/pageSizes'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // App preferences are owned by the settings store. The form keeps local drafts until
 // Save succeeds, so cancelling or a rejected save never changes live settings.
@@ -137,7 +138,7 @@ async function save() {
     </div>
 
     <div class="pf-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="$emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="saving" @click="save">Save</BaseButton>
     </div>
@@ -182,5 +183,4 @@ async function save() {
   padding: 0 16px;
   gap: 8px;
 }
-.spacer { flex: 1; }
 </style>

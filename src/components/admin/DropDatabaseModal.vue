@@ -10,6 +10,7 @@ import { invalidateConnectionResources } from '../../stores/connectionData'
 import { closeWhere } from '../../stores/tabs'
 import { affectedByResource } from '../../workspaces/lifecycle'
 import { createResourceRef } from '../../utils/resourceRef'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Database → Drop Database…: destructive, so it confirms first. Dropping also closes every
 // open tab pointing into that database — those tabs can no longer resolve anything.
@@ -50,7 +51,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="danger" :disabled="deleting" @click="confirm">
         {{ deleting ? 'Dropping…' : 'Drop' }}

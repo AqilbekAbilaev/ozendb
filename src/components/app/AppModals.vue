@@ -11,6 +11,7 @@ import { indexSpecJson } from '../../utils/indexSpec'
 import SshHostKeyModal from '../connection/SshHostKeyModal.vue'
 import { openModals, closeModal, modalOptions } from '../../stores/modals'
 import { renameTabTarget, renameTabValue, confirmRenameTab } from '../../stores/tabs'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // indexes/ssh still come through App.vue's appModals provide — see the comment there
 // for why useIndexes/useSshHostKey can't be module-scope stores yet.
@@ -93,7 +94,7 @@ const {
           />
         </div>
         <div class="del-footer">
-          <span class="spacer"></span>
+          <FlexSpacer />
           <BaseButton @click="renameTabTarget = null">Cancel</BaseButton>
           <BaseButton variant="primary" :disabled="!renameTabValue.trim()" @click="confirmRenameTab">Rename</BaseButton>
         </div>
@@ -115,7 +116,7 @@ const {
           <div v-else class="idx-msg">Usage statistics unavailable.</div>
         </div>
         <div class="del-footer">
-          <span class="spacer"></span>
+          <FlexSpacer />
           <BaseButton @click="indexDetailsTarget = null">Close</BaseButton>
         </div>
   </BaseModal>
@@ -138,7 +139,7 @@ const {
           <FieldError :text="dropIndexError" spaced />
         </div>
         <div class="del-footer">
-          <span class="spacer"></span>
+          <FlexSpacer />
           <BaseButton @click="dropIndexTarget = null">Cancel</BaseButton>
           <BaseButton
             variant="danger"

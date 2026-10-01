@@ -10,6 +10,7 @@ import { errText } from '../../utils/errors'
 import { parsePipeline } from '../../utils/queryParser'
 import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Add View… (from a database node) opens with no source; Add View Here… (from a
 // collection node) prefills that collection — the caller seeds `target.source`.
@@ -75,7 +76,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!valid || saving" @click="confirm">
         {{ saving ? 'Creating…' : 'Create' }}

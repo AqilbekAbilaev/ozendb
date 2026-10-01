@@ -1,6 +1,7 @@
 <script setup>
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // The Operations pane: a bottom-docked, read-only log of every long-running operation
 // the app has run (fed from the backend registry via useOperations). Purely display +
@@ -47,7 +48,7 @@ const hasFinished = () => props.operations.some((op) => op.status !== 'running')
     <div class="ops-head">
       <span class="ops-title">Operations</span>
       <span class="ops-count" v-if="operations.length">{{ operations.length }}</span>
-      <span class="ops-spacer"></span>
+      <FlexSpacer />
       <BaseButton
         variant="ghost"
         size="sm"
@@ -117,7 +118,6 @@ const hasFinished = () => props.operations.some((op) => op.status !== 'running')
   border-radius: 9px;
   padding: 1px 7px;
 }
-.ops-spacer { flex: 1; }
 
 .ops-body { flex: 1; min-height: 0; overflow-y: auto; }
 .ops-empty { padding: 18px 12px; font-size: 12px; color: var(--text-faint); text-align: center; }

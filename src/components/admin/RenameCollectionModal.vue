@@ -11,6 +11,7 @@ import { invalidateConnectionResources } from '../../stores/connectionData'
 import { tabs } from '../../stores/tabs'
 import { retargetResource } from '../../workspaces/lifecycle'
 import { createResourceRef } from '../../utils/resourceRef'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Collection → Rename Collection…: prefilled with the current name. Open workspaces on
 // the collection are retargeted in place rather than closed, so the user keeps their work.
@@ -71,7 +72,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!valid || saving" @click="confirm">
         {{ saving ? 'Renaming…' : 'Rename' }}

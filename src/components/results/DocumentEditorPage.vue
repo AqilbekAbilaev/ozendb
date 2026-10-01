@@ -10,6 +10,7 @@ import { docExtensions } from '../../utils/docEditor'
 import { mongoStringify } from '../../utils/mongoFormat'
 import { parseField } from '../../utils/queryParser'
 import { errText } from '../../utils/errors'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // The pop-out document window (Studio-3T-style Cmd/Ctrl+J). Opened by the Rust
 // open_document_window command, seeded from the window URL on first load. Three modes:
@@ -252,7 +253,7 @@ onBeforeUnmount(() => {
       <span v-else-if="readonly" class="hint">Read-only</span>
       <span v-else-if="okMsg" class="hint ok">{{ okMsg }}</span>
       <span v-else-if="dirty" class="hint">Unsaved changes</span>
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton v-if="isInsert" :disabled="saving || loading" @click="onSave(true)">
         Add &amp; Continue
       </BaseButton>
@@ -302,6 +303,5 @@ onBeforeUnmount(() => {
 
 .hint { font-size: 12px; color: var(--text-faint); }
 .hint.ok { color: var(--success-text); }
-.spacer { flex: 1; }
 
 </style>

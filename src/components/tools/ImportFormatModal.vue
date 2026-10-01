@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseRadio from '../base/BaseRadio.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Studio-3T-style "Import format" picker: the first thing the user sees after
 // choosing Import. It only selects an input format — on Configure it emits the
@@ -93,7 +94,7 @@ function configure() {
     </div>
 
     <div class="ifm-footer">
-      <span class="ifm-spacer"></span>
+      <FlexSpacer />
       <BaseButton bordered @click="$emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" @click="configure">Configure</BaseButton>
     </div>
@@ -137,5 +138,4 @@ function configure() {
   padding: 12px 16px;
   border-top: 1px solid var(--border-soft);
 }
-.ifm-spacer { flex: 1; }
 </style>

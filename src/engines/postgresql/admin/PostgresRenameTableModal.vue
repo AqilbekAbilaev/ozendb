@@ -11,6 +11,7 @@ import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
 import { tabs } from '../../../stores/tabs'
 import { retargetResource } from '../../../workspaces/lifecycle'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Table → Rename Table…: open tabs on the table follow it rather than close, so the
 // user keeps their filters and SQL.
@@ -55,7 +56,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!valid || saving" @click="confirm">
         {{ saving ? 'Renaming…' : 'Rename' }}

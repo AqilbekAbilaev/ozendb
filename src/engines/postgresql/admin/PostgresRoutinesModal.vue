@@ -12,6 +12,7 @@ import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseModalBody from '../../../components/base/BaseModalBody.vue'
 import CodeEditor from '../../../components/base/CodeEditor.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Opened from a PostgreSQL database or schema node. Read-only: the source shown is
 // the server's own CREATE statement, and editing it means opening a SQL tab, where
@@ -118,7 +119,7 @@ function editInSqlTab() {
         <div class="pr-source">
           <div class="pr-bar">
             <span class="pr-kind">{{ selected?.kind ?? '' }}</span>
-            <span class="pr-spacer"></span>
+            <FlexSpacer />
             <BaseButton variant="ghost" icon="copy" :disabled="!source" @click="copySource">Copy definition</BaseButton>
             <BaseButton variant="primary" icon="sql" :disabled="!source" @click="editInSqlTab">Open in SQL tab</BaseButton>
           </div>
@@ -155,6 +156,5 @@ function editInSqlTab() {
 .pr-source { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .pr-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .pr-kind { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
-.pr-spacer { flex: 1; }
 .pr-code { flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 6px; }
 </style>

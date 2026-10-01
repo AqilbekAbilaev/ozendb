@@ -17,6 +17,9 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   // Trigger density: 'md' (default form control) or 'sm' (compact pills / inline).
   size: { type: String, default: 'md' },
+  // Trigger/menu skin: 'field' (bordered input, for forms) or 'ghost' (borderless,
+  // dims until hovered, for toolbars that already read as controls).
+  variant: { type: String, default: 'field' },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -107,13 +110,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootEl" class="base-select" :class="{ disabled }">
-    <button ref="triggerEl" type="button" class="bs-trigger" :class="[`bs-${size}`, { placeholder: !selected, open }]"
+    <button ref="triggerEl" type="button" class="bs-trigger" :class="[`bs-${size}`, `bs-${variant}`, { placeholder: !selected, open }]"
       :disabled="disabled" @click="toggle">
       <span class="bs-label">{{ triggerLabel }}</span>
       <BaseIcon name="caretDown" :size="12" class="bs-caret" />
     </button>
     <Teleport to="body">
-      <div v-if="open" ref="menuEl" class="bs-menu" :style="menuStyle">
+      <div v-if="open" ref="menuEl" class="bs-menu" :class="`bs-menu-${variant}`" :style="menuStyle">
         <div
           v-for="opt in options"
           :key="String(opt.value)"
@@ -173,4 +176,23 @@ onBeforeUnmount(() => {
 .bs-item:hover:not(.disabled) { background: var(--bg-hover); color: var(--text); }
 .bs-item.on { color: var(--accent); font-weight: 600; }
 .bs-item.disabled { opacity: .4; cursor: default; }
+
+/* ghost: borderless toolbar control. Specificity beats the .open / :hover rules above. */
+.bs-trigger.bs-ghost {
+  width: auto;
+  background: none;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+.bs-trigger.bs-ghost:hover:not(:disabled) { background: none; color: var(--text); }
+.bs-trigger.bs-ghost.open { border-color: transparent; }
+.bs-menu-ghost { background: var(--bg-panel); border-radius: 6px; }
+.bs-menu-ghost .bs-item {
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  gap: 6px;
+}
+.bs-menu-ghost .bs-item.on { color: var(--accent); }
 </style>

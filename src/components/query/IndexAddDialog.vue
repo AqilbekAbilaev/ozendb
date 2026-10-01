@@ -10,6 +10,7 @@ import TabStrip from '../base/TabStrip.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // The Add / Edit index dialog (Screenshot A). It owns all of its form state and
 // emits an assembled { keys, options } pair — two JSON strings the backend merges
@@ -374,7 +375,7 @@ const title = computed(() => props.mode === 'edit' ? 'Edit index' : 'Add index')
       <div class="del-footer idx-add-footer">
         <label class="bg-check"><BaseCheckbox v-model="background" /><span>Create in background</span></label>
         <BaseButton size="sm" class="json-btn" @click="toggleJson">{{ jsonMode ? 'Form' : 'JSON' }}</BaseButton>
-        <span class="spacer"></span>
+        <FlexSpacer />
         <BaseButton @click="emit('cancel')">Cancel</BaseButton>
         <BaseButton variant="primary" :disabled="busy" @click="onSubmit">
           {{ busy ? (mode === 'edit' ? 'Saving…' : 'Creating…') : (mode === 'edit' ? 'Save changes' : 'Create index') }}

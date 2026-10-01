@@ -11,6 +11,7 @@ import { errText } from '../../utils/errors'
 import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { buildCollectionOptions, emptyCollectionOptions } from '../../utils/collectionOptions'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Database → Add Collection…: name plus the collection type and that type's options
 // (mirrors 3T's dialog). The per-type field rules live in utils/collectionOptions.js so
@@ -117,7 +118,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!name.trim() || saving" @click="confirm">
         {{ saving ? 'Creating…' : 'Create' }}

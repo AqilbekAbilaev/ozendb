@@ -27,6 +27,7 @@ import { showToast } from '../../stores/toast'
 import { useTicker } from '../../composables/useTicker'
 import { useResultsPagination } from '../../composables/useResultsPagination'
 import { PAGE_SIZE_OPTIONS } from '../../constants/pageSizes'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 const VIEW_MODES = [
   { value: 'table', label: 'Table View' },
@@ -210,7 +211,7 @@ function toggleReadOnly() {
       <BaseButton icon="deleteDialog" :icon-size="18" title="Delete documents by query…"
         :disabled="!isCollection || !activeTab.hasRun || activeTab.isRunning || activeTab.readOnly"
         @click="showDeleteDialog = true" />
-      <span class="rtoolbar-spacer"></span>
+      <FlexSpacer />
 
       <BaseSelect class="view-mode-pick" size="sm" v-model="viewMode" :options="VIEW_MODES" />
     </div>
@@ -281,7 +282,7 @@ function toggleReadOnly() {
     <!-- Footer -->
     <div class="rfooter">
       <span>{{ activeTab.selectedRow >= 0 ? '1 document selected' : '0 documents selected' }}</span>
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton
         variant="ghost"
         size="sm"
@@ -330,7 +331,7 @@ function toggleReadOnly() {
       <FieldError :text="crudError" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="showDeleteConfirm = false">Cancel</BaseButton>
       <BaseButton variant="danger" @click="onDeleteConfirm">{{ selectedCount > 1 ? `Delete ${selectedCount}` : 'Delete' }}</BaseButton>
     </div>
@@ -345,7 +346,7 @@ function toggleReadOnly() {
       <p v-if="pasteHidden" class="paste-more">… and {{ pasteHidden.toLocaleString() }} more characters</p>
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton :disabled="pasteBusy" @click="pasteConfirm = null">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="pasteBusy" @click="onPasteConfirm">
         {{ pasteBusy ? 'Pasting…' : 'Paste' }}
@@ -372,7 +373,7 @@ function toggleReadOnly() {
       <FieldError :text="removeFieldError" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="removeFieldName = null">Cancel</BaseButton>
       <BaseButton variant="danger" @click="onRemoveFieldConfirm">Remove</BaseButton>
     </div>
@@ -405,7 +406,7 @@ function toggleReadOnly() {
       <FieldError :text="clearError" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="showClearConfirm = false">Cancel</BaseButton>
       <BaseButton variant="danger" :disabled="clearBusy || clearConfirmText !== activeTab.collectionName"
               @click="onClearConfirm">{{ clearBusy ? 'Clearing…' : 'Clear Collection' }}</BaseButton>

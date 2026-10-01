@@ -8,6 +8,7 @@ import FieldError from '../../../components/base/FieldError.vue'
 import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 const props = defineProps({
   target: { type: Object, required: true },   // { connId, database }
@@ -43,7 +44,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!valid || saving" @click="confirm">
         {{ saving ? 'Creating…' : 'Create' }}

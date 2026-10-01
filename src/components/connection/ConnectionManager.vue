@@ -18,6 +18,7 @@ import ToolbarButton from '../base/ToolbarButton.vue'
 import NewConnection from './NewConnection.vue'
 import ContextMenu from '../base/ContextMenu.vue'
 import { formatNow } from '../../utils/format'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 const emit = defineEmits(['close'])
 
@@ -342,7 +343,7 @@ const CM_TOOLS = [
           </span>
           Show on startup
         </label>
-        <span class="spacer"></span>
+        <FlexSpacer />
         <BaseButton bordered @click="$emit('close')">Close</BaseButton>
         <BaseButton variant="primary" :disabled="!selectedId" @click="connectSelected">Connect</BaseButton>
       </div>

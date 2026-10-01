@@ -16,6 +16,7 @@ import { useIndexPaneLifecycle } from '../../composables/useIndexPaneLifecycle'
 import { showToast } from '../../stores/toast'
 import { refreshRequest } from '../../stores/menuRequests'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Each Index Manager tab manages its own index list, selection, and metrics
 // independently so that two tabs for different collections don't interfere.
@@ -24,7 +25,6 @@ import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 const props = defineProps({
   activeTab: { type: Object, required: true },
 })
-
 
 // Per-tab state (not shared across tabs)
 const localIndexesList     = ref([])
@@ -346,7 +346,7 @@ function usageOf(index)  { const u = localIndexUsage.value[index.name]; return u
     <!-- Status bar -->
     <div class="idx-status">
       <span>{{ localIndexesList.length }} {{ localIndexesList.length === 1 ? 'Index' : 'Indexes' }}</span>
-      <span class="spacer"></span>
+      <FlexSpacer />
       <span v-if="localIndexTotalSize != null">{{ fmtBytes(localIndexTotalSize, 'n/a') }}</span>
     </div>
 
@@ -423,6 +423,5 @@ function usageOf(index)  { const u = localIndexUsage.value[index.name]; return u
   padding: 4px 12px; font-size: 12px; color: var(--text-dim);
   background: var(--bg-toolbar); border-top: 1px solid var(--border); flex: none;
 }
-.idx-status .spacer { flex: 1; }
 
 </style>

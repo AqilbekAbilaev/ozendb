@@ -8,6 +8,7 @@ import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Collection → Duplicate Collection…: copies every document into a new collection in the
 // same database, prefilled with a "_copy" suffix. The backend returns the copied count.
@@ -60,7 +61,7 @@ async function confirm() {
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton @click="emit('close')">Cancel</BaseButton>
       <BaseButton variant="primary" :disabled="!valid || saving" @click="confirm">
         {{ saving ? 'Duplicating…' : 'Duplicate' }}

@@ -29,9 +29,6 @@
   padding: 0 16px;
   gap: 8px;
 }
-/* Pushes the footer buttons right. Nested so it can't restyle the `.spacer` spans in
-   QueryBar, ShellConsole, OperationsPane and friends, which define their own or none. */
-.del-footer .spacer { flex: 1; }
 
 /* ── prompt inputs ── */
 .prompt-input,

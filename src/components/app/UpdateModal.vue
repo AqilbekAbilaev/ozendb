@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
+import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Shown when a check finds a newer release. `canInstall` decides whether this is an
 // offer to self-update or a pointer at the downloads page — see useUpdater for why a
@@ -41,7 +42,7 @@ const percent = computed(() => {
     </div>
 
     <div class="up-footer">
-      <span class="spacer"></span>
+      <FlexSpacer />
       <BaseButton :disabled="installing" @click="$emit('close')">Later</BaseButton>
       <BaseButton
         v-if="canInstall"
@@ -102,5 +103,4 @@ const percent = computed(() => {
   padding: 12px 16px;
   border-top: 1px solid var(--border-soft);
 }
-.spacer { flex: 1; }
 </style>

@@ -21,6 +21,7 @@ import { usePostgresTable } from './usePostgresTable.js'
 import { openConnections } from '../../../stores/openConnections'
 import { showToast } from '../../../stores/toast'
 import { refreshRequest } from '../../../stores/menuRequests'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 const props = defineProps({
   activeTab: { type: Object, required: true },
@@ -158,7 +159,7 @@ async function saveChanges() {
           :title="t.tabReadOnly ? 'Read-only mode is on — click to allow edits' : 'Read-only mode (block accidental edits)'"
           @click="t.tabReadOnly = !t.tabReadOnly"
         />
-        <span class="qbar-spacer"></span>
+        <FlexSpacer />
         <span class="qlabel limit">Limit</span>
         <NumberStepper v-model="limitDraft" :min="1" @enter="run" />
         <BaseButton bordered icon="aggregate" class="qbar-hide-lg" :active="t.panel.builderOpen" title="Visual Query Builder" @click="t.panel.builderOpen = !t.panel.builderOpen">Query Builder</BaseButton>
@@ -180,7 +181,7 @@ async function saveChanges() {
             <BaseButton icon="trash" :icon-size="18" :disabled="t.tabReadOnly || !selectedRowIndexes.length" title="Mark the selected row(s) for deletion" @click="deleteSelection" />
             <BaseButton icon="undo" :icon-size="18" :disabled="!selectedRowIndexes.length" title="Undo the selected row's pending change" @click="restoreSelection" />
             <span v-if="t.deletedCount" class="stage-deleted"><BaseIcon name="trash" :size="12" /> {{ t.deletedCount }} deleted</span>
-            <span class="qbar-spacer"></span>
+            <FlexSpacer />
             <BaseButton icon="sql" :icon-size="18" :disabled="!t.pendingCount" title="Preview the SQL a save will run" @click="reviewSqlOpen = true" />
             <BaseButton icon="close" :icon-size="18" :disabled="!t.pendingCount" title="Drop every pending change" @click="t.discardAll()" />
             <BaseButton
@@ -226,7 +227,7 @@ async function saveChanges() {
           <div v-else-if="t.panel.rtab === 'Query Code'" class="qcode">
             <div class="qcode-bar">
               <span>Generated from the column filters</span>
-              <span class="spacer"></span>
+              <FlexSpacer />
               <BaseButton variant="ghost" icon="copy" @click="copySql">Copy</BaseButton>
               <BaseButton variant="primary" icon="sql" @click="switchMode('sql')">Open in SQL editor</BaseButton>
             </div>
@@ -286,7 +287,6 @@ async function saveChanges() {
 .pg-table { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .limit { margin-right: 6px; }
 .limit + * { margin-right: 8px; }
-.spacer { flex: 1; }
 .pg-body { display: flex; flex: 1; min-height: 0; }
 .pg-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .rtabs { display: flex; flex: none; border-bottom: 1px solid var(--border); }
