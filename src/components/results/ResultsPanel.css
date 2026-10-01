@@ -12,59 +12,19 @@
   border-bottom: 1px solid var(--border);
   flex: none;
 }
-.page-size {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-soft);
-  border-radius: 5px;
-  padding: 3px 6px;
-  font-size: 12px;
-  color: var(--text);
-}
 .docs-range { font-size: 12px; color: var(--text-dim); margin: 0 4px; }
 .rtoolbar-spacer { flex: 1; }
 
-/* view mode */
-.view-select-wrap { position: relative; }
-.view-select {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-soft);
-  border-radius: 5px;
-  padding: 4px 9px;
-  font-size: 12px;
-  color: var(--text);
-  cursor: pointer;
-}
-.view-menu {
-  position: absolute;
-  right: 0;
-  top: 30px;
-  width: 160px;
-  background: var(--bg-field);
-  border: 1px solid var(--border-soft);
-  border-radius: 7px;
-  box-shadow: 0 14px 34px rgba(0,0,0,.55);
-  z-index: 20;
-  padding: 4px;
-}
-.view-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 5px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-.view-menu-item:hover { background: var(--bg-hover); color: var(--text); }
-.view-menu-item.on { color: var(--text); }
-.view-menu-item:not(.on) span { margin-left: 21px; }
+/* Page-size and view-mode pickers are BaseSelect triggers; only their footprint is ours
+   (BaseSelect owns the menu, teleported to <body>). BaseSelect sizes the menu to the
+   trigger, so these are set to just fit the widest option — including the check icon in
+   the view-mode rows — rather than to the previous fixed 70px / 160px menu widths. */
+.page-size-pick { width: 60px; flex: none; }
+.view-mode-pick { width: 124px; flex: none; }
+/* nowrap: an option that wraps reads as two rows in a one-line menu. The check icon is
+   always rendered (hidden when unselected) so labels stay aligned down the column. */
+.vm-opt { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.vm-check-off { visibility: hidden; }
 
 /* Striped placeholder background, shared by the "coming soon" sub-tab. */
 .empty-rows {
@@ -74,32 +34,6 @@
     repeating-linear-gradient(to bottom, transparent 0 24px, var(--grid-line) 24px 25px),
     repeating-linear-gradient(to bottom, var(--bg-row) 0 25px, var(--bg-row-alt) 25px 50px);
 }
-
-/* page size dropdown */
-.page-size-wrap { position: relative; }
-.page-size { cursor: pointer; }
-.page-size-menu {
-  position: absolute;
-  top: 28px;
-  left: 0;
-  width: 70px;
-  background: var(--bg-field);
-  border: 1px solid var(--border-soft);
-  border-radius: 7px;
-  box-shadow: 0 10px 28px rgba(0,0,0,.55);
-  z-index: 20;
-  padding: 4px;
-}
-.psm-item {
-  padding: 6px 10px;
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--text-dim);
-  cursor: pointer;
-  text-align: right;
-}
-.psm-item:hover { background: var(--bg-hover); color: var(--text); }
-.psm-item.on    { color: var(--accent); font-weight: 600; }
 
 /* Footer */
 .rfooter {
