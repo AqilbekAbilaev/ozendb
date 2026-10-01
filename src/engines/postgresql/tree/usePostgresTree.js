@@ -111,6 +111,14 @@ export function isOpenTable(tab, connectionId, schema, table) {
   return tab?.type === 'postgresql.table_browse' && tab.connectionId === connectionId && tab.schema === schema && tab.table === table
 }
 
+// The schema holding the table the active tab is browsing on this connection, or null
+// when the tab is something else. The tree opens down to it, because a row that isn't
+// rendered can't carry the highlight — a restored tab left the sidebar showing nothing.
+export function activeTableSchema(tab, connectionId) {
+  if (tab?.type !== 'postgresql.table_browse' || tab.connectionId !== connectionId) return null
+  return tab.schema
+}
+
 // `table.column` a column's foreign key points at (schema-qualified when it's in
 // another schema), or null.
 function referenceOf(keys, schema, table, column) {

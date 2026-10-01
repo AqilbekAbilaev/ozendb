@@ -1,7 +1,7 @@
 <script setup>
 import { computed, watch } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
-import { usePostgresTree, visibleSchemas, isOpenTable } from './usePostgresTree.js'
+import { usePostgresTree, visibleSchemas, isOpenTable, activeTableSchema } from './usePostgresTree.js'
 import { activeTab } from '../../../stores/tabs'
 import { openPostgresTable, openPostgresQuery } from '../../../stores/tabCreators'
 import { contextMenu, contextActiveNodeKey, pgNodeKey } from '../../../stores/contextMenu'
@@ -22,6 +22,16 @@ const { toggleTable, isTableOpen, columnsOf, databaseSizes, databaseOpen, toggle
   usePostgresTree(props.conn.id)
 // A refresh brings a new schema list; the open schemas' tables are re-read with it.
 watch(() => props.schemas, reloadTables)
+// The active table's row can only carry the highlight once it is rendered, so the tree
+// opens down to it, as the sidebar does for MongoDB's active collection. `immediate`
+// because this component is rebuilt whenever its connection is re-expanded — and because
+// a restored session arrives with the tab already active.
+watch(activeTab, (tab) => {
+  const schema = activeTableSchema(tab, props.conn.id)
+  if (!schema) return
+  if (!databaseOpen.value) toggleDatabase()
+  if (!openSchemas.value[schema]) toggleSchema(schema)
+}, { immediate: true })
 const shown = computed(() => visibleSchemas(props.schemas, showSystem.value))
 const database = computed(() => props.conn.database || 'postgres')
 // Read when the database row opens (see usePostgresTree); null until then, and null

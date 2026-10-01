@@ -198,19 +198,25 @@ export function useConnectionTree({ emit }) {
     if (pending) openRequestedConnection(pending)
   })
 
-  // The collection open in the active tab, so its row (and its connection) highlight.
-  const activeCollection = computed(() => {
+  // The resource the active tab browses, whichever engine: a MongoDB collection or a
+  // PostgreSQL table. Its row is the one the tree highlights.
+  const activeResource = computed(() => {
     const t = activeTab.value
-    return t?.kind === 'collection' ? t : null
+    return t?.kind === 'collection' || t?.kind === 'pgTable' ? t : null
   })
+  // The connection whose row highlights. Was a startsWith() over the collection key,
+  // which prefix-matched an id instead of comparing one, and only ever for MongoDB.
+  const activeConnectionId = computed(() => activeResource.value?.connectionId ?? null)
   const activeCollectionKey = computed(() => {
-    const t = activeCollection.value
-    return t ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
+    const t = activeResource.value
+    return t?.kind === 'collection' ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
   })
 
-  // When a collection becomes the active one (e.g. switching tabs in the
-  // workspace), expand the sidebar down to it so the highlighted row is visible.
-  watch(activeCollection, async (t) => {
+  // When it becomes the active one (switching tabs, or a restored session) expand the
+  // sidebar down to it, so the highlighted row is on screen rather than hidden under a
+  // collapsed parent. Only the connection level is shared: a PostgreSQL connection's own
+  // tree holds the schema state below it and opens itself (PostgresTreeNodes).
+  watch(activeResource, async (t) => {
     if (!t) return
     const conn = connections.value.find(c => c.id === t.connectionId)
     if (!conn) return  // not a connection the sidebar currently shows
@@ -218,7 +224,7 @@ export function useConnectionTree({ emit }) {
     if (!expandedConns.value[t.connectionId]) {
       await toggleConnection(conn)
     }
-    expandedDbs.value[`${t.connectionId}/${t.dbName}`] = true
+    if (t.kind === 'collection') expandedDbs.value[`${t.connectionId}/${t.dbName}`] = true
   })
 
   const filtered = computed(() => {
@@ -250,6 +256,7 @@ export function useConnectionTree({ emit }) {
     retryConnection,
     toggleDatabase,
     highlightCollection,
+    activeConnectionId,
     activeCollectionKey,
     openCollection,
     collectionKey,

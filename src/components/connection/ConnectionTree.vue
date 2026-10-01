@@ -22,7 +22,7 @@ const emit = defineEmits(['select-collection'])
 const {
   expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
-  retryConnection, toggleDatabase, highlightCollection, activeCollectionKey,
+  retryConnection, toggleDatabase, highlightCollection, activeConnectionId, activeCollectionKey,
   openCollection, collectionKey,
 } = useConnectionTree({ emit })
 
@@ -110,7 +110,7 @@ const { tip, ...statsTip } = useStatsTip()
         <div
           class="tnode"
           :class="{
-            sel: activeCollectionKey?.startsWith(conn.id),
+            sel: activeConnectionId === conn.id,
             'ctx-sel': contextActiveNodeKey === conn.id,
             tagged: !!connColor(conn),
           }"

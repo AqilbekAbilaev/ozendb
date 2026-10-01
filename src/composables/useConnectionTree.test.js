@@ -8,13 +8,16 @@ vi.mock('vue', async importOriginal => ({
 }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }))
 vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases: vi.fn() }))
+vi.mock('../engines/postgresql/api/resources', () => ({ listSchemas: vi.fn() }))
 vi.mock('../appApi/connectionState', () => ({ setConnectionOpen: vi.fn() }))
 
 import { onMounted, onUnmounted } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { listDatabases } from '../engines/mongodb/api/resources'
+import { listSchemas } from '../engines/postgresql/api/resources'
 import { connDatabases, clearConnectionResources, invalidateConnectionResources, refreshConnectionResources } from '../stores/connectionData'
 import { consumeConnectionOpenRequest, requestConnectionOpen, treeSelection } from '../stores/connectionNavigation'
+import { tabs, activeTabId } from '../stores/tabs'
 import { useConnectionTree } from './useConnectionTree'
 
 let scope
@@ -25,6 +28,8 @@ beforeEach(() => {
   vi.resetAllMocks()
   clearConnectionResources('a')
   consumeConnectionOpenRequest()
+  tabs.value = []
+  activeTabId.value = null
   scope = effectScope()
   tree = scope.run(() => useConnectionTree({ emit: vi.fn() }))
   tree.connections.value = [conn]
@@ -44,6 +49,50 @@ it('opens a requested connection through the navigation store', async () => {
   requestConnectionOpen('a')
   await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
   expect(listDatabases).toHaveBeenCalledWith('a')
+})
+
+// A restored PostgreSQL table tab is useless to the tree while its connection is
+// collapsed: the row that carries the highlight isn't rendered at all.
+it('expands the connection of an active PostgreSQL table tab', async () => {
+  listSchemas.mockResolvedValue([])
+  tree.connections.value = [{ id: 'a', name: 'Connection', engine: 'postgresql' }]
+  tabs.value = [{
+    id: 'pg', kind: 'pgTable', type: 'postgresql.table_browse',
+    connectionId: 'a', database: 'payments', schema: 'public', table: 'merchants',
+  }]
+  activeTabId.value = 'pg'
+  await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
+  expect(listSchemas).toHaveBeenCalledWith('a')
+})
+
+// The same watcher serves both engines; MongoDB also gets its database opened, which
+// PostgreSQL's own tree does for itself.
+it('expands the connection and database of an active MongoDB collection tab', async () => {
+  listDatabases.mockResolvedValue([])
+  tabs.value = [{
+    id: 'mongo', kind: 'collection', type: 'mongodb.find',
+    connectionId: 'a', dbName: 'shop', collectionName: 'orders',
+  }]
+  activeTabId.value = 'mongo'
+  await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
+  expect(tree.expandedDbs.value['a/shop']).toBe(true)
+})
+
+// The connection row used to prefix-match the collection key, so it lit up for MongoDB
+// collections only — and would have matched any connection whose id was a prefix.
+it('names the connection holding the active tab\'s resource, either engine', async () => {
+  listDatabases.mockResolvedValue([])
+  tabs.value = [
+    { id: 'm', kind: 'collection', connectionId: 'a', dbName: 'shop', collectionName: 'orders' },
+    { id: 'p', kind: 'pgTable', type: 'postgresql.table_browse', connectionId: 'a', schema: 'public', table: 'merchants' },
+    { id: 'q', kind: 'quickstart' },
+  ]
+  activeTabId.value = 'm'
+  expect(tree.activeConnectionId.value).toBe('a')
+  activeTabId.value = 'p'
+  expect(tree.activeConnectionId.value).toBe('a')
+  activeTabId.value = 'q'
+  expect(tree.activeConnectionId.value).toBeNull()
 })
 
 it('refreshes a collapsed connection through the resource store', async () => {
