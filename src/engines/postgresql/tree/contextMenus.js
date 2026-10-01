@@ -29,7 +29,7 @@ export const PG_MENUS = {
     { label: 'Disconnect All' },
   ],
   database: [NEW_SQL, ROUTINES, { sep: true }, { label: 'Create Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
-  schema: [ROUTINES, { sep: true }, { label: 'Create Table…', icon: 'table' }, { label: 'Drop Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
+  schema: [ROUTINES, { label: 'Search in Schema…', icon: 'search' }, { sep: true }, { label: 'Create Table…', icon: 'table' }, { label: 'Drop Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
   table: [
     { label: 'Open Table', icon: 'table', shortcut: '↵' }, NEW_SQL,
     { sep: true }, { label: 'Rename Table…' }, { label: 'Drop Table…' },
@@ -42,6 +42,7 @@ export const PG_ACTIONS = {
   'Server Activity…': (n) => openModal('pgActivity', n),
   'Roles…': (n) => openModal('pgRoles', n),
   'Functions & Procedures…': (n) => openModal('pgRoutines', n),
+  'Search in Schema…': (n) => openModal('pgSearch', n),
   'Create Schema…': (n) => openModal('pgCreateSchema', n),
   'Drop Schema…': (n) => openModal('pgDrop', n),
   'Create Table…': (n) => openModal('pgCreateTable', n),
