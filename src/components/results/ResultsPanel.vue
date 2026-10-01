@@ -181,6 +181,7 @@ function toggleReadOnly() {
       <BaseSelect class="page-size-pick" size="sm"
         :model-value="activeTab.limit || 50"
         :options="PAGE_SIZE_OPTIONS"
+        :placeholder="String(activeTab.limit || 50)"
         @update:model-value="setPageSize" />
       <span class="docs-range">
         Documents {{ rangeText }}
