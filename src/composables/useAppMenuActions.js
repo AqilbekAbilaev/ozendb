@@ -291,6 +291,13 @@ export function useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll
   // Linux — where WebKitGTK swallows native accelerators, so menu.rs attaches none —
   // the webview matches the keyboard against the user's bindings itself.
   const nativeMenuOwnsShortcuts = !/Linux/i.test(navigator.userAgent)
+  // ozendb-4b8: macOS reserves Ctrl+Tab/Ctrl+Shift+Tab for Cocoa's key-view-loop
+  // navigation, claimed earlier in the dispatch pipeline than any menu accelerator —
+  // so the native menu item for these two never fires from the keyboard (clicking it
+  // still works). The keystroke still reaches the webview as an ordinary keydown, so
+  // catch just these two here. matchBinding still honors a user rebind of either id.
+  const isMac = /Mac/i.test(navigator.userAgent)
+  const TAB_NAV_IDS = new Set(['view:next_tab', 'view:prev_tab'])
 
   function onGlobalKeydown(e) {
     if (isEditingTarget(e.target)) return
@@ -301,14 +308,25 @@ export function useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll
     }
   }
 
+  function onTabNavKeydown(e) {
+    if (isEditingTarget(e.target)) return
+    const id = matchBinding(e, keyBindings.value)
+    if (id && TAB_NAV_IDS.has(id)) {
+      e.preventDefault()
+      handleMenuAction(id)
+    }
+  }
+
   let unlisten
   onMounted(() => {
     unlisten = listen('menu-action', (e) => handleMenuAction(e.payload))
     if (!nativeMenuOwnsShortcuts) window.addEventListener('keydown', onGlobalKeydown)
+    else if (isMac) window.addEventListener('keydown', onTabNavKeydown)
   })
   onUnmounted(() => {
     unlisten.then(off => off())
     window.removeEventListener('keydown', onGlobalKeydown)
+    window.removeEventListener('keydown', onTabNavKeydown)
   })
 
   return { handleMenuAction }
