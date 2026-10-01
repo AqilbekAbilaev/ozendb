@@ -15,21 +15,21 @@ beforeEach(() => {
 describe('PostgreSQL queries', () => {
   it('runs SQL against a connection', async () => {
     await runQuery('c1', 'SELECT 1')
-    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT 1', runId: null, txId: null })
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT 1', runId: null, txId: null, database: null })
   })
 
   it('names a run so it can be cancelled, and cancels it by that name', async () => {
     await runQuery('c1', 'SELECT pg_sleep(9)', 'run-1')
-    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT pg_sleep(9)', runId: 'run-1', txId: null })
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT pg_sleep(9)', runId: 'run-1', txId: null, database: null })
     await cancelQuery('c1', 'run-1')
     expect(invoke).toHaveBeenCalledWith('cancel_pg_query', { id: 'c1', runId: 'run-1' })
   })
 
   it('holds a transaction open, runs in it, and ends it', async () => {
     await beginTransaction('c1', 'tx-1')
-    expect(invoke).toHaveBeenCalledWith('begin_pg_transaction', { id: 'c1', txId: 'tx-1' })
+    expect(invoke).toHaveBeenCalledWith('begin_pg_transaction', { id: 'c1', txId: 'tx-1', database: null })
     await runQuery('c1', 'DELETE FROM t', 'run-1', 'tx-1')
-    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'DELETE FROM t', runId: 'run-1', txId: 'tx-1' })
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'DELETE FROM t', runId: 'run-1', txId: 'tx-1', database: null })
     await commitTransaction('tx-1')
     expect(invoke).toHaveBeenCalledWith('commit_pg_transaction', { txId: 'tx-1' })
     await rollbackTransaction('tx-1')
@@ -43,7 +43,16 @@ describe('PostgreSQL queries', () => {
 
   it('explains a query', async () => {
     await explainQuery('c1', 'SELECT 1')
-    expect(invoke).toHaveBeenCalledWith('explain_pg_query', { id: 'c1', sql: 'SELECT 1' })
+    expect(invoke).toHaveBeenCalledWith('explain_pg_query', { id: 'c1', sql: 'SELECT 1', database: null })
+  })
+
+  it('targets a database other than the connection\'s own for query/transaction/explain', async () => {
+    await runQuery('c1', 'SELECT 1', 'run-1', null, 'otherdb')
+    expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT 1', runId: 'run-1', txId: null, database: 'otherdb' })
+    await beginTransaction('c1', 'tx-1', 'otherdb')
+    expect(invoke).toHaveBeenCalledWith('begin_pg_transaction', { id: 'c1', txId: 'tx-1', database: 'otherdb' })
+    await explainQuery('c1', 'SELECT 1', 'otherdb')
+    expect(invoke).toHaveBeenCalledWith('explain_pg_query', { id: 'c1', sql: 'SELECT 1', database: 'otherdb' })
   })
 
   it('browses a page of a table, unordered by default', async () => {

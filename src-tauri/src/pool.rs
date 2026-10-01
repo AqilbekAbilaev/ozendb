@@ -23,7 +23,10 @@ use tokio::sync::Mutex;
 /// the live tunnel, keyed by the same id, shared by whichever map is in use.
 pub struct ConnectionPool {
     clients: Mutex<HashMap<String, Client>>,
-    pg_pools: Mutex<HashMap<String, PgPool>>,
+    // Keyed by (connection id, database) rather than just id: a connection's own
+    // tunnel/credentials are shared, but Postgres has no per-query `USE`, so
+    // opening a second database on the same server (ozendb-bj2) needs its own pool.
+    pg_pools: Mutex<HashMap<(String, String), PgPool>>,
     tunnels: Mutex<HashMap<String, Arc<SshTunnel>>>,
     // One lock per connection id, held while a tunnel is established. Without it,
     // two concurrent operations on the same SSH connection each build a tunnel on
@@ -70,13 +73,14 @@ impl ConnectionPool {
         self.clients.lock().await.get(id).cloned()
     }
 
-    pub async fn get_postgres(&self, id: &str) -> Option<PgPool> {
-        self.pg_pools.lock().await.get(id).cloned()
+    pub async fn get_postgres(&self, id: &str, database: &str) -> Option<PgPool> {
+        self.pg_pools.lock().await.get(&(id.to_string(), database.to_string())).cloned()
     }
 
     pub async fn remove(&self, id: &str) {
         self.clients.lock().await.remove(id);
-        self.pg_pools.lock().await.remove(id);
+        // Every database's pool for this connection, not just one.
+        self.pg_pools.lock().await.retain(|(cid, _), _| cid != id);
         // Dropping the last Arc tears the tunnel (accept loop + session) down.
         self.tunnels.lock().await.remove(id);
     }
@@ -102,14 +106,15 @@ impl ConnectionPool {
         Ok(map.entry(id.to_string()).or_insert(client).clone())
     }
 
-    /// Postgres sibling of `get_or_create`: returns a cached pool, or opens and
-    /// caches a new one from `options`.
+    /// Postgres sibling of `get_or_create`: returns a cached pool for `(id,
+    /// database)`, or opens and caches a new one from `options`.
     async fn get_or_create_postgres(
         &self,
         id: &str,
+        database: &str,
         options: PgConnectOptions,
     ) -> Result<PgPool, AppError> {
-        if let Some(pool) = self.get_postgres(id).await {
+        if let Some(pool) = self.get_postgres(id, database).await {
             return Ok(pool);
         }
 
@@ -119,7 +124,7 @@ impl ConnectionPool {
         };
 
         let mut map = self.pg_pools.lock().await;
-        Ok(map.entry(id.to_string()).or_insert(pool).clone())
+        Ok(map.entry((id.to_string(), database.to_string())).or_insert(pool).clone())
     }
 
     /// Single entry point every command uses to obtain a client for a
@@ -163,30 +168,34 @@ impl ConnectionPool {
 
     /// Postgres sibling of `connect`: same tunnel-then-cache shape, resolving a
     /// `PgPool` from the parallel `pg_pools` map instead of a `mongodb::Client`.
-    pub async fn connect_postgres(&self, config: &ConnectionConfig) -> Result<PgPool, AppError> {
+    /// `database` names a database other than the config's own — opening a second
+    /// database on the same server (ozendb-bj2) — reusing the same tunnel,
+    /// credentials and TLS/read-only options; `None` behaves exactly as before.
+    pub async fn connect_postgres(&self, config: &ConnectionConfig, database: Option<&str>) -> Result<PgPool, AppError> {
         let postgres = postgres_config(config)?;
+        let database = database.unwrap_or_else(|| pg_uri::resolved_database(postgres));
 
         if config.ssh_enabled {
             let tunnel = match self.ensure_tunnel(config).await {
                 Ok(value) => value,
                 Err(e) => return Err(e),
             };
-            if let Some(pool) = self.get_postgres(&config.id).await {
+            if let Some(pool) = self.get_postgres(&config.id, database).await {
                 return Ok(pool);
             }
             let password = crate::keychain::get(&config.id);
             let host = String::from("127.0.0.1");
             let port = tunnel.local_addr.port();
-            let options = pg_uri::build_options_to(config, postgres, password.as_deref(), &host, port)?;
-            return self.get_or_create_postgres(&config.id, options).await;
+            let options = pg_uri::build_options_to_for_database(config, postgres, password.as_deref(), &host, port, database)?;
+            return self.get_or_create_postgres(&config.id, database, options).await;
         }
 
-        if let Some(pool) = self.get_postgres(&config.id).await {
+        if let Some(pool) = self.get_postgres(&config.id, database).await {
             return Ok(pool);
         }
         let password = crate::keychain::get(&config.id);
-        let options = pg_uri::build_options(config, postgres, password.as_deref())?;
-        self.get_or_create_postgres(&config.id, options).await
+        let options = pg_uri::build_options_for_database(config, postgres, password.as_deref(), database)?;
+        self.get_or_create_postgres(&config.id, database, options).await
     }
 
     /// Returns the cached SSH tunnel for `config`, establishing one if needed.
@@ -217,7 +226,7 @@ impl ConnectionPool {
                 config.id
             );
             self.clients.lock().await.remove(&config.id);
-            self.pg_pools.lock().await.remove(&config.id);
+            self.pg_pools.lock().await.retain(|(cid, _), _| cid != &config.id);
             self.tunnels.lock().await.remove(&config.id);
         }
 
@@ -246,7 +255,7 @@ impl ConnectionPool {
         // the old one so `get_or_create`/`get_or_create_postgres` rebuilds it for
         // this tunnel's port.
         self.clients.lock().await.remove(&config.id);
-        self.pg_pools.lock().await.remove(&config.id);
+        self.pg_pools.lock().await.retain(|(cid, _), _| cid != &config.id);
         self.tunnels
             .lock()
             .await

@@ -20,7 +20,27 @@ beforeEach(() => {
   pushHistory.mockResolvedValue(null)
 })
 
+describe('createSqlRun', () => {
+  it('defaults to no database override, and carries one when given', () => {
+    expect(createSqlRun('c1').database).toBe(null)
+    expect(createSqlRun('c1', 'otherdb').database).toBe('otherdb')
+  })
+})
+
 describe('runSql', () => {
+  it('forwards the run\'s database override to runQuery/beginTransaction/explainQuery', async () => {
+    runQuery.mockResolvedValue({ columns: [], rows: [], truncated: false, elapsedMs: 1 })
+    explainQuery.mockResolvedValue([])
+    const t = newRun({ database: 'otherdb', txn: 'manual' })
+
+    await runSql(t, 'SELECT 1')
+    expect(beginTransaction).toHaveBeenCalledWith('c1', expect.any(String), 'otherdb')
+    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 1', expect.any(String), t.txId, 'otherdb')
+
+    await explainSql(t, 'SELECT 1')
+    expect(explainQuery).toHaveBeenCalledWith('c1', 'SELECT 1', 'otherdb')
+  })
+
   it('keeps the result on the tab', async () => {
     const result = { columns: ['?column?'], rows: [[1]], truncated: false, elapsedMs: 2 }
     runQuery.mockResolvedValue(result)
@@ -28,7 +48,7 @@ describe('runSql', () => {
 
     await runSql(t, 'SELECT 1')
 
-    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 1', expect.any(String), null)
+    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 1', expect.any(String), null, null)
     expect(t).toMatchObject({ result, error: null, running: false })
   })
 
@@ -66,7 +86,7 @@ describe('runSql', () => {
   it('runs just the given SQL when a selection is passed', async () => {
     runQuery.mockResolvedValue({ columns: [], rows: [], truncated: false, elapsedMs: 1 })
     await runSql(newRun(), 'SELECT 2')
-    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 2', expect.any(String), null)
+    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 2', expect.any(String), null, null)
   })
 
   it('logs each run for the Messages tab', async () => {
@@ -113,7 +133,7 @@ describe('runSql', () => {
     const t = newRun({ plan: 'old' })
     explainQuery.mockResolvedValueOnce([{ Plan: {} }])
     await explainSql(t, 'SELECT 2')
-    expect(explainQuery).toHaveBeenCalledWith('c1', 'SELECT 2')
+    expect(explainQuery).toHaveBeenCalledWith('c1', 'SELECT 2', null)
     expect(t).toMatchObject({ plan: [{ Plan: {} }], planError: null, explaining: false })
 
     explainQuery.mockRejectedValueOnce({ code: 'command', message: 'syntax error' })
@@ -145,7 +165,7 @@ describe('Manual transactions', () => {
     await runSql(t, 'SELECT 1')
     expect(beginTransaction).toHaveBeenCalledTimes(1)
     const txId = beginTransaction.mock.calls[0][1]
-    expect(beginTransaction).toHaveBeenCalledWith('c1', txId)
+    expect(beginTransaction).toHaveBeenCalledWith('c1', txId, null)
     expect(runQuery.mock.calls.map(c => c[3])).toEqual([txId, txId])
     expect(t.txId).toBe(txId)
 

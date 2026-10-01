@@ -33,6 +33,37 @@ pub fn build_options_to(
     options_for(config, postgres, password, host, port)
 }
 
+/// `build_options`, but naming an explicit database rather than the config's own —
+/// for opening a second database on the same server (ozendb-bj2). Host,
+/// credentials, TLS and the read-only/statement-timeout options are unchanged.
+pub fn build_options_for_database(
+    config: &ConnectionConfig,
+    postgres: &PostgresConfig,
+    password: Option<&str>,
+    database: &str,
+) -> Result<PgConnectOptions, AppError> {
+    Ok(build_options(config, postgres, password)?.database(database))
+}
+
+/// The database a config connects to absent an override — what `options_for`
+/// resolves internally, exposed so `ConnectionPool` can key its per-database pool
+/// cache by the same name `build_options` would actually use.
+pub(crate) fn resolved_database(postgres: &PostgresConfig) -> &str {
+    postgres.database.as_deref().filter(|s| !s.is_empty()).unwrap_or(DEFAULT_DATABASE)
+}
+
+/// `build_options_to`'s sibling, for the same reason.
+pub fn build_options_to_for_database(
+    config: &ConnectionConfig,
+    postgres: &PostgresConfig,
+    password: Option<&str>,
+    host: &str,
+    port: u16,
+    database: &str,
+) -> Result<PgConnectOptions, AppError> {
+    Ok(build_options_to(config, postgres, password, host, port)?.database(database))
+}
+
 fn options_for(
     config: &ConnectionConfig,
     postgres: &PostgresConfig,

@@ -343,7 +343,7 @@ describe('explain', () => {
     explainQuery.mockResolvedValue([{ Plan: {} }])
     const t = await loaded()
     await t.explain()
-    expect(explainQuery).toHaveBeenCalledWith('c1', t.currentSql.value)
+    expect(explainQuery).toHaveBeenCalledWith('c1', t.currentSql.value, null)
     expect(t.explainRun.plan).toEqual([{ Plan: {} }])
   })
 })
@@ -447,7 +447,7 @@ describe('SQL mode', () => {
     await t.toSql()
     expect(t.mode.value).toBe('sql')
     expect(t.sql.value).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC\nLIMIT 100 OFFSET 100;')
-    expect(runQuery).toHaveBeenCalledWith('c1', t.sql.value, expect.any(String), null)
+    expect(runQuery).toHaveBeenCalledWith('c1', t.sql.value, expect.any(String), null, null)
   })
 
   it('opens given SQL — a saved or earlier query — without running it', async () => {
