@@ -110,7 +110,7 @@ onBeforeUnmount(() => {
     <button ref="triggerEl" type="button" class="bs-trigger" :class="[`bs-${size}`, { placeholder: !selected, open }]"
       :disabled="disabled" @click="toggle">
       <span class="bs-label">{{ triggerLabel }}</span>
-      <BaseIcon name="caretDown" :size="12" class="bs-caret" />
+      <BaseIcon :name="open ? 'caretDown' : 'caret'" :size="12" class="bs-caret" />
     </button>
     <Teleport to="body">
       <div v-if="open" ref="menuEl" class="bs-menu" :style="menuStyle">
