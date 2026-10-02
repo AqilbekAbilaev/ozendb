@@ -146,6 +146,22 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
             ],
         ),
         (
+            // PostgreSQL-only (ozendb-sxd): gated on the active tab naming a schema
+            // or table, not the sidebar tree — it doesn't yet feed a PostgreSQL
+            // selection into the menu context (see menuContext.js). Every id here
+            // reuses the same handlers the table workspace's own toolbar/context
+            // menu already call.
+            "PostgreSQL",
+            vec![
+                Spec::Action { id: "pg:new_sql", label: "New SQL Query", accel: None, gate: Some(Gate::PgSchema) },
+                Spec::Action { id: "pg:create_table", label: "Create Table…", accel: None, gate: Some(Gate::PgSchema) },
+                Spec::Action { id: "pg:search_schema", label: "Search in Schema…", accel: None, gate: Some(Gate::PgSchema) },
+                Spec::Separator,
+                Spec::Action { id: "pg:row_history", label: "Row History…", accel: None, gate: Some(Gate::PgTable) },
+                Spec::Action { id: "pg:drop_table", label: "Drop Table…", accel: None, gate: Some(Gate::PgTable) },
+            ],
+        ),
+        (
             "View",
             vec![
                 Spec::Action { id: "view:refresh", label: "Refresh", accel: Some("CmdOrCtrl+R"), gate: Some(Gate::RefreshableTab) },

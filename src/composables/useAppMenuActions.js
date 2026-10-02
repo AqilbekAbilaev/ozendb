@@ -1,6 +1,6 @@
 import { nextTick, onMounted, onUnmounted } from 'vue'
 import { showToast } from '../stores/toast'
-import { openCollectionTab, openQuickstart } from '../stores/tabCreators'
+import { openCollectionTab, openQuickstart, openPostgresQuery } from '../stores/tabCreators'
 import { useZoom } from './useZoom'
 import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh } from '../stores/menuRequests'
 import { listen } from '@tauri-apps/api/event'
@@ -16,10 +16,10 @@ import { keyBindings } from '../stores/settings'
 import { matchBinding } from '../utils/keybindings'
 import { isEditingTarget } from '../utils/editingTarget'
 
-// `menuTarget` comes from useMenu and the three dispatchers from useFeatures — App.vue
-// constructs both once and hands over what this needs of them. `toolbarHidden` is
-// App.vue's own layout state; the View menu just toggles it.
-export function useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden }) {
+// `menuTarget`/`pgMenuTarget` come from useMenu and the three dispatchers from
+// useFeatures — App.vue constructs both once and hands over what this needs of
+// them. `toolbarHidden` is App.vue's own layout state; the View menu just toggles it.
+export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, refreshAll, toolbarHidden }) {
   const { zoomIn, zoomOut, resetZoom } = useZoom()
   const appWindow = getCurrentWindow()
 
@@ -218,6 +218,37 @@ export function useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll
         const tab = tabs.value.find(t => t.id === activeTabId.value)
         if (!tab || tab.kind !== 'collection') { showToast('Open a collection tab first'); return }
         requestHistory()
+        return
+      }
+
+      // PostgreSQL (ozendb-sxd) — the same handlers the table workspace's own
+      // toolbar/context menu already call (PG_ACTIONS), targeting the active tab
+      // (see pgMenuTarget). The PgSchema/PgTable gates already guarantee one is
+      // open, so a null target here would only mean the tab closed between the
+      // menu enabling and the click — rare, so just no-op rather than toast.
+      case 'pg:new_sql': {
+        const target = pgMenuTarget()
+        if (target) openPostgresQuery({ connectionId: target.connectionId, connectionName: target.connectionName, database: target.database })
+        return
+      }
+      case 'pg:create_table': {
+        const target = pgMenuTarget()
+        if (target) openModal('pgCreateTable', target)
+        return
+      }
+      case 'pg:search_schema': {
+        const target = pgMenuTarget()
+        if (target) openModal('pgSearch', target)
+        return
+      }
+      case 'pg:row_history': {
+        const target = pgMenuTarget()
+        if (target?.table) openModal('pgRowHistory', target)
+        return
+      }
+      case 'pg:drop_table': {
+        const target = pgMenuTarget()
+        if (target?.table) openModal('pgDrop', target)
         return
       }
     }
