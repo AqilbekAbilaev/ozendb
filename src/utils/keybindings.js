@@ -63,14 +63,19 @@ export function mergeBindings(overrides) {
   return merged
 }
 
-// Parse a Tauri accelerator string into a normalized matcher.
+// Parse a Tauri accelerator string into a normalized matcher. `cmdOrCtrl` means
+// "either", matched leniently; `ctrl`/`cmd` are the physical keys, matched exactly
+// (ozendb-wpy) — a binding that asked for one specific key must not also fire for
+// the other, which is exactly the bug this distinction fixes.
 export function parseAccel(accel) {
-  const matcher = { mod: false, shift: false, alt: false, key: '' }
+  const matcher = { cmdOrCtrl: false, ctrl: false, cmd: false, shift: false, alt: false, key: '' }
   for (const raw of String(accel).split('+')) {
     const part = raw.trim()
     if (part === '') continue
     const low = part.toLowerCase()
-    if (['cmdorctrl', 'cmd', 'command', 'ctrl', 'control', 'meta', 'super'].includes(low)) matcher.mod = true
+    if (low === 'cmdorctrl') matcher.cmdOrCtrl = true
+    else if (low === 'ctrl' || low === 'control') matcher.ctrl = true
+    else if (low === 'cmd' || low === 'command' || low === 'meta' || low === 'super') matcher.cmd = true
     else if (low === 'shift') matcher.shift = true
     else if (low === 'alt' || low === 'option') matcher.alt = true
     else matcher.key = part
@@ -88,13 +93,16 @@ function eventKey(event) {
   return event.key
 }
 
-// Does a keydown event match the accelerator? Mirrors the app convention that
-// CmdOrCtrl means Ctrl (Win/Linux) or Cmd (mac): we accept ctrl OR meta.
+// Does a keydown event match the accelerator? CmdOrCtrl means Ctrl (Win/Linux) or
+// Cmd (mac): we accept ctrl OR meta. A literal Ctrl or Cmd means exactly that
+// physical key, not either — see `parseAccel`.
 export function eventMatchesAccel(event, accel) {
   const matcher = parseAccel(accel)
   if (matcher.key === '') return false
-  const mod = event.ctrlKey || event.metaKey
-  if (matcher.mod !== mod) return false
+  const modOk = matcher.cmdOrCtrl
+    ? (event.ctrlKey || event.metaKey)
+    : (event.ctrlKey === matcher.ctrl && event.metaKey === matcher.cmd)
+  if (!modOk) return false
   if (matcher.shift !== event.shiftKey) return false
   if (matcher.alt !== event.altKey) return false
   return String(eventKey(event)).toLowerCase() === matcher.key.toLowerCase()
@@ -118,6 +126,8 @@ export function accelToTokens(accel, isMac) {
     if (part === '') continue
     const low = part.toLowerCase()
     if (low === 'cmdorctrl') tokens.push(isMac ? '⌘' : 'Ctrl')
+    else if (low === 'cmd' || low === 'command') tokens.push(isMac ? '⌘' : 'Cmd')
+    else if (low === 'ctrl' || low === 'control') tokens.push('Ctrl')
     else if (low === 'shift') tokens.push(isMac ? '⇧' : 'Shift')
     else if (low === 'alt') tokens.push(isMac ? '⌥' : 'Alt')
     else tokens.push(part.length === 1 ? part.toUpperCase() : part)
@@ -128,6 +138,14 @@ export function accelToTokens(accel, isMac) {
 // Capture a keydown into a Tauri accelerator string, or null if it isn't a
 // usable global shortcut. Requires either a modifier or a function key — a bare
 // letter would fire while typing. Used by the "press a key" capture field.
+//
+// ctrlKey and metaKey are captured as the distinct physical keys they are
+// (ozendb-wpy) — collapsing both into one "CmdOrCtrl" token meant a user
+// rebinding to a Control-only chord on macOS (e.g. Ctrl+Shift+J) silently got
+// Cmd+Shift+J saved instead, since CmdOrCtrl always resolves to Cmd there, with
+// no sign the captured combo differed from what they pressed. A rebind now
+// records exactly the key held: Ctrl stays Ctrl, Cmd stays Cmd, holding both
+// captures both.
 export function accelFromEvent(event) {
   // Use the same code fallback as the matcher so Shift+Tab (which WebKitGTK
   // reports as key "Unidentified"/ISO_Left_Tab) is captured, not dropped.
@@ -142,7 +160,8 @@ export function accelFromEvent(event) {
 
   const isFunctionKey = /^F\d{1,2}$/.test(main)
   const tokens = []
-  if (event.ctrlKey || event.metaKey) tokens.push('CmdOrCtrl')
+  if (event.ctrlKey) tokens.push('Ctrl')
+  if (event.metaKey) tokens.push('Cmd')
   if (event.shiftKey) tokens.push('Shift')
   if (event.altKey) tokens.push('Alt')
   if (tokens.length === 0 && !isFunctionKey) return null
