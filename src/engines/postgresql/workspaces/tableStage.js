@@ -2,6 +2,7 @@ import { computed } from 'vue'
 import { updateRow, deleteRows as deleteRowsApi, insertRow, beginTransaction, commitTransaction, rollbackTransaction } from '../api/queries'
 import { errMessage } from '../../../utils/errors'
 import { formatCell } from './formatCell.js'
+import { buildInsertSql, buildUpdateSql, buildDeleteSql } from './buildStagedSql.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -202,27 +203,30 @@ export function useTableStage(t, connectionReadOnly) {
   const pendingCount = computed(() => Object.keys(staged.edits).length + staged.deletedKeys.length + staged.inserts.length)
   const deletedCount = computed(() => staged.deletedKeys.length)
 
-  // A readable preview of every pending change, one statement per row — not the
-  // exact bound SQL the server runs (see sqlLiteral), just close enough to review.
+  // A readable preview of every pending change, one statement per row (or, for
+  // deletes, one statement for the whole batch) — not the exact bound SQL the
+  // server runs (see sqlLiteral), just close enough to review. Each statement is
+  // laid out over several lines (see buildStagedSql.js) rather than one that runs
+  // off the edge for a table with many columns, with a blank line between them.
   const reviewSql = computed(() => {
     const qualified = `${target.schema}.${target.table}`
-    const lines = []
+    const statements = []
     for (const draft of staged.inserts) {
       const cols = Object.keys(draft.values)
       if (!cols.length) continue
-      lines.push(`INSERT INTO ${qualified} (${cols.join(', ')}) VALUES (${cols.map(c => sqlLiteral(draft.values[c])).join(', ')});`)
+      statements.push(buildInsertSql(qualified, cols, cols.map(c => sqlLiteral(draft.values[c]))))
     }
     for (const [key, edits] of Object.entries(staged.edits)) {
       const where = JSON.parse(key).map((value, i) => `${keyColumns.value[i]} = ${sqlLiteral(value)}`).join(' AND ')
-      const set = Object.entries(edits).map(([column, { value }]) => `${column} = ${sqlLiteral(value)}`).join(', ')
-      lines.push(`UPDATE ${qualified} SET ${set} WHERE ${where};`)
+      const set = Object.entries(edits).map(([column, { value }]) => `${column} = ${sqlLiteral(value)}`)
+      statements.push(buildUpdateSql(qualified, set, where))
     }
     if (staged.deletedKeys.length) {
       const keyCols = keyColumns.value.join(', ')
-      const tuples = staged.deletedKeys.map(key => `(${JSON.parse(key).map(sqlLiteral).join(', ')})`).join(', ')
-      lines.push(`DELETE FROM ${qualified} WHERE (${keyCols}) IN (${tuples});`)
+      const tuples = staged.deletedKeys.map(key => `(${JSON.parse(key).map(sqlLiteral).join(', ')})`)
+      statements.push(buildDeleteSql(qualified, keyCols, tuples))
     }
-    return lines.join('\n')
+    return statements.join('\n\n')
   })
 
   // Runs every pending change in one transaction: any failure rolls it back and

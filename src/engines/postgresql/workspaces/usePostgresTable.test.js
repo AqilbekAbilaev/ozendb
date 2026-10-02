@@ -705,9 +705,9 @@ describe('reviewSql', () => {
     t.toggleDelete([1])
 
     const sql = t.reviewSql.value
-    expect(sql).toContain("INSERT INTO public.users (name) VALUES ('New');")
-    expect(sql).toContain("UPDATE public.users SET name = 'Ada L.' WHERE id = 1;")
-    expect(sql).toContain('DELETE FROM public.users WHERE (id) IN ((2));')
+    expect(sql).toContain("INSERT INTO public.users (\nname\n) VALUES (\n'New'\n);")
+    expect(sql).toContain("UPDATE public.users\nSET name = 'Ada L.'\nWHERE id = 1;")
+    expect(sql).toContain('DELETE FROM public.users\nWHERE (id) IN (\n(2)\n);')
   })
 })
 
