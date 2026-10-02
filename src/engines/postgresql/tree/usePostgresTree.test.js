@@ -5,7 +5,7 @@ const listColumns = vi.fn()
 const listForeignKeys = vi.fn()
 vi.mock('../api/resources', () => ({ listTables, listColumns, listForeignKeys }))
 
-const { usePostgresTree, visibleSchemas, isOpenTable, activeTableSchema } = await import('./usePostgresTree.js')
+const { usePostgresTree, visibleSchemas, isOpenTable, activeTableSchema, isSelectedNode } = await import('./usePostgresTree.js')
 
 beforeEach(() => vi.resetAllMocks())
 
@@ -39,6 +39,31 @@ describe('activeTableSchema', () => {
     expect(activeTableSchema(tab, 'c2')).toBeNull()
     expect(activeTableSchema({ ...tab, type: 'postgresql.query' }, 'c1')).toBeNull()
     expect(activeTableSchema(null, 'c1')).toBeNull()
+  })
+})
+
+describe('isSelectedNode', () => {
+  const sel = {
+    connectionId: 'c1', engine: 'postgresql', kind: 'table',
+    database: 'app', schema: 'public', table: 'users',
+  }
+  it('is the sidebar row the selection names, on this connection', () => {
+    expect(isSelectedNode(sel, 'c1', 'table', 'public', 'users')).toBe(true)
+    expect(isSelectedNode(sel, 'c2', 'table', 'public', 'users')).toBe(false)
+    expect(isSelectedNode(sel, 'c1', 'table', 'audit', 'users')).toBe(false)
+    expect(isSelectedNode(sel, 'c1', 'schema', 'public', null)).toBe(false)
+  })
+
+  it('matches a schema row only when no table is named', () => {
+    const schemaSel = { ...sel, kind: 'schema', table: null }
+    expect(isSelectedNode(schemaSel, 'c1', 'schema', 'public', null)).toBe(true)
+    expect(isSelectedNode(schemaSel, 'c1', 'table', 'public', 'users')).toBe(false)
+  })
+
+  // A MongoDB selection is a different tree's row even at the same depth.
+  it('ignores a selection from another engine, or none', () => {
+    expect(isSelectedNode({ ...sel, engine: 'mongodb' }, 'c1', 'table', 'public', 'users')).toBe(false)
+    expect(isSelectedNode(null, 'c1', 'table', 'public', 'users')).toBe(false)
   })
 })
 
