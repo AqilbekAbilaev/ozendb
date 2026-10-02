@@ -5,6 +5,7 @@ import { errText, errCode } from '../../../utils/errors'
 import { roleAttributes, matchRoles, membersOf, canDropRole } from './roleRows'
 import { openConnections } from '../../../stores/openConnections'
 import { showToast } from '../../../stores/toast'
+import { openModal } from '../../../stores/modals'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseCheckbox from '../../../components/base/BaseCheckbox.vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
@@ -147,6 +148,12 @@ async function confirmDrop() {
               <div class="pr-head">
                 <span class="pr-title">{{ selected.name }}</span>
                 <FlexSpacer />
+                <BaseButton
+                  variant="ghost"
+                  icon="key"
+                  title="What this role can touch"
+                  @click="openModal('pgGrants', { connId: target.connId, connName: target.connName, role: selected.name })"
+                >Grants…</BaseButton>
                 <BaseButton
                   variant="ghost"
                   icon="trash"
