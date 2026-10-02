@@ -119,6 +119,15 @@ export function activeTableSchema(tab, connectionId) {
   return tab.schema
 }
 
+// Whether `selection` (the shared sidebar selection) names this very row — what the
+// tree highlights, and the same selection the native menu gates on (ozendb-sxd).
+// The engine is part of the comparison because a MongoDB collection sits at the same
+// depth as a PostgreSQL schema.
+export function isSelectedNode(selection, connectionId, kind, schema = null, table = null) {
+  if (selection?.engine !== 'postgresql' || selection.connectionId !== connectionId) return false
+  return selection.kind === kind && (selection.schema ?? null) === schema && (selection.table ?? null) === table
+}
+
 // `table.column` a column's foreign key points at (schema-qualified when it's in
 // another schema), or null.
 function referenceOf(keys, schema, table, column) {

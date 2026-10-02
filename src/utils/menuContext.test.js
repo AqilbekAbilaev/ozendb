@@ -249,10 +249,9 @@ describe('resolveMenuTarget', () => {
   })
 })
 
-// ozendb-sxd: PostgreSQL has no sidebar selection feeding the menu context yet
-// (PostgresTreeNodes.vue never calls setTreeSelection), so these are resolved from
-// the active tab alone — the opposite of the Mongo tests above, which exist
-// precisely because the sidebar half matters there.
+// ozendb-sxd: the PostgreSQL gates are the union of the active tab and the sidebar
+// selection, the same as the Mongo ones above — PostgresTreeNodes feeds its clicked
+// schema/table row into the shared tree-selection store.
 const pgQueryTab = { id: 'p1', type: 'postgresql.query', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public' }
 const pgTableTab = { id: 'p2', type: 'postgresql.table_browse', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public', table: 'widgets' }
 
@@ -281,6 +280,51 @@ describe('deriveMenuContext (PostgreSQL)', () => {
   })
 })
 
+// Built the way PostgresTreeNodes builds them, so these cannot drift from the runtime
+// payload — the PostgreSQL levels name their own fields (database/schema/table).
+function pgSelection(kind, fields) {
+  const sel = {
+    connectionId: 'c1', connectionName: 'PG', engine: 'postgresql',
+    database: null, schema: null, table: null, kind, ...fields,
+  }
+  return { ...sel, resource: resourceFromTreeSelection(sel) }
+}
+
+describe('deriveMenuContext (PostgreSQL sidebar selection)', () => {
+  it('a selected schema enables the schema gate with no tab open', () => {
+    const ctx = deriveMenuContext(quickstart, pgSelection('schema', { database: 'app', schema: 'public' }), 1)
+    expect(ctx.hasPgSchema).toBe(true)
+    expect(ctx.hasPgTable).toBe(false)
+  })
+
+  it('a selected table enables both gates with no tab open', () => {
+    const ctx = deriveMenuContext(quickstart, pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' }), 1)
+    expect(ctx.hasPgSchema).toBe(true)
+    expect(ctx.hasPgTable).toBe(true)
+  })
+
+  it('a shallower PostgreSQL selection enables neither', () => {
+    const connSel = pgSelection('connection', {})
+    expect(deriveMenuContext(quickstart, connSel, 1).hasPgSchema).toBe(false)
+    expect(deriveMenuContext(quickstart, connSel, 1).hasPgTable).toBe(false)
+  })
+
+  // A Mongo collection is two segments deep, as a Postgres schema is — the engine is
+  // what separates them, not the depth.
+  it('a MongoDB selection never enables the PostgreSQL gates', () => {
+    const ctx = deriveMenuContext(quickstart, selection('c1', 'Local', 'shop', 'orders', 'collection'), 1)
+    expect(ctx.hasPgSchema).toBe(false)
+    expect(ctx.hasPgTable).toBe(false)
+  })
+
+  // The mirror of the Mongo rule: a Postgres tab must not light up the Mongo gates.
+  it('a PostgreSQL selection never enables the MongoDB gates', () => {
+    const ctx = deriveMenuContext(quickstart, pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' }), 1)
+    expect(ctx.hasDatabase).toBe(false)
+    expect(ctx.hasCollection).toBe(false)
+  })
+})
+
 describe('resolvePgMenuTarget', () => {
   it('resolves a query tab, carrying both alias spellings', () => {
     expect(resolvePgMenuTarget(pgQueryTab)).toEqual({
@@ -296,5 +340,32 @@ describe('resolvePgMenuTarget', () => {
   it('is null for a non-PostgreSQL tab, or none', () => {
     expect(resolvePgMenuTarget(collectionTab)).toBeNull()
     expect(resolvePgMenuTarget(null)).toBeNull()
+  })
+
+  // Same precedence rule as resolveMenuTarget: the sidebar selection wins when it is
+  // deep enough for the action, since that is what the user just clicked.
+  it('prefers a deep-enough sidebar selection over the active tab', () => {
+    const sel = pgSelection('table', { database: 'other', schema: 'audit', table: 'events' })
+    expect(resolvePgMenuTarget(pgTableTab, sel, 'table')).toEqual({
+      connId: 'c1', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
+      database: 'other', schema: 'audit', table: 'events',
+    })
+  })
+
+  it('falls back to the active tab when the selection is too shallow', () => {
+    const sel = pgSelection('schema', { database: 'other', schema: 'audit' })
+    expect(resolvePgMenuTarget(pgTableTab, sel, 'table').table).toBe('widgets')
+  })
+
+  it('resolves a selected schema with no PostgreSQL tab open', () => {
+    const sel = pgSelection('schema', { database: 'app', schema: 'public' })
+    expect(resolvePgMenuTarget(quickstart, sel, 'schema')).toEqual({
+      connId: 'c1', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
+      database: 'app', schema: 'public', table: null,
+    })
+  })
+
+  it('is null when neither the tab nor the selection is PostgreSQL', () => {
+    expect(resolvePgMenuTarget(collectionTab, selection('c1', 'Local', 'shop', 'orders', 'collection'), 'schema')).toBeNull()
   })
 })

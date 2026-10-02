@@ -22,6 +22,18 @@ import { resourceFromLegacyTab, legacyTargetFromResource } from './legacyResourc
 // How many segments each gated level needs.
 const DEPTH = { connection: 0, database: 1, collection: 2 }
 
+// PostgreSQL's own levels, one deeper than Mongo's: database/schema/table.
+const PG_DEPTH = { schema: 2, table: 3 }
+
+// The mirror of mongoResource: only a PostgreSQL selection or tab counts toward the
+// PostgreSQL gates. Depth alone cannot separate them — a Mongo collection is two
+// segments deep, exactly as a Postgres schema is.
+function pgResource(source, ref) {
+  return source?.engine === 'postgresql' ? ref : null
+}
+
+const PG_TAB_TYPES = ['postgresql.query', 'postgresql.table_browse']
+
 // Every item behind the connection/database/collection gates is a MongoDB action, so
 // only a MongoDB selection or tab counts toward them — a PostgreSQL one names no
 // resource here, and an action can never be handed one. No engine means MongoDB (a
@@ -57,13 +69,13 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount
   const hasField = hasDocument && !!(tab && tab.selectedField)
 
-  // PostgreSQL-only (ozendb-sxd), resolved from the active tab alone — unlike
-  // Connection/Database/Collection above, the sidebar tree doesn't yet feed a
-  // PostgreSQL selection into the menu context (PostgresTreeNodes.vue never calls
-  // setTreeSelection), so there is no sidebar half to union with here. A query tab
-  // names a schema; a table tab names a schema and a table.
-  const hasPgSchema = tab?.type === 'postgresql.query' || tab?.type === 'postgresql.table_browse'
-  const hasPgTable = tab?.type === 'postgresql.table_browse'
+  // PostgreSQL (ozendb-sxd), the same union as Connection/Database/Collection above:
+  // a query tab names a schema, a table tab names a schema and a table, and the
+  // sidebar contributes whichever level its clicked row named.
+  const pgSelDepth = depth(pgResource(treeSelection, treeSelection?.resource))
+  const pgReaches = (level) => pgSelDepth >= PG_DEPTH[level]
+  const hasPgSchema = PG_TAB_TYPES.includes(tab?.type) || pgReaches('schema')
+  const hasPgTable = tab?.type === 'postgresql.table_browse' || pgReaches('table')
 
   return {
     hasConnection: reaches('connection'),
@@ -115,25 +127,36 @@ export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null
   return nodeFrom(sel, selRef) || nodeFrom(tab, tabRef)
 }
 
-// The PostgreSQL sibling of resolveMenuTarget (ozendb-sxd): the active tab alone —
-// there is no sidebar-selection half to union with (see `hasPgSchema`/`hasPgTable`
-// above). `null` when the active tab isn't PostgreSQL.
+// The PostgreSQL sibling of resolveMenuTarget (ozendb-sxd), with the same precedence:
+// the sidebar selection wins when it is deep enough for the action, the active tab is
+// the fallback, and `null` means neither can name a PostgreSQL target.
+// `requiredLevel` is 'schema' | 'table' | null.
 //
 // Carries both the short alias PG_MENUS/PG_ACTIONS use (connId/connName) and the
 // long alias collection/table-tab targets use (connectionId/connectionName) —
 // the modals this feeds are a mix of both conventions (see CLAUDE.md's resource-
 // identity note on the two flat shapes still being live), and duplicating two
 // fields here is simpler than a per-call-site remap.
-export function resolvePgMenuTarget(activeTab) {
+export function resolvePgMenuTarget(activeTab, treeSelection = null, requiredLevel = null) {
+  const sel = treeSelection || null
   const tab = activeTab || null
-  if (tab?.type !== 'postgresql.query' && tab?.type !== 'postgresql.table_browse') return null
+  const needed = PG_DEPTH[requiredLevel] ?? PG_DEPTH.schema
+
+  if (depth(pgResource(sel, sel?.resource ?? null)) >= needed) return pgTarget(sel)
+  if (PG_TAB_TYPES.includes(tab?.type)) return pgTarget(tab)
+  return null
+}
+
+// Both PostgreSQL sources already spell their levels the same way (database/schema/
+// table), on a tab and on a tree selection alike, so one projection serves both.
+function pgTarget(source) {
   return {
-    connId: tab.connectionId,
-    connName: tab.connectionName,
-    connectionId: tab.connectionId,
-    connectionName: tab.connectionName,
-    database: tab.database,
-    schema: tab.schema ?? null,
-    table: tab.table ?? null,
+    connId: source.connectionId,
+    connName: source.connectionName,
+    connectionId: source.connectionId,
+    connectionName: source.connectionName,
+    database: source.database,
+    schema: source.schema ?? null,
+    table: source.table ?? null,
   }
 }
