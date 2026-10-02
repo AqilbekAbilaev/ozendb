@@ -249,7 +249,8 @@ export function useTableStage(t, connectionReadOnly) {
       for (const [key, edits] of Object.entries(staged.edits)) {
         const where = JSON.parse(key).map((value, i) => ({ column: keyColumns.value[i], value }))
         const set = Object.entries(edits).map(([column, { value }]) => ({ column, value }))
-        const affected = await updateRow(target, set, where, txId)
+        const before = Object.entries(edits).map(([column, { original }]) => ({ column, value: original }))
+        const affected = await updateRow(target, set, before, where, txId)
         if (affected !== 1) throw new Error('A row changed or was deleted since it was loaded.')
       }
       if (staged.deletedKeys.length) {

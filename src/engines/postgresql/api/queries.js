@@ -55,10 +55,13 @@ export function countTable({ connectionId, schema, table }, filters = [], joins 
   return invoke('count_pg_table', { id: connectionId, schema, table, joins, filters })
 }
 
-// `where` holds the row's primary-key columns and their original values. `txId` runs
-// it in a transaction held open by beginTransaction, the same as runQuery.
-export function updateRow({ connectionId, schema, table }, set, where, txId = null) {
-  return invoke('update_pg_row', { id: connectionId, schema, table, set, where, txId })
+// `where` holds the row's primary-key columns and their original values. `before`
+// holds `set`'s columns' own pre-edit values — the grid already has them loaded —
+// so the backend can record an undo-able history entry (ozendb-h4y) without a
+// second read. `txId` runs it in a transaction held open by beginTransaction, the
+// same as runQuery.
+export function updateRow({ connectionId, database, schema, table }, set, before, where, txId = null) {
+  return invoke('update_pg_row', { id: connectionId, database, schema, table, set, before, where, txId })
 }
 
 // `rows` holds one entry per row to delete, each its primary-key columns and their
@@ -79,4 +82,21 @@ export function insertRow({ connectionId, schema, table }, values, txId = null) 
 // with the reason, SQL the filter boxes can't show.
 export function readTableSelect({ schema, table }, sql) {
   return invoke('read_pg_table_select', { sql, schema, table })
+}
+
+// Row-edit history (ozendb-h4y) — `updateRow`'s pre-images, newest first. Distinct
+// from `library.js`'s `listHistory`: that is the SQL *statements* a connection ran,
+// this is what *data* a table's rows actually changed to and from.
+export function listRowHistory({ connectionId, database, schema, table }) {
+  return invoke('list_pg_row_history', { id: connectionId, database, schema, table })
+}
+
+export function clearRowHistory({ connectionId, database, schema, table }) {
+  return invoke('clear_pg_row_history', { id: connectionId, database, schema, table })
+}
+
+// Reverses one recorded edit; refused (as a conflict, not a silent overwrite) if the
+// row has changed again since.
+export function undoRowEdit(entryId) {
+  return invoke('undo_pg_row_edit', { entryId })
 }

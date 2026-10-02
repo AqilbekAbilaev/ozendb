@@ -1,5 +1,43 @@
-use super::stringify_param;
+use super::{history_entry, stringify_param, ColumnValue};
 use serde_json::json;
+
+#[test]
+fn history_entry_pairs_each_set_column_with_its_before_value_by_name() {
+    let set = vec![
+        ColumnValue { column: String::from("name"), value: json!("new") },
+        ColumnValue { column: String::from("age"), value: json!(30) },
+    ];
+    // Deliberately out of order — matching is by column name, not position.
+    let before = vec![
+        ColumnValue { column: String::from("age"), value: json!(29) },
+        ColumnValue { column: String::from("name"), value: json!("old") },
+    ];
+    let key = vec![ColumnValue { column: String::from("id"), value: json!(1) }];
+
+    let entry = history_entry("c1", "appdb", "public", "users", &set, &before, &key);
+
+    assert_eq!(entry.conn_id, "c1");
+    assert_eq!(entry.database, "appdb");
+    assert_eq!(entry.schema, "public");
+    assert_eq!(entry.table, "users");
+    assert_eq!(entry.key.len(), 1);
+    assert_eq!(entry.key[0].column, "id");
+
+    let name_change = entry.changes.iter().find(|c| c.column == "name").unwrap();
+    assert_eq!(name_change.before, json!("old"));
+    assert_eq!(name_change.after, json!("new"));
+    let age_change = entry.changes.iter().find(|c| c.column == "age").unwrap();
+    assert_eq!(age_change.before, json!(29));
+    assert_eq!(age_change.after, json!(30));
+}
+
+#[test]
+fn history_entry_defaults_a_missing_before_value_to_null() {
+    let set = vec![ColumnValue { column: String::from("name"), value: json!("new") }];
+    let entry = history_entry("c1", "appdb", "public", "users", &set, &[], &[]);
+    assert_eq!(entry.changes[0].before, serde_json::Value::Null);
+    assert_eq!(entry.changes[0].after, json!("new"));
+}
 
 #[test]
 fn stringify_renders_scalars_as_plain_text() {

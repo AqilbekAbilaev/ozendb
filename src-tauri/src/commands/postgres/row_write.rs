@@ -1,10 +1,10 @@
 use crate::error::AppError;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use super::{array_literal::array_literal, primary_key_columns, quote_ident, AppContext};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ColumnValue {
     pub column: String,
     pub value: serde_json::Value,
@@ -181,6 +181,34 @@ pub(crate) async fn update_row_impl(
     execute_write(sql, binds, pool).await
 }
 
+/// The history entry an update would record, from the column values the frontend
+/// already had loaded (`before`) and what it set them to — never a server round
+/// trip to re-SELECT a pre-image. Not yet actually recorded: the caller decides
+/// when (immediately for auto-commit, only on commit for a held transaction).
+fn history_entry(conn_id: &str, database: &str, schema: &str, table: &str, set: &[ColumnValue], before: &[ColumnValue], r#where: &[ColumnValue]) -> crate::pg_row_history::PgHistoryEntry {
+    let changes = set
+        .iter()
+        .map(|after| {
+            let prior = before.iter().find(|b| b.column == after.column);
+            crate::pg_row_history::PgColumnChange {
+                column: after.column.clone(),
+                before: prior.map(|b| b.value.clone()).unwrap_or(serde_json::Value::Null),
+                after: after.value.clone(),
+            }
+        })
+        .collect();
+    crate::pg_row_history::PgHistoryEntry {
+        id: uuid::Uuid::new_v4().to_string(),
+        conn_id: conn_id.to_string(),
+        database: database.to_string(),
+        schema: schema.to_string(),
+        table: table.to_string(),
+        at: chrono::Utc::now().timestamp_millis(),
+        key: r#where.to_vec(),
+        changes,
+    }
+}
+
 /// Updates one row, identified by `where` — its primary-key column(s) and their
 /// original values, which the frontend gets from `list_pg_columns`'
 /// `is_primary_key` flag — with the column/value pairs in `set`. A primary key is
@@ -190,32 +218,49 @@ pub(crate) async fn update_row_impl(
 /// matches (edited or deleted since it was fetched), which the caller should
 /// treat as a conflict, not silently ignore.
 ///
+/// `before` carries `set`'s columns' pre-edit values — the grid already has them
+/// loaded — so a successful edit can record a history entry (ozendb-h4y) without
+/// an extra SELECT. `database` names which database this row's table lives in,
+/// for that entry; scoped to the connection's own for now, not ozendb-bj2's
+/// cross-database browsing (table edits don't support that yet).
+///
 /// A `tx_id` runs the update inside that held transaction instead of
 /// auto-commit (see transaction.rs) — the same branch `run_pg_query` takes, so
-/// Rollback undoes a cell edit the way it undoes a query. Read-only is enforced
-/// either way: `pg_pool_for_write` refuses outright with no `tx_id`, and a
-/// transaction begun on a read-only connection is already `SET TRANSACTION READ
-/// ONLY` (see `begin_pg_transaction`), so Postgres itself refuses the write.
+/// Rollback undoes a cell edit the way it undoes a query. The transaction branch
+/// queues its history entry rather than recording it now — see `PgTransactions::
+/// execute` — so an edit later rolled back is never recorded as having happened.
+/// Read-only is enforced either way: `pg_pool_for_write` refuses outright with no
+/// `tx_id`, and a transaction begun on a read-only connection is already `SET
+/// TRANSACTION READ ONLY` (see `begin_pg_transaction`), so Postgres itself
+/// refuses the write.
 #[tauri::command]
 pub async fn update_pg_row(
     ctx: State<'_, AppContext>,
     txs: State<'_, super::PgTransactions>,
+    history: State<'_, crate::pg_row_history::PgRowHistoryStore>,
     id: String,
+    database: String,
     schema: String,
     table: String,
     set: Vec<ColumnValue>,
+    before: Vec<ColumnValue>,
     r#where: Vec<ColumnValue>,
     tx_id: Option<String>,
 ) -> Result<u64, AppError> {
+    let entry = history_entry(&id, &database, &schema, &table, &set, &before, &r#where);
     match tx_id {
         Some(tx_id) => {
             let pool = ctx.pg_pool(&id).await?;
             let (sql, binds) = build_update(&pool, &schema, &table, &set, &r#where).await?;
-            txs.execute(&tx_id, sql, binds).await
+            txs.execute(&tx_id, sql, binds, Some(entry)).await
         }
         None => {
             let pool = ctx.pg_pool_for_write(&id).await?;
-            update_row_impl(&pool, &schema, &table, &set, &r#where).await
+            let affected = update_row_impl(&pool, &schema, &table, &set, &r#where).await?;
+            if affected > 0 {
+                let _ = history.push(entry);
+            }
+            Ok(affected)
         }
     }
 }
@@ -310,7 +355,7 @@ pub async fn delete_pg_rows(
         Some(tx_id) => {
             let pool = ctx.pg_pool(&id).await?;
             let (sql, binds) = build_delete(&pool, &schema, &table, &rows).await?;
-            txs.execute(&tx_id, sql, binds).await
+            txs.execute(&tx_id, sql, binds, None).await
         }
         None => {
             let pool = ctx.pg_pool_for_write(&id).await?;
@@ -392,7 +437,7 @@ pub async fn insert_pg_row(
         Some(tx_id) => {
             let pool = ctx.pg_pool(&id).await?;
             let (sql, binds) = build_insert(&pool, &schema, &table, &values).await?;
-            txs.execute(&tx_id, sql, binds).await
+            txs.execute(&tx_id, sql, binds, None).await
         }
         None => {
             let pool = ctx.pg_pool_for_write(&id).await?;
