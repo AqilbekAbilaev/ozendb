@@ -116,6 +116,29 @@ describe('paging and sorting', () => {
     expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ offset: 100 }))
   })
 
+  it('jumps to the first and last page', async () => {
+    const t = await loaded({ pageSize: 100 })
+    await t.nextPage()
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ offset: 100 }))
+
+    // total is 250 (see beforeEach), limit 100 — last full page starts at 200.
+    await t.lastPage()
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ offset: 200 }))
+    expect(t.hasNext.value).toBe(false)
+
+    await t.firstPage()
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ offset: 0 }))
+    expect(t.hasPrev.value).toBe(false)
+  })
+
+  it('does nothing for lastPage while the row count is still unknown', async () => {
+    const t = await loaded({ pageSize: 100 })
+    const callsBefore = browseTable.mock.calls.length
+    t.total.value = null // not yet known, e.g. a fresh load still in flight
+    await t.lastPage()
+    expect(browseTable).toHaveBeenCalledTimes(callsBefore)
+  })
+
   it('sorts by a column, flips direction on a second click, and restarts from page one', async () => {
     const t = await loaded({ pageSize: 100 })
     await t.nextPage()

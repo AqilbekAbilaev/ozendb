@@ -172,10 +172,10 @@ async function saveChanges() {
           </div>
 
           <div class="stagebar">
-            <BaseButton icon="first" :icon-size="18" disabled title="First page" />
-            <BaseButton icon="prev" :icon-size="18" disabled title="Previous page" />
-            <BaseButton icon="next" :icon-size="18" disabled title="Next page" />
-            <BaseButton icon="last" :icon-size="18" disabled title="Last page" />
+            <BaseButton icon="first" :icon-size="18" :disabled="!t.hasPrev || t.loading" title="First page" @click="t.firstPage" />
+            <BaseButton icon="prev" :icon-size="18" :disabled="!t.hasPrev || t.loading" title="Previous page" @click="t.prevPage" />
+            <BaseButton icon="next" :icon-size="18" :disabled="!t.hasNext || t.loading" title="Next page" @click="t.nextPage" />
+            <BaseButton icon="last" :icon-size="18" :disabled="!t.hasNext || t.loading" title="Last page" @click="t.lastPage" />
             <BaseButton icon="plus" :icon-size="18" :disabled="t.tabReadOnly" title="Add a new row" @click="onAddRow" />
             <BaseButton icon="duplicate" :icon-size="18" :disabled="t.tabReadOnly || !canDuplicate" title="Duplicate the selected row" @click="duplicateSelection" />
             <BaseButton icon="trash" :icon-size="18" :disabled="t.tabReadOnly || !selectedRowIndexes.length" title="Mark the selected row(s) for deletion" @click="deleteSelection" />
