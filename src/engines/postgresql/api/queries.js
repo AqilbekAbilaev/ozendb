@@ -4,15 +4,17 @@
 import { invoke } from '@tauri-apps/api/core'
 
 // `runId` names the run so cancelQuery can stop it while it's in flight; `txId` runs it
-// in a transaction held open by beginTransaction.
-export function runQuery(connectionId, sql, runId = null, txId = null) {
-  return invoke('run_pg_query', { id: connectionId, sql, runId, txId })
+// in a transaction held open by beginTransaction. `database`, when given, targets a
+// database other than the connection's own — opening a second database on the same
+// server (ozendb-bj2).
+export function runQuery(connectionId, sql, runId = null, txId = null, database = null) {
+  return invoke('run_pg_query', { id: connectionId, sql, runId, txId, database })
 }
 
 // Manual mode: a transaction held open on its own connection, under an id the caller
-// picks, until committed or rolled back.
-export function beginTransaction(connectionId, txId) {
-  return invoke('begin_pg_transaction', { id: connectionId, txId })
+// picks, until committed or rolled back. `database` as in `runQuery`.
+export function beginTransaction(connectionId, txId, database = null) {
+  return invoke('begin_pg_transaction', { id: connectionId, txId, database })
 }
 
 export function commitTransaction(txId) {
@@ -24,9 +26,9 @@ export function rollbackTransaction(txId) {
 }
 
 // The plan PostgreSQL chose, with real timings: EXPLAIN (ANALYZE, FORMAT JSON)'s array,
-// run in a transaction that's rolled back.
-export function explainQuery(connectionId, sql) {
-  return invoke('explain_pg_query', { id: connectionId, sql })
+// run in a transaction that's rolled back. `database` as in `runQuery`.
+export function explainQuery(connectionId, sql, database = null) {
+  return invoke('explain_pg_query', { id: connectionId, sql, database })
 }
 
 // The SQL laid out one clause per line; refused (with why) for SQL it can't read or

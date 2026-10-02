@@ -5,10 +5,12 @@ import { createSelection } from '../../../composables/useRowSelection'
 
 // A SQL editor's runs against one connection: the last result, a line per run, the plan
 // Explain found, and the Manual-mode transaction. Runtime only — the SQL itself is the
-// tab's lasting state, passed in to each call.
-export function createSqlRun(connectionId) {
+// tab's lasting state, passed in to each call. `database`, when it names a database
+// other than the connection's own, opens a second database on the same server
+// (ozendb-bj2) — `null` behaves exactly as the connection's own.
+export function createSqlRun(connectionId, database = null) {
   return {
-    connectionId,
+    connectionId, database,
     result: null, error: null, running: false, runId: null, messages: [],
     txn: 'auto', txId: null,
     plan: null, planError: null, explaining: false,
@@ -29,7 +31,7 @@ export async function runSql(run, sql) {
   run.runId = crypto.randomUUID()
   try {
     if (run.txn === 'manual' && !run.txId) await begin(run)
-    run.result = await runQuery(run.connectionId, sql, run.runId, run.txId ?? null)
+    run.result = await runQuery(run.connectionId, sql, run.runId, run.txId ?? null, run.database)
     log(run, true, outcome(run.result), run.result.elapsedMs)
     pushHistory(run.connectionId, sql).catch(() => {})
   } catch (e) {
@@ -45,7 +47,7 @@ export async function runSql(run, sql) {
 
 async function begin(run) {
   const txId = crypto.randomUUID()
-  await beginTransaction(run.connectionId, txId)
+  await beginTransaction(run.connectionId, txId, run.database)
   run.txId = txId
 }
 
@@ -93,7 +95,7 @@ export async function explainSql(run, sql) {
   run.explaining = true
   run.planError = null
   try {
-    run.plan = await explainQuery(run.connectionId, sql)
+    run.plan = await explainQuery(run.connectionId, sql, run.database)
   } catch (e) {
     run.plan = null
     run.planError = errMessage(e)

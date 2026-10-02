@@ -40,7 +40,7 @@ function queryWorkspace({ connectionId, connectionName, database }, sql = '') {
     fields: {
       kind: 'pgQuery', connectionId, connectionName, database,
       state: { sql },
-      runtime: { run: createSqlRun(connectionId) },
+      runtime: { run: createSqlRun(connectionId, database) },
     },
   }
 }

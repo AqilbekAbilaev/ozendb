@@ -146,6 +146,23 @@ fn build_options_to_targets_the_given_host_and_port_instead_of_the_configs() {
 }
 
 #[test]
+fn build_options_for_database_overrides_only_the_database() {
+    let postgres = PostgresConfig { database: Some(String::from("appdb")) };
+    let options = build_options_for_database(&base_config(), &postgres, None, "otherdb").unwrap();
+    assert_eq!(options.get_database(), Some("otherdb"));
+    assert_eq!(options.get_host(), "db.example.com");
+    assert_eq!(options.get_port(), 5433);
+}
+
+#[test]
+fn build_options_to_for_database_overrides_both_the_target_and_the_database() {
+    let options = build_options_to_for_database(&base_config(), &base_postgres(), None, "127.0.0.1", 15432, "otherdb").unwrap();
+    assert_eq!(options.get_database(), Some("otherdb"));
+    assert_eq!(options.get_host(), "127.0.0.1");
+    assert_eq!(options.get_port(), 15432);
+}
+
+#[test]
 fn connection_string_names_everything_but_the_password() {
     let mut config = base_config();
     config.username = Some(String::from("app user"));

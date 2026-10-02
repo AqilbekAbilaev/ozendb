@@ -32,8 +32,9 @@ pub(crate) async fn list_databases_impl(pool: &sqlx::PgPool) -> Result<Vec<PgDat
 /// Every non-template database on the server this connection points at — the
 /// Postgres sibling of `list_databases`' MongoDB server-level listing. A
 /// connection is bound to one database at a time (Postgres has no per-query
-/// `USE`), so browsing *into* a different one is later work; this exists so the
-/// tree can at least show what else is on the server.
+/// `USE`); the sidebar lists the others from here and opens a SQL tab against
+/// one via `run_pg_query`'s `database` override (ozendb-bj2), which reuses this
+/// connection's pool infrastructure (tunnel, credentials, TLS) per database.
 #[tauri::command]
 pub async fn list_pg_databases(
     ctx: State<'_, AppContext>,

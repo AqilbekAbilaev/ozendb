@@ -118,14 +118,17 @@ impl PgTransactions {
     }
 }
 
+/// `database`, when given, targets a database other than the connection's own —
+/// opening a second database on the same server (ozendb-bj2).
 #[tauri::command]
 pub async fn begin_pg_transaction(
     ctx: State<'_, AppContext>,
     txs: State<'_, PgTransactions>,
     id: String,
     tx_id: String,
+    database: Option<String>,
 ) -> Result<(), AppError> {
-    let pool = ctx.pg_pool(&id).await?;
+    let pool = ctx.pg_pool_for_database(&id, database.as_deref()).await?;
     txs.begin(&pool, &tx_id, ctx.is_read_only(&id)).await
 }
 

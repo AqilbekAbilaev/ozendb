@@ -74,14 +74,14 @@ describe('postgresql.query', () => {
     const created = def.create({ target: db })
     expect(created.title).toBe('SQL: app')
     expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }] })
-    expect(created.fields).toEqual({ kind: 'pgQuery', ...db, state: { sql: '' }, runtime: { run: createSqlRun('c1') } })
+    expect(created.fields).toEqual({ kind: 'pgQuery', ...db, state: { sql: '' }, runtime: { run: createSqlRun('c1', 'app') } })
   })
 
   it('duplicates the SQL but not the result', () => {
     const tab = def.create({ target: db }).fields
     tab.state.sql = 'SELECT 1'
     Object.assign(tab.runtime.run, { result: { rows: [[1]] }, error: 'x' })
-    expect(def.duplicate(tab).fields).toMatchObject({ state: { sql: 'SELECT 1' }, runtime: { run: createSqlRun('c1') } })
+    expect(def.duplicate(tab).fields).toMatchObject({ state: { sql: 'SELECT 1' }, runtime: { run: createSqlRun('c1', 'app') } })
   })
 })
 

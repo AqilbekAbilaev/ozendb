@@ -164,7 +164,7 @@ pub async fn save_connection(
     // The password was just written to the keychain above, so the pool reads it
     // back when it opens the connection.
     let warm = match &config.engine {
-        EngineConfig::Postgres(_) => ctx.pool.connect_postgres(&config).await.map(|_| ()),
+        EngineConfig::Postgres(_) => ctx.pool.connect_postgres(&config, None).await.map(|_| ()),
         EngineConfig::Mongo(_) => ctx.pool.connect(&config).await.map(|_| ()),
     };
     if let Err(e) = warm {

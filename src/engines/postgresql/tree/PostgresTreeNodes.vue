@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import { usePostgresTree, visibleSchemas, isOpenTable, activeTableSchema } from './usePostgresTree.js'
 import { activeTab } from '../../../stores/tabs'
@@ -43,6 +43,18 @@ const databaseSize = computed(() => {
 
 function openQuery() {
   openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: database.value })
+}
+
+// Every other non-template database on this server (ozendb-bj2) — same data
+// `databaseSize` reads, fetched once the primary database row opens. A SQL tab
+// against one targets it via `runQuery`'s `database` override, reusing this
+// connection's pool/tunnel/credentials rather than opening a second connection.
+const otherDatabasesOpen = ref(false)
+const otherDatabases = computed(() =>
+  Object.keys(databaseSizes.value).filter(name => name !== database.value).sort(),
+)
+function openOtherQuery(name) {
+  openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: name })
 }
 
 // Rows below the connection have no colours of their own yet, so they all show the
@@ -177,6 +189,37 @@ function openTable(schema, table) {
           </template>
         </template>
       </template>
+    </template>
+
+    <!-- Every other database on this server (ozendb-bj2) — a connection still binds
+         to one database to browse, but a SQL tab against another reuses the same
+         pool/tunnel/credentials instead of a dead click. -->
+    <div
+      v-if="otherDatabases.length"
+      class="tnode"
+      style="padding-left: 36px"
+      @click="otherDatabasesOpen = !otherDatabasesOpen"
+    >
+      <span class="tw"><BaseIcon :name="otherDatabasesOpen ? 'caretDown' : 'caret'" :size="12" /></span>
+      <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
+      <span class="tt">Other databases</span>
+      <span class="cnt">({{ otherDatabases.length }})</span>
+    </div>
+    <template v-if="otherDatabasesOpen">
+      <div
+        v-for="name in otherDatabases"
+        :key="name"
+        class="tnode"
+        style="padding-left: 51px"
+      >
+        <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
+        <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
+        <span class="tt">{{ name }}</span>
+        <span v-if="databaseSizes[name]" class="cnt" :title="`${name} is ${fmtBytes(databaseSizes[name])} on disk`">{{ fmtBytes(databaseSizes[name]) }}</span>
+        <span class="row-action push" title="New SQL query" @click.stop="openOtherQuery(name)">
+          <BaseIcon name="sql" :size="14" />
+        </span>
+      </div>
     </template>
   </template>
 </template>

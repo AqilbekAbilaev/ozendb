@@ -181,16 +181,28 @@ impl AppContext {
     /// `mongodb::Client`. Every Postgres command goes through here or
     /// `pg_pool_for_write`, the same choke-point shape as the Mongo pair above.
     pub async fn pg_pool(&self, id: &str) -> Result<sqlx::PgPool, AppError> {
+        self.pg_pool_for_database(id, None).await
+    }
+
+    /// `pg_pool`, but for a database other than the connection's own — opening a
+    /// second database on the same server (ozendb-bj2). `None` is exactly `pg_pool`.
+    pub async fn pg_pool_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
         let config = match self.storage.find(id) {
             Some(val) => val,
             None => return Err(AppError::UnknownConnection(id.to_string())),
         };
-        self.pool.connect_postgres(&config).await
+        self.pool.connect_postgres(&config, database).await
     }
 
     /// The write-gated sibling of `pg_pool`, mirroring `client_for_write`: a
     /// `read_only` connection is refused before any write reaches the driver.
     pub async fn pg_pool_for_write(&self, id: &str) -> Result<sqlx::PgPool, AppError> {
+        self.pg_pool_for_write_for_database(id, None).await
+    }
+
+    /// `pg_pool_for_write`'s sibling for a non-primary database, mirroring
+    /// `pg_pool_for_database`.
+    pub async fn pg_pool_for_write_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
         let config = match self.storage.find(id) {
             Some(val) => val,
             None => return Err(AppError::UnknownConnection(id.to_string())),
@@ -198,7 +210,7 @@ impl AppContext {
         if config.read_only {
             return Err(AppError::ReadOnly { name: config.name.clone() });
         }
-        self.pool.connect_postgres(&config).await
+        self.pool.connect_postgres(&config, database).await
     }
 
     /// Whether the connection is marked `read_only` — for a command that must

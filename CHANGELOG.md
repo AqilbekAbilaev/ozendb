@@ -21,8 +21,9 @@
     you Commit or Roll back. Statements stop after five minutes.
   - The results grid supports cell and row selection, keyboard navigation,
     copy, column resize, auto-fit and drag-to-reorder.
-  - Only the database named in the connection can be browsed for now; other
-    databases on the server are listed but can't be opened yet.
+  - Other databases on the same server are listed in the sidebar; open one in
+    its own SQL tab, which reuses the connection's credentials and SSH tunnel
+    rather than opening a second connection.
 - **Current Operations is now a live tab** — filter by namespace, age and
   kind, see plan, app, user and waiting details, switch to JSON or Tree view,
   and kill an operation. Several can be open at once, and they survive a

@@ -157,3 +157,54 @@ async fn query_paging_and_count_round_trip() {
         Err(e) => panic!("drop table: {}", e),
     }
 }
+
+/// `ConnectionPool::connect_postgres`'s `database` override (ozendb-bj2): the same
+/// connection's options, targeting a database other than the config's own, reusing
+/// everything else (host, credentials, TLS). Proven here at the `pg_uri` layer that
+/// actually builds those options, since a live `ConnectionPool` needs an `AppHandle`
+/// a plain test can't build (see this file's own doc comment).
+#[tokio::test]
+async fn opens_and_queries_a_second_database_on_the_same_server() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let mut conn = connect(&config).await;
+
+    // CREATE/DROP DATABASE can't run inside a transaction, and DROP DATABASE
+    // refuses while anyone is connected to it — both run here on the config's own
+    // (default) database, never on the throwaway one itself.
+    let _ = sqlx::query("DROP DATABASE IF EXISTS ozendb_it_other_db").execute(&mut conn).await;
+    match sqlx::query("CREATE DATABASE ozendb_it_other_db").execute(&mut conn).await {
+        Ok(_) => {}
+        Err(e) => panic!("create database: {}", e),
+    }
+
+    let password = std::env::var("OZENDB_TEST_POSTGRES_PASSWORD").ok();
+    let postgres = config.engine.as_postgres().expect("the integration config is Postgres");
+    let other_options = match pg_uri::build_options_for_database(&config, postgres, password.as_deref(), "ozendb_it_other_db") {
+        Ok(val) => val,
+        Err(e) => panic!("could not build connect options for the other database: {}", e),
+    };
+    let mut other_conn = match sqlx::PgConnection::connect_with(&other_options).await {
+        Ok(val) => val,
+        Err(e) => panic!("could not connect to the second database: {}", e),
+    };
+
+    let current_db: String = match sqlx::query_scalar("SELECT current_database()").fetch_one(&mut other_conn).await {
+        Ok(val) => val,
+        Err(e) => panic!("select current_database: {}", e),
+    };
+    assert_eq!(current_db, "ozendb_it_other_db");
+
+    if let Err(e) = other_conn.close().await {
+        panic!("could not close the second database connection: {}", e);
+    }
+    match sqlx::query("DROP DATABASE ozendb_it_other_db").execute(&mut conn).await {
+        Ok(_) => {}
+        Err(e) => panic!("drop database: {}", e),
+    }
+}

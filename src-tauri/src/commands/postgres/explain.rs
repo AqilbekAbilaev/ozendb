@@ -35,9 +35,11 @@ pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool
     result
 }
 
+/// `database`, when given, targets a database other than the connection's own —
+/// opening a second database on the same server (ozendb-bj2).
 #[tauri::command]
-pub async fn explain_pg_query(ctx: State<'_, AppContext>, id: String, sql: String) -> Result<serde_json::Value, AppError> {
-    let pool = ctx.pg_pool(&id).await?;
+pub async fn explain_pg_query(ctx: State<'_, AppContext>, id: String, sql: String, database: Option<String>) -> Result<serde_json::Value, AppError> {
+    let pool = ctx.pg_pool_for_database(&id, database.as_deref()).await?;
     let read_only = ctx.is_read_only(&id);
     explain_impl(&pool, &sql, read_only).await
 }
