@@ -56,6 +56,15 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   const selectedRow = tab ? (tab.selectedRow ?? -1) : -1
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount
   const hasField = hasDocument && !!(tab && tab.selectedField)
+
+  // PostgreSQL-only (ozendb-sxd), resolved from the active tab alone — unlike
+  // Connection/Database/Collection above, the sidebar tree doesn't yet feed a
+  // PostgreSQL selection into the menu context (PostgresTreeNodes.vue never calls
+  // setTreeSelection), so there is no sidebar half to union with here. A query tab
+  // names a schema; a table tab names a schema and a table.
+  const hasPgSchema = tab?.type === 'postgresql.query' || tab?.type === 'postgresql.table_browse'
+  const hasPgTable = tab?.type === 'postgresql.table_browse'
+
   return {
     hasConnection: reaches('connection'),
     hasDatabase: reaches('database'),
@@ -69,9 +78,13 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     hasIndex: !!indexSelected,
     // The active tab's read-only lock disables the write actions (see writable.js).
     // Only the tab can carry it — the sidebar selection never locks anything.
-    readOnly: !!(tab && tab.readOnly),
+    // MongoDB tabs carry it at the top level; PostgreSQL's table tab carries its
+    // own accidental-edit lock nested under `state` instead (tableState.js).
+    readOnly: !!(tab && (tab.readOnly || tab.state?.readOnly)),
     // Refresh reloads the active tab, never the sidebar selection.
     canRefreshTab: !!canRefresh,
+    hasPgSchema: hasPgSchema,
+    hasPgTable: hasPgTable,
   }
 }
 
@@ -100,4 +113,27 @@ export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null
   // Neither is deep enough: hand back the shallower of the two anyway, so the caller
   // can name what is selected in its guide message.
   return nodeFrom(sel, selRef) || nodeFrom(tab, tabRef)
+}
+
+// The PostgreSQL sibling of resolveMenuTarget (ozendb-sxd): the active tab alone —
+// there is no sidebar-selection half to union with (see `hasPgSchema`/`hasPgTable`
+// above). `null` when the active tab isn't PostgreSQL.
+//
+// Carries both the short alias PG_MENUS/PG_ACTIONS use (connId/connName) and the
+// long alias collection/table-tab targets use (connectionId/connectionName) —
+// the modals this feeds are a mix of both conventions (see CLAUDE.md's resource-
+// identity note on the two flat shapes still being live), and duplicating two
+// fields here is simpler than a per-call-site remap.
+export function resolvePgMenuTarget(activeTab) {
+  const tab = activeTab || null
+  if (tab?.type !== 'postgresql.query' && tab?.type !== 'postgresql.table_browse') return null
+  return {
+    connId: tab.connectionId,
+    connName: tab.connectionName,
+    connectionId: tab.connectionId,
+    connectionName: tab.connectionName,
+    database: tab.database,
+    schema: tab.schema ?? null,
+    table: tab.table ?? null,
+  }
 }

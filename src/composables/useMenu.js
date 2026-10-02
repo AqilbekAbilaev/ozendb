@@ -1,6 +1,6 @@
 import { computed, watch } from 'vue'
 import { setMenuContext } from '../appApi/menu'
-import { deriveMenuContext, resolveMenuTarget } from '../utils/menuContext'
+import { deriveMenuContext, resolveMenuTarget, resolvePgMenuTarget } from '../utils/menuContext'
 import { activeTab } from '../stores/tabs'
 import { treeSelection } from '../stores/connectionNavigation'
 import { openConnections } from '../stores/openConnections'
@@ -39,6 +39,8 @@ export function useMenu() {
       hasIndex: ctx.hasIndex,
       readOnly: ctx.readOnly,
       canRefreshTab: ctx.canRefreshTab,
+      hasPgSchema: ctx.hasPgSchema,
+      hasPgTable: ctx.hasPgTable,
     }).catch(() => {})
   }, { immediate: true })
 
@@ -53,5 +55,10 @@ export function useMenu() {
     )
   }
 
-  return { menuTarget: menuTarget }
+  // The PostgreSQL sibling of menuTarget (ozendb-sxd) — see resolvePgMenuTarget.
+  function pgMenuTarget() {
+    return resolvePgMenuTarget(activeTab.value)
+  }
+
+  return { menuTarget: menuTarget, pgMenuTarget: pgMenuTarget }
 }

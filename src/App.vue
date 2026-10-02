@@ -30,11 +30,11 @@ const { operations, runningCount, clearFinished } = useOperations()
 const operationsPaneOpen = ref(false)
 const operationsPaneHeight = ref(200)
 
-const { menuTarget } = useMenu()
+const { menuTarget, pgMenuTarget } = useMenu()
 
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({ menuTarget })
 
-useAppMenuActions({ menuTarget, handleTool, menuNode, refreshAll, toolbarHidden })
+useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, refreshAll, toolbarHidden })
 </script>
 
 <template>

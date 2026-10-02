@@ -21,6 +21,8 @@ export const WRITE_ACTIONS = [
   'coll:delete_dialog',
   'coll:clear',
   'edit:paste_documents',
+  'pg:create_table',
+  'pg:drop_table',
 ]
 
 export function isWriteAction(id) {

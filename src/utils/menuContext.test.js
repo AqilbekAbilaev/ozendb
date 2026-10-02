@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveMenuContext, resolveMenuTarget } from './menuContext'
+import { deriveMenuContext, resolveMenuTarget, resolvePgMenuTarget } from './menuContext'
 
 // These lock the fix that made the native menu usable: context is the union of the
 // active tab and the sidebar/tree selection, so selecting a node in the tree
@@ -25,6 +25,7 @@ describe('deriveMenuContext', () => {
     expect(deriveMenuContext(null, null, 0)).toEqual({
       hasConnection: false, hasDatabase: false, hasCollection: false, anyConnection: false,
       hasDocument: false, hasField: false, hasIndex: false, readOnly: false, canRefreshTab: false,
+      hasPgSchema: false, hasPgTable: false,
     })
   })
 
@@ -245,5 +246,55 @@ describe('resolveMenuTarget', () => {
     expect(resolveMenuTarget(schema, null, 'collection')).toEqual({
       connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
     })
+  })
+})
+
+// ozendb-sxd: PostgreSQL has no sidebar selection feeding the menu context yet
+// (PostgresTreeNodes.vue never calls setTreeSelection), so these are resolved from
+// the active tab alone — the opposite of the Mongo tests above, which exist
+// precisely because the sidebar half matters there.
+const pgQueryTab = { id: 'p1', type: 'postgresql.query', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public' }
+const pgTableTab = { id: 'p2', type: 'postgresql.table_browse', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public', table: 'widgets' }
+
+describe('deriveMenuContext (PostgreSQL)', () => {
+  it('a query tab enables the schema gate only', () => {
+    const ctx = deriveMenuContext(pgQueryTab, null, 0)
+    expect(ctx.hasPgSchema).toBe(true)
+    expect(ctx.hasPgTable).toBe(false)
+  })
+
+  it('a table tab enables both the schema and table gates', () => {
+    const ctx = deriveMenuContext(pgTableTab, null, 0)
+    expect(ctx.hasPgSchema).toBe(true)
+    expect(ctx.hasPgTable).toBe(true)
+  })
+
+  it('a non-PostgreSQL tab, or none, enables neither', () => {
+    expect(deriveMenuContext(collectionTab, null, 0).hasPgSchema).toBe(false)
+    expect(deriveMenuContext(null, null, 0).hasPgSchema).toBe(false)
+  })
+
+  it('reads the table tab\'s own accidental-edit lock, nested under state', () => {
+    const locked = { ...pgTableTab, state: { readOnly: true } }
+    expect(deriveMenuContext(locked, null, 0).readOnly).toBe(true)
+    expect(deriveMenuContext(pgTableTab, null, 0).readOnly).toBe(false)
+  })
+})
+
+describe('resolvePgMenuTarget', () => {
+  it('resolves a query tab, carrying both alias spellings', () => {
+    expect(resolvePgMenuTarget(pgQueryTab)).toEqual({
+      connId: 'c1', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
+      database: 'app', schema: 'public', table: null,
+    })
+  })
+
+  it('resolves a table tab with its table name', () => {
+    expect(resolvePgMenuTarget(pgTableTab).table).toBe('widgets')
+  })
+
+  it('is null for a non-PostgreSQL tab, or none', () => {
+    expect(resolvePgMenuTarget(collectionTab)).toBeNull()
+    expect(resolvePgMenuTarget(null)).toBeNull()
   })
 })

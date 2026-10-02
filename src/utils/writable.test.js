@@ -40,6 +40,8 @@ describe('isWriteAction', () => {
       'doc:remove_field',
       'doc:rename_field',
       'edit:paste_documents',
+      'pg:create_table',
+      'pg:drop_table',
     ])
   })
 })
