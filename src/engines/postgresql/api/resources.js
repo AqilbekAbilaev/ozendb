@@ -32,3 +32,12 @@ export function listForeignKeys({ connectionId, schema, table }) {
 export function tableStats({ connectionId, schema, table }) {
   return invoke('pg_table_stats', { id: connectionId, schema, table })
 }
+
+// Cross-table "Search in…" (ozendb-86k): every text-like column of every table in
+// `tables` (or, omitted, every ordinary table in the schema) for `term` as a
+// substring (default) or, with `regex`, a pattern Postgres itself evaluates.
+// `runId` lets `cancelQuery` (queries.js) stop it — it registers under the same
+// run-id mechanism a plain query would.
+export function searchTables({ connectionId, schema, tables = null }, term, { matchCase = false, regex = false, limit = null, runId = null } = {}) {
+  return invoke('search_pg_tables', { id: connectionId, schema, tables, term, matchCase, regex, limit, runId })
+}

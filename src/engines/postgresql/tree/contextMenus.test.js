@@ -58,4 +58,11 @@ describe('PostgreSQL right-click menus', () => {
     PG_ACTIONS['Rename Table…'](table)
     expect(openModal).toHaveBeenCalledWith('pgRenameTable', table)
   })
+
+  it('opens cross-table search on the schema it was opened on', () => {
+    expect(PG_MENUS.schema.map(i => i.label)).toContain('Search in Schema…')
+    const schemaNode = { connId: 'p1', connName: 'Payments PG', engine: 'postgresql', database: 'payments', schema: 'public' }
+    PG_ACTIONS['Search in Schema…'](schemaNode)
+    expect(openModal).toHaveBeenCalledWith('pgSearch', schemaNode)
+  })
 })

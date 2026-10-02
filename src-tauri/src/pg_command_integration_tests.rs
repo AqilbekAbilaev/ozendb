@@ -7,7 +7,7 @@
 
 use crate::commands::{
     browse_table_impl, count_table_impl, list_columns_impl, list_databases_impl, list_schemas_impl,
-    list_tables_impl, run_query_as, update_row_impl, ColumnRef, ColumnValue,
+    list_tables_impl, run_query_as, search_tables_impl, update_row_impl, ColumnRef, ColumnValue,
 };
 use crate::pg_integration_tests::{pool, test_config};
 
@@ -391,4 +391,61 @@ async fn a_read_only_connection_is_enforced_per_transaction_not_just_by_session_
     assert_eq!(err.code(), "command", "a prior set_config must not leave a later call writable");
 
     sqlx::query("DROP SEQUENCE ozendb_it_seq").execute(&setup_pool).await.unwrap();
+}
+
+#[tokio::test]
+async fn search_tables_finds_matches_across_tables_and_columns_skipping_the_unsearchable() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_search CASCADE",
+        "CREATE SCHEMA ozendb_it_search",
+        "CREATE TABLE ozendb_it_search.widgets (id SERIAL PRIMARY KEY, name TEXT NOT NULL, note VARCHAR(100))",
+        "INSERT INTO ozendb_it_search.widgets (name, note) VALUES ('Blue Widget', 'on back order'), ('Red Gadget', NULL)",
+        // No primary key: every column is text-like, but the table itself must be skipped.
+        "CREATE TABLE ozendb_it_search.no_key (label TEXT)",
+        "INSERT INTO ozendb_it_search.no_key (label) VALUES ('Widget mentions here too')",
+        // A primary key but no text-like column: also skipped.
+        "CREATE TABLE ozendb_it_search.numbers_only (id SERIAL PRIMARY KEY, qty INT)",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap();
+    }
+
+    let result = search_tables_impl(&pool, "ozendb_it_search", None, "widget", false, false, None, None).await.unwrap();
+
+    assert_eq!(result.skipped, vec!["no_key".to_string(), "numbers_only".to_string()]);
+    assert_eq!(result.matches.len(), 1, "only widgets.name should match, case-insensitively");
+    let m = &result.matches[0];
+    assert_eq!((m.table.as_str(), m.column.as_str(), m.value.as_str()), ("widgets", "name", "Blue Widget"));
+    assert_eq!(m.primary_key, serde_json::json!({ "id": "1" }));
+
+    // An explicit table list searches only those, even when others would also match.
+    let scoped = search_tables_impl(
+        &pool,
+        "ozendb_it_search",
+        Some(vec!["no_key".to_string()]),
+        "widget",
+        false,
+        false,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(scoped.skipped, vec!["no_key".to_string()]);
+    assert!(scoped.matches.is_empty());
+
+    // Regex mode: Postgres's own `~*` evaluates the term as a pattern.
+    let regex_result = search_tables_impl(&pool, "ozendb_it_search", None, "^Red", false, true, None, None).await.unwrap();
+    assert_eq!(regex_result.matches.len(), 1);
+    assert_eq!(regex_result.matches[0].value, "Red Gadget");
+
+    sqlx::query("DROP SCHEMA ozendb_it_search CASCADE").execute(&pool).await.unwrap();
 }

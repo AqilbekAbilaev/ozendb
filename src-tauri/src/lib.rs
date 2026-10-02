@@ -257,6 +257,7 @@ pub fn run() {
             rename_pg_table,
             run_pg_query,
             cancel_pg_query,
+            search_pg_tables,
             explain_pg_query,
             list_pg_history,
             push_pg_history,
