@@ -249,6 +249,7 @@ pub fn run() {
             pg_roles,
             create_pg_role,
             drop_pg_role,
+            list_pg_grants,
             create_pg_schema,
             drop_pg_schema,
             create_pg_table,

@@ -2,7 +2,7 @@
 //! `create_role_impl`, `drop_role_impl`). Shares `pg_integration_tests.rs`'s helpers
 //! and skip behaviour; see its module doc comment for how to run these.
 
-use crate::commands::{create_role_impl, drop_role_impl, list_roles_impl, NewPgRole};
+use crate::commands::{create_role_impl, drop_role_impl, list_grants_impl, list_roles_impl, NewPgRole};
 use crate::pg_integration_tests::{pool, test_config};
 use sqlx::Connection;
 
@@ -215,4 +215,57 @@ async fn a_role_name_is_quoted_not_spliced() {
 
     drop_role_impl(&pool, hostile).await.expect("drop the awkward role");
     assert!(!list_roles_impl(&pool).await.expect("roles").iter().any(|r| r.name == hostile));
+}
+
+#[tokio::test]
+async fn lists_direct_grants_including_the_owners_implicit_ones() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    let name = "ozendb_it_grantee";
+    drop_if_exists(&pool, &[name]).await;
+    create_role_impl(&pool, &role(name)).await.expect("create the test role");
+
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_grants CASCADE".to_string(),
+        "CREATE SCHEMA ozendb_it_grants".to_string(),
+        "CREATE TABLE ozendb_it_grants.widgets (id int)".to_string(),
+        format!("GRANT USAGE ON SCHEMA ozendb_it_grants TO \"{name}\""),
+        format!("GRANT SELECT, UPDATE ON ozendb_it_grants.widgets TO \"{name}\""),
+    ] {
+        sqlx::query(sqlx::AssertSqlSafe(stmt)).execute(&pool).await.expect("setup");
+    }
+
+    let grants = list_grants_impl(&pool, name).await.expect("grants");
+    assert!(
+        grants.iter().any(|g| g.object_kind == "schema" && g.schema == "ozendb_it_grants" && g.privilege == "USAGE"),
+        "missing the schema USAGE grant: {grants:?}",
+    );
+    assert!(
+        grants.iter().any(|g| g.object_kind == "table"
+            && g.schema == "ozendb_it_grants"
+            && g.object.as_deref() == Some("widgets")
+            && g.privilege == "SELECT"),
+        "missing the table SELECT grant: {grants:?}",
+    );
+    assert!(grants.iter().any(|g| g.privilege == "UPDATE"), "missing the table UPDATE grant: {grants:?}");
+
+    // A role nobody has granted anything to still sees nothing — no implicit entries
+    // leak in for an unrelated role.
+    let other = "ozendb_it_grantee_bystander";
+    drop_if_exists(&pool, &[other]).await;
+    create_role_impl(&pool, &role(other)).await.expect("create the bystander role");
+    let bystander_grants = list_grants_impl(&pool, other).await.expect("grants");
+    assert!(
+        !bystander_grants.iter().any(|g| g.schema == "ozendb_it_grants"),
+        "a role with no grant must not see another role's: {bystander_grants:?}",
+    );
+
+    sqlx::query(sqlx::AssertSqlSafe(String::from("DROP SCHEMA ozendb_it_grants CASCADE"))).execute(&pool).await.ok();
+    drop_if_exists(&pool, &[name, other]).await;
 }

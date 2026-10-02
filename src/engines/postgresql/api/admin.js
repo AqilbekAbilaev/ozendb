@@ -52,3 +52,10 @@ export function createRole(connectionId, role) {
 export function dropRole(connectionId, name) {
   return invoke('drop_pg_role', { id: connectionId, name })
 }
+
+// Read-only (ozendb-ahy): every schema/table/view/sequence this role holds a direct
+// privilege on — not what it inherits through group membership, and not per-object
+// GRANT/REVOKE itself, which is a separate, much larger surface.
+export function grants(connectionId, role) {
+  return invoke('list_pg_grants', { id: connectionId, role })
+}
