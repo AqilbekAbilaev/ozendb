@@ -276,9 +276,10 @@ UI, and never swallow one into a generic "something went wrong": map it to a cod
 
 This project is human-delivered, AI-developed. The human must stay in full control of what ships.
 
-- **Tasks live in Beads** (`bd`). `bd ready` lists what can start, `bd show <id>` has the detail;
-  `bd update <id> --claim` when starting, `bd close <id> --reason "PR #N"` once merged. The issue
-  database is a local Dolt store under `.beads/` (git-ignored);
+- **Tasks live in [GitHub Issues](https://github.com/AqilbekAbilaev/ozendb/issues).** Labels carry the
+  type (`bug`, `enhancement`, `task`, `chore`, `epic`, `decision`) and priority (`P1`–`P4`); an epic's
+  work is its sub-issues. A PR closes its issue with `Closes #N` in the description. #92–#157 are the
+  closed history migrated from the old Beads tracker.
 - **One logical change per session.** Never bundle unrelated changes into a single response. If a task touches more than ~3 files, split it into steps and confirm with the user between each step.
 - **Explain before committing.** Always describe what changed and why in plain language before reporting the work as done. No code jargon — write as if explaining to someone who will review the diff.
 - **Never mix refactoring with bug fixes.** Each commit must have a single concern. If a bug fix requires a refactor, do them in separate steps.
