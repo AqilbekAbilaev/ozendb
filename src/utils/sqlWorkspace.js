@@ -20,17 +20,17 @@ export async function runTranslatedSql(tab, {
   }
   if (!canApply()) return
 
-  tab.filter = mql.filter
-  tab.projection = mql.projection
-  tab.sort = mql.sort
-  tab.skip = mql.skip ?? 0
-  tab.limit = mql.limit ?? (tab.limit || 50)
+  tab.state.query.filter = mql.filter
+  tab.state.query.projection = mql.projection
+  tab.state.query.sort = mql.sort
+  tab.state.query.skip = mql.skip ?? 0
+  tab.state.query.limit = mql.limit ?? (tab.state.query.limit || 50)
   runQuery(tab, {
     filter: mql.filter,
     projection: mql.projection,
     sort: mql.sort,
-    skip: tab.skip,
-    limit: tab.limit,
+    skip: tab.state.query.skip,
+    limit: tab.state.query.limit,
     addToHistory: true,
   })
   if (explainVisible()) runExplain(tab)

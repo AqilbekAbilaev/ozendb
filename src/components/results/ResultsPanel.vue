@@ -55,10 +55,10 @@ const emit = defineEmits(['run', 'requery', 'select-rtab', 'explain-verbosity', 
 // a tab that has none yet falls back to the configured default (Preferences → General).
 const viewMode = computed({
   get() {
-    return props.activeTab && props.activeTab.resultView ? props.activeTab.resultView : defaultResultView.value
+    return props.activeTab && props.activeTab.ui.resultView ? props.activeTab.ui.resultView : defaultResultView.value
   },
   set(value) {
-    if (props.activeTab) props.activeTab.resultView = value
+    if (props.activeTab) props.activeTab.ui.resultView = value
   },
 })
 
@@ -118,7 +118,7 @@ const pasteHidden  = computed(() => Math.max(0, (pasteConfirm.value?.text?.lengt
 
 // Live counter in the footer while a query is in flight, replaced by the server's
 // own timing once the results land.
-const isRunning = computed(() => !!props.activeTab?.isRunning)
+const isRunning = computed(() => !!props.activeTab?.runtime?.isRunning)
 const now = useTicker(isRunning)
 const runningMs = computed(() => Math.max(0, now.value - (props.activeTab?.startedAt ?? now.value)))
 
@@ -163,26 +163,26 @@ function toggleReadOnly() {
 
     <!-- Result toolbar -->
     <div class="rtoolbar" v-if="rtab === 'Result'">
-      <BaseButton icon="refresh" :icon-size="18" @click="emit('run')" :disabled="activeTab.isRunning || !runValid" />
-      <BaseButton v-if="activeTab.isRunning" size="sm" bordered @click="emit('cancel')" title="Cancel the running query">
+      <BaseButton icon="refresh" :icon-size="18" @click="emit('run')" :disabled="activeTab.runtime.isRunning || !runValid" />
+      <BaseButton v-if="activeTab.runtime.isRunning" size="sm" bordered @click="emit('cancel')" title="Cancel the running query">
         <BaseIcon name="close" :size="13" /> Cancel
       </BaseButton>
       <BaseButton icon="first" :icon-size="18"
-        :disabled="isAggregate || !activeTab.hasRun || (activeTab.skip || 0) === 0 || activeTab.isRunning"
+        :disabled="isAggregate || !activeTab.runtime.hasRun || (activeTab.state.query.skip || 0) === 0 || activeTab.runtime.isRunning"
         @click="goFirst" />
       <BaseButton icon="prev" :icon-size="18"
-        :disabled="isAggregate || !activeTab.hasRun || (activeTab.skip || 0) === 0 || activeTab.isRunning"
+        :disabled="isAggregate || !activeTab.runtime.hasRun || (activeTab.state.query.skip || 0) === 0 || activeTab.runtime.isRunning"
         @click="goPrev" />
       <BaseButton icon="next" :icon-size="18"
-        :disabled="isAggregate || !activeTab.hasRun || (activeTab.results?.length ?? 0) < (activeTab.limit || 50) || activeTab.isRunning"
+        :disabled="isAggregate || !activeTab.runtime.hasRun || (activeTab.runtime.results?.length ?? 0) < (activeTab.state.query.limit || 50) || activeTab.runtime.isRunning"
         @click="goNext" />
       <BaseButton icon="last" :icon-size="18"
-        :disabled="isAggregate || !activeTab.hasRun || (activeTab.results?.length ?? 0) < (activeTab.limit || 50) || activeTab.isRunning"
+        :disabled="isAggregate || !activeTab.runtime.hasRun || (activeTab.runtime.results?.length ?? 0) < (activeTab.state.query.limit || 50) || activeTab.runtime.isRunning"
         @click="goLast" />
       <BaseSelect class="page-size-pick" size="sm"
-        :model-value="activeTab.limit || 50"
+        :model-value="activeTab.state.query.limit || 50"
         :options="PAGE_SIZE_OPTIONS"
-        :placeholder="String(activeTab.limit || 50)"
+        :placeholder="String(activeTab.state.query.limit || 50)"
         @update:model-value="setPageSize" />
       <span class="docs-range">
         Documents {{ rangeText }}
@@ -191,25 +191,25 @@ function toggleReadOnly() {
         :title="activeTab.readOnly ? 'Read-only mode is on — click to allow edits' : 'Read-only mode (block accidental edits)'"
         @click="toggleReadOnly" />
       <BaseButton icon="plus" :icon-size="18" title="Add document"
-        :disabled="!activeTab.hasRun || activeTab.isRunning || activeTab.readOnly"
+        :disabled="!activeTab.runtime.hasRun || activeTab.runtime.isRunning || activeTab.readOnly"
         @click="openInsert" />
       <BaseButton icon="eye" :icon-size="18" title="View document (read-only)"
-        :disabled="activeTab.selectedRow < 0"
+        :disabled="activeTab.runtime.selectedRow < 0"
         @click="openView" />
       <BaseButton icon="edit" :icon-size="18" title="Edit document"
-        :disabled="activeTab.selectedRow < 0 || activeTab.readOnly"
+        :disabled="activeTab.runtime.selectedRow < 0 || activeTab.readOnly"
         @click="openEdit" />
       <BaseButton icon="copy" :icon-size="18" title="Copy document"
-        :disabled="activeTab.selectedRow < 0"
+        :disabled="activeTab.runtime.selectedRow < 0"
         @click="copySelectedDocument" />
       <BaseButton icon="trash" :icon-size="18" title="Delete document"
-        :disabled="activeTab.selectedRow < 0 || activeTab.readOnly"
+        :disabled="activeTab.runtime.selectedRow < 0 || activeTab.readOnly"
         @click="showDeleteConfirm = true; crudError = null" />
       <BaseButton icon="updateDialog" :icon-size="18" title="Update documents by query…"
-        :disabled="!isCollection || !activeTab.hasRun || activeTab.isRunning || activeTab.readOnly"
+        :disabled="!isCollection || !activeTab.runtime.hasRun || activeTab.runtime.isRunning || activeTab.readOnly"
         @click="showUpdateDialog = true" />
       <BaseButton icon="deleteDialog" :icon-size="18" title="Delete documents by query…"
-        :disabled="!isCollection || !activeTab.hasRun || activeTab.isRunning || activeTab.readOnly"
+        :disabled="!isCollection || !activeTab.runtime.hasRun || activeTab.runtime.isRunning || activeTab.readOnly"
         @click="showDeleteDialog = true" />
       <FlexSpacer />
 
@@ -218,20 +218,20 @@ function toggleReadOnly() {
 
     <!-- Result-tab states: error / loading / empty (shared placeholder) -->
     <StateMessage
-      v-if="rtab === 'Result' && activeTab.runError"
+      v-if="rtab === 'Result' && activeTab.runtime.runError"
       mode="error"
-      :message="activeTab.runError"
+      :message="activeTab.runtime.runError"
       :code="activeTab.runErrorCode"
       retryable
       @retry="emit('run')"
     />
     <StateMessage
-      v-else-if="rtab === 'Result' && activeTab.isRunning"
+      v-else-if="rtab === 'Result' && activeTab.runtime.isRunning"
       mode="loading"
       label="Running query…"
     />
     <StateMessage
-      v-else-if="rtab === 'Result' && activeTab.hasRun && !activeTab.results?.length"
+      v-else-if="rtab === 'Result' && activeTab.runtime.hasRun && !activeTab.runtime.results?.length"
       mode="empty"
     />
 
@@ -252,13 +252,13 @@ function toggleReadOnly() {
     <!-- JSON view -->
     <JsonResultView
       v-else-if="rtab === 'Result' && viewMode === 'json'"
-      :results="activeTab.results"
+      :results="activeTab.runtime.results"
     />
 
     <!-- Tree view -->
     <TreeResultView
       v-else-if="rtab === 'Result' && viewMode === 'tree'"
-      :results="activeTab.results"
+      :results="activeTab.runtime.results"
     />
 
     <!-- Query Code sub-tab -->
@@ -281,7 +281,7 @@ function toggleReadOnly() {
 
     <!-- Footer -->
     <div class="rfooter">
-      <span>{{ activeTab.selectedRow >= 0 ? '1 document selected' : '0 documents selected' }}</span>
+      <span>{{ activeTab.runtime.selectedRow >= 0 ? '1 document selected' : '0 documents selected' }}</span>
       <FlexSpacer />
       <BaseButton
         variant="ghost"
@@ -292,13 +292,13 @@ function toggleReadOnly() {
         :active="activeTab.isCounting"
         @click="runCount"
         @contextmenu="onCountContext"><template v-if="activeTab.isCounting">Counting…</template><template v-else>Count Documents<template v-if="countText != null">: {{ countText }}</template></template></BaseButton>
-      <span class="fitem" v-if="activeTab.isRunning">
+      <span class="fitem" v-if="activeTab.runtime.isRunning">
         <BaseIcon name="clock" :size="14" />
         {{ (runningMs / 1000).toFixed(1) }}s
       </span>
-      <span class="fitem" v-else-if="activeTab.elapsedMs != null">
+      <span class="fitem" v-else-if="activeTab.runtime.elapsedMs != null">
         <BaseIcon name="clock" :size="14" />
-        {{ (activeTab.elapsedMs / 1000).toFixed(3) }}s
+        {{ (activeTab.runtime.elapsedMs / 1000).toFixed(3) }}s
       </span>
     </div>
     </div><!-- /result-content -->

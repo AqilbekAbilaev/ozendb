@@ -11,8 +11,8 @@ import { mongoStringify } from './mongoFormat'
 // useDocumentActions (kept separate so the dialogs depend only on this util).
 export function selectedRowIndices(tab) {
   if (!tab) return []
-  if (tab.selectedRows && tab.selectedRows.length) return tab.selectedRows
-  return (tab.selectedRow ?? -1) >= 0 ? [tab.selectedRow] : []
+  if (tab.runtime.selectedRows && tab.runtime.selectedRows.length) return tab.runtime.selectedRows
+  return (tab.runtime.selectedRow ?? -1) >= 0 ? [tab.runtime.selectedRow] : []
 }
 
 // Whether "Selected Document(s)" has anything to act on (gates the dropdown option).
@@ -22,12 +22,12 @@ export function hasSelectedDocs(tab) {
 
 export function predefinedQuery(kind, tab) {
   if (kind === 'current') {
-    const filter = (tab && tab.filter ? tab.filter : '').trim()
+    const filter = (tab && tab.state.query.filter ? tab.state.query.filter : '').trim()
     return filter || '{}'
   }
   if (kind === 'selected') {
     const ids = selectedRowIndices(tab)
-      .map((i) => (tab && tab.results ? tab.results[i] : null))
+      .map((i) => (tab && tab.runtime.results ? tab.runtime.results[i] : null))
       .filter((doc) => doc != null)
       .map((doc) => doc._id)
     // mongoStringify renders EJSON _id wrappers as shell types (ObjectId("…") etc.),

@@ -80,10 +80,10 @@ const height = computed(() => {
       ref="inputEl"
       class="agg-input"
       :style="{ height: height + 'px' }"
-      :model-value="activeTab.pipeline"
+      :model-value="activeTab.state.query.pipeline"
       :extensions="pipelineExtensions"
       :line-numbers="false"
-      @update:model-value="activeTab.pipeline = $event"
+      @update:model-value="activeTab.state.query.pipeline = $event"
     />
     <Resizer
       class="agg-grip"

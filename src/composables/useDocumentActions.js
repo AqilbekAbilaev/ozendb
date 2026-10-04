@@ -27,7 +27,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // rising edge of isRunning so every fresh run (refresh, pagination, query bar) starts
   // at the top level. The grid shows its loading skeleton while isRunning, so the reset
   // is never visible mid-flight.
-  watch(() => { const tab = activeTab(); return tab && tab.isRunning }, (running, prev) => {
+  watch(() => { const tab = activeTab(); return tab && tab.runtime.isRunning }, (running, prev) => {
     if (running && !prev) drillPath.value = []
   })
 
@@ -111,8 +111,8 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // row. Empty when nothing is selected. Shared by the toolbar Copy and Delete actions.
   function selectedRowIndices(tab) {
     if (!tab) return []
-    if (tab.selectedRows && tab.selectedRows.length) return tab.selectedRows
-    return (tab.selectedRow ?? -1) >= 0 ? [tab.selectedRow] : []
+    if (tab.runtime.selectedRows && tab.runtime.selectedRows.length) return tab.runtime.selectedRows
+    return (tab.runtime.selectedRow ?? -1) >= 0 ? [tab.runtime.selectedRow] : []
   }
 
   // How many documents Copy/Delete will act on — drives the delete-confirm wording.
@@ -123,7 +123,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // Ctrl+C so the toolbar button and the shortcut agree).
   function copySelectedDocument() {
     const tab = activeTab()
-    const docs = selectedRowIndices(tab).map((i) => tab.results[i]).filter((d) => d != null)
+    const docs = selectedRowIndices(tab).map((i) => tab.runtime.results[i]).filter((d) => d != null)
     if (!docs.length) return
     const payload = docs.length === 1 ? docs[0] : docs
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
@@ -138,20 +138,20 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       if (rows.length === 1) {
         await deleteDocument(
           { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
-          buildIdFilter(tab.results[rows[0]]),
+          buildIdFilter(tab.runtime.results[rows[0]]),
         )
       } else {
         // Bulk delete via a single { _id: { $in: [...] } } filter. The _id values are
         // already in the same Extended-JSON shape buildIdFilter relies on.
-        const ids = rows.map((i) => tab.results[i]).filter((d) => d != null).map((d) => d._id)
+        const ids = rows.map((i) => tab.runtime.results[i]).filter((d) => d != null).map((d) => d._id)
         await deleteMany(
           { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
           JSON.stringify({ _id: { $in: ids } }),
         )
       }
       showDeleteConfirm.value = false
-      tab.selectedRow = -1
-      tab.selectedRows = []
+      tab.runtime.selectedRow = -1
+      tab.runtime.selectedRows = []
       requery(true)
     } catch (e) {
       crudError.value = errText(e)
@@ -177,8 +177,8 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // The currently selected document, or null when no row is selected / out of range.
   function selectedDoc() {
     const tab = activeTab()
-    if (!tab || (tab.selectedRow ?? -1) < 0) return null
-    return tab.results?.[tab.selectedRow] ?? null
+    if (!tab || (tab.runtime.selectedRow ?? -1) < 0) return null
+    return tab.runtime.results?.[tab.runtime.selectedRow] ?? null
   }
 
   // Dispatch a native Document/Collection menu action onto this panel. The menu gates
@@ -216,7 +216,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       case 'view:step_column':
       case 'view:step_cell': {
         const stepDoc = selectedDoc()
-        const stepField = tab.selectedField
+        const stepField = tab.runtime.selectedField
         if (!stepDoc || !stepField) { showToast('Select a cell to step into'); return }
         const stepVal = selectedFieldValue(stepDoc)
         if (stepVal === null || typeof stepVal !== 'object') {
@@ -224,8 +224,8 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
           return
         }
         drillPath.value = [...drillPath.value, stepField]
-        tab.selectedRow = -1
-        tab.selectedField = null
+        tab.runtime.selectedRow = -1
+        tab.runtime.selectedField = null
         return
       }
       case 'coll:clear':
@@ -257,7 +257,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       // Edit → Copy: context-appropriate — the selected cell's value if a cell is
       // selected, otherwise the whole document (mirrors the grid's Ctrl+C).
       case 'edit:copy':
-        if (tab.selectedField) {
+        if (tab.runtime.selectedField) {
           writeClipboard(valueToClipboard(selectedFieldValue(doc)), 'Copied')
         } else {
           writeClipboard(documentToClipboard(doc), 'Copied')
@@ -266,7 +266,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     }
 
     // Field-level actions — need a selected field.
-    const field = tab.selectedField
+    const field = tab.runtime.selectedField
     if (!field) { showToast('Select a field (click a cell) first'); return }
 
     // Field-level copies are read-only, so they're allowed on any field including _id
@@ -316,7 +316,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   function selectedFieldValue(doc) {
     const container = getContainer(doc, drillPath.value)
     if (container === null || typeof container !== 'object') return undefined
-    return container[activeTab().selectedField]
+    return container[activeTab().runtime.selectedField]
   }
 
   // Put `text` on the system clipboard and confirm with a toast, or report failure.
@@ -361,7 +361,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       }
       await saveDocReplacement(newDoc, doc)
       fieldEdit.value = null
-      tab.selectedField = null
+      tab.runtime.selectedField = null
     } catch (e) {
       fieldEditError.value = errText(e)
     }
@@ -377,7 +377,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
       const newDoc = removeField(doc, drillPath.value, field)
       await saveDocReplacement(newDoc, doc)
       removeFieldName.value = null
-      tab.selectedField = null
+      tab.runtime.selectedField = null
     } catch (e) {
       removeFieldError.value = errText(e)
     }
@@ -393,8 +393,8 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
         { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
       )
       showClearConfirm.value = false
-      tab.selectedRow = -1
-      tab.selectedField = null
+      tab.runtime.selectedRow = -1
+      tab.runtime.selectedField = null
       showToast(`Cleared ${removed} document${removed !== 1 ? 's' : ''} from ${tab.collectionName}`)
       requery(true)
     } catch (e) {
@@ -413,8 +413,8 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   function onDeleteDialogDone(message) {
     const tab = activeTab()
     showDeleteDialog.value = false
-    tab.selectedRow = -1
-    tab.selectedField = null
+    tab.runtime.selectedRow = -1
+    tab.runtime.selectedField = null
     showToast(message)
     requery(true)
   }

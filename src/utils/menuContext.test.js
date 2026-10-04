@@ -18,7 +18,9 @@ const quickstart = { id: 't0', kind: 'quickstart', title: 'Quickstart' }
 const collectionTab = {
   id: 't1', kind: 'collection',
   connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders',
+  runtime: { results: [], selectedRow: -1, selectedField: null },
 }
+const withRuntime = (runtime) => ({ ...collectionTab, runtime: { ...collectionTab.runtime, ...runtime } })
 
 describe('deriveMenuContext', () => {
   it('is all-false with no tab, no selection, no connections', () => {
@@ -84,17 +86,17 @@ describe('deriveMenuContext', () => {
     expect(fromSidebar.hasField).toBe(false)
 
     // A collection tab with results but no row selected: still no document context.
-    const noSelection = { ...collectionTab, results: [{ _id: 1 }], selectedRow: -1 }
+    const noSelection = withRuntime({ results: [{ _id: 1 }], selectedRow: -1 })
     expect(deriveMenuContext(noSelection, null, 1).hasDocument).toBe(false)
 
     // A row selected enables whole-document actions but not field actions.
-    const rowSelected = { ...collectionTab, results: [{ _id: 1 }], selectedRow: 0 }
+    const rowSelected = withRuntime({ results: [{ _id: 1 }], selectedRow: 0 })
     const rowCtx = deriveMenuContext(rowSelected, null, 1)
     expect(rowCtx.hasDocument).toBe(true)
     expect(rowCtx.hasField).toBe(false)
 
     // A selected field enables both.
-    const fieldSelected = { ...collectionTab, results: [{ _id: 1 }], selectedRow: 0, selectedField: '_id' }
+    const fieldSelected = withRuntime({ results: [{ _id: 1 }], selectedRow: 0, selectedField: '_id' })
     const fieldCtx = deriveMenuContext(fieldSelected, null, 1)
     expect(fieldCtx.hasDocument).toBe(true)
     expect(fieldCtx.hasField).toBe(true)

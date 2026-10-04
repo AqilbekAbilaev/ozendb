@@ -35,10 +35,10 @@ function onKeydown(e) {
         size="sm"
         class="run"
         @click="emit('run')"
-        :disabled="activeTab.isRunning || !runValid"
+        :disabled="activeTab.runtime.isRunning || !runValid"
       >
         <BaseIcon name="run" :size="18" class="ic" />
-        {{ activeTab.isRunning ? 'Running…' : 'Run' }}
+        {{ activeTab.runtime.isRunning ? 'Running…' : 'Run' }}
       </BaseButton>
       <span class="hint">⌘/Ctrl + Enter</span>
     </div>

@@ -42,8 +42,8 @@ const vqbState = ref(createDefaultVqb())
 function syncVqbState() {
   const tab = activeTab.value
   if (!tab) { vqbState.value = createDefaultVqb(); return }
-  if (!tab.vqb) tab.vqb = createDefaultVqb()
-  vqbState.value = tab.vqb
+  if (!tab.state.query.vqb) tab.state.query.vqb = createDefaultVqb()
+  vqbState.value = tab.state.query.vqb
 }
 
 watch(() => props.activeTabId, syncVqbState, { immediate: true })
@@ -77,14 +77,14 @@ function uid() { return Math.random().toString(36).slice(2, 10) }
 
 function applyToTab() {
   const tab = activeTab.value
-  if (!tab || !tab.vqb) return
-  const s = tab.vqb
+  if (!tab || !tab.state.query.vqb) return
+  const s = tab.state.query.vqb
   const filterStr = s.queryEnabled ? generateFilter(s.conditions, s.logic) : '{}'
   const sortStr   = s.sortEnabled  ? generateSort(s.sortFields)           : '{}'
   const projStr   = s.projEnabled  ? generateProjection(s.projFields)     : '{}'
-  tab.filter     = filterStr === '{}' ? '' : filterStr
-  tab.sort       = sortStr   === '{}' ? '' : sortStr
-  tab.projection = projStr   === '{}' ? '' : projStr
+  tab.state.query.filter     = filterStr === '{}' ? '' : filterStr
+  tab.state.query.sort       = sortStr   === '{}' ? '' : sortStr
+  tab.state.query.projection = projStr   === '{}' ? '' : projStr
 }
 
 let timer = null

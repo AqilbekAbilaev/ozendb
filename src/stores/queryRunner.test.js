@@ -13,6 +13,7 @@ const { invoke } = await import('@tauri-apps/api/core')
 const api = await import('./queryRunner')
 const { showToast } = await import('./toast')
 const { tabs } = await import('./tabs')
+const { createCollectionState, createCollectionRuntime } = await import('../engines/mongodb/workspaces/collectionState')
 
 // The timing on the toast is the server's, not this process's. Wall clock here also
 // pays for IPC and result marshalling, which grow with the page size and say nothing
@@ -20,7 +21,10 @@ const { tabs } = await import('./tabs')
 
 function harness() {
   const toasts = []
-  tabs.value = [{ id: 't1', connectionId: 'c1', dbName: 'db', collectionName: 'coll', mode: 'find' }]
+  tabs.value = [{
+    id: 't1', connectionId: 'c1', dbName: 'db', collectionName: 'coll', mode: 'find',
+    state: createCollectionState(), runtime: createCollectionRuntime(),
+  }]
   showToast.mockImplementation((m) => toasts.push(m))
   return { api, toasts, tab: tabs.value[0] }
 }
@@ -32,7 +36,7 @@ beforeEach(() => {
 describe('cancelling', () => {
   it('leaves the calm cancelled state and no timing behind', async () => {
     const { api, toasts, tab } = harness()
-    tab.elapsedMs = 999 // a previous run's number, which must not survive this one
+    tab.runtime.elapsedMs = 999 // a previous run's number, which must not survive this one
     invoke.mockImplementation((cmd, args) => {
       if (cmd === 'find_documents') {
         return new Promise((_, reject) => setTimeout(() => reject(new Error('operation was interrupted')), 20))
@@ -48,10 +52,10 @@ describe('cancelling', () => {
     await api.cancelQuery('t1')
     await running
 
-    expect(tab.isRunning).toBe(false)
-    expect(tab.runError).toBe('Query cancelled.')
+    expect(tab.runtime.isRunning).toBe(false)
+    expect(tab.runtime.runError).toBe('Query cancelled.')
     expect(tab.runErrorCode).toBe(null)
-    expect(tab.elapsedMs).toBe(null)
+    expect(tab.runtime.elapsedMs).toBe(null)
     expect(toasts).toContain('Query cancelled')
   })
 
@@ -71,12 +75,12 @@ describe('cancelling', () => {
     const running = api.runQuery('t1', { filter: '{}', sort: '{}', projection: '{}', skip: 0, limit: 50 })
     await api.cancelQuery('t1')
     // The spinner stops on the click, not when the abandoned response happens to land.
-    expect(tab.isRunning).toBe(false)
+    expect(tab.runtime.isRunning).toBe(false)
     await running
 
-    expect(tab.results ?? []).toEqual([])
-    expect(tab.hasRun).toBeFalsy()
-    expect(tab.runError).toBe('Query cancelled.')
+    expect(tab.runtime.results ?? []).toEqual([])
+    expect(tab.runtime.hasRun).toBeFalsy()
+    expect(tab.runtime.runError).toBe('Query cancelled.')
     expect(toasts).toContain('Query cancelled')
   })
 
@@ -95,8 +99,8 @@ describe('cancelling', () => {
     await api.runQuery('t1', { filter: '{}', sort: '{}', projection: '{}', skip: 50, limit: 50 })
     await first
 
-    expect(tab.results).toEqual([{ run: 'second' }])
-    expect(tab.isRunning).toBe(false)
+    expect(tab.runtime.results).toEqual([{ run: 'second' }])
+    expect(tab.runtime.isRunning).toBe(false)
   })
 })
 
@@ -111,7 +115,7 @@ describe('reported timing', () => {
 
     await api.runQuery('t1', { filter: '{}', sort: '{}', projection: '{}', skip: 0, limit: 50 })
 
-    expect(tab.elapsedMs).toBe(12)
+    expect(tab.runtime.elapsedMs).toBe(12)
     expect(toasts[0]).toBe('Query returned 1 document in 0.012s')
   })
 
@@ -124,7 +128,7 @@ describe('reported timing', () => {
 
     await api.runAggregate('t1', { pipeline: '[]' })
 
-    expect(tab.elapsedMs).toBe(7)
+    expect(tab.runtime.elapsedMs).toBe(7)
     expect(toasts[0]).toBe('Aggregation returned 2 documents in 0.007s')
   })
 })
