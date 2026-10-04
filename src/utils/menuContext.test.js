@@ -384,10 +384,32 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
     expect(deriveMenuContext(pgTab, null, 1).engine).toBe('postgresql')
   })
 
-  it('lets the sidebar selection win over the active tab, as resolveMenuTarget does', () => {
+  it('follows a sidebar selection that enables something when the tab names no engine', () => {
+    const app = { ...quickstart, engine: 'app' }
     const pgSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
-    expect(deriveMenuContext(mongoTab, pgSel, 2).engine).toBe('postgresql')
-    expect(deriveMenuContext(pgTab, selection('c1', 'Local', 'shop', 'orders', 'collection'), 2).engine).toBe('mongodb')
+    expect(deriveMenuContext(app, pgSel, 1).engine).toBe('postgresql')
+    expect(deriveMenuContext(app, selection('c1', 'Local', 'shop', 'orders', 'collection'), 1).engine).toBe('mongodb')
+  })
+
+  it('ignores a PostgreSQL selection too shallow to enable anything', () => {
+    // Clicking a connection or database row to expand it must not hide the open
+    // MongoDB tab's items: no PostgreSQL item enables below a schema.
+    const pgConn = pgSelection('connection', {})
+    const pgDb = pgSelection('database', { database: 'app' })
+    expect(deriveMenuContext(mongoTab, pgConn, 2).engine).toBe('mongodb')
+    expect(deriveMenuContext(mongoTab, pgDb, 2).engine).toBe('mongodb')
+    expect(deriveMenuContext({ ...quickstart, engine: 'app' }, pgDb, 1).engine).toBe(null)
+  })
+
+  it('shows everything when a live selection and the tab disagree', () => {
+    const pgSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
+    expect(deriveMenuContext(mongoTab, pgSel, 2).engine).toBe(null)
+    expect(deriveMenuContext(pgTab, selection('c1', 'Local', null, null, 'connection'), 2).engine).toBe(null)
+  })
+
+  it('agrees with a live selection of the same engine as the tab', () => {
+    const pgSel = pgSelection('schema', { database: 'app', schema: 'public' })
+    expect(deriveMenuContext(pgTab, pgSel, 1).engine).toBe('postgresql')
   })
 
   it('treats a selection with no engine as MongoDB, like the gates do', () => {

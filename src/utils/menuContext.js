@@ -45,12 +45,18 @@ function mongoResource(source, ref) {
 // The engines the native menu has items of its own for (menu.rs's MenuEngine).
 const MENU_ENGINES = ['mongodb', 'postgresql']
 
-// Which engine's items the menu shows (ozendb-izk): the sidebar selection's when there
-// is one, the same precedence resolveMenuTarget gives it, else the active tab's. Null
-// (Quickstart, nothing selected) keeps the full menu.
-function menuEngine(tab, treeSelection) {
-  const engine = treeSelection ? (treeSelection.engine ?? 'mongodb') : tab?.engine
-  return MENU_ENGINES.includes(engine) ? engine : null
+// Which engine's items the menu shows (ozendb-izk). Hiding must only ever drop items
+// that could not enable anyway, so a sidebar selection counts only when it enables
+// something (a PostgreSQL row above a schema enables nothing), and when a live
+// selection and the tab name different engines both halves stay. Null keeps the
+// full menu.
+function menuEngine(tab, selDepth, pgSelDepth) {
+  const tabEngine = MENU_ENGINES.includes(tab?.engine) ? tab.engine : null
+  let selEngine = null
+  if (selDepth >= 0) selEngine = 'mongodb'
+  else if (pgSelDepth >= PG_DEPTH.schema) selEngine = 'postgresql'
+  if (!selEngine) return tabEngine
+  return !tabEngine || tabEngine === selEngine ? selEngine : null
 }
 
 // -1 for "names no resource", so every comparison below is false for it.
@@ -108,7 +114,7 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     canRefreshTab: !!canRefresh,
     hasPgSchema: hasPgSchema,
     hasPgTable: hasPgTable,
-    engine: menuEngine(tab, treeSelection),
+    engine: menuEngine(tab, selDepth, pgSelDepth),
   }
 }
 
