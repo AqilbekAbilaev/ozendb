@@ -41,6 +41,7 @@ export function useMenu() {
       canRefreshTab: ctx.canRefreshTab,
       hasPgSchema: ctx.hasPgSchema,
       hasPgTable: ctx.hasPgTable,
+      engine: ctx.engine,
     }).catch(() => {})
   }, { immediate: true })
 

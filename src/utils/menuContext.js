@@ -42,6 +42,17 @@ function mongoResource(source, ref) {
   return (source?.engine ?? 'mongodb') === 'mongodb' ? ref : null
 }
 
+// The engines the native menu has items of its own for (menu.rs's MenuEngine).
+const MENU_ENGINES = ['mongodb', 'postgresql']
+
+// Which engine's items the menu shows (ozendb-izk): the sidebar selection's when there
+// is one, the same precedence resolveMenuTarget gives it, else the active tab's. Null
+// (Quickstart, nothing selected) keeps the full menu.
+function menuEngine(tab, treeSelection) {
+  const engine = treeSelection ? (treeSelection.engine ?? 'mongodb') : tab?.engine
+  return MENU_ENGINES.includes(engine) ? engine : null
+}
+
 // -1 for "names no resource", so every comparison below is false for it.
 function depth(ref) {
   return ref ? ref.segments.length : -1
@@ -97,6 +108,7 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     canRefreshTab: !!canRefresh,
     hasPgSchema: hasPgSchema,
     hasPgTable: hasPgTable,
+    engine: menuEngine(tab, treeSelection),
   }
 }
 
