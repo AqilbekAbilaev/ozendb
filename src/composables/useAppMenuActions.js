@@ -222,32 +222,34 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       }
 
       // PostgreSQL (ozendb-sxd) — the same handlers the table workspace's own
-      // toolbar/context menu already call (PG_ACTIONS), targeting the active tab
-      // (see pgMenuTarget). The PgSchema/PgTable gates already guarantee one is
-      // open, so a null target here would only mean the tab closed between the
-      // menu enabling and the click — rare, so just no-op rather than toast.
+      // toolbar/context menu already call (PG_ACTIONS). Each asks pgMenuTarget for
+      // the depth its gate required, so a sidebar selection deep enough for the
+      // action wins over the active tab and a shallower one falls back to it. The
+      // gates already guarantee one of the two qualifies, so a null target here
+      // means it went away between the menu enabling and the click — rare enough
+      // to no-op rather than toast.
       case 'pg:new_sql': {
-        const target = pgMenuTarget()
+        const target = pgMenuTarget('schema')
         if (target) openPostgresQuery({ connectionId: target.connectionId, connectionName: target.connectionName, database: target.database })
         return
       }
       case 'pg:create_table': {
-        const target = pgMenuTarget()
+        const target = pgMenuTarget('schema')
         if (target) openModal('pgCreateTable', target)
         return
       }
       case 'pg:search_schema': {
-        const target = pgMenuTarget()
+        const target = pgMenuTarget('schema')
         if (target) openModal('pgSearch', target)
         return
       }
       case 'pg:row_history': {
-        const target = pgMenuTarget()
+        const target = pgMenuTarget('table')
         if (target?.table) openModal('pgRowHistory', target)
         return
       }
       case 'pg:drop_table': {
-        const target = pgMenuTarget()
+        const target = pgMenuTarget('table')
         if (target?.table) openModal('pgDrop', target)
         return
       }

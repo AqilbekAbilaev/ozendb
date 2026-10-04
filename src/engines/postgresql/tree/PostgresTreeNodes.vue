@@ -1,10 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
-import { usePostgresTree, visibleSchemas, isOpenTable, activeTableSchema } from './usePostgresTree.js'
+import { usePostgresTree, visibleSchemas, isOpenTable, activeTableSchema, isSelectedNode } from './usePostgresTree.js'
 import { activeTab } from '../../../stores/tabs'
 import { openPostgresTable, openPostgresQuery } from '../../../stores/tabCreators'
 import { contextMenu, contextActiveNodeKey, pgNodeKey } from '../../../stores/contextMenu'
+import { treeSelection, setTreeSelection } from '../../../stores/connectionNavigation'
 import { PG_MENUS } from './contextMenus.js'
 import { tagOverrides } from '../../../stores/nodeTags'
 import { colorHex, nodeTagName } from '../../../utils/tabColor.js'
@@ -62,6 +63,25 @@ function openOtherQuery(name) {
 const color = computed(() => nodeTagName(tagOverrides.value, props.conn.id, props.conn.tag))
 const tagStyle = computed(() => (color.value ? { '--tag-color': colorHex(color.value) } : null))
 
+// Clicking a row selects it, which is what the native menu's PostgreSQL gates read
+// (ozendb-sxd) — without this the menu could only ever target an open tab. Both
+// spellings of the database name ride along: `dbName` is what the shared selection
+// store's ref builder reads, `database` is what every PostgreSQL consumer uses.
+function select(kind, schemaName = null, tableName = null) {
+  setTreeSelection({
+    connectionId: props.conn.id,
+    connectionName: props.conn.name,
+    engine: 'postgresql',
+    dbName: database.value,
+    database: database.value,
+    schema: schemaName,
+    table: tableName,
+    kind: kind,
+  })
+}
+const isSelected = (kind, schemaName = null, tableName = null) =>
+  isSelectedNode(treeSelection.value, props.conn.id, kind, schemaName, tableName)
+
 // The row whose right-click menu is open stays highlighted, as MongoDB's rows do.
 const ctxSel = (level, schema, table) => contextActiveNodeKey.value === pgNodeKey(level, { connId: props.conn.id, schema, table })
 
@@ -71,7 +91,10 @@ function onContext(e, level, label, extra = {}) {
   contextMenu.value = { type: 'pg:' + level, x: e.clientX, y: e.clientY, label, nodeData: node, items: PG_MENUS[level] }
 }
 
+// The opened tab now names the table, so drop the selection the preceding click set:
+// left behind, it would outrank the active tab in the menu after a keyboard tab switch.
 function openTable(schema, table) {
+  setTreeSelection(null)
   openPostgresTable({
     connectionId: props.conn.id,
     connectionName: props.conn.name,
@@ -86,10 +109,10 @@ function openTable(schema, table) {
   <!-- A connection is bound to one database; it's the only one there is to browse. -->
   <div
     class="tnode"
-    :class="{ 'ctx-sel': ctxSel('database'), tagged: !!color }"
+    :class="{ 'ctx-sel': ctxSel('database'), sel: isSelected('database'), tagged: !!color }"
     :style="tagStyle"
     style="padding-left: 21px"
-    @click="toggleDatabase"
+    @click="toggleDatabase(); select('database')"
     @contextmenu.prevent="onContext($event, 'database', database)"
   >
     <span class="tw"><BaseIcon :name="databaseOpen ? 'caretDown' : 'caret'" :size="12" /></span>
@@ -114,10 +137,10 @@ function openTable(schema, table) {
     <template v-for="schema in shown" :key="schema.name">
       <div
         class="tnode"
-        :class="{ 'ctx-sel': ctxSel('schema', schema.name), tagged: !!color }"
+        :class="{ 'ctx-sel': ctxSel('schema', schema.name), sel: isSelected('schema', schema.name), tagged: !!color }"
         :style="tagStyle"
         style="padding-left: 36px"
-        @click="toggleSchema(schema.name)"
+        @click="toggleSchema(schema.name); select('schema', schema.name)"
         @contextmenu.prevent="onContext($event, 'schema', schema.name, { schema: schema.name })"
       >
         <span class="tw"><BaseIcon :name="openSchemas[schema.name] ? 'caretDown' : 'caret'" :size="12" /></span>
@@ -145,11 +168,13 @@ function openTable(schema, table) {
             class="tnode"
             :class="{
               'ctx-sel': ctxSel('table', schema.name, table.name),
-              sel: isOpenTable(activeTab, conn.id, schema.name, table.name),
+              sel: isOpenTable(activeTab, conn.id, schema.name, table.name)
+                || isSelected('table', schema.name, table.name),
               tagged: !!color,
             }"
             :style="tagStyle"
             style="padding-left: 66px"
+            @click="select('table', schema.name, table.name)"
             @dblclick="openTable(schema.name, table.name)"
             @contextmenu.prevent="onContext($event, 'table', table.name, { schema: schema.name, table: table.name })"
             @mouseenter="table.kind !== 'view' && statsTip.show($event, { connId: conn.id, engine: 'postgresql', schema: schema.name, table: table.name })"

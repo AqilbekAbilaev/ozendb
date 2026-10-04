@@ -28,6 +28,35 @@ describe('resourceFromTreeSelection', () => {
     })).toEqual(COLL_REF)
   })
 
+  // PostgreSQL's hierarchy is database/schema/table, so its selections carry their
+  // own two kinds rather than being squeezed into database/collection (ozendb-sxd).
+  it('converts PostgreSQL schema and table selections', () => {
+    expect(resourceFromTreeSelection({
+      connectionId: 'c1', connectionName: 'PG', engine: 'postgresql',
+      database: 'app', schema: 'public', table: null, kind: 'schema',
+    })).toEqual({
+      connectionId: 'c1',
+      segments: [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }],
+    })
+    expect(resourceFromTreeSelection({
+      connectionId: 'c1', connectionName: 'PG', engine: 'postgresql',
+      database: 'app', schema: 'public', table: 'widgets', kind: 'table',
+    })).toEqual({
+      connectionId: 'c1',
+      segments: [
+        { kind: 'database', name: 'app' },
+        { kind: 'schema', name: 'public' },
+        { kind: 'table', name: 'widgets' },
+      ],
+    })
+  })
+
+  it('returns null for a PostgreSQL selection missing a level', () => {
+    expect(resourceFromTreeSelection({ connectionId: 'c1', database: 'app', kind: 'schema' })).toBe(null)
+    expect(resourceFromTreeSelection({ connectionId: 'c1', schema: 'public', kind: 'schema' })).toBe(null)
+    expect(resourceFromTreeSelection({ connectionId: 'c1', database: 'app', schema: 'public', kind: 'table' })).toBe(null)
+  })
+
   it('returns null for missing fields and unknown kinds', () => {
     expect(resourceFromTreeSelection(null)).toBe(null)
     expect(resourceFromTreeSelection({})).toBe(null)
