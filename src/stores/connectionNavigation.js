@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { resourceFromTreeSelection } from '../utils/legacyResourceRef'
+import { sameResource, isResourceAncestor } from '../utils/resourceRef'
 
 // A request is consumed by the tree after it opens the matching connection. The nonce
 // makes two requests for the same connection distinct, which matters when a caller asks
@@ -28,4 +29,11 @@ export const treeSelection = ref(null)
 
 export function setTreeSelection(sel) {
   treeSelection.value = sel && { ...sel, resource: resourceFromTreeSelection(sel) }
+}
+
+// Called beside closeWhere(affectedByResource(drop)) so a dropped node, or one inside it,
+// doesn't stay selected for the native menu to act on (ozendb-9gf).
+export function clearTreeSelectionUnder(drop) {
+  const sel = treeSelection.value?.resource
+  if (sel && (sameResource(sel, drop) || isResourceAncestor(drop, sel))) treeSelection.value = null
 }

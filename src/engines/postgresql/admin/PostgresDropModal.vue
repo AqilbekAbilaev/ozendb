@@ -10,6 +10,7 @@ import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
 import { closeWhere } from '../../../stores/tabs'
+import { clearTreeSelectionUnder } from '../../../stores/connectionNavigation'
 import { affectedByResource } from '../../../workspaces/lifecycle'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
@@ -35,7 +36,9 @@ async function confirm() {
     if (isTable.value) await dropTable({ connectionId: connId, schema, table }, cascade.value)
     else await dropSchema(connId, schema, cascade.value)
     invalidateConnectionResources(connId)
-    closeWhere(affectedByResource(pgNodeRef(props.target)))
+    const dropped = pgNodeRef(props.target)
+    closeWhere(affectedByResource(dropped))
+    clearTreeSelectionUnder(dropped)
     showToast(`${isTable.value ? 'Table' : 'Schema'} "${name.value}" dropped`)
     emit('close')
   } catch (e) {

@@ -8,6 +8,7 @@ import { errText } from '../../utils/errors'
 import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { closeWhere } from '../../stores/tabs'
+import { clearTreeSelectionUnder } from '../../stores/connectionNavigation'
 import { affectedByResource } from '../../workspaces/lifecycle'
 import { createResourceRef } from '../../utils/resourceRef'
 import FlexSpacer from '../base/FlexSpacer.vue'
@@ -33,7 +34,9 @@ async function confirm() {
     // Containment closes every tab scoped into the dropped database (collections,
     // shells, tools), and only those; connection-scoped tabs like Current Operations
     // survive. closeTab runs disposal for each removed workspace.
-    closeWhere(affectedByResource(createResourceRef(props.target.connectionId, [{ kind: 'database', name: props.target.dbName }])))
+    const dropped = createResourceRef(props.target.connectionId, [{ kind: 'database', name: props.target.dbName }])
+    closeWhere(affectedByResource(dropped))
+    clearTreeSelectionUnder(dropped)
     showToast(`Database "${props.target.dbName}" dropped`)
     emit('close')
   } catch (e) {
