@@ -27,10 +27,10 @@ function isStale(tab, runId) {
 // failure — the op can have finished already — so the cancel still holds locally.
 export async function cancelQuery(tabId) {
   const tab = tabs.value.find(t => t.id === tabId)
-  if (!tab || !tab.isRunning || !tab.runId) return
+  if (!tab || !tab.runtime.isRunning || !tab.runId) return
   tab.cancelled = true
-  tab.isRunning = false
-  tab.runError = 'Query cancelled.'
+  tab.runtime.isRunning = false
+  tab.runtime.runError = 'Query cancelled.'
   tab.runErrorCode = null
   try {
     await qapi.cancelRun(tab.connectionId, tab.runId)
@@ -42,8 +42,8 @@ export async function cancelQuery(tabId) {
     // over a query nobody is waiting for.
     if (tab.runId) {
       tab.cancelled = false
-      tab.isRunning = true
-      tab.runError = null
+      tab.runtime.isRunning = true
+      tab.runtime.runError = null
     }
     showToast('Cancel not permitted on this server: ' + errText(e))
   }
@@ -52,12 +52,12 @@ export async function cancelQuery(tabId) {
 export async function runQuery(tabId, params) {
   const tab = tabs.value.find(t => t.id === tabId)
   if (!tab) return
-  tab.isRunning = true
+  tab.runtime.isRunning = true
   // Wall clock, and only for the live counter while the query is in flight — the
   // figure that stays behind is the server's (see below).
   tab.startedAt = Date.now()
-  tab.elapsedMs = null
-  tab.runError = null
+  tab.runtime.elapsedMs = null
+  tab.runtime.runError = null
   tab.runErrorCode = null
   tab.cancelled = false
   // A new run invalidates any count shown on the footer's Count Documents button,
@@ -77,20 +77,20 @@ export async function runQuery(tabId, params) {
     // replace still update the grid) without deep-proxying every nested field of
     // every document — the result set is display-only and replaced wholesale, so
     // the per-node proxies were pure memory + CPU overhead on large results.
-    tab.results = res.documents.map((doc) => markRaw(doc))
-    tab.hasRun = true
+    tab.runtime.results = res.documents.map((doc) => markRaw(doc))
+    tab.runtime.hasRun = true
     // The server's own timing, not the wall clock here — the round trip also pays
     // for IPC and rendering, which say nothing about how fast the query was.
-    tab.elapsedMs = res.elapsedMs
-    showToast(`Query returned ${tab.results.length} document${tab.results.length !== 1 ? 's' : ''} in ${(tab.elapsedMs / 1000).toFixed(3)}s`)
+    tab.runtime.elapsedMs = res.elapsedMs
+    showToast(`Query returned ${tab.runtime.results.length} document${tab.runtime.results.length !== 1 ? 's' : ''} in ${(tab.runtime.elapsedMs / 1000).toFixed(3)}s`)
     if (addToHistory) {
       pushQueryHistory(
         { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
         {
           mode:       'find',
-          filter:     tab.filter     || '',
-          sort:       tab.sort       || '',
-          projection: tab.projection || '',
+          filter:     tab.state.query.filter     || '',
+          sort:       tab.state.query.sort       || '',
+          projection: tab.state.query.projection || '',
           skip:       queryParams.skip  ?? 0,
           limit:      queryParams.limit ?? 50,
           pipeline:   '',
@@ -101,13 +101,13 @@ export async function runQuery(tabId, params) {
     // A killed op errors, and a stale run's error belongs to nothing on screen —
     // either way the tab already says what it needs to say.
     if (isStale(tab, runId)) return
-    tab.runError = errText(e)
+    tab.runtime.runError = errText(e)
     tab.runErrorCode = errCode(e)
   } finally {
     // Clearing runId marks this run settled: a later response is stale, and a cancel
     // that lands now has nothing to restore.
     if (tab.runId === runId) {
-      tab.isRunning = false
+      tab.runtime.isRunning = false
       tab.runId = null
     }
   }
@@ -116,12 +116,12 @@ export async function runQuery(tabId, params) {
 export async function runAggregate(tabId, params) {
   const tab = tabs.value.find(t => t.id === tabId)
   if (!tab) return
-  tab.isRunning = true
+  tab.runtime.isRunning = true
   // Wall clock, and only for the live counter while the query is in flight — the
   // figure that stays behind is the server's (see below).
   tab.startedAt = Date.now()
-  tab.elapsedMs = null
-  tab.runError = null
+  tab.runtime.elapsedMs = null
+  tab.runtime.runError = null
   tab.runErrorCode = null
   tab.cancelled = false
   // A new run invalidates any count shown on the footer's Count Documents button,
@@ -136,13 +136,13 @@ export async function runAggregate(tabId, params) {
       runId,
     )
     if (isStale(tab, runId)) return
-    tab.results = res.documents.map((doc) => markRaw(doc))
-    tab.hasRun = true
-    tab.elapsedMs = res.elapsedMs
+    tab.runtime.results = res.documents.map((doc) => markRaw(doc))
+    tab.runtime.hasRun = true
+    tab.runtime.elapsedMs = res.elapsedMs
     if (res.truncated) {
       showToast(`Showing the first ${res.documents.length.toLocaleString()} results — add a $limit stage to narrow it down.`)
     } else {
-      showToast(`Aggregation returned ${res.documents.length} document${res.documents.length !== 1 ? 's' : ''} in ${(tab.elapsedMs / 1000).toFixed(3)}s`)
+      showToast(`Aggregation returned ${res.documents.length} document${res.documents.length !== 1 ? 's' : ''} in ${(tab.runtime.elapsedMs / 1000).toFixed(3)}s`)
     }
     pushQueryHistory(
       { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
@@ -153,20 +153,20 @@ export async function runAggregate(tabId, params) {
         projection: '',
         skip:       0,
         limit:      50,
-        pipeline:   tab.pipeline || '',
+        pipeline:   tab.state.query.pipeline || '',
       },
     ).catch(() => {})
   } catch (e) {
     // A killed op errors, and a stale run's error belongs to nothing on screen —
     // either way the tab already says what it needs to say.
     if (isStale(tab, runId)) return
-    tab.runError = errText(e)
+    tab.runtime.runError = errText(e)
     tab.runErrorCode = errCode(e)
   } finally {
     // Clearing runId marks this run settled: a later response is stale, and a cancel
     // that lands now has nothing to restore.
     if (tab.runId === runId) {
-      tab.isRunning = false
+      tab.runtime.isRunning = false
       tab.runId = null
     }
   }
