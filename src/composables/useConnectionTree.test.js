@@ -16,7 +16,7 @@ import { listen } from '@tauri-apps/api/event'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { listSchemas } from '../engines/postgresql/api/resources'
 import { connDatabases, clearConnectionResources, invalidateConnectionResources, refreshConnectionResources } from '../stores/connectionData'
-import { consumeConnectionOpenRequest, requestConnectionOpen, treeSelection } from '../stores/connectionNavigation'
+import { consumeConnectionOpenRequest, requestConnectionOpen, setTreeSelection, treeSelection } from '../stores/connectionNavigation'
 import { tabs, activeTabId } from '../stores/tabs'
 import { useConnectionTree } from './useConnectionTree'
 
@@ -248,4 +248,20 @@ it('keeps the selection while the active tab stays put', async () => {
   tree.highlightCollection(conn, { name: 'shop' }, 'orders')
   await nextTick()
   expect(treeSelection.value).toEqual(expect.objectContaining({ collectionName: 'orders' }))
+})
+
+// ozendb-jh8: double-click, right-click Open Table and the auto-open after Create Table
+// all go through openPostgresTable, which always opens a new tab, so none may leave the
+// clicked row selected for the menu to act on.
+it('clears a PostgreSQL selection when a table is opened by any route', async () => {
+  const { registerWorkspaceDefinitions } = await import('../workspaces/registerDefinitions')
+  registerWorkspaceDefinitions()
+  const { openPostgresTable } = await import('../stores/tabCreators')
+  setTreeSelection({
+    connectionId: 'a', connectionName: 'PG', engine: 'postgresql',
+    database: 'app', schema: 'public', table: 'widgets', kind: 'table',
+  })
+  openPostgresTable({ connectionId: 'a', connectionName: 'PG', database: 'app', schema: 'public', table: 'widgets' })
+  await nextTick()
+  expect(treeSelection.value).toBeNull()
 })
