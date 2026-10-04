@@ -239,6 +239,8 @@ function toggleReadOnly() {
     <ResultTable
       v-else-if="rtab === 'Result' && viewMode === 'table'"
       :active-tab="activeTab"
+      :holder="activeTab.runtime"
+      :order-holder="activeTab.state.query"
       :readonly="!!activeTab.readOnly"
       v-model:drillPath="drillPath"
       @dragged-field="draggedField = $event"
