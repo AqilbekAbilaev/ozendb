@@ -212,9 +212,7 @@ export function useConnectionTree({ emit }) {
     return t?.kind === 'collection' ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
   })
 
-  // A tab switch is a move away from whatever was clicked here, but the keyboard ones
-  // (Ctrl+Tab, closing a tab) never click outside the sidebar, so without this the
-  // native menu kept acting on the old row (ozendb-xh3).
+  // Keyboard tab switches never click outside the sidebar, so clear the selection here.
   watch(activeTabId, clearSelection)
 
   // When it becomes the active one (switching tabs, or a restored session) expand the
