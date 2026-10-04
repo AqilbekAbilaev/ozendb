@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 // The native OS menu. On macOS it renders in the system menu bar (with ⌘
 // accelerators + the standard application menu); on Windows/Linux it renders as
@@ -25,7 +25,7 @@ mod build;
 mod document_window;
 mod table;
 
-pub use build::{build, MenuItems};
+pub use build::{build, install, MenuItems, MenuState};
 pub use document_window::{open_document_window, DocumentTarget};
 pub use table::menus;
 
@@ -144,6 +144,16 @@ pub fn gate_engine(gate: Gate) -> Option<MenuEngine> {
     }
 }
 
+// The frontend's workspace `engine` id. Anything else (the Quickstart tab's 'app',
+// nothing selected) shows the full menu.
+pub fn menu_engine_from_id(id: Option<&str>) -> Option<MenuEngine> {
+    match id {
+        Some("mongodb") => Some(MenuEngine::MongoDb),
+        Some("postgresql") => Some(MenuEngine::Postgres),
+        _ => None,
+    }
+}
+
 // `menus()` minus the other engine's items, with separators re-tidied and any
 // submenu left empty dropped.
 pub fn menus_for(engine: Option<MenuEngine>) -> Vec<(&'static str, Vec<Spec>)> {
@@ -202,10 +212,14 @@ pub fn handle_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
 
 // Updates the enabled state of every gated item to match the current selection
 // context. Called by the frontend whenever the active tab or the sidebar/tree
-// selection changes.
+// selection changes. Items can't be hidden in place (tauri/muda expose no
+// visibility setter), so when the engine changes the whole menu is rebuilt and
+// swapped before the enable states are applied to the fresh handles.
 #[tauri::command]
 pub fn set_menu_context(
+    app: AppHandle,
     items: State<'_, MenuItems>,
+    engine: Option<String>,
     has_connection: bool,
     has_database: bool,
     has_collection: bool,
@@ -231,11 +245,25 @@ pub fn set_menu_context(
         has_pg_schema: has_pg_schema,
         has_pg_table: has_pg_table,
     };
-    let guard = match items.0.lock() {
+    let mut state = match items.0.lock() {
         Ok(val) => val,
         Err(e) => return Err(e.to_string()),
     };
-    for (item, gate, is_write) in guard.iter() {
+    let engine = menu_engine_from_id(engine.as_deref());
+    if engine != state.engine {
+        let overrides = app.state::<crate::keybindings::KeybindingStorage>().load();
+        let (native_menu, gated) = match build(&app, &overrides, engine) {
+            Ok(val) => val,
+            Err(e) => return Err(e.to_string()),
+        };
+        match install(&app, native_menu) {
+            Ok(val) => val,
+            Err(e) => return Err(e),
+        };
+        state.engine = engine;
+        state.gated = gated;
+    }
+    for (item, gate, is_write) in state.gated.iter() {
         let enabled = item_enabled(*gate, *is_write, &context);
         match item.set_enabled(enabled) {
             Ok(val) => val,

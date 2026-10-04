@@ -1,4 +1,4 @@
-use super::{is_write_action, menus, Gate, Spec};
+use super::{is_write_action, menus_for, Gate, MenuEngine, Spec};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{
@@ -7,8 +7,14 @@ use tauri::{
 };
 
 // Managed state: the gated items, their gate, and whether they are write actions
-// (so `set_menu_context` can also disable them under the read-only lock).
-pub struct MenuItems(pub Mutex<Vec<(MenuItem<Wry>, Gate, bool)>>);
+// (so `set_menu_context` can also disable them under the read-only lock), plus the
+// engine the live menu was built for, so a rebuild happens only when it changes.
+pub struct MenuItems(pub Mutex<MenuState>);
+
+pub struct MenuState {
+    pub engine: Option<MenuEngine>,
+    pub gated: Vec<(MenuItem<Wry>, Gate, bool)>,
+}
 
 // Whether native accelerators should be attached. On Linux/WebKitGTK, registering
 // accelerators (especially the predefined clipboard ones) makes the menu swallow
@@ -228,6 +234,7 @@ fn build_app_menu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
 pub fn build(
     app: &AppHandle,
     overrides: &HashMap<String, String>,
+    engine: Option<MenuEngine>,
 ) -> tauri::Result<(Menu<Wry>, Vec<(MenuItem<Wry>, Gate, bool)>)> {
     let menu = match Menu::new(app) {
         Ok(val) => val,
@@ -247,7 +254,7 @@ pub fn build(
         };
     }
 
-    for (name, specs) in menus().iter() {
+    for (name, specs) in menus_for(engine).iter() {
         let submenu = match build_submenu(app, name, specs, overrides, &mut gated) {
             Ok(val) => val,
             Err(e) => return Err(e),
@@ -259,4 +266,34 @@ pub fn build(
     }
 
     Ok((menu, gated))
+}
+
+// Attaches a built menu. Shared by startup and the per-engine rebuild.
+pub fn install(app: &AppHandle, menu: Menu<Wry>) -> Result<(), String> {
+    // `WebviewWindow::set_menu` is a documented no-op on macOS (its own docs:
+    // "Unsupported... use AppHandle::set_menu instead") — it returns Ok without
+    // ever attaching anything, silently leaving the OS's bare default menu in
+    // place. macOS has one shared system menu bar regardless of which window is
+    // frontmost, so app-wide is the only model there anyway — no risk of a
+    // pop-out document window getting its own menu, unlike Windows/Linux.
+    #[cfg(target_os = "macos")]
+    match app.set_menu(menu) {
+        Ok(_val) => {}
+        Err(e) => return Err(e.to_string()),
+    };
+    // Scope the menu to the main window so the pop-out document windows
+    // don't get their own native menu bar.
+    #[cfg(not(target_os = "macos"))]
+    {
+        use tauri::Manager;
+        let main_window = match app.get_webview_window("main") {
+            Some(val) => val,
+            None => return Err("no main window to attach the menu to".to_string()),
+        };
+        match main_window.set_menu(menu) {
+            Ok(_val) => {}
+            Err(e) => return Err(e.to_string()),
+        };
+    }
+    Ok(())
 }

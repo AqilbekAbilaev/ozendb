@@ -439,3 +439,14 @@ fn filtered_menus_never_leave_an_empty_menu_or_stray_separator() {
         }
     }
 }
+
+#[test]
+fn menu_engine_reads_the_frontends_engine_ids() {
+    assert_eq!(menu_engine_from_id(Some("mongodb")), Some(MenuEngine::MongoDb));
+    assert_eq!(menu_engine_from_id(Some("postgresql")), Some(MenuEngine::Postgres));
+    // The Quickstart tab's engine, an unknown future engine, or nothing selected
+    // all mean "show the full menu".
+    assert_eq!(menu_engine_from_id(Some("app")), None);
+    assert_eq!(menu_engine_from_id(Some("mysql")), None);
+    assert_eq!(menu_engine_from_id(None), None);
+}

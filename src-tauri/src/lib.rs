@@ -181,39 +181,23 @@ pub fn run() {
             // which routes them through the existing handlers. The gated item
             // handles are kept in managed state so `set_menu_context` can toggle
             // their enabled flag as the selection changes.
-            // Custom shortcut accelerators (empty = built-in defaults). Read once
-            // here so the native menu is built with the user's bindings; a rebind
-            // made later takes effect on the next launch.
+            // Custom shortcut accelerators (empty = built-in defaults). Read here so
+            // the native menu is built with the user's bindings; a rebind made later
+            // takes effect on the next launch or the next engine switch's rebuild.
+            // Built for no engine (everything shown) until the frontend reports one.
             let key_overrides = app.state::<KeybindingStorage>().load();
-            let (native_menu, gated_items) = match menu::build(app.handle(), &key_overrides) {
+            let (native_menu, gated_items) = match menu::build(app.handle(), &key_overrides, None) {
                 Ok(val) => val,
                 Err(e) => return Err(e.into()),
             };
-            // `WebviewWindow::set_menu` is a documented no-op on macOS (its own docs:
-            // "Unsupported... use AppHandle::set_menu instead") — it returns Ok without
-            // ever attaching anything, silently leaving the OS's bare default menu in
-            // place. macOS has one shared system menu bar regardless of which window is
-            // frontmost, so app-wide is the only model there anyway — no risk of a
-            // pop-out document window getting its own menu, unlike Windows/Linux.
-            #[cfg(target_os = "macos")]
-            match app.handle().set_menu(native_menu) {
+            match menu::install(app.handle(), native_menu) {
                 Ok(_val) => {}
                 Err(e) => return Err(e.into()),
             };
-            // Scope the menu to the main window so the pop-out document windows
-            // don't get their own native menu bar.
-            #[cfg(not(target_os = "macos"))]
-            {
-                let main_window = match app.get_webview_window("main") {
-                    Some(val) => val,
-                    None => return Err("no main window to attach the menu to".into()),
-                };
-                match main_window.set_menu(native_menu) {
-                    Ok(_val) => {}
-                    Err(e) => return Err(e.into()),
-                };
-            }
-            app.manage(menu::MenuItems(std::sync::Mutex::new(gated_items)));
+            app.manage(menu::MenuItems(std::sync::Mutex::new(menu::MenuState {
+                engine: None,
+                gated: gated_items,
+            })));
             app.on_menu_event(menu::handle_event);
 
             Ok(())
