@@ -1,7 +1,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { errCode, errMessage } from '../utils/errors'
-import { activeTab } from '../stores/tabs'
+import { activeTab, activeTabId } from '../stores/tabs'
 import {
   connectionResourceLoading, connectionResourceErrors,
   ensureConnectionResources, refreshConnectionResources,
@@ -211,6 +211,9 @@ export function useConnectionTree({ emit }) {
     const t = activeResource.value
     return t?.kind === 'collection' ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
   })
+
+  // Keyboard tab switches never click outside the sidebar, so clear the selection here.
+  watch(activeTabId, clearSelection)
 
   // When it becomes the active one (switching tabs, or a restored session) expand the
   // sidebar down to it, so the highlighted row is on screen rather than hidden under a

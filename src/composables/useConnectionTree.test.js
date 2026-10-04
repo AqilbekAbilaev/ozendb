@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { effectScope } from 'vue'
+import { effectScope, nextTick } from 'vue'
 
 vi.mock('vue', async importOriginal => ({
   ...await importOriginal(),
@@ -227,4 +227,25 @@ it('unlistens from every backend event on unmount', async () => {
   onUnmounted.mock.calls.at(-1)[0]()
   await new Promise(r => setTimeout(r, 0))
   for (const off of offs) expect(off).toHaveBeenCalledTimes(1)
+})
+
+// ozendb-xh3: a keyboard tab switch never clicks outside the sidebar, so the selection
+// used to outlive it and the native menu kept acting on the old row.
+it('clears the selection when the active tab changes', async () => {
+  tabs.value = [{ id: 't1', kind: 'quickstart' }, { id: 't2', kind: 'quickstart' }]
+  activeTabId.value = 't1'
+  await nextTick()
+  tree.highlightCollection(conn, { name: 'shop' }, 'orders')
+  activeTabId.value = 't2'
+  await nextTick()
+  expect(treeSelection.value).toBeNull()
+})
+
+it('keeps the selection while the active tab stays put', async () => {
+  tabs.value = [{ id: 't1', kind: 'quickstart' }]
+  activeTabId.value = 't1'
+  await nextTick()
+  tree.highlightCollection(conn, { name: 'shop' }, 'orders')
+  await nextTick()
+  expect(treeSelection.value).toEqual(expect.objectContaining({ collectionName: 'orders' }))
 })
