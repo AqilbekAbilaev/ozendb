@@ -240,6 +240,8 @@ pub fn run() {
             create_pg_role,
             drop_pg_role,
             list_pg_grants,
+            grant_pg_privileges,
+            revoke_pg_privileges,
             export_pg_data,
             pg_import_preview,
             import_pg_csv,
