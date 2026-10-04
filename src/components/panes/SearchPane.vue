@@ -157,8 +157,8 @@ function segments(text) {
         placeholder="Search…"
         @enter="search"
       />
-      <label class="se-opt"><BaseCheckbox v-model="matchCase" /> Match case</label>
-      <label class="se-opt"><BaseCheckbox v-model="regex" /> RegEx</label>
+      <BaseCheckbox v-model="matchCase" class="se-opt" label="Match case" />
+      <BaseCheckbox v-model="regex" class="se-opt" label="RegEx" />
       <BaseButton variant="primary" :disabled="loading || !term.trim()" @click="search">
         {{ loading ? 'Searching…' : 'Search' }}
       </BaseButton>
@@ -230,10 +230,7 @@ function segments(text) {
 }
 .se-scope { flex: none; width: 190px; }
 .base-input.se-input { flex: 1; }
-.se-opt {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 12.5px; color: var(--text-dim); cursor: pointer; white-space: nowrap;
-}
+.base-check.se-opt { color: var(--text-dim); white-space: nowrap; }
 
 .se-body { flex: 1; min-height: 0; overflow: auto; }
 

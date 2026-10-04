@@ -87,13 +87,12 @@ function when(at) {
           </li>
         </ul>
 
-        <label class="er-detail">
-          <BaseCheckbox v-model="includeDetail" />
+        <BaseCheckbox v-model="includeDetail" class="er-detail">
           <span>
             Include the messages above in the report.
             <em>Recommended — without them a report is just a count. Paths are shortened to <code>~</code>.</em>
           </span>
-        </label>
+        </BaseCheckbox>
       </template>
     </div>
 
@@ -144,7 +143,7 @@ function when(at) {
    unreadable line (break-word still handles a frame too long for the column). */
 .er-msg { font-family: var(--mono); white-space: pre-wrap; word-break: break-word; color: var(--text-dim); }
 
-.er-detail { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; }
+.base-check.er-detail { align-items: flex-start; line-height: 1.45; }
 .er-detail em { color: var(--text-faint); font-style: normal; }
 
 .er-footer { display: flex; gap: 8px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--border); }

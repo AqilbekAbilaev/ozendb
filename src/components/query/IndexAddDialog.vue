@@ -292,11 +292,11 @@ const title = computed(() => props.mode === 'edit' ? 'Edit index' : 'Add index')
 
         <!-- Options tab -->
         <div v-else-if="subtab === 'options'" class="tab-pane options-pane">
-          <label class="opt-row"><BaseCheckbox v-model="optUnique" /><span>Unique</span></label>
-          <label class="opt-row"><BaseCheckbox v-model="optSparse" /><span>Sparse</span></label>
-          <label class="opt-row"><BaseCheckbox v-model="optHidden" /><span>Hidden (ignored by the query planner)</span></label>
-          <label class="opt-row"><BaseCheckbox v-model="optTtlEnabled" /><span>TTL — expire documents after</span>
-            <BaseInput v-model="optTtlSeconds" class="prompt-input sm ttl" :disabled="!optTtlEnabled" placeholder="seconds" /></label>
+          <BaseCheckbox v-model="optUnique" class="opt-row" label="Unique" />
+          <BaseCheckbox v-model="optSparse" class="opt-row" label="Sparse" />
+          <BaseCheckbox v-model="optHidden" class="opt-row" label="Hidden (ignored by the query planner)" />
+          <BaseCheckbox v-model="optTtlEnabled" class="opt-row"><span>TTL — expire documents after</span>
+            <BaseInput v-model="optTtlSeconds" class="prompt-input sm ttl" :disabled="!optTtlEnabled" placeholder="seconds" /></BaseCheckbox>
           <FormField label="Partial filter expression (JSON)">
             <BaseInput v-model="optPartial" class="prompt-input" placeholder='e.g. {"status": "active"}' />
           </FormField>
@@ -364,16 +364,16 @@ const title = computed(() => props.mode === 'edit' ? 'Edit index' : 'Add index')
               </FormField>
             </div>
           </div>
-          <label class="opt-row"><BaseCheckbox v-model="colCaseLevel" /><span>Case level</span></label>
-          <label class="opt-row"><BaseCheckbox v-model="colNumericOrdering" /><span>Numeric ordering</span></label>
-          <label class="opt-row"><BaseCheckbox v-model="colBackwards" /><span>Backwards (French accent sort)</span></label>
+          <BaseCheckbox v-model="colCaseLevel" class="opt-row" label="Case level" />
+          <BaseCheckbox v-model="colNumericOrdering" class="opt-row" label="Numeric ordering" />
+          <BaseCheckbox v-model="colBackwards" class="opt-row" label="Backwards (French accent sort)" />
         </div>
 
         <FieldError :text="shownError" spaced />
       </div>
 
       <div class="del-footer idx-add-footer">
-        <label class="bg-check"><BaseCheckbox v-model="background" /><span>Create in background</span></label>
+        <BaseCheckbox v-model="background" label="Create in background" />
         <BaseButton size="sm" class="json-btn" @click="toggleJson">{{ jsonMode ? 'Form' : 'JSON' }}</BaseButton>
         <FlexSpacer />
         <BaseButton @click="emit('cancel')">Cancel</BaseButton>
@@ -415,7 +415,7 @@ const title = computed(() => props.mode === 'edit' ? 'Edit index' : 'Add index')
 .kind-label { font-size: 12px; color: var(--text-faint); }
 
 .options-pane { display: flex; flex-direction: column; gap: 6px; }
-.opt-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--text); padding: 7px 0; }
+.base-check.opt-row { padding: 7px 0; }
 .pane-note { margin: 0 0 12px; }
 .pane-note code { font-family: var(--mono); font-size: 11.5px; }
 .geo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 16px; margin-top: 6px; }
@@ -424,6 +424,5 @@ const title = computed(() => props.mode === 'edit' ? 'Edit index' : 'Add index')
 .base-textarea.json-area { min-height: 280px; }
 
 .idx-add-footer { display: flex; align-items: center; gap: 14px; }
-.bg-check { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text); }
 .json-btn { margin-left: 4px; }
 </style>

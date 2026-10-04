@@ -202,11 +202,10 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
           <div v-if="joins.length && columnInfo[c]?.tableLabel !== columnInfo[columns[i - 1]]?.tableLabel" class="grp">
             {{ columnInfo[c]?.tableLabel }}
           </div>
-          <label class="colrow">
-            <BaseCheckbox :model-value="shownColumns.includes(c)" @update:model-value="toggleColumn(c)" />
+          <BaseCheckbox class="colrow" :model-value="shownColumns.includes(c)" @update:model-value="toggleColumn(c)">
             <span :class="{ dim: shownColumns.length && !shownColumns.includes(c) }">{{ columnInfo[c]?.name ?? c }}</span>
             <span class="type">{{ columnInfo[c]?.dataType }}</span>
-          </label>
+          </BaseCheckbox>
         </template>
         <button v-if="shownColumns.length" class="link" @click="emit('columns', [])">Show all columns</button>
       </div>
@@ -260,10 +259,7 @@ const DIRECTIONS = [{ value: 'asc', label: '↑ Ascending' }, { value: 'desc', l
 .grp { padding: 8px 4px 3px; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
 .count { font-size: 11.5px; color: var(--text-faint); }
 .cols { gap: 2px; }
-.colrow {
-  display: flex; align-items: center; gap: 9px; padding: 5px 4px; border-radius: 5px;
-  font-size: 12.5px; color: var(--text); cursor: pointer;
-}
+.base-check.colrow { padding: 5px 4px; border-radius: 5px; }
 .colrow:hover { background: var(--bg-hover); }
 .dim { color: var(--text-faint); }
 .type { margin-left: auto; font: 11px var(--mono); color: var(--text-faint); }

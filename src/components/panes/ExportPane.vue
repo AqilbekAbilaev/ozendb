@@ -262,10 +262,7 @@ const sourceLabel = computed(() => {
             Preview of the first {{ previewRows.length }} row{{ previewRows.length === 1 ? '' : 's' }}.
           </HintText>
           <div class="iew-export-opts">
-            <label class="iew-f iew-inc" title="Export only documents added since this collection's last incremental export (tracked by _id)">
-              <BaseCheckbox v-model="activeTab.incremental" />
-              Incremental (new only)
-            </label>
+            <BaseCheckbox v-model="activeTab.incremental" class="iew-inc" title="Export only documents added since this collection's last incremental export (tracked by _id)" label="Incremental (new only)" />
           </div>
         </div>
         <div class="iew-table-wrap">
@@ -411,8 +408,7 @@ const sourceLabel = computed(() => {
 
 .iew-f { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
 .iew-export-opts { display: flex; align-items: center; gap: 16px; flex: none; }
-.iew-inc { cursor: pointer; }
-.iew-inc input { cursor: pointer; }
+.base-check.iew-inc { color: var(--text-dim); }
 
 .iew-preview-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .iew-table-wrap { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border-soft); border-radius: 6px; }

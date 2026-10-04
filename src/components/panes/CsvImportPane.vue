@@ -268,10 +268,7 @@ function reset() {
               <label class="csv-f">Text qualifier:
                 <BaseInput v-model="t.csv.qualifier" class="csv-other" maxlength="1" />
               </label>
-              <label class="csv-f csv-check">
-                <BaseCheckbox v-model="t.csv.hasHeader" />
-                File contains header with field names
-              </label>
+              <BaseCheckbox v-model="t.csv.hasHeader" class="csv-check" label="File contains header with field names" />
             </div>
           </section>
 
@@ -367,7 +364,7 @@ function reset() {
 
 .csv-grid { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
 .csv-f { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-dim); }
-.csv-check { cursor: pointer; }
+.base-check.csv-check { color: var(--text-dim); }
 .csv-select { min-width: 150px; }
 .base-input.csv-other { width: 46px; text-align: center; }
 .csv-skip { width: 110px; }
