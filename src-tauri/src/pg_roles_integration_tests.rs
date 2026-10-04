@@ -2,7 +2,10 @@
 //! `create_role_impl`, `drop_role_impl`). Shares `pg_integration_tests.rs`'s helpers
 //! and skip behaviour; see its module doc comment for how to run these.
 
-use crate::commands::{create_role_impl, drop_role_impl, list_grants_impl, list_roles_impl, NewPgRole};
+use crate::commands::{
+    change_privileges_impl, create_role_impl, drop_role_impl, list_grants_impl, list_roles_impl, NewPgRole,
+    PgPrivilegeChange,
+};
 use crate::pg_integration_tests::{pool, test_config};
 use sqlx::Connection;
 
@@ -268,4 +271,84 @@ async fn lists_direct_grants_including_the_owners_implicit_ones() {
 
     sqlx::query(sqlx::AssertSqlSafe(String::from("DROP SCHEMA ozendb_it_grants CASCADE"))).execute(&pool).await.ok();
     drop_if_exists(&pool, &[name, other]).await;
+}
+
+fn privilege_change(role: &str, kind: &str, object: Option<&str>, privileges: &[&str]) -> PgPrivilegeChange {
+    PgPrivilegeChange {
+        role: role.to_string(),
+        object_kind: kind.to_string(),
+        schema: String::from("ozendb_it_grant_edit"),
+        object: object.map(String::from),
+        privileges: privileges.iter().map(|p| p.to_string()).collect(),
+        grant_option: false,
+        cascade: false,
+    }
+}
+
+fn holds(grants: &[crate::commands::PgGrant], object: Option<&str>, privilege: &str) -> Option<bool> {
+    grants
+        .iter()
+        .find(|g| g.schema == "ozendb_it_grant_edit" && g.object.as_deref() == object && g.privilege == privilege)
+        .map(|g| g.grantable)
+}
+
+// ozendb-ahy: GRANT and REVOKE round-trip through what list_grants_impl reports.
+#[tokio::test]
+async fn grants_and_revokes_privileges_on_schemas_tables_and_sequences() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    // A name that needs quoting proves the identifiers go through %I, not splicing.
+    let name = "ozendb it \"grant\" edit";
+    sqlx::query(sqlx::AssertSqlSafe(String::from("DROP SCHEMA IF EXISTS ozendb_it_grant_edit CASCADE"))).execute(&pool).await.ok();
+    drop_quoted_role(&pool, name).await;
+    create_role_impl(&pool, &role(name)).await.expect("create the grantee");
+    for stmt in [
+        "CREATE SCHEMA ozendb_it_grant_edit",
+        "CREATE TABLE ozendb_it_grant_edit.orders (id serial PRIMARY KEY)",
+    ] {
+        sqlx::query(sqlx::AssertSqlSafe(String::from(stmt))).execute(&pool).await.expect("setup");
+    }
+
+    let mut on_table = privilege_change(name, "table", Some("orders"), &["SELECT", "INSERT"]);
+    on_table.grant_option = true;
+    change_privileges_impl(&pool, &on_table, true).await.expect("grant on the table");
+    change_privileges_impl(&pool, &privilege_change(name, "schema", None, &["USAGE"]), true).await.expect("grant on the schema");
+    change_privileges_impl(&pool, &privilege_change(name, "sequence", Some("orders_id_seq"), &["USAGE"]), true)
+        .await
+        .expect("grant on the sequence");
+
+    let grants = list_grants_impl(&pool, name).await.expect("grants");
+    assert_eq!(holds(&grants, Some("orders"), "SELECT"), Some(true), "SELECT WITH GRANT OPTION: {grants:?}");
+    assert_eq!(holds(&grants, Some("orders"), "INSERT"), Some(true), "{grants:?}");
+    assert_eq!(holds(&grants, None, "USAGE"), Some(false), "schema USAGE: {grants:?}");
+    assert_eq!(holds(&grants, Some("orders_id_seq"), "USAGE"), Some(false), "sequence USAGE: {grants:?}");
+
+    change_privileges_impl(&pool, &privilege_change(name, "table", Some("orders"), &["INSERT"]), false)
+        .await
+        .expect("revoke INSERT");
+    change_privileges_impl(&pool, &privilege_change(name, "schema", None, &["USAGE"]), false).await.expect("revoke USAGE");
+    let after = list_grants_impl(&pool, name).await.expect("grants");
+    assert_eq!(holds(&after, Some("orders"), "INSERT"), None, "INSERT should be gone: {after:?}");
+    assert_eq!(holds(&after, Some("orders"), "SELECT"), Some(true), "SELECT must survive: {after:?}");
+    assert_eq!(holds(&after, None, "USAGE"), None, "schema USAGE should be gone: {after:?}");
+
+    // A privilege the kind lacks is refused before anything reaches the server.
+    let refused = change_privileges_impl(&pool, &privilege_change(name, "sequence", Some("orders_id_seq"), &["DELETE"]), true).await;
+    assert!(matches!(refused, Err(crate::error::AppError::Validation(_))), "{refused:?}");
+
+    sqlx::query(sqlx::AssertSqlSafe(String::from("DROP SCHEMA ozendb_it_grant_edit CASCADE"))).execute(&pool).await.ok();
+    drop_quoted_role(&pool, name).await;
+}
+
+// drop_if_exists splices the name, which a role name containing a quote can't survive.
+async fn drop_quoted_role(pool: &sqlx::PgPool, name: &str) {
+    if let Ok(drop) = sqlx::query_scalar::<_, String>("SELECT format('DROP ROLE IF EXISTS %I', $1)").bind(name).fetch_one(pool).await {
+        sqlx::query(sqlx::AssertSqlSafe(drop)).execute(pool).await.ok();
+    }
 }
