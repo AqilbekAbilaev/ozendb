@@ -1,7 +1,7 @@
 //! Live-PostgreSQL coverage of bulk export (`export_impl`, ozendb-6v3). Shares
 //! `pg_integration_tests.rs`'s helpers and skip behaviour; see its module doc comment.
 
-use crate::commands::{export_impl, PgExportSource};
+use crate::commands::{export_impl, import_csv_impl, import_preview_impl, PgExportSource};
 use crate::pg_integration_tests::{pool, test_config};
 
 const SCHEMA: &str = "ozendb_it_export";
@@ -87,6 +87,119 @@ async fn exports_tables_and_queries_as_csv_and_json_past_the_grid_cap() {
 
     sqlx::query(sqlx::AssertSqlSafe(String::from("DROP SCHEMA ozendb_it_export CASCADE"))).execute(&pool).await.ok();
     for name in ["items.csv", "items.json", "many.json", "all.json", "write.csv"] {
+        std::fs::remove_file(temp_path(name)).ok();
+    }
+}
+
+async fn count(pool: &sqlx::PgPool, table: &str) -> i64 {
+    sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM ozendb_it_import.{table}")))
+        .fetch_one(pool)
+        .await
+        .expect("count")
+}
+
+fn write_file(name: &str, text: &str) -> String {
+    let path = temp_path(name);
+    std::fs::write(&path, text).expect("write the CSV");
+    path
+}
+
+// ozendb-6v3: preview, mapped import, row-level failure, and an export → import round trip.
+#[tokio::test]
+async fn imports_csv_through_a_mapping_all_or_nothing() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_import CASCADE",
+        "CREATE SCHEMA ozendb_it_import",
+        "CREATE TABLE ozendb_it_import.people (id integer NOT NULL, name text, joined date, score numeric(5,1), \
+           active boolean DEFAULT true, doubled integer GENERATED ALWAYS AS (id * 2) STORED)",
+    ] {
+        sqlx::query(sqlx::AssertSqlSafe(String::from(stmt))).execute(&pool).await.expect("setup");
+    }
+
+    // Headers in another order and case, one extra column to skip.
+    let good = write_file(
+        "people.csv",
+        "Name,ID,ignored,joined,score\n\
+         \"Ada, Countess\",1,x,2026-01-02,9.5\n\
+         \"two\nlines \"\"quoted\"\"\",2,y,,\n\
+         \n\
+         Grace,3,z,2026-03-04,7\n",
+    );
+    let preview = import_preview_impl(&pool, "ozendb_it_import", "people", &good, 20).await.expect("preview");
+    assert_eq!(preview.headers, vec!["Name", "ID", "ignored", "joined", "score"]);
+    assert_eq!(preview.rows.len(), 4, "the blank line is still a row in the preview");
+    assert_eq!(
+        preview.mapping,
+        vec![Some("name".to_string()), Some("id".to_string()), None, Some("joined".to_string()), Some("score".to_string())],
+    );
+    assert!(preview.columns.iter().find(|c| c.name == "doubled").expect("doubled").generated);
+
+    let imported = import_csv_impl(&pool, "ozendb_it_import", "people", &good, &preview.mapping).await.expect("import");
+    assert_eq!(imported, 3, "the blank line is skipped");
+    let rows: Vec<(i32, Option<String>, Option<String>, Option<String>, bool, i32)> = sqlx::query_as(
+        "SELECT id, name, joined::text, score::text, active, doubled FROM ozendb_it_import.people ORDER BY id",
+    )
+    .fetch_all(&pool)
+    .await
+    .expect("read back");
+    assert_eq!(rows[0], (1, Some("Ada, Countess".into()), Some("2026-01-02".into()), Some("9.5".into()), true, 2));
+    assert_eq!(rows[1], (2, Some("two\nlines \"quoted\"".into()), None, None, true, 4), "empty fields import as NULL");
+    assert_eq!(rows[2].0, 3);
+
+    // A bad value fails the whole import, named by row and column.
+    let bad = write_file("bad.csv", "id,score\n4,1.0\nfive,2.0\n6,3.0\n");
+    let mapping = vec![Some("id".to_string()), Some("score".to_string())];
+    let failure = import_csv_impl(&pool, "ozendb_it_import", "people", &bad, &mapping).await;
+    match failure {
+        Err(crate::error::AppError::Validation(message)) => {
+            assert!(message.starts_with("Row 2 (column id): "), "{message}");
+            assert!(message.ends_with("Nothing was imported."), "{message}");
+        }
+        other => panic!("expected a row-level failure, got {other:?}"),
+    }
+    assert_eq!(count(&pool, "people").await, 3, "row 1 of the bad file must have been rolled back");
+
+    // A ragged row is refused before COPY sees it.
+    let ragged = write_file("ragged.csv", "id,score\n7,1.0\n8\n");
+    let refused = import_csv_impl(&pool, "ozendb_it_import", "people", &ragged, &mapping).await;
+    assert!(matches!(refused, Err(crate::error::AppError::Validation(ref m)) if m.starts_with("Row 2 has 1 fields")), "{refused:?}");
+    assert_eq!(count(&pool, "people").await, 3);
+
+    // What export writes, import reads back.
+    sqlx::query(sqlx::AssertSqlSafe(String::from(
+        "CREATE TABLE ozendb_it_import.copy (LIKE ozendb_it_import.people INCLUDING DEFAULTS)",
+    )))
+    .execute(&pool)
+    .await
+    .expect("copy table");
+    let source = PgExportSource {
+        schema: None,
+        table: None,
+        query: Some(String::from("SELECT id, name, joined, score, active FROM ozendb_it_import.people")),
+    };
+    let exported = temp_path("round.csv");
+    export_impl(&pool, &source, "csv", &exported).await.expect("export");
+    let round = import_preview_impl(&pool, "ozendb_it_import", "copy", &exported, 20).await.expect("preview");
+    import_csv_impl(&pool, "ozendb_it_import", "copy", &exported, &round.mapping).await.expect("round-trip import");
+    let same: bool = sqlx::query_scalar(
+        "SELECT NOT EXISTS (SELECT id, name, joined, score, active FROM ozendb_it_import.people \
+                             EXCEPT SELECT id, name, joined, score, active FROM ozendb_it_import.copy)",
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("compare");
+    assert!(same, "the round trip changed the data");
+
+    sqlx::query(sqlx::AssertSqlSafe(String::from("DROP SCHEMA ozendb_it_import CASCADE"))).execute(&pool).await.ok();
+    for name in ["people.csv", "bad.csv", "ragged.csv", "round.csv"] {
         std::fs::remove_file(temp_path(name)).ok();
     }
 }
