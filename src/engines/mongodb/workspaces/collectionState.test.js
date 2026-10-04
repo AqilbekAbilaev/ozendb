@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  COLLECTION_STATE_VERSION, createCollectionState, createCollectionUi,
+  COLLECTION_STATE_VERSION, createCollectionState,
   createCollectionRuntime, migrateCollectionState,
 } from './collectionState'
 
