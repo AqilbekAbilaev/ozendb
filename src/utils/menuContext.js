@@ -48,14 +48,14 @@ const MENU_ENGINES = ['mongodb', 'postgresql']
 // Which engine's items the menu shows (ozendb-izk): 'none' hides both (Quickstart,
 // nothing selected). A sidebar selection counts only when it enables something (a
 // PostgreSQL row above a schema enables nothing), and when a live selection and the
-// tab name different engines, null keeps both halves rather than hide live items.
+// tab name different engines, 'all' keeps both halves rather than hide live items.
 function menuEngine(tab, selDepth, pgSelDepth) {
   const tabEngine = MENU_ENGINES.includes(tab?.engine) ? tab.engine : null
   let selEngine = null
   if (selDepth >= 0) selEngine = 'mongodb'
   else if (pgSelDepth >= PG_DEPTH.schema) selEngine = 'postgresql'
   if (!selEngine) return tabEngine ?? 'none'
-  return !tabEngine || tabEngine === selEngine ? selEngine : null
+  return !tabEngine || tabEngine === selEngine ? selEngine : 'all'
 }
 
 // -1 for "names no resource", so every comparison below is false for it.

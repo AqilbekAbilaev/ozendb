@@ -460,11 +460,10 @@ fn neutral_scope_keeps_only_items_that_need_no_database() {
 
 #[test]
 fn menu_scope_reads_the_frontends_engine_ids() {
-    assert_eq!(menu_scope_from_id(Some("mongodb")), MenuScope::Engine(MenuEngine::MongoDb));
-    assert_eq!(menu_scope_from_id(Some("postgresql")), MenuScope::Engine(MenuEngine::Postgres));
-    assert_eq!(menu_scope_from_id(Some("none")), MenuScope::Neutral);
-    // Nothing sent (a live selection and tab disagree) or an id this build doesn't
-    // know never hides anything.
-    assert_eq!(menu_scope_from_id(None), MenuScope::All);
-    assert_eq!(menu_scope_from_id(Some("mysql")), MenuScope::All);
+    assert_eq!(menu_scope_from_id("mongodb"), MenuScope::Engine(MenuEngine::MongoDb));
+    assert_eq!(menu_scope_from_id("postgresql"), MenuScope::Engine(MenuEngine::Postgres));
+    assert_eq!(menu_scope_from_id("none"), MenuScope::Neutral);
+    assert_eq!(menu_scope_from_id("all"), MenuScope::All);
+    // An id this build doesn't know never hides anything.
+    assert_eq!(menu_scope_from_id("mysql"), MenuScope::All);
 }

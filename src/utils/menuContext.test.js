@@ -403,8 +403,8 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
 
   it('shows everything when a live selection and the tab disagree', () => {
     const pgSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
-    expect(deriveMenuContext(mongoTab, pgSel, 2).engine).toBe(null)
-    expect(deriveMenuContext(pgTab, selection('c1', 'Local', null, null, 'connection'), 2).engine).toBe(null)
+    expect(deriveMenuContext(mongoTab, pgSel, 2).engine).toBe('all')
+    expect(deriveMenuContext(pgTab, selection('c1', 'Local', null, null, 'connection'), 2).engine).toBe('all')
   })
 
   it('agrees with a live selection of the same engine as the tab', () => {

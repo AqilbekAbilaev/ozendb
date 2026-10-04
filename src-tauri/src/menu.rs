@@ -155,11 +155,11 @@ pub fn gate_engine(gate: Gate) -> Option<MenuEngine> {
 
 // The frontend's `engine` (see menuContext.js). An id this build doesn't know never
 // hides anything.
-pub fn menu_scope_from_id(id: Option<&str>) -> MenuScope {
+pub fn menu_scope_from_id(id: &str) -> MenuScope {
     match id {
-        Some("mongodb") => MenuScope::Engine(MenuEngine::MongoDb),
-        Some("postgresql") => MenuScope::Engine(MenuEngine::Postgres),
-        Some("none") => MenuScope::Neutral,
+        "mongodb" => MenuScope::Engine(MenuEngine::MongoDb),
+        "postgresql" => MenuScope::Engine(MenuEngine::Postgres),
+        "none" => MenuScope::Neutral,
         _ => MenuScope::All,
     }
 }
@@ -234,7 +234,7 @@ pub fn handle_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
 pub fn set_menu_context(
     app: AppHandle,
     items: State<'_, MenuItems>,
-    engine: Option<String>,
+    engine: String,
     has_connection: bool,
     has_database: bool,
     has_collection: bool,
@@ -264,7 +264,7 @@ pub fn set_menu_context(
         Ok(val) => val,
         Err(e) => return Err(e.to_string()),
     };
-    let scope = menu_scope_from_id(engine.as_deref());
+    let scope = menu_scope_from_id(&engine);
     if scope != state.scope {
         let overrides = app.state::<crate::keybindings::KeybindingStorage>().load();
         let (native_menu, gated) = match build(&app, &overrides, scope) {
