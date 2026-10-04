@@ -8,9 +8,11 @@ import { formatCell, guessType } from '../utils/resultGrid'
 
 // What a MongoDB grid's cells do beyond being clicked (see useGridCells): drill into a
 // nested value, follow a DBRef, copy a value / document / selection, and edit in place.
-// `cells` is the grid's useGridCells; `selectedCol` its useRowSelection's.
+// `cells` is the grid's useGridCells; `selectedCol` its useRowSelection's. `holder` is
+// where results and selection live (a MongoDB tab's runtime); the tab itself when omitted.
 export function useMongoCellActions({
   activeTab,
+  holder = activeTab,
   drillPath,
   readonly,
   gridDocs,
@@ -28,7 +30,7 @@ export function useMongoCellActions({
     if (guessType(col, value) !== 'obj') return
     emit('update:drillPath', [...drillPath(), col])
     selectedCol.value = null
-    tab.selectedRow = -1
+    holder().selectedRow = -1
   }
 
   function goToDrillLevel(level) {
@@ -36,34 +38,34 @@ export function useMongoCellActions({
     emit('update:drillPath', level < 0 ? [] : path.slice(0, level + 1))
     selectedCol.value = null
     const tab = activeTab()
-    if (tab) tab.selectedRow = -1
+    if (tab) holder().selectedRow = -1
   }
 
   function copySelectedCell() {
     const tab = activeTab()
-    if (!tab || tab.selectedRow < 0 || !selectedCol.value) return
-    const value = gridDocs()[tab.selectedRow]?.[selectedCol.value]
+    if (!tab || holder().selectedRow < 0 || !selectedCol.value) return
+    const value = gridDocs()[holder().selectedRow]?.[selectedCol.value]
     navigator.clipboard.writeText(valueToClipboard(value))
   }
 
   function copySelectedDocument() {
     const tab = activeTab()
-    if (!tab || tab.selectedRow < 0) return
-    navigator.clipboard.writeText(JSON.stringify(tab.results[tab.selectedRow], null, 2))
+    if (!tab || holder().selectedRow < 0) return
+    navigator.clipboard.writeText(JSON.stringify(holder().results[holder().selectedRow], null, 2))
   }
 
   function copySelection() {
     const tab = activeTab()
     if (!tab) return
-    const rows = tab.selectedRows?.length
-      ? tab.selectedRows
-      : (tab.selectedRow >= 0 ? [tab.selectedRow] : [])
+    const rows = holder().selectedRows?.length
+      ? holder().selectedRows
+      : (holder().selectedRow >= 0 ? [holder().selectedRow] : [])
     if (!rows.length) return
     if (rows.length === 1) {
       selectedCol.value ? copySelectedCell() : copySelectedDocument()
       return
     }
-    const documents = rows.map((index) => tab.results[index]).filter((doc) => doc != null)
+    const documents = rows.map((index) => holder().results[index]).filter((doc) => doc != null)
     navigator.clipboard.writeText(JSON.stringify(documents, null, 2))
   }
 
@@ -147,11 +149,11 @@ export function useMongoCellActions({
     const tab = activeTab()
     if (!tab) return
 
-    const rootDocument = JSON.parse(JSON.stringify(tab.results[edit.rowIdx]))
+    const rootDocument = JSON.parse(JSON.stringify(holder().results[edit.rowIdx]))
     let target = rootDocument
     for (const key of drillPath()) target = target[key]
     target[edit.col] = editedValue(edit, gridDocs()[edit.rowIdx]?.[edit.col])
-    const filter = idFilter(tab.results[edit.rowIdx])
+    const filter = idFilter(holder().results[edit.rowIdx])
 
     try {
       await replaceDocument(
@@ -163,8 +165,8 @@ export function useMongoCellActions({
         { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
         { filter, projection: '{}', sort: '{}', skip: 0, limit: 1 },
       )
-      if (documents.length) tab.results.splice(edit.rowIdx, 1, markRaw(documents[0]))
-      else tab.results.splice(edit.rowIdx, 1)
+      if (documents.length) holder().results.splice(edit.rowIdx, 1, markRaw(documents[0]))
+      else holder().results.splice(edit.rowIdx, 1)
     } catch (error) {
       emit('crud-error', errText(error))
     }

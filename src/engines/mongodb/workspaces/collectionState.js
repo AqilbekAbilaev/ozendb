@@ -2,11 +2,6 @@
 // (engines/postgresql/workspaces/tableState.js): `state` is what the user built, as
 // JSON-only data a session saves; `ui` is this device's view of the tab; `runtime` is
 // what it fetched, rebuilt fresh and never saved.
-//
-// MongoDB-only code reads the nested state. `withFlatFields` stays because the shared
-// ResultTable (with useMongoCellActions, useDrillColumnOrder and the selection holder)
-// reads a flat result holder, which the shell and Current Operations also pass; the
-// definition's `hydrate` hook re-establishes the accessors after the lifecycle's clone.
 
 import { createSelection } from '../../../composables/useRowSelection'
 
@@ -67,34 +62,4 @@ export function migrateCollectionState(saved = {}) {
     return saved.state.v === COLLECTION_STATE_VERSION ? saved.state : createCollectionState()
   }
   return fromFlat(saved ?? {})
-}
-
-const QUERY_FIELDS = ['filter', 'projection', 'sort', 'skip', 'limit', 'pipeline', 'vqb', 'colOrder']
-const RUNTIME_FIELDS = ['results', 'hasRun', 'isRunning', 'runError', 'selectedRow', 'selectedRows', 'selectedField', 'elapsedMs']
-const UI_FIELDS = ['resultView']
-
-// `holder` returns the object the value actually lives on, so a nested path
-// (state.query) is as ordinary as a top-level one (runtime).
-function define(tab, name, holder, key) {
-  Object.defineProperty(tab, name, {
-    get() { return holder(this)[key] },
-    set(value) { holder(this)[key] = value },
-    // Enumerable, so `Object.keys(tab)` and `{ ...tab }` see exactly what they saw
-    // before the split — 26 files still do both. What a session writes is chosen by
-    // the definition's `serialize`, not by enumerability, so nothing duplicates on
-    // disk. Non-enumerable would be tidier and would silently change spread results.
-    enumerable: true,
-    configurable: true,
-  })
-}
-
-export function withFlatFields(tab) {
-  // A tab that has been through the lifecycle's clone still has its data but not its
-  // accessors; one built fresh has neither. Both arrive here, so this must be safe to
-  // apply twice — `configurable: true` is what makes that so.
-  if (!tab.state) return tab
-  for (const name of QUERY_FIELDS) define(tab, name, t => t.state.query, name)
-  for (const name of RUNTIME_FIELDS) define(tab, name, t => t.runtime, name)
-  for (const name of UI_FIELDS) define(tab, name, t => t.ui, name)
-  return tab
 }

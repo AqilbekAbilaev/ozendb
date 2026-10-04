@@ -40,30 +40,30 @@ describe('mongodb.find', () => {
   })
 
   it('applies the query-limit and result-view defaults', () => {
-    expect(created.fields.limit).toBe(25)
-    expect(created.fields.resultView).toBe('grid')
+    expect(created.fields.state.query.limit).toBe(25)
+    expect(created.fields.ui.resultView).toBe('grid')
   })
 
   it('falls back to the app defaults when none are supplied', () => {
     const bare = defFor('mongodb.find').create(ctx(COLLECTION))
-    expect(bare.fields.limit).toBe(50)
-    expect(bare.fields.resultView).toBe('table')
+    expect(bare.fields.state.query.limit).toBe(50)
+    expect(bare.fields.ui.resultView).toBe('table')
   })
 
   it('starts with empty editors and fresh result containers', () => {
-    expect(created.fields.filter).toBe('')
-    expect(created.fields.projection).toBe('')
-    expect(created.fields.sort).toBe('')
-    expect(created.fields.skip).toBe(0)
-    expect(created.fields.pipeline).toBe('')
-    expect(created.fields.vqb).toBe(null)
-    expect(created.fields.results).toEqual([])
-    expect(created.fields.hasRun).toBe(false)
-    expect(created.fields.isRunning).toBe(false)
-    expect(created.fields.runError).toBe(null)
-    expect(created.fields.selectedRow).toBe(-1)
-    expect(created.fields.selectedRows).toEqual([])
-    expect(created.fields.elapsedMs).toBe(null)
+    expect(created.fields.state.query.filter).toBe('')
+    expect(created.fields.state.query.projection).toBe('')
+    expect(created.fields.state.query.sort).toBe('')
+    expect(created.fields.state.query.skip).toBe(0)
+    expect(created.fields.state.query.pipeline).toBe('')
+    expect(created.fields.state.query.vqb).toBe(null)
+    expect(created.fields.runtime.results).toEqual([])
+    expect(created.fields.runtime.hasRun).toBe(false)
+    expect(created.fields.runtime.isRunning).toBe(false)
+    expect(created.fields.runtime.runError).toBe(null)
+    expect(created.fields.runtime.selectedRow).toBe(-1)
+    expect(created.fields.runtime.selectedRows).toEqual([])
+    expect(created.fields.runtime.elapsedMs).toBe(null)
   })
 
   it('carries the flat identity fields and a canonical collection target', () => {
@@ -85,7 +85,7 @@ describe('mongodb.aggregate', () => {
   it('is a collection workspace in aggregate mode with an empty pipeline', () => {
     expect(created.fields.kind).toBe('collection')
     expect(created.fields.mode).toBe('aggregate')
-    expect(created.fields.pipeline).toBe('')
+    expect(created.fields.state.query.pipeline).toBe('')
     expect(created.title).toBe('orders')
   })
 })
@@ -102,8 +102,8 @@ describe('mongodb.sql_to_mql', () => {
 
   it('shares the collection result spine', () => {
     expect(created.fields.kind).toBe('collection')
-    expect(created.fields.results).toEqual([])
-    expect(created.fields.resultView).toBe('table')
+    expect(created.fields.runtime.results).toEqual([])
+    expect(created.fields.ui.resultView).toBe('table')
   })
 })
 
@@ -152,8 +152,8 @@ describe('query definitions — no shared mutable state', () => {
   it('gives every creation fresh result, selection, history, and logs arrays', () => {
     const a = defFor('mongodb.find').create(ctx(COLLECTION))
     const b = defFor('mongodb.find').create(ctx(COLLECTION))
-    expect(a.fields.results).not.toBe(b.fields.results)
-    expect(a.fields.selectedRows).not.toBe(b.fields.selectedRows)
+    expect(a.fields.runtime.results).not.toBe(b.fields.runtime.results)
+    expect(a.fields.runtime.selectedRows).not.toBe(b.fields.runtime.selectedRows)
     const s1 = defFor('mongodb.shell').create(ctx(DATABASE))
     const s2 = defFor('mongodb.shell').create(ctx(DATABASE))
     expect(s1.fields.history).not.toBe(s2.fields.history)
@@ -191,20 +191,20 @@ describe('lifecycle — duplicate', () => {
 
   it('preserves query text exactly and resets runtime', () => {
     const dup = duplicateWorkspace(SOURCE)
-    expect(dup.filter).toBe('{ "a": 1 }')
-    expect(dup.projection).toBe('{ "a": 1 }')
-    expect(dup.sort).toBe('{ "a": -1 }')
-    expect(dup.skip).toBe(2)
-    expect(dup.limit).toBe(25)
+    expect(dup.state.query.filter).toBe('{ "a": 1 }')
+    expect(dup.state.query.projection).toBe('{ "a": 1 }')
+    expect(dup.state.query.sort).toBe('{ "a": -1 }')
+    expect(dup.state.query.skip).toBe(2)
+    expect(dup.state.query.limit).toBe(25)
     expect(dup.mode).toBe('find')
-    expect(dup.resultView).toBe('tree')
-    expect(dup.results).toEqual([])
-    expect(dup.hasRun).toBe(false)
-    expect(dup.isRunning).toBe(false)
-    expect(dup.runError).toBe(null)
-    expect(dup.selectedRow).toBe(-1)
-    expect(dup.selectedRows).toEqual([])
-    expect(dup.elapsedMs).toBe(null)
+    expect(dup.ui.resultView).toBe('tree')
+    expect(dup.runtime.results).toEqual([])
+    expect(dup.runtime.hasRun).toBe(false)
+    expect(dup.runtime.isRunning).toBe(false)
+    expect(dup.runtime.runError).toBe(null)
+    expect(dup.runtime.selectedRow).toBe(-1)
+    expect(dup.runtime.selectedRows).toEqual([])
+    expect(dup.runtime.elapsedMs).toBe(null)
   })
 
   it('receives the initial-run marker so its workspace runs it once', () => {
@@ -214,10 +214,10 @@ describe('lifecycle — duplicate', () => {
 
   it('detaches nested VQB and column-order state', () => {
     const dup = duplicateWorkspace(SOURCE)
-    expect(dup.vqb).not.toBe(SOURCE.vqb)
-    expect(dup.colOrder).not.toBe(SOURCE.colOrder)
-    dup.vqb.rows.push(2)
-    dup.colOrder.a = 9
+    expect(dup.state.query.vqb).not.toBe(SOURCE.vqb)
+    expect(dup.state.query.colOrder).not.toBe(SOURCE.colOrder)
+    dup.state.query.vqb.rows.push(2)
+    dup.state.query.colOrder.a = 9
     expect(SOURCE.vqb.rows).toEqual([1])
     expect(SOURCE.colOrder.a).toBe(0)
   })
@@ -232,9 +232,9 @@ describe('lifecycle — duplicate', () => {
     expect(sql.needsInitialRun).toBeUndefined()
     expect(sql.sql).toBe('SELECT * FROM orders')
     expect(sql.sqlError).toBe(null)
-    expect(sql.filter).toBe('')
-    expect(sql.projection).toBe('')
-    expect(sql.pipeline).toBe('')
+    expect(sql.state.query.filter).toBe('')
+    expect(sql.state.query.projection).toBe('')
+    expect(sql.state.query.pipeline).toBe('')
   })
 
   it('shell duplicate clones code but gets a fresh session and cleared output', () => {
@@ -274,22 +274,22 @@ describe('lifecycle — restore', () => {
 
   it('find restores editor state with fresh runtime and the one-shot marker', () => {
     const tab = restoreWorkspace(savedFind)
-    expect(tab.filter).toBe('{ "a": 1 }')
-    expect(tab.sort).toBe('{ "a": -1 }')
-    expect(tab.skip).toBe(2)
-    expect(tab.limit).toBe(25)
-    expect(tab.resultView).toBe('json')
+    expect(tab.state.query.filter).toBe('{ "a": 1 }')
+    expect(tab.state.query.sort).toBe('{ "a": -1 }')
+    expect(tab.state.query.skip).toBe(2)
+    expect(tab.state.query.limit).toBe(25)
+    expect(tab.ui.resultView).toBe('json')
     expect(tab.needsInitialRun).toBe(true)
-    expect(tab.results).toEqual([])
-    expect(tab.hasRun).toBe(false)
-    expect(tab.elapsedMs).toBe(null)
+    expect(tab.runtime.results).toEqual([])
+    expect(tab.runtime.hasRun).toBe(false)
+    expect(tab.runtime.elapsedMs).toBe(null)
     expect(tab.id).toBe('r1')
   })
 
   it('aggregate restores its pipeline and does not run', () => {
     const tab = restoreWorkspace({ ...savedFind, id: 'a', mode: 'aggregate', pipeline: '[{ "$match": {} }]' })
     expect(tab.mode).toBe('aggregate')
-    expect(tab.pipeline).toBe('[{ "$match": {} }]')
+    expect(tab.state.query.pipeline).toBe('[{ "$match": {} }]')
     expect(tab.needsInitialRun).toBeUndefined()
   })
 
@@ -298,9 +298,9 @@ describe('lifecycle — restore', () => {
     expect(tab.mode).toBe('sql')
     expect(tab.sql).toBe('SELECT 1')
     expect(tab.sqlError).toBe(null)
-    expect(tab.filter).toBe('')
-    expect(tab.projection).toBe('')
-    expect(tab.pipeline).toBe('')
+    expect(tab.state.query.filter).toBe('')
+    expect(tab.state.query.projection).toBe('')
+    expect(tab.state.query.pipeline).toBe('')
     expect(tab.readOnly).toBe(true)
     expect(tab.needsInitialRun).toBeUndefined()
   })

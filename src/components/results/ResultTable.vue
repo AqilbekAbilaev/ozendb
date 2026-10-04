@@ -23,7 +23,10 @@ const props = defineProps({
   // Read-only grid (IntelliShell, Current Operations): no inline cell editing; drill-down still works.
   readonly:  { type: Boolean, default: false },
   rowClass:  { type: Function, default: null },  // extra per-row class, by row index
+  holder:      { type: Object, default: null },  // results + selection (a MongoDB tab's runtime); else the tab
+  orderHolder: { type: Object, default: null },  // column order (a MongoDB tab's query state); else the tab
 })
+const held = () => props.holder ?? props.activeTab
 
 // The drag-to-VQB outputs (`vqb-drop`, `dragged-field`, `drag-over-section`) are
 // consumed by VisualQueryBuilder, which lives beside this grid in ResultsPanel, so they
@@ -97,7 +100,7 @@ const {
 })
 
 // ── row / cell selection ──────────────────────────────
-const rowSelection = useRowSelection({ activeTab: () => props.activeTab })
+const rowSelection = useRowSelection({ activeTab: held })
 const { selectedCol, anchorRow, isRowSelected } = rowSelection
 
 const cells = useGridCells({ rows: rowSelection, suppressNextClick })
@@ -108,6 +111,7 @@ const {
   startInlineEdit, commitInlineEdit, cancelInlineEdit, openCellDrill, goToDrillLevel,
 } = useMongoCellActions({
   activeTab:  () => props.activeTab,
+  holder:     held,
   drillPath:  () => props.drillPath,
   readonly:   () => props.readonly,
   gridDocs:   () => gridDocs.value,
@@ -127,18 +131,14 @@ watch(() => props.activeTab?.id, () => {
   anchorRow.value = -1
 })
 
-// the "documents" the grid currently renders: either the real result set, or
-// (once drilled) every document's value at the drilled path — one row per
-// original document is kept, so documents missing that path just render blank
-// instead of collapsing the grid down to a single row
-// Cached once per render. The template reads these many times (the column list is
-// referenced once per row), so computing them as plain functions made rendering a
-// 200-document result O(rows²); memoizing keeps the draw fast.
+// The rows the grid renders: the results, or once drilled each document's value at the
+// path (one row per document, so a missing path renders blank rather than vanishing).
+// Memoized: the template reads it per row, and recomputing made 200 rows O(rows²).
 const gridDocs = computed(() => {
-  const tab = props.activeTab
-  if (!tab) return []
-  if (!props.drillPath.length) return tab.results || []
-  return (tab.results || []).map((doc) => {
+  const results = held()?.results
+  if (!results) return []
+  if (!props.drillPath.length) return results
+  return results.map((doc) => {
     const val = getAtPath(doc, props.drillPath) ?? {}
     if (Array.isArray(val)) {
       const obj = {}
@@ -157,7 +157,7 @@ const gridDocs = computed(() => {
 const derivedColumns = computed(() => columns(gridDocs.value))
 
 const { gridColumns, moveColumn } = useDrillColumnOrder({
-  activeTab: () => props.activeTab, drillPath: () => props.drillPath, derivedColumns,
+  activeTab: () => props.orderHolder ?? props.activeTab, drillPath: () => props.drillPath, derivedColumns,
 })
 const {
   onHeaderMouseDown,
@@ -216,7 +216,7 @@ const {
   onActivate: scrollToMatch,   // next/prev: scroll the active match into view
   onApply:    scrollToMatch,   // query settled: jump to the first match
   debounce:   150,
-  resetOn:    () => props.activeTab?.results,
+  resetOn:    () => held()?.results,
 })
 
 // Flat list of all matches: { row, col } for every cell whose display text contains
@@ -260,7 +260,7 @@ const { virtualRows, padTop, padBottom, remeasure, scrollToRow } = useRowVirtual
 })
 
 useResultKeyboard({
-  selection: () => props.activeTab, rows: rowSelection, cellCtx, copySelection, tableRef, gridWrapRef,
+  selection: held, rows: rowSelection, cellCtx, copySelection, tableRef, gridWrapRef,
   rowCount: () => gridDocs.value.length, columns: () => gridColumns.value, editing: () => !!inlineEdit.value,
   onPaste: () => emit('paste-documents'), scrollToRow: scrollToRow,
 })
@@ -270,18 +270,16 @@ onMounted(remeasure)
 // tab switch). An inline edit splices `results` in place — same array reference — so it
 // deliberately does NOT reset the scroll. flush:'post' re-measures the row height once
 // the fresh rows are on screen.
-watch([() => props.activeTab?.id, () => props.activeTab?.results, () => props.drillPath],
+watch([() => props.activeTab?.id, () => held()?.results, () => props.drillPath],
   () => {
     if (gridWrapRef.value) gridWrapRef.value.scrollTop = 0
     remeasure()
-    // The row set just changed (requery/drill/tab switch): drop any multi-row selection,
-    // whose indices may no longer line up, collapsing back to the single active row so we
-    // never carry stale indices into a copy/delete.
-    const tab = props.activeTab
-    if (tab) {
-      tab.selectedRows = tab.selectedRow >= 0 ? [tab.selectedRow] : []
-      anchorRow.value = tab.selectedRow ?? -1
-    }
+    // The row set just changed: collapse to the single active row, so stale multi-row
+    // indices never reach a copy/delete.
+    const selection = held()
+    if (!selection) return
+    selection.selectedRows = selection.selectedRow >= 0 ? [selection.selectedRow] : []
+    anchorRow.value = selection.selectedRow ?? -1
   }, { flush: 'post' })
 
 </script>
@@ -313,7 +311,7 @@ watch([() => props.activeTab?.id, () => props.activeTab?.results, () => props.dr
     </div>
     <div class="grid-wrap" ref="gridWrapRef">
     <div class="grid-scroll">
-    <template v-if="!activeTab.hasRun || activeTab.isRunning">
+    <template v-if="!held().hasRun || held().isRunning">
       <table class="grid">
         <thead><tr>
           <th class="rownum"></th>
@@ -323,7 +321,7 @@ watch([() => props.activeTab?.id, () => props.activeTab?.results, () => props.dr
       </table>
       <div class="empty-rows"><div class="empty-rows-gutter"></div></div>
     </template>
-    <template v-else-if="activeTab.results?.length === 0">
+    <template v-else-if="held().results?.length === 0">
       <table class="grid">
         <thead><tr>
           <th class="rownum"></th>
@@ -373,7 +371,7 @@ watch([() => props.activeTab?.id, () => props.activeTab?.results, () => props.dr
               v-for="cell in cellData[vrow.index]"
               :key="cell.col"
               :data-match="searchOpen && isMatchCell(vrow.index, cell.col) ? vrow.index + ',' + cell.col : undefined"
-              :class="{ selcell: activeTab.selectedRow === vrow.index && selectedCol === cell.col, drillable: cell.drillable, 'search-match': isMatchCell(vrow.index, cell.col), 'search-active': searchOpen && searchMatches[searchIdx]?.row === vrow.index && searchMatches[searchIdx]?.col === cell.col }"
+              :class="{ selcell: held().selectedRow === vrow.index && selectedCol === cell.col, drillable: cell.drillable, 'search-match': isMatchCell(vrow.index, cell.col), 'search-active': searchOpen && searchMatches[searchIdx]?.row === vrow.index && searchMatches[searchIdx]?.col === cell.col }"
               @mousedown="onCellMouseDown($event, cell.col, cell.display)"
               @click.stop="onCellClick($event, vrow.index, cell.col)"
               @dblclick.stop="cell.drillable ? openCellDrill(vrow.index, cell.col) : startInlineEdit(vrow.index, cell.col)"
