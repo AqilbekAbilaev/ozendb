@@ -423,3 +423,38 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
     expect(deriveMenuContext({ ...mongoTab, engine: 'mysql' }, null, 1).engine).toBe('none')
   })
 })
+
+// ozendb-7dz: a write action aimed at the sidebar selection must respect the lock of an
+// open tab on that same resource, not only the active tab's.
+describe('deriveMenuContext read-only for a sidebar target', () => {
+  const app = { ...quickstart, engine: 'app' }
+  const orders = { connectionId: 'c1', segments: [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }] }
+  const users = { connectionId: 'c1', segments: [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'users' }] }
+  const widgets = {
+    connectionId: 'c1',
+    segments: [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'widgets' }],
+  }
+  const ordersSel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+  const widgetsSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
+
+  it('locks when an open tab on the selected collection is locked', () => {
+    const locked = { id: 'x', target: orders, readOnly: true }
+    expect(deriveMenuContext(app, ordersSel, 1, false, false, [app, locked]).readOnly).toBe(true)
+  })
+
+  it('locks when an open PostgreSQL tab on the selected table is locked', () => {
+    const locked = { id: 'p', target: widgets, state: { readOnly: true } }
+    expect(deriveMenuContext(app, widgetsSel, 1, false, false, [app, locked]).readOnly).toBe(true)
+  })
+
+  it('stays unlocked when the selected resource has no locked tab', () => {
+    const unlocked = { id: 'x', target: orders, readOnly: false }
+    const lockedElsewhere = { id: 'y', target: users, readOnly: true }
+    expect(deriveMenuContext(app, ordersSel, 1, false, false, [app, unlocked, lockedElsewhere]).readOnly).toBe(false)
+  })
+
+  it('ignores open tabs when nothing is selected', () => {
+    const locked = { id: 'x', target: orders, readOnly: true }
+    expect(deriveMenuContext(app, null, 1, false, false, [app, locked]).readOnly).toBe(false)
+  })
+})
