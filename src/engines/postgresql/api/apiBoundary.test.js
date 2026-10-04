@@ -14,6 +14,8 @@ const POSTGRES_COMMANDS = [
   'create_pg_schema', 'drop_pg_schema', 'create_pg_table', 'drop_pg_table', 'rename_pg_table',
   // library.js
   'list_pg_history', 'push_pg_history', 'clear_pg_history', 'list_pg_saved', 'save_pg_query', 'delete_pg_saved',
+  // transfer.js
+  'export_pg_data',
 ]
 
 function walk(dir, files = []) {
