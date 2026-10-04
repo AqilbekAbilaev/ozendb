@@ -3,12 +3,10 @@
 // JSON-only data a session saves; `ui` is this device's view of the tab; `runtime` is
 // what it fetched, rebuilt fresh and never saved.
 //
-// The flat field names (tab.filter, tab.results, …) are what ~300 call sites still
-// read, so `withFlatFields` keeps them working as accessors onto the nested state —
-// one value under two names, rather than two copies that drift. They are
-// non-enumerable, so serializing a tab writes the nested state alone, and the
-// definition's `hydrate` hook re-establishes them after the lifecycle's deep clone.
-// Migrating those call sites and deleting the accessors is the rest of this work.
+// MongoDB-only code reads the nested state. `withFlatFields` stays because the shared
+// ResultTable (with useMongoCellActions, useDrillColumnOrder and the selection holder)
+// reads a flat result holder, which the shell and Current Operations also pass; the
+// definition's `hydrate` hook re-establishes the accessors after the lifecycle's clone.
 
 import { createSelection } from '../../../composables/useRowSelection'
 
