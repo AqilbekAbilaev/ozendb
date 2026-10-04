@@ -91,7 +91,10 @@ function onContext(e, level, label, extra = {}) {
   contextMenu.value = { type: 'pg:' + level, x: e.clientX, y: e.clientY, label, nodeData: node, items: PG_MENUS[level] }
 }
 
+// The opened tab now names the table, so drop the selection the preceding click set:
+// left behind, it would outrank the active tab in the menu after a keyboard tab switch.
 function openTable(schema, table) {
+  setTreeSelection(null)
   openPostgresTable({
     connectionId: props.conn.id,
     connectionName: props.conn.name,
