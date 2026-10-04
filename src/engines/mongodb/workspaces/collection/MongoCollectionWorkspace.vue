@@ -49,15 +49,15 @@ const parsedQuery = computed(() => {
   const tab = activeTab.value
   if (!tab || tab.kind !== 'collection') return null
   return {
-    filter:     parseField(tab.filter),
-    projection: parseField(tab.projection),
-    sort:       parseField(tab.sort),
+    filter:     parseField(tab.state.query.filter),
+    projection: parseField(tab.state.query.projection),
+    sort:       parseField(tab.state.query.sort),
   }
 })
 const parsedPipeline = computed(() => {
   const tab = activeTab.value
   if (!tab || tab.kind !== 'collection') return null
-  return parsePipeline(tab.pipeline)
+  return parsePipeline(tab.state.query.pipeline)
 })
 const queryValid = computed(() => {
   const p = parsedQuery.value
@@ -116,7 +116,7 @@ async function runSql(tab = activeTab.value) {
 
 function runAggregate(tab = activeTab.value) {
   if (!tab || tab.kind !== 'collection') return
-  const parsed = parsePipeline(tab.pipeline)
+  const parsed = parsePipeline(tab.state.query.pipeline)
   if (!parsed || !parsed.ok) return  // inline error is already shown
   emit('run-aggregate', tab.id, { pipeline: parsed.ejson })
   // Keep the Explain plan in sync when it's the visible sub-tab.
@@ -127,17 +127,17 @@ function runQuery(addToHistory = true, tab = activeTab.value) {
   if (!tab || tab.kind !== 'collection') return
   expandIdFilter(tab)
   const parsed = {
-    filter: parseField(tab.filter),
-    projection: parseField(tab.projection),
-    sort: parseField(tab.sort),
+    filter: parseField(tab.state.query.filter),
+    projection: parseField(tab.state.query.projection),
+    sort: parseField(tab.state.query.sort),
   }
   if (!parsed || !parsed.filter.ok || !parsed.projection.ok || !parsed.sort.ok) return
   emit('run-query', tab.id, {
     filter:        parsed.filter.ejson,
     projection:    parsed.projection.ejson,
     sort:          parsed.sort.ejson,
-    skip:          tab.skip || 0,
-    limit:         tab.limit || 50,
+    skip:          tab.state.query.skip || 0,
+    limit:         tab.state.query.limit || 50,
     addToHistory:  addToHistory,
   })
   // Keep the Explain plan in sync when it's the visible sub-tab.
@@ -164,7 +164,7 @@ async function runExplain(tab = activeTab.value) {
   // Aggregate tabs explain their pipeline; find tabs explain the find query. Explaining
   // a find({}) on an aggregate tab (the old behavior) was silently misleading.
   if (tab.mode === 'aggregate') {
-    const parsed = parsePipeline(tab.pipeline)
+    const parsed = parsePipeline(tab.state.query.pipeline)
     if (!parsed || !parsed.ok) {
       tab.explainError = 'Fix the pipeline before running Explain.'
       tab.explainResult = null
@@ -192,9 +192,9 @@ async function runExplain(tab = activeTab.value) {
   }
 
   const parsed = {
-    filter: parseField(tab.filter),
-    projection: parseField(tab.projection),
-    sort: parseField(tab.sort),
+    filter: parseField(tab.state.query.filter),
+    projection: parseField(tab.state.query.projection),
+    sort: parseField(tab.state.query.sort),
   }
   if (!parsed || !parsed.filter.ok || !parsed.projection.ok || !parsed.sort.ok) {
     tab.explainError = 'Fix the query before running Explain.'
@@ -211,8 +211,8 @@ async function runExplain(tab = activeTab.value) {
         filter:     parsed.filter.ejson,
         projection: parsed.projection.ejson,
         sort:       parsed.sort.ejson,
-        skip:       tab.skip || 0,
-        limit:      tab.limit || 50,
+        skip:       tab.state.query.skip || 0,
+        limit:      tab.state.query.limit || 50,
       },
       verbosity,
     )
@@ -253,9 +253,9 @@ function onExplainVerbosity(v) {
 // keystroke) so the field stays a plain text input — rewriting its value on input is
 // what defeats the browser's native undo/redo.
 function expandIdFilter(tab) {
-  const v = (tab.filter || '').trim()
+  const v = (tab.state.query.filter || '').trim()
   if (/^[0-9a-fA-F]{24}$/.test(v)) {
-    tab.filter = `{ _id: ObjectId("${v}") }`
+    tab.state.query.filter = `{ _id: ObjectId("${v}") }`
   }
 }
 
@@ -264,14 +264,14 @@ async function applyFromBrowser(entry) {
   if (!tab) return
   if (entry.mode === 'aggregate') {
     setCollectionQueryMode(tab, 'aggregate')
-    tab.pipeline = entry.pipeline
+    tab.state.query.pipeline = entry.pipeline
   } else {
     setCollectionQueryMode(tab, 'find')
-    tab.filter     = entry.filter
-    tab.sort       = entry.sort
-    tab.projection = entry.projection
-    tab.skip       = Number(entry.skip)
-    tab.limit      = Number(entry.limit)
+    tab.state.query.filter     = entry.filter
+    tab.state.query.sort       = entry.sort
+    tab.state.query.projection = entry.projection
+    tab.state.query.skip       = Number(entry.skip)
+    tab.state.query.limit      = Number(entry.limit)
   }
   await nextTick()
   run(tab)

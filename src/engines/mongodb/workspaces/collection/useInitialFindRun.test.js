@@ -7,11 +7,9 @@ function restoredFind(fields = {}) {
     id: 'find-1',
     type: 'mongodb.find',
     needsInitialRun: true,
-    filter: '{ status: "open" }',
-    projection: '{ name: 1 }',
-    sort: '{ createdAt: -1 }',
-    skip: '2',
-    limit: '25',
+    state: {
+      query: { filter: '{ status: "open" }', projection: '{ name: 1 }', sort: '{ createdAt: -1 }', skip: '2', limit: '25' },
+    },
     ...fields,
   }
 }
@@ -66,11 +64,7 @@ describe('useInitialFindRun', () => {
 
   it('preserves restored-query fallback parsing', () => {
     const workspace = restoredFind({
-      filter: '{',
-      projection: 'not valid',
-      sort: '[',
-      skip: null,
-      limit: undefined,
+      state: { query: { filter: '{', projection: 'not valid', sort: '[', skip: null, limit: undefined } },
     })
     const runQuery = vi.fn()
 
