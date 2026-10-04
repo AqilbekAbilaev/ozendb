@@ -124,6 +124,56 @@ pub fn item_enabled(gate: Gate, is_write: bool, context: &MenuContext) -> bool {
     gate_enabled(gate, context) && (!is_write || !context.read_only)
 }
 
+// The engine whose items the menu shows (ozendb-izk); `None` shows everything.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum MenuEngine {
+    MongoDb,
+    Postgres,
+}
+
+// Read off the gate rather than tagged per item: a Mongo-shaped gate can never
+// enable on a PostgreSQL target and vice versa, so hiding stays exactly "the items
+// that would be dead here" and can't drift from the gating.
+pub fn gate_engine(gate: Gate) -> Option<MenuEngine> {
+    match gate {
+        Gate::Connection | Gate::Database | Gate::Collection | Gate::Document | Gate::DocumentField | Gate::Index => {
+            Some(MenuEngine::MongoDb)
+        }
+        Gate::PgSchema | Gate::PgTable => Some(MenuEngine::Postgres),
+        Gate::AnyConnection | Gate::RefreshableTab => None,
+    }
+}
+
+// `menus()` minus the other engine's items, with separators re-tidied and any
+// submenu left empty dropped.
+pub fn menus_for(engine: Option<MenuEngine>) -> Vec<(&'static str, Vec<Spec>)> {
+    let mut result = Vec::new();
+    for (name, specs) in menus() {
+        let mut kept: Vec<Spec> = Vec::new();
+        for spec in specs {
+            let item_engine = match &spec {
+                Spec::Action { gate: Some(gate), .. } => gate_engine(*gate),
+                _ => None,
+            };
+            if engine.is_some() && item_engine.is_some() && item_engine != engine {
+                continue;
+            }
+            let is_separator = matches!(spec, Spec::Separator);
+            if is_separator && matches!(kept.last(), None | Some(Spec::Separator)) {
+                continue;
+            }
+            kept.push(spec);
+        }
+        if matches!(kept.last(), Some(Spec::Separator)) {
+            kept.pop();
+        }
+        if !kept.is_empty() {
+            result.push((name, kept));
+        }
+    }
+    result
+}
+
 // One row in a submenu.
 pub enum Spec {
     // A working item wired to a frontend handler. `gate: None` means always

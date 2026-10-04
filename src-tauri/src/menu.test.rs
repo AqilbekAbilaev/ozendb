@@ -361,3 +361,81 @@ fn gate_of(id: &str) -> Gate {
         None => panic!("expected {id} to be a gated action"),
     }
 }
+
+// ozendb-izk: each engine sees only its own items, derived from the gates.
+
+fn ids_and_names(engine: Option<MenuEngine>) -> (Vec<&'static str>, Vec<&'static str>) {
+    let mut names = Vec::new();
+    let mut ids = Vec::new();
+    for (name, specs) in menus_for(engine) {
+        names.push(name);
+        for spec in specs {
+            match spec {
+                Spec::Action { id, .. } | Spec::Placeholder { id, .. } => ids.push(id),
+                Spec::Separator => {}
+            }
+        }
+    }
+    (names, ids)
+}
+
+#[test]
+fn gate_engine_maps_each_gate_to_its_engine() {
+    for gate in [Gate::Connection, Gate::Database, Gate::Collection, Gate::Document, Gate::DocumentField, Gate::Index] {
+        assert_eq!(gate_engine(gate), Some(MenuEngine::MongoDb), "{gate:?}");
+    }
+    for gate in [Gate::PgSchema, Gate::PgTable] {
+        assert_eq!(gate_engine(gate), Some(MenuEngine::Postgres), "{gate:?}");
+    }
+    for gate in [Gate::AnyConnection, Gate::RefreshableTab] {
+        assert_eq!(gate_engine(gate), None, "{gate:?} should be engine-neutral");
+    }
+}
+
+#[test]
+fn no_engine_keeps_the_full_menu() {
+    let (all_names, all_ids) = ids_and_names(None);
+    let full_names: Vec<&str> = menus().into_iter().map(|(name, _)| name).collect();
+    assert_eq!(all_names, full_names);
+    assert!(all_ids.contains(&"coll:drop"));
+    assert!(all_ids.contains(&"pg:drop_table"));
+}
+
+#[test]
+fn postgres_hides_every_mongodb_item_and_menu() {
+    let (names, ids) = ids_and_names(Some(MenuEngine::Postgres));
+    assert_eq!(names, vec!["File", "Edit", "PostgreSQL", "View", "Help"]);
+    for id in &ids {
+        let gate = gate_of_opt(id);
+        assert!(gate.map(gate_engine) != Some(Some(MenuEngine::MongoDb)), "{id} is MongoDB-only");
+    }
+    for id in ["file:connect", "file:exit", "edit:preferences", "view:refresh", "view:refresh_all", "pg:drop_table"] {
+        assert!(ids.contains(&id), "{id} should survive on PostgreSQL");
+    }
+}
+
+#[test]
+fn mongodb_hides_the_postgresql_menu() {
+    let (names, ids) = ids_and_names(Some(MenuEngine::MongoDb));
+    assert!(!names.contains(&"PostgreSQL"));
+    assert!(!ids.iter().any(|id| id.starts_with("pg:")));
+    assert!(ids.contains(&"coll:drop"));
+    assert!(ids.contains(&"file:connect"));
+}
+
+#[test]
+fn filtered_menus_never_leave_an_empty_menu_or_stray_separator() {
+    for engine in [None, Some(MenuEngine::MongoDb), Some(MenuEngine::Postgres)] {
+        for (name, specs) in menus_for(engine) {
+            assert!(specs.iter().any(|s| !matches!(s, Spec::Separator)), "{name} is empty for {engine:?}");
+            assert!(!matches!(specs.first(), Some(Spec::Separator)), "{name} starts with a separator for {engine:?}");
+            assert!(!matches!(specs.last(), Some(Spec::Separator)), "{name} ends with a separator for {engine:?}");
+            for pair in specs.windows(2) {
+                assert!(
+                    !(matches!(pair[0], Spec::Separator) && matches!(pair[1], Spec::Separator)),
+                    "{name} has adjacent separators for {engine:?}"
+                );
+            }
+        }
+    }
+}
