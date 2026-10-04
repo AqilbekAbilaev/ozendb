@@ -124,11 +124,20 @@ pub fn item_enabled(gate: Gate, is_write: bool, context: &MenuContext) -> bool {
     gate_enabled(gate, context) && (!is_write || !context.read_only)
 }
 
-// The engine whose items the menu shows (ozendb-izk); `None` shows everything.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum MenuEngine {
     MongoDb,
     Postgres,
+}
+
+// Which engine-specific items the menu shows (ozendb-izk). `All` is for a live
+// sidebar selection and tab that disagree, where hiding either half would hide
+// items that can still enable.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum MenuScope {
+    All,
+    Neutral,
+    Engine(MenuEngine),
 }
 
 // Read off the gate rather than tagged per item: a Mongo-shaped gate can never
@@ -144,19 +153,20 @@ pub fn gate_engine(gate: Gate) -> Option<MenuEngine> {
     }
 }
 
-// The frontend's workspace `engine` id. Anything else (the Quickstart tab's 'app',
-// nothing selected) shows the full menu.
-pub fn menu_engine_from_id(id: Option<&str>) -> Option<MenuEngine> {
+// The frontend's `engine` (see menuContext.js). An id this build doesn't know never
+// hides anything.
+pub fn menu_scope_from_id(id: Option<&str>) -> MenuScope {
     match id {
-        Some("mongodb") => Some(MenuEngine::MongoDb),
-        Some("postgresql") => Some(MenuEngine::Postgres),
-        _ => None,
+        Some("mongodb") => MenuScope::Engine(MenuEngine::MongoDb),
+        Some("postgresql") => MenuScope::Engine(MenuEngine::Postgres),
+        Some("none") => MenuScope::Neutral,
+        _ => MenuScope::All,
     }
 }
 
-// `menus()` minus the other engine's items, with separators re-tidied and any
+// `menus()` minus the items outside `scope`, with separators re-tidied and any
 // submenu left empty dropped.
-pub fn menus_for(engine: Option<MenuEngine>) -> Vec<(&'static str, Vec<Spec>)> {
+pub fn menus_for(scope: MenuScope) -> Vec<(&'static str, Vec<Spec>)> {
     let mut result = Vec::new();
     for (name, specs) in menus() {
         let mut kept: Vec<Spec> = Vec::new();
@@ -165,7 +175,12 @@ pub fn menus_for(engine: Option<MenuEngine>) -> Vec<(&'static str, Vec<Spec>)> {
                 Spec::Action { gate: Some(gate), .. } => gate_engine(*gate),
                 _ => None,
             };
-            if engine.is_some() && item_engine.is_some() && item_engine != engine {
+            let shown = match (scope, item_engine) {
+                (_, None) | (MenuScope::All, _) => true,
+                (MenuScope::Neutral, Some(_)) => false,
+                (MenuScope::Engine(engine), Some(item)) => item == engine,
+            };
+            if !shown {
                 continue;
             }
             let is_separator = matches!(spec, Spec::Separator);
@@ -249,10 +264,10 @@ pub fn set_menu_context(
         Ok(val) => val,
         Err(e) => return Err(e.to_string()),
     };
-    let engine = menu_engine_from_id(engine.as_deref());
-    if engine != state.engine {
+    let scope = menu_scope_from_id(engine.as_deref());
+    if scope != state.scope {
         let overrides = app.state::<crate::keybindings::KeybindingStorage>().load();
-        let (native_menu, gated) = match build(&app, &overrides, engine) {
+        let (native_menu, gated) = match build(&app, &overrides, scope) {
             Ok(val) => val,
             Err(e) => return Err(e.to_string()),
         };
@@ -260,7 +275,7 @@ pub fn set_menu_context(
             Ok(val) => val,
             Err(e) => return Err(e),
         };
-        state.engine = engine;
+        state.scope = scope;
         state.gated = gated;
     }
     for (item, gate, is_write) in state.gated.iter() {

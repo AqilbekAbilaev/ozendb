@@ -1,4 +1,4 @@
-use super::{is_write_action, menus_for, Gate, MenuEngine, Spec};
+use super::{is_write_action, menus_for, Gate, MenuScope, Spec};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{
@@ -8,11 +8,11 @@ use tauri::{
 
 // Managed state: the gated items, their gate, and whether they are write actions
 // (so `set_menu_context` can also disable them under the read-only lock), plus the
-// engine the live menu was built for, so a rebuild happens only when it changes.
+// scope the live menu was built for, so a rebuild happens only when it changes.
 pub struct MenuItems(pub Mutex<MenuState>);
 
 pub struct MenuState {
-    pub engine: Option<MenuEngine>,
+    pub scope: MenuScope,
     pub gated: Vec<(MenuItem<Wry>, Gate, bool)>,
 }
 
@@ -234,7 +234,7 @@ fn build_app_menu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
 pub fn build(
     app: &AppHandle,
     overrides: &HashMap<String, String>,
-    engine: Option<MenuEngine>,
+    scope: MenuScope,
 ) -> tauri::Result<(Menu<Wry>, Vec<(MenuItem<Wry>, Gate, bool)>)> {
     let menu = match Menu::new(app) {
         Ok(val) => val,
@@ -254,7 +254,7 @@ pub fn build(
         };
     }
 
-    for (name, specs) in menus_for(engine).iter() {
+    for (name, specs) in menus_for(scope).iter() {
         let submenu = match build_submenu(app, name, specs, overrides, &mut gated) {
             Ok(val) => val,
             Err(e) => return Err(e),

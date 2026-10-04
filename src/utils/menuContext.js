@@ -45,17 +45,16 @@ function mongoResource(source, ref) {
 // The engines the native menu has items of its own for (menu.rs's MenuEngine).
 const MENU_ENGINES = ['mongodb', 'postgresql']
 
-// Which engine's items the menu shows (ozendb-izk). Hiding must only ever drop items
-// that could not enable anyway, so a sidebar selection counts only when it enables
-// something (a PostgreSQL row above a schema enables nothing), and when a live
-// selection and the tab name different engines both halves stay. Null keeps the
-// full menu.
+// Which engine's items the menu shows (ozendb-izk): 'none' hides both (Quickstart,
+// nothing selected). A sidebar selection counts only when it enables something (a
+// PostgreSQL row above a schema enables nothing), and when a live selection and the
+// tab name different engines, null keeps both halves rather than hide live items.
 function menuEngine(tab, selDepth, pgSelDepth) {
   const tabEngine = MENU_ENGINES.includes(tab?.engine) ? tab.engine : null
   let selEngine = null
   if (selDepth >= 0) selEngine = 'mongodb'
   else if (pgSelDepth >= PG_DEPTH.schema) selEngine = 'postgresql'
-  if (!selEngine) return tabEngine
+  if (!selEngine) return tabEngine ?? 'none'
   return !tabEngine || tabEngine === selEngine ? selEngine : null
 }
 

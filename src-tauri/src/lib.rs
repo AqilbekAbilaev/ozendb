@@ -184,9 +184,10 @@ pub fn run() {
             // Custom shortcut accelerators (empty = built-in defaults). Read here so
             // the native menu is built with the user's bindings; a rebind made later
             // takes effect on the next launch or the next engine switch's rebuild.
-            // Built for no engine (everything shown) until the frontend reports one.
+            // Neutral until the frontend reports a scope: launch shows Quickstart, and
+            // building the full menu first would flash it.
             let key_overrides = app.state::<KeybindingStorage>().load();
-            let (native_menu, gated_items) = match menu::build(app.handle(), &key_overrides, None) {
+            let (native_menu, gated_items) = match menu::build(app.handle(), &key_overrides, menu::MenuScope::Neutral) {
                 Ok(val) => val,
                 Err(e) => return Err(e.into()),
             };
@@ -195,7 +196,7 @@ pub fn run() {
                 Err(e) => return Err(e.into()),
             };
             app.manage(menu::MenuItems(std::sync::Mutex::new(menu::MenuState {
-                engine: None,
+                scope: menu::MenuScope::Neutral,
                 gated: gated_items,
             })));
             app.on_menu_event(menu::handle_event);

@@ -364,10 +364,10 @@ fn gate_of(id: &str) -> Gate {
 
 // ozendb-izk: each engine sees only its own items, derived from the gates.
 
-fn ids_and_names(engine: Option<MenuEngine>) -> (Vec<&'static str>, Vec<&'static str>) {
+fn ids_and_names(scope: MenuScope) -> (Vec<&'static str>, Vec<&'static str>) {
     let mut names = Vec::new();
     let mut ids = Vec::new();
-    for (name, specs) in menus_for(engine) {
+    for (name, specs) in menus_for(scope) {
         names.push(name);
         for spec in specs {
             match spec {
@@ -393,8 +393,8 @@ fn gate_engine_maps_each_gate_to_its_engine() {
 }
 
 #[test]
-fn no_engine_keeps_the_full_menu() {
-    let (all_names, all_ids) = ids_and_names(None);
+fn all_scope_keeps_the_full_menu() {
+    let (all_names, all_ids) = ids_and_names(MenuScope::All);
     let full_names: Vec<&str> = menus().into_iter().map(|(name, _)| name).collect();
     assert_eq!(all_names, full_names);
     assert!(all_ids.contains(&"coll:drop"));
@@ -403,7 +403,7 @@ fn no_engine_keeps_the_full_menu() {
 
 #[test]
 fn postgres_hides_every_mongodb_item_and_menu() {
-    let (names, ids) = ids_and_names(Some(MenuEngine::Postgres));
+    let (names, ids) = ids_and_names(MenuScope::Engine(MenuEngine::Postgres));
     assert_eq!(names, vec!["File", "Edit", "PostgreSQL", "View", "Help"]);
     for id in &ids {
         let gate = gate_of_opt(id);
@@ -416,7 +416,7 @@ fn postgres_hides_every_mongodb_item_and_menu() {
 
 #[test]
 fn mongodb_hides_the_postgresql_menu() {
-    let (names, ids) = ids_and_names(Some(MenuEngine::MongoDb));
+    let (names, ids) = ids_and_names(MenuScope::Engine(MenuEngine::MongoDb));
     assert!(!names.contains(&"PostgreSQL"));
     assert!(!ids.iter().any(|id| id.starts_with("pg:")));
     assert!(ids.contains(&"coll:drop"));
@@ -425,7 +425,13 @@ fn mongodb_hides_the_postgresql_menu() {
 
 #[test]
 fn filtered_menus_never_leave_an_empty_menu_or_stray_separator() {
-    for engine in [None, Some(MenuEngine::MongoDb), Some(MenuEngine::Postgres)] {
+    let scopes = [
+        MenuScope::All,
+        MenuScope::Neutral,
+        MenuScope::Engine(MenuEngine::MongoDb),
+        MenuScope::Engine(MenuEngine::Postgres),
+    ];
+    for engine in scopes {
         for (name, specs) in menus_for(engine) {
             assert!(specs.iter().any(|s| !matches!(s, Spec::Separator)), "{name} is empty for {engine:?}");
             assert!(!matches!(specs.first(), Some(Spec::Separator)), "{name} starts with a separator for {engine:?}");
@@ -441,12 +447,24 @@ fn filtered_menus_never_leave_an_empty_menu_or_stray_separator() {
 }
 
 #[test]
-fn menu_engine_reads_the_frontends_engine_ids() {
-    assert_eq!(menu_engine_from_id(Some("mongodb")), Some(MenuEngine::MongoDb));
-    assert_eq!(menu_engine_from_id(Some("postgresql")), Some(MenuEngine::Postgres));
-    // The Quickstart tab's engine, an unknown future engine, or nothing selected
-    // all mean "show the full menu".
-    assert_eq!(menu_engine_from_id(Some("app")), None);
-    assert_eq!(menu_engine_from_id(Some("mysql")), None);
-    assert_eq!(menu_engine_from_id(None), None);
+fn neutral_scope_keeps_only_items_that_need_no_database() {
+    let (names, ids) = ids_and_names(MenuScope::Neutral);
+    assert_eq!(names, vec!["File", "Edit", "View", "Help"]);
+    for id in &ids {
+        assert_eq!(gate_of_opt(id).and_then(gate_engine), None, "{id} belongs to an engine");
+    }
+    for id in ["file:connect", "file:exit", "edit:preferences", "view:refresh_all", "view:zoom_in", "help:about"] {
+        assert!(ids.contains(&id), "{id} should survive with no engine");
+    }
+}
+
+#[test]
+fn menu_scope_reads_the_frontends_engine_ids() {
+    assert_eq!(menu_scope_from_id(Some("mongodb")), MenuScope::Engine(MenuEngine::MongoDb));
+    assert_eq!(menu_scope_from_id(Some("postgresql")), MenuScope::Engine(MenuEngine::Postgres));
+    assert_eq!(menu_scope_from_id(Some("none")), MenuScope::Neutral);
+    // Nothing sent (a live selection and tab disagree) or an id this build doesn't
+    // know never hides anything.
+    assert_eq!(menu_scope_from_id(None), MenuScope::All);
+    assert_eq!(menu_scope_from_id(Some("mysql")), MenuScope::All);
 }

@@ -25,7 +25,7 @@ describe('deriveMenuContext', () => {
     expect(deriveMenuContext(null, null, 0)).toEqual({
       hasConnection: false, hasDatabase: false, hasCollection: false, anyConnection: false,
       hasDocument: false, hasField: false, hasIndex: false, readOnly: false, canRefreshTab: false,
-      hasPgSchema: false, hasPgTable: false, engine: null,
+      hasPgSchema: false, hasPgTable: false, engine: 'none',
     })
   })
 
@@ -374,9 +374,9 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
   const mongoTab = { ...collectionTab, engine: 'mongodb' }
   const pgTab = { ...pgTableTab, engine: 'postgresql' }
 
-  it('is null with nothing to name an engine, so the full menu shows', () => {
-    expect(deriveMenuContext({ ...quickstart, engine: 'app' }, null, 0).engine).toBe(null)
-    expect(deriveMenuContext(null, null, 0).engine).toBe(null)
+  it("is 'none' with nothing to name an engine, so neither engine's items show", () => {
+    expect(deriveMenuContext({ ...quickstart, engine: 'app' }, null, 0).engine).toBe('none')
+    expect(deriveMenuContext(null, null, 0).engine).toBe('none')
   })
 
   it('reads the active tab when nothing is selected in the sidebar', () => {
@@ -398,7 +398,7 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
     const pgDb = pgSelection('database', { database: 'app' })
     expect(deriveMenuContext(mongoTab, pgConn, 2).engine).toBe('mongodb')
     expect(deriveMenuContext(mongoTab, pgDb, 2).engine).toBe('mongodb')
-    expect(deriveMenuContext({ ...quickstart, engine: 'app' }, pgDb, 1).engine).toBe(null)
+    expect(deriveMenuContext({ ...quickstart, engine: 'app' }, pgDb, 1).engine).toBe('none')
   })
 
   it('shows everything when a live selection and the tab disagree', () => {
@@ -417,7 +417,7 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
     expect(deriveMenuContext({ ...quickstart, engine: 'app' }, legacy, 1).engine).toBe('mongodb')
   })
 
-  it('is null for an engine the menu has no items for', () => {
-    expect(deriveMenuContext({ ...mongoTab, engine: 'mysql' }, null, 1).engine).toBe(null)
+  it("is 'none' for an engine the menu has no items for", () => {
+    expect(deriveMenuContext({ ...mongoTab, engine: 'mysql' }, null, 1).engine).toBe('none')
   })
 })
