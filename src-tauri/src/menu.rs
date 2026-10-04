@@ -130,12 +130,9 @@ pub enum MenuEngine {
     Postgres,
 }
 
-// Which engine-specific items the menu shows (ozendb-izk). `All` is for a live
-// sidebar selection and tab that disagree, where hiding either half would hide
-// items that can still enable.
+// Which engine-specific items the menu shows (ozendb-izk): one engine's, or neither.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum MenuScope {
-    All,
     Neutral,
     Engine(MenuEngine),
 }
@@ -153,14 +150,13 @@ pub fn gate_engine(gate: Gate) -> Option<MenuEngine> {
     }
 }
 
-// The frontend's `engine` (see menuContext.js). An id this build doesn't know never
-// hides anything.
+// The frontend's `engine` (see menuContext.js): 'none', or an engine this build may
+// have no items for.
 pub fn menu_scope_from_id(id: &str) -> MenuScope {
     match id {
         "mongodb" => MenuScope::Engine(MenuEngine::MongoDb),
         "postgresql" => MenuScope::Engine(MenuEngine::Postgres),
-        "none" => MenuScope::Neutral,
-        _ => MenuScope::All,
+        _ => MenuScope::Neutral,
     }
 }
 
@@ -176,7 +172,7 @@ pub fn menus_for(scope: MenuScope) -> Vec<(&'static str, Vec<Spec>)> {
                 _ => None,
             };
             let shown = match (scope, item_engine) {
-                (_, None) | (MenuScope::All, _) => true,
+                (_, None) => true,
                 (MenuScope::Neutral, Some(_)) => false,
                 (MenuScope::Engine(engine), Some(item)) => item == engine,
             };

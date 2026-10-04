@@ -393,15 +393,6 @@ fn gate_engine_maps_each_gate_to_its_engine() {
 }
 
 #[test]
-fn all_scope_keeps_the_full_menu() {
-    let (all_names, all_ids) = ids_and_names(MenuScope::All);
-    let full_names: Vec<&str> = menus().into_iter().map(|(name, _)| name).collect();
-    assert_eq!(all_names, full_names);
-    assert!(all_ids.contains(&"coll:drop"));
-    assert!(all_ids.contains(&"pg:drop_table"));
-}
-
-#[test]
 fn postgres_hides_every_mongodb_item_and_menu() {
     let (names, ids) = ids_and_names(MenuScope::Engine(MenuEngine::Postgres));
     assert_eq!(names, vec!["File", "Edit", "PostgreSQL", "View", "Help"]);
@@ -426,7 +417,6 @@ fn mongodb_hides_the_postgresql_menu() {
 #[test]
 fn filtered_menus_never_leave_an_empty_menu_or_stray_separator() {
     let scopes = [
-        MenuScope::All,
         MenuScope::Neutral,
         MenuScope::Engine(MenuEngine::MongoDb),
         MenuScope::Engine(MenuEngine::Postgres),
@@ -463,7 +453,6 @@ fn menu_scope_reads_the_frontends_engine_ids() {
     assert_eq!(menu_scope_from_id("mongodb"), MenuScope::Engine(MenuEngine::MongoDb));
     assert_eq!(menu_scope_from_id("postgresql"), MenuScope::Engine(MenuEngine::Postgres));
     assert_eq!(menu_scope_from_id("none"), MenuScope::Neutral);
-    assert_eq!(menu_scope_from_id("all"), MenuScope::All);
-    // An id this build doesn't know never hides anything.
-    assert_eq!(menu_scope_from_id("mysql"), MenuScope::All);
+    // An id this build has no items for shows neither engine.
+    assert_eq!(menu_scope_from_id("mysql"), MenuScope::Neutral);
 }

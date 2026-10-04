@@ -401,10 +401,10 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
     expect(deriveMenuContext({ ...quickstart, engine: 'app' }, pgDb, 1).engine).toBe('none')
   })
 
-  it('shows everything when a live selection and the tab disagree', () => {
+  it('lets a live selection win over a tab of the other engine', () => {
     const pgSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
-    expect(deriveMenuContext(mongoTab, pgSel, 2).engine).toBe('all')
-    expect(deriveMenuContext(pgTab, selection('c1', 'Local', null, null, 'connection'), 2).engine).toBe('all')
+    expect(deriveMenuContext(mongoTab, pgSel, 2).engine).toBe('postgresql')
+    expect(deriveMenuContext(pgTab, selection('c1', 'Local', null, null, 'connection'), 2).engine).toBe('mongodb')
   })
 
   it('agrees with a live selection of the same engine as the tab', () => {
