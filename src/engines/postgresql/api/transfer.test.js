@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { exportData } from './transfer'
+import { exportData, importPreview, importCsv } from './transfer'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -21,5 +21,23 @@ describe('exportData', () => {
   it('leaves the database out for the connection\'s own', async () => {
     await exportData({ connectionId: 'p1' }, { query: 'SELECT 1' }, 'json', '/tmp/q.json')
     expect(invoke).toHaveBeenCalledWith('export_pg_data', expect.objectContaining({ database: null }))
+  })
+})
+
+describe('import', () => {
+  const table = { connectionId: 'p1', database: 'shop', schema: 'public', table: 'orders' }
+
+  it('previews a file against a table', async () => {
+    await importPreview(table, '/tmp/o.csv')
+    expect(invoke).toHaveBeenCalledWith('pg_import_preview', {
+      id: 'p1', database: 'shop', schema: 'public', table: 'orders', path: '/tmp/o.csv',
+    })
+  })
+
+  it('imports through a mapping', async () => {
+    await importCsv(table, '/tmp/o.csv', ['id', null])
+    expect(invoke).toHaveBeenCalledWith('import_pg_csv', {
+      id: 'p1', database: 'shop', schema: 'public', table: 'orders', path: '/tmp/o.csv', mapping: ['id', null],
+    })
   })
 })

@@ -1,7 +1,7 @@
 use super::{AppError, CsvOptions};
 use mongodb::bson;
 
-struct CsvRecords<R: std::io::Read> {
+pub(crate) struct CsvRecords<R: std::io::Read> {
     bytes: std::io::Bytes<R>,
     // One-byte look-ahead buffer, used to detect a doubled quote (`""`) and to peek
     // the byte after a closing quote.
@@ -14,7 +14,7 @@ struct CsvRecords<R: std::io::Read> {
 }
 
 impl<R: std::io::Read> CsvRecords<R> {
-    fn new(reader: R, delimiter: u8, quote: u8) -> Self {
+    pub(crate) fn new(reader: R, delimiter: u8, quote: u8) -> Self {
         CsvRecords {
             bytes: reader.bytes(),
             peeked: None,
@@ -51,7 +51,7 @@ impl<R: std::io::Read> CsvRecords<R> {
             .map_err(|e| AppError::Bson(format!("Import file is not valid UTF-8: {e}")))
     }
 
-    fn next_record(&mut self) -> Result<Option<Vec<String>>, AppError> {
+    pub(crate) fn next_record(&mut self) -> Result<Option<Vec<String>>, AppError> {
         if self.finished {
             return Ok(None);
         }

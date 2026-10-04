@@ -15,7 +15,7 @@ const POSTGRES_COMMANDS = [
   // library.js
   'list_pg_history', 'push_pg_history', 'clear_pg_history', 'list_pg_saved', 'save_pg_query', 'delete_pg_saved',
   // transfer.js
-  'export_pg_data',
+  'export_pg_data', 'pg_import_preview', 'import_pg_csv',
 ]
 
 function walk(dir, files = []) {

@@ -241,6 +241,8 @@ pub fn run() {
             drop_pg_role,
             list_pg_grants,
             export_pg_data,
+            pg_import_preview,
+            import_pg_csv,
             create_pg_schema,
             drop_pg_schema,
             create_pg_table,

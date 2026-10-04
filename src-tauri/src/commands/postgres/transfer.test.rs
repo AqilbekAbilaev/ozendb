@@ -57,3 +57,55 @@ fn the_json_writer_counts_rows() {
     array.row(&mut out, "{}").unwrap();
     assert_eq!(array.rows, 2);
 }
+
+// ── import (ozendb-6v3) ──
+
+fn column(name: &str, generated: bool) -> PgImportColumn {
+    PgImportColumn { name: name.into(), data_type: "text".into(), nullable: true, has_default: false, generated }
+}
+
+#[test]
+fn rows_are_re_encoded_with_empty_fields_as_null() {
+    assert_eq!(encode_csv_row(&["1", "plain", ""]), "\"1\",\"plain\",\n");
+    assert_eq!(encode_csv_row(&["a \"q\", b", "two\nlines"]), "\"a \"\"q\"\", b\",\"two\nlines\"\n");
+}
+
+#[test]
+fn headers_map_to_same_named_columns_ignoring_case() {
+    let columns = vec![column("id", false), column("Name", false), column("doubled", true)];
+    let headers: Vec<String> = ["ID", "name", "doubled", "extra"].iter().map(|h| h.to_string()).collect();
+    assert_eq!(auto_mapping(&headers, &columns), vec![Some("id".into()), Some("Name".into()), None, None]);
+}
+
+#[test]
+fn a_mapping_keeps_its_header_order_and_drops_unmapped_columns() {
+    let columns = vec![column("id", false), column("name", false)];
+    let mapping = vec![Some("name".to_string()), None, Some("id".to_string())];
+    assert_eq!(check_mapping(&mapping, &columns).unwrap(), vec![(0, "name".to_string()), (2, "id".to_string())]);
+}
+
+#[test]
+fn a_bad_mapping_is_refused() {
+    let columns = vec![column("id", false), column("doubled", true)];
+    let refused = |mapping: Vec<Option<&str>>| {
+        let owned: Vec<Option<String>> = mapping.into_iter().map(|m| m.map(String::from)).collect();
+        matches!(check_mapping(&owned, &columns), Err(AppError::Validation(_)))
+    };
+    assert!(refused(vec![None, None]), "nothing mapped");
+    assert!(refused(vec![Some("id"), Some("id")]), "a column mapped twice");
+    assert!(refused(vec![Some("missing")]), "an unknown column");
+    assert!(refused(vec![Some("doubled")]), "a generated column");
+}
+
+#[test]
+fn a_copy_failure_names_the_row_and_column() {
+    assert_eq!(
+        describe_copy_failure("invalid input syntax for type integer: \"abc\"", Some("COPY items, line 3, column id: \"abc\"")),
+        "Row 3 (column id): invalid input syntax for type integer: \"abc\". Nothing was imported.",
+    );
+    assert_eq!(
+        describe_copy_failure("null value in column \"id\" violates not-null constraint", Some("COPY items, line 2: \"\"")),
+        "Row 2: null value in column \"id\" violates not-null constraint. Nothing was imported.",
+    );
+    assert_eq!(describe_copy_failure("boom", None), "boom. Nothing was imported.");
+}
