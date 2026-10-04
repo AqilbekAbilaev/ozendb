@@ -42,6 +42,18 @@ function mongoResource(source, ref) {
   return (source?.engine ?? 'mongodb') === 'mongodb' ? ref : null
 }
 
+// The engines the native menu has items of its own for (menu.rs's MenuEngine).
+const MENU_ENGINES = ['mongodb', 'postgresql']
+
+// Which engine's items the menu shows (ozendb-izk); 'none' hides both. A sidebar
+// selection wins, as it does in resolveMenuTarget, but only when it enables something:
+// a PostgreSQL row above a schema enables nothing, so the tab decides instead.
+function menuEngine(tab, selDepth, pgSelDepth) {
+  if (selDepth >= 0) return 'mongodb'
+  if (pgSelDepth >= PG_DEPTH.schema) return 'postgresql'
+  return MENU_ENGINES.includes(tab?.engine) ? tab.engine : 'none'
+}
+
 // -1 for "names no resource", so every comparison below is false for it.
 function depth(ref) {
   return ref ? ref.segments.length : -1
@@ -97,6 +109,7 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     canRefreshTab: !!canRefresh,
     hasPgSchema: hasPgSchema,
     hasPgTable: hasPgTable,
+    engine: menuEngine(tab, selDepth, pgSelDepth),
   }
 }
 

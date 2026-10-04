@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 // The native OS menu. On macOS it renders in the system menu bar (with ⌘
 // accelerators + the standard application menu); on Windows/Linux it renders as
@@ -25,7 +25,7 @@ mod build;
 mod document_window;
 mod table;
 
-pub use build::{build, MenuItems};
+pub use build::{build, install, MenuItems, MenuState};
 pub use document_window::{open_document_window, DocumentTarget};
 pub use table::menus;
 
@@ -124,6 +124,77 @@ pub fn item_enabled(gate: Gate, is_write: bool, context: &MenuContext) -> bool {
     gate_enabled(gate, context) && (!is_write || !context.read_only)
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum MenuEngine {
+    MongoDb,
+    Postgres,
+}
+
+// Which engine-specific items the menu shows (ozendb-izk): one engine's, or neither.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum MenuScope {
+    Neutral,
+    Engine(MenuEngine),
+}
+
+// Read off the gate rather than tagged per item: a Mongo-shaped gate can never
+// enable on a PostgreSQL target and vice versa, so hiding stays exactly "the items
+// that would be dead here" and can't drift from the gating.
+pub fn gate_engine(gate: Gate) -> Option<MenuEngine> {
+    match gate {
+        Gate::Connection | Gate::Database | Gate::Collection | Gate::Document | Gate::DocumentField | Gate::Index => {
+            Some(MenuEngine::MongoDb)
+        }
+        Gate::PgSchema | Gate::PgTable => Some(MenuEngine::Postgres),
+        Gate::AnyConnection | Gate::RefreshableTab => None,
+    }
+}
+
+// The frontend's `engine` (see menuContext.js): 'none', or an engine this build may
+// have no items for.
+pub fn menu_scope_from_id(id: &str) -> MenuScope {
+    match id {
+        "mongodb" => MenuScope::Engine(MenuEngine::MongoDb),
+        "postgresql" => MenuScope::Engine(MenuEngine::Postgres),
+        _ => MenuScope::Neutral,
+    }
+}
+
+// `menus()` minus the items outside `scope`, with separators re-tidied and any
+// submenu left empty dropped.
+pub fn menus_for(scope: MenuScope) -> Vec<(&'static str, Vec<Spec>)> {
+    let mut result = Vec::new();
+    for (name, specs) in menus() {
+        let mut kept: Vec<Spec> = Vec::new();
+        for spec in specs {
+            let item_engine = match &spec {
+                Spec::Action { gate: Some(gate), .. } => gate_engine(*gate),
+                _ => None,
+            };
+            let shown = match (scope, item_engine) {
+                (_, None) => true,
+                (MenuScope::Neutral, Some(_)) => false,
+                (MenuScope::Engine(engine), Some(item)) => item == engine,
+            };
+            if !shown {
+                continue;
+            }
+            let is_separator = matches!(spec, Spec::Separator);
+            if is_separator && matches!(kept.last(), None | Some(Spec::Separator)) {
+                continue;
+            }
+            kept.push(spec);
+        }
+        if matches!(kept.last(), Some(Spec::Separator)) {
+            kept.pop();
+        }
+        if !kept.is_empty() {
+            result.push((name, kept));
+        }
+    }
+    result
+}
+
 // One row in a submenu.
 pub enum Spec {
     // A working item wired to a frontend handler. `gate: None` means always
@@ -152,10 +223,14 @@ pub fn handle_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
 
 // Updates the enabled state of every gated item to match the current selection
 // context. Called by the frontend whenever the active tab or the sidebar/tree
-// selection changes.
+// selection changes. Items can't be hidden in place (tauri/muda expose no
+// visibility setter), so when the engine changes the whole menu is rebuilt and
+// swapped before the enable states are applied to the fresh handles.
 #[tauri::command]
 pub fn set_menu_context(
+    app: AppHandle,
     items: State<'_, MenuItems>,
+    engine: String,
     has_connection: bool,
     has_database: bool,
     has_collection: bool,
@@ -181,11 +256,25 @@ pub fn set_menu_context(
         has_pg_schema: has_pg_schema,
         has_pg_table: has_pg_table,
     };
-    let guard = match items.0.lock() {
+    let mut state = match items.0.lock() {
         Ok(val) => val,
         Err(e) => return Err(e.to_string()),
     };
-    for (item, gate, is_write) in guard.iter() {
+    let scope = menu_scope_from_id(&engine);
+    if scope != state.scope {
+        let overrides = app.state::<crate::keybindings::KeybindingStorage>().load();
+        let (native_menu, gated) = match build(&app, &overrides, scope) {
+            Ok(val) => val,
+            Err(e) => return Err(e.to_string()),
+        };
+        match install(&app, native_menu) {
+            Ok(val) => val,
+            Err(e) => return Err(e),
+        };
+        state.scope = scope;
+        state.gated = gated;
+    }
+    for (item, gate, is_write) in state.gated.iter() {
         let enabled = item_enabled(*gate, *is_write, &context);
         match item.set_enabled(enabled) {
             Ok(val) => val,

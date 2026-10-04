@@ -25,7 +25,7 @@ describe('deriveMenuContext', () => {
     expect(deriveMenuContext(null, null, 0)).toEqual({
       hasConnection: false, hasDatabase: false, hasCollection: false, anyConnection: false,
       hasDocument: false, hasField: false, hasIndex: false, readOnly: false, canRefreshTab: false,
-      hasPgSchema: false, hasPgTable: false,
+      hasPgSchema: false, hasPgTable: false, engine: 'none',
     })
   })
 
@@ -367,5 +367,57 @@ describe('resolvePgMenuTarget', () => {
 
   it('is null when neither the tab nor the selection is PostgreSQL', () => {
     expect(resolvePgMenuTarget(collectionTab, selection('c1', 'Local', 'shop', 'orders', 'collection'), 'schema')).toBeNull()
+  })
+})
+
+describe('deriveMenuContext engine (ozendb-izk)', () => {
+  const mongoTab = { ...collectionTab, engine: 'mongodb' }
+  const pgTab = { ...pgTableTab, engine: 'postgresql' }
+
+  it("is 'none' with nothing to name an engine, so neither engine's items show", () => {
+    expect(deriveMenuContext({ ...quickstart, engine: 'app' }, null, 0).engine).toBe('none')
+    expect(deriveMenuContext(null, null, 0).engine).toBe('none')
+  })
+
+  it('reads the active tab when nothing is selected in the sidebar', () => {
+    expect(deriveMenuContext(mongoTab, null, 1).engine).toBe('mongodb')
+    expect(deriveMenuContext(pgTab, null, 1).engine).toBe('postgresql')
+  })
+
+  it('follows a sidebar selection that enables something when the tab names no engine', () => {
+    const app = { ...quickstart, engine: 'app' }
+    const pgSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
+    expect(deriveMenuContext(app, pgSel, 1).engine).toBe('postgresql')
+    expect(deriveMenuContext(app, selection('c1', 'Local', 'shop', 'orders', 'collection'), 1).engine).toBe('mongodb')
+  })
+
+  it('ignores a PostgreSQL selection too shallow to enable anything', () => {
+    // Clicking a connection or database row to expand it must not hide the open
+    // MongoDB tab's items: no PostgreSQL item enables below a schema.
+    const pgConn = pgSelection('connection', {})
+    const pgDb = pgSelection('database', { database: 'app' })
+    expect(deriveMenuContext(mongoTab, pgConn, 2).engine).toBe('mongodb')
+    expect(deriveMenuContext(mongoTab, pgDb, 2).engine).toBe('mongodb')
+    expect(deriveMenuContext({ ...quickstart, engine: 'app' }, pgDb, 1).engine).toBe('none')
+  })
+
+  it('lets a live selection win over a tab of the other engine', () => {
+    const pgSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
+    expect(deriveMenuContext(mongoTab, pgSel, 2).engine).toBe('postgresql')
+    expect(deriveMenuContext(pgTab, selection('c1', 'Local', null, null, 'connection'), 2).engine).toBe('mongodb')
+  })
+
+  it('agrees with a live selection of the same engine as the tab', () => {
+    const pgSel = pgSelection('schema', { database: 'app', schema: 'public' })
+    expect(deriveMenuContext(pgTab, pgSel, 1).engine).toBe('postgresql')
+  })
+
+  it('treats a selection with no engine as MongoDB, like the gates do', () => {
+    const legacy = { ...selection('c1', 'Local', 'shop', 'orders', 'collection'), engine: undefined }
+    expect(deriveMenuContext({ ...quickstart, engine: 'app' }, legacy, 1).engine).toBe('mongodb')
+  })
+
+  it("is 'none' for an engine the menu has no items for", () => {
+    expect(deriveMenuContext({ ...mongoTab, engine: 'mysql' }, null, 1).engine).toBe('none')
   })
 })

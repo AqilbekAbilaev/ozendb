@@ -361,3 +361,98 @@ fn gate_of(id: &str) -> Gate {
         None => panic!("expected {id} to be a gated action"),
     }
 }
+
+// ozendb-izk: each engine sees only its own items, derived from the gates.
+
+fn ids_and_names(scope: MenuScope) -> (Vec<&'static str>, Vec<&'static str>) {
+    let mut names = Vec::new();
+    let mut ids = Vec::new();
+    for (name, specs) in menus_for(scope) {
+        names.push(name);
+        for spec in specs {
+            match spec {
+                Spec::Action { id, .. } | Spec::Placeholder { id, .. } => ids.push(id),
+                Spec::Separator => {}
+            }
+        }
+    }
+    (names, ids)
+}
+
+#[test]
+fn gate_engine_maps_each_gate_to_its_engine() {
+    for gate in [Gate::Connection, Gate::Database, Gate::Collection, Gate::Document, Gate::DocumentField, Gate::Index] {
+        assert_eq!(gate_engine(gate), Some(MenuEngine::MongoDb), "{gate:?}");
+    }
+    for gate in [Gate::PgSchema, Gate::PgTable] {
+        assert_eq!(gate_engine(gate), Some(MenuEngine::Postgres), "{gate:?}");
+    }
+    for gate in [Gate::AnyConnection, Gate::RefreshableTab] {
+        assert_eq!(gate_engine(gate), None, "{gate:?} should be engine-neutral");
+    }
+}
+
+#[test]
+fn postgres_hides_every_mongodb_item_and_menu() {
+    let (names, ids) = ids_and_names(MenuScope::Engine(MenuEngine::Postgres));
+    assert_eq!(names, vec!["File", "Edit", "PostgreSQL", "View", "Help"]);
+    for id in &ids {
+        let gate = gate_of_opt(id);
+        assert!(gate.map(gate_engine) != Some(Some(MenuEngine::MongoDb)), "{id} is MongoDB-only");
+    }
+    for id in ["file:connect", "file:exit", "edit:preferences", "view:refresh", "view:refresh_all", "pg:drop_table"] {
+        assert!(ids.contains(&id), "{id} should survive on PostgreSQL");
+    }
+}
+
+#[test]
+fn mongodb_hides_the_postgresql_menu() {
+    let (names, ids) = ids_and_names(MenuScope::Engine(MenuEngine::MongoDb));
+    assert!(!names.contains(&"PostgreSQL"));
+    assert!(!ids.iter().any(|id| id.starts_with("pg:")));
+    assert!(ids.contains(&"coll:drop"));
+    assert!(ids.contains(&"file:connect"));
+}
+
+#[test]
+fn filtered_menus_never_leave_an_empty_menu_or_stray_separator() {
+    let scopes = [
+        MenuScope::Neutral,
+        MenuScope::Engine(MenuEngine::MongoDb),
+        MenuScope::Engine(MenuEngine::Postgres),
+    ];
+    for engine in scopes {
+        for (name, specs) in menus_for(engine) {
+            assert!(specs.iter().any(|s| !matches!(s, Spec::Separator)), "{name} is empty for {engine:?}");
+            assert!(!matches!(specs.first(), Some(Spec::Separator)), "{name} starts with a separator for {engine:?}");
+            assert!(!matches!(specs.last(), Some(Spec::Separator)), "{name} ends with a separator for {engine:?}");
+            for pair in specs.windows(2) {
+                assert!(
+                    !(matches!(pair[0], Spec::Separator) && matches!(pair[1], Spec::Separator)),
+                    "{name} has adjacent separators for {engine:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn neutral_scope_keeps_only_items_that_need_no_database() {
+    let (names, ids) = ids_and_names(MenuScope::Neutral);
+    assert_eq!(names, vec!["File", "Edit", "View", "Help"]);
+    for id in &ids {
+        assert_eq!(gate_of_opt(id).and_then(gate_engine), None, "{id} belongs to an engine");
+    }
+    for id in ["file:connect", "file:exit", "edit:preferences", "view:refresh_all", "view:zoom_in", "help:about"] {
+        assert!(ids.contains(&id), "{id} should survive with no engine");
+    }
+}
+
+#[test]
+fn menu_scope_reads_the_frontends_engine_ids() {
+    assert_eq!(menu_scope_from_id("mongodb"), MenuScope::Engine(MenuEngine::MongoDb));
+    assert_eq!(menu_scope_from_id("postgresql"), MenuScope::Engine(MenuEngine::Postgres));
+    assert_eq!(menu_scope_from_id("none"), MenuScope::Neutral);
+    // An id this build has no items for shows neither engine.
+    assert_eq!(menu_scope_from_id("mysql"), MenuScope::Neutral);
+}
