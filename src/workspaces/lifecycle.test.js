@@ -33,10 +33,10 @@ describe('duplicateWorkspace', () => {
 
   it('deeply detaches durable fields from the source', () => {
     const dup = duplicateWorkspace(FIND)
-    expect(dup.colOrder).not.toBe(FIND.colOrder)
-    expect(dup.vqb).not.toBe(FIND.vqb)
-    dup.colOrder.a = 99
-    dup.vqb.rows.push(3)
+    expect(dup.state.query.colOrder).not.toBe(FIND.colOrder)
+    expect(dup.state.query.vqb).not.toBe(FIND.vqb)
+    dup.state.query.colOrder.a = 99
+    dup.state.query.vqb.rows.push(3)
     expect(FIND.colOrder.a).toBe(0)
     expect(FIND.vqb.rows).toEqual([1, 2])
   })
@@ -50,12 +50,12 @@ describe('duplicateWorkspace', () => {
 
   it('resets runtime state and preserves editor text', () => {
     const dup = duplicateWorkspace(FIND)
-    expect(dup.filter).toBe('{ "a": 1 }')
-    expect(dup.results).toEqual([])
-    expect(dup.hasRun).toBe(false)
-    expect(dup.elapsedMs).toBe(null)
-    expect(dup.selectedRow).toBe(-1)
-    expect(dup.selectedRows).toEqual([])
+    expect(dup.state.query.filter).toBe('{ "a": 1 }')
+    expect(dup.runtime.results).toEqual([])
+    expect(dup.runtime.hasRun).toBe(false)
+    expect(dup.runtime.elapsedMs).toBe(null)
+    expect(dup.runtime.selectedRow).toBe(-1)
+    expect(dup.runtime.selectedRows).toEqual([])
   })
 
   it('returns null for an unsupported duplicate', () => {
@@ -87,11 +87,11 @@ describe('restoreWorkspace', () => {
 
   it('restores fresh runtime state and the one-shot initial-run marker', () => {
     const tab = restoreWorkspace(saved)
-    expect(tab.filter).toBe('{ "a": 1 }')
+    expect(tab.state.query.filter).toBe('{ "a": 1 }')
     expect(tab.needsInitialRun).toBe(true)
-    expect(tab.results).toEqual([])
-    expect(tab.hasRun).toBe(false)
-    expect(tab.selectedRow).toBe(-1)
+    expect(tab.runtime.results).toEqual([])
+    expect(tab.runtime.hasRun).toBe(false)
+    expect(tab.runtime.selectedRow).toBe(-1)
   })
 
   it('maps SQL and aggregate saved records to their own types', () => {
@@ -315,48 +315,5 @@ describe('canRefreshWorkspace', () => {
   it('reloads a PostgreSQL table tab in Filter mode, never its SQL', () => {
     expect(canRefreshWorkspace({ type: 'postgresql.table_browse', state: { mode: 'filter' } })).toBe(true)
     expect(canRefreshWorkspace({ type: 'postgresql.table_browse', state: { mode: 'sql' } })).toBe(false)
-  })
-})
-
-// A definition whose fields are more than plain data re-establishes them with
-// `hydrate`, because the deep clone every duplicate and restore goes through keeps
-// values and drops everything else.
-describe('the hydrate hook', () => {
-  const type = 'test.hydrating'
-  registerWorkspaceDefinition({
-    type,
-    engine: 'test',
-    component: {},
-    duplicate: (workspace) => ({ title: 'copy', target: null, fields: withAccessor({ box: { n: workspace.n } }) }),
-    hydrate: (fields) => withAccessor(fields),
-  })
-
-  function withAccessor(fields) {
-    Object.defineProperty(fields, 'n', {
-      get() { return this.box.n },
-      set(v) { this.box.n = v },
-      enumerable: false, configurable: true,
-    })
-    return fields
-  }
-
-  it('re-establishes an accessor the clone would have dropped', () => {
-    const copy = duplicateWorkspace({ id: 'h1', type, engine: 'test', n: 7, box: { n: 7 } })
-    expect(copy.box.n).toBe(7)
-    expect(copy.n).toBe(7)          // gone without the hook: structuredClone drops it
-    copy.n = 9
-    expect(copy.box.n).toBe(9)      // and it still writes through
-  })
-
-  it('leaves the envelope on the hydrated object', () => {
-    const copy = duplicateWorkspace({ id: 'h1', type, engine: 'test', n: 1, box: { n: 1 } })
-    expect(copy).toMatchObject({ type, engine: 'test', title: 'copy' })
-    expect(copy.id).toBeTruthy()
-    expect(copy.n).toBe(1)          // the envelope must not have been spread over it
-  })
-
-  it('is optional — a definition without one is cloned as before', () => {
-    const copy = duplicateWorkspace(FIND, { ids: { workspace: () => 'dup' } })
-    expect(copy.filter).toBe('{ "a": 1 }')
   })
 })

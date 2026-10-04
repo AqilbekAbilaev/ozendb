@@ -250,6 +250,12 @@ describe('toLegacyRecord bridge', () => {
     'mongodb.current_operations': ['frequency', 'retention', 'ownOnly', 'showSys', 'slowOnly', 'slowSecs', 'dbName', 'collName', 'view'],
   }
 
+  // A collection tab keeps its query under state and its view under ui; the pinned
+  // fixtures are the flat record those come from, so compare against that layout.
+  const flatView = (tab) => (tab.kind === 'collection'
+    ? { ...tab, ...tab.state.query, resultView: tab.ui.resultView }
+    : tab)
+
   it('round-trips every persisted type through the legacy restore hooks', () => {
     for (const [type, conf] of Object.entries(restorable)) {
       const v2 = expected[conf.key]
@@ -265,14 +271,15 @@ describe('toLegacyRecord bridge', () => {
       expect(restored.target, type).toEqual(v2.target)
       // Flat identity comes back from the saved record (names were re-injected by
       // the bridge); durable state must match the pinned projection exactly.
-      expect(restored, type).toMatchObject(legacy[conf.key])
+      const view = flatView(restored)
+      expect(view, type).toMatchObject(legacy[conf.key])
       const durable = type === 'mongodb.import'
         ? (v2.state.format === 'csv'
             ? ['format', 'sourceType', 'filePath', 'csv', 'targetDb', 'targetColl', 'mode']
             : ['format', 'validate', 'sources'])
         : DURABLE[type]
       for (const key of durable) {
-        expect(restored[key], `${type}.${key}`).toEqual(v2.state[key])
+        expect(view[key], `${type}.${key}`).toEqual(v2.state[key])
       }
     }
   })

@@ -295,8 +295,8 @@ describe('duplicateTab', () => {
     expect(tabs.value).toHaveLength(3)
     expect(activeTabId.value).toBe(tabs.value[2].id)
     expect(tabs.value[2].id).not.toBe('f1')
-    expect(tabs.value[2].filter).toBe('{ "a": 1 }')
-    expect(tabs.value[2].results).toEqual([])
+    expect(tabs.value[2].state.query.filter).toBe('{ "a": 1 }')
+    expect(tabs.value[2].runtime.results).toEqual([])
   })
 
   it('marks a duplicated find for workspace-owned initial execution', () => {

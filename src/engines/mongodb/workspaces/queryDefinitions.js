@@ -1,6 +1,6 @@
 // MongoDB query workspace definitions (Work 5C): find, aggregate, SQL-to-MQL, and
-// shell. Each owns the full shape of its fresh tab — the legacy flat fields keep
-// existing panes working unchanged; the canonical envelope comes from the factory.
+// shell. Each owns the full shape of its fresh tab; the canonical envelope comes from
+// the factory.
 // Work 6 adds the lifecycle hooks (duplicate, restore, dispose) that generic helpers
 // dispatch through.
 import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
@@ -8,16 +8,13 @@ import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { closeShellSession } from '../api/shell'
 import {
   createCollectionState, createCollectionUi, createCollectionRuntime,
-  migrateCollectionState, withFlatFields,
+  migrateCollectionState,
 } from './collectionState'
 
 // The editor+result spine shared by every collection-scoped query mode. Scalar
 // defaults arrive from the creator; the fallbacks mirror the app's settings defaults
 // so a definition used without a context still produces a sane tab.
-// Identity plus the state / ui / runtime split (collectionState.js). The flat
-// accessors are NOT applied here: they are non-enumerable and every caller spreads
-// this into a larger object, which would leave them behind. `collectionTab` wraps the
-// finished object, and the definitions' `hydrate` re-applies them after a clone.
+// Identity plus the state / ui / runtime split (collectionState.js).
 function collectionFields({ target, defaults = {}, state, ui }) {
   return {
     kind: 'collection',
@@ -30,8 +27,6 @@ function collectionFields({ target, defaults = {}, state, ui }) {
     runtime: createCollectionRuntime(),
   }
 }
-
-const collectionTab = (fields) => withFlatFields(fields)
 
 function collectionTarget(target) {
   return {
@@ -52,7 +47,7 @@ function createCollection(ctx, mode, extra = {}) {
   return {
     title: ctx.target.collectionName,
     target: collectionRef(ctx.target),
-    fields: collectionTab({ ...collectionFields(ctx), mode: mode, ...extra }),
+    fields: { ...collectionFields(ctx), mode: mode, ...extra },
   }
 }
 
@@ -63,10 +58,8 @@ function duplicateCollection(workspace, mode, durable) {
   return {
     title: workspace.title,
     target: collectionRef(workspace),
-    // `durable` is the flat editorState shape, which migrateCollectionState reads, so
-    // the copy's state is built from it rather than spread over the spine — flat keys
-    // there would shadow the accessors that share their names.
-    fields: collectionTab({
+    // `durable` is the flat editorState shape, which migrateCollectionState reads.
+    fields: {
       ...collectionFields({
         target: workspace,
         state: migrateCollectionState(durable),
@@ -76,7 +69,7 @@ function duplicateCollection(workspace, mode, durable) {
       ...(durable.needsInitialRun ? { needsInitialRun: true } : {}),
       readOnly: !!durable.readOnly,
       ...(durable.sql !== undefined ? { sql: durable.sql, sqlError: durable.sqlError ?? null } : {}),
-    }),
+    },
   }
 }
 
@@ -108,7 +101,7 @@ function restoreCollection(saved, defaults = {}) {
   return {
     title: saved.title || saved.collectionName,
     target,
-    fields: collectionTab({
+    fields: {
       ...collectionFields({
         target,
         defaults,
@@ -121,7 +114,7 @@ function restoreCollection(saved, defaults = {}) {
       collectionName: saved.collectionName ?? null,
       mode: saved.mode || 'find',
       readOnly: !!saved.readOnly,
-    }),
+    },
   }
 }
 
@@ -171,7 +164,6 @@ export const queryDefinitions = [
     engine: 'mongodb',
     // The lifecycle's deep clone keeps the nested state and drops the flat accessors
     // over it; this puts them back (see collectionState.js).
-    hydrate: collectionTab,
     component: WORKSPACE_COMPONENTS.collection,
     // A find only reads, so Refresh may run it again; the other query modes can write.
     canRefresh: () => true,
@@ -198,7 +190,6 @@ export const queryDefinitions = [
   {
     type: 'mongodb.aggregate',
     engine: 'mongodb',
-    hydrate: collectionTab,
     component: WORKSPACE_COMPONENTS.collection,
     create(ctx) {
       return createCollection(ctx, 'aggregate')
@@ -215,7 +206,6 @@ export const queryDefinitions = [
   {
     type: 'mongodb.sql_to_mql',
     engine: 'mongodb',
-    hydrate: collectionTab,
     component: WORKSPACE_COMPONENTS.collection,
     create(ctx) {
       const base = createCollection(ctx, 'sql', {
@@ -229,7 +219,7 @@ export const queryDefinitions = [
       // and the display settings come back.
       return {
         sql: workspace.sql ?? '', readOnly: !!workspace.readOnly,
-        colOrder: workspace.colOrder ?? null,
+        colOrder: editorState(workspace).colOrder,
       }
     },
     duplicate(workspace) {
@@ -237,7 +227,7 @@ export const queryDefinitions = [
       // duplicated SQL tab must never run with a stale translation.
       return duplicateCollection(workspace, 'sql', {
         sql: workspace.sql ?? '', sqlError: null,
-        readOnly: !!workspace.readOnly, colOrder: workspace.colOrder ?? null,
+        readOnly: !!workspace.readOnly, colOrder: editorState(workspace).colOrder,
       })
     },
     restore(saved, ctx) {
@@ -246,14 +236,11 @@ export const queryDefinitions = [
       const base = restoreCollection(saved, ctx.defaults)
       return {
         ...base,
-        // The query fields are cleared in the state itself, not under their flat
-        // names: those are accessors onto the state, so assigning them here would be
-        // overwritten the moment hydrate re-established them.
-        fields: collectionTab(Object.assign(base.fields, {
+        fields: Object.assign(base.fields, {
           mode: 'sql',
           sql: saved.sql ?? '', sqlError: null,
           state: createCollectionState(),
-        })),
+        }),
       }
     },
   },

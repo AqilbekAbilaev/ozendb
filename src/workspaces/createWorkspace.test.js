@@ -124,10 +124,10 @@ describe('createWorkspace — fresh mutable state', () => {
   it('never shares mutable containers between workspaces', () => {
     const a = createWorkspace('mongodb.find', { target: COLLECTION_TARGET })
     const b = createWorkspace('mongodb.find', { target: COLLECTION_TARGET })
-    expect(a.results).not.toBe(b.results)
-    expect(a.selectedRows).not.toBe(b.selectedRows)
-    a.results.push({ x: 1 })
-    expect(b.results).toEqual([])
+    expect(a.runtime.results).not.toBe(b.runtime.results)
+    expect(a.runtime.selectedRows).not.toBe(b.runtime.selectedRows)
+    a.runtime.results.push({ x: 1 })
+    expect(b.runtime.results).toEqual([])
   })
 
   it('allocates fresh nested import options per workspace', () => {

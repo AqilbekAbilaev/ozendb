@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   COLLECTION_STATE_VERSION, createCollectionState, createCollectionUi,
-  createCollectionRuntime, migrateCollectionState, withFlatFields,
+  createCollectionRuntime, migrateCollectionState,
 } from './collectionState'
-
-const tab = () => withFlatFields({
-  state: createCollectionState(), ui: createCollectionUi(), runtime: createCollectionRuntime(),
-})
 
 describe('createCollectionState', () => {
   it('carries its version, so a newer shape is recognised as one', () => {
@@ -77,80 +73,5 @@ describe('migrateCollectionState', () => {
   it('survives a record with nothing in it', () => {
     expect(migrateCollectionState().query.filter).toBe('')
     expect(migrateCollectionState({}).query.skip).toBe(0)
-  })
-})
-
-describe('withFlatFields', () => {
-  it('reads a query field through its old flat name', () => {
-    const t = tab()
-    t.state.query.filter = '{ a: 1 }'
-    expect(t.filter).toBe('{ a: 1 }')
-  })
-
-  it('writes through the flat name into the nested state', () => {
-    const t = tab()
-    t.filter = '{ b: 2 }'
-    t.skip = 30
-    expect(t.state.query).toMatchObject({ filter: '{ b: 2 }', skip: 30 })
-  })
-
-  it('does the same for runtime fields', () => {
-    const t = tab()
-    t.results = [{ _id: 1 }]
-    t.isRunning = true
-    expect(t.runtime.results).toEqual([{ _id: 1 }])
-    expect(t.runtime.isRunning).toBe(true)
-    expect(t.results).toEqual([{ _id: 1 }])
-  })
-
-  it('and for the per-device view fields', () => {
-    const t = tab()
-    t.resultView = 'json'
-    expect(t.ui.resultView).toBe('json')
-  })
-
-  it('stays spreadable: the flat names survive Object.keys and a spread', () => {
-    // 26 files still spread a tab or walk its keys; the split must not change that.
-    const t = tab()
-    t.filter = '{ a: 1 }'
-    expect(Object.keys(t)).toContain('filter')
-    expect({ ...t }.filter).toBe('{ a: 1 }')
-  })
-
-  it('holds the nested state as the one place the value lives', () => {
-    const t = tab()
-    t.filter = '{ a: 1 }'
-    expect(JSON.parse(JSON.stringify(t)).state.query.filter).toBe('{ a: 1 }')
-  })
-
-  it('can be applied twice, as a clone then a hydrate does', () => {
-    const t = withFlatFields(withFlatFields({
-      state: createCollectionState(), ui: createCollectionUi(), runtime: createCollectionRuntime(),
-    }))
-    t.filter = '{ a: 1 }'
-    expect(t.state.query.filter).toBe('{ a: 1 }')
-  })
-
-  it('leaves an object with no state alone rather than defining broken accessors', () => {
-    const plain = withFlatFields({ kind: 'shell', code: 'db.x.find()' })
-    expect(plain.filter).toBeUndefined()
-    expect(plain.code).toBe('db.x.find()')
-  })
-
-  it('round-trips: a state saved and restored holds what was built', () => {
-    const t = tab()
-    t.filter = '{ a: 1 }'
-    t.limit = 25
-    t.results = [{ _id: 1 }]   // runtime: deliberately not saved
-
-    const saved = JSON.parse(JSON.stringify({ state: t.state, ui: t.ui }))
-    const restored = withFlatFields({
-      state: migrateCollectionState(saved),
-      ui: { ...createCollectionUi(), ...saved.ui },
-      runtime: createCollectionRuntime(),
-    })
-    expect(restored.filter).toBe('{ a: 1 }')
-    expect(restored.limit).toBe(25)
-    expect(restored.results).toEqual([])
   })
 })
