@@ -8,6 +8,7 @@ import { errText } from '../../utils/errors'
 import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import { closeWhere } from '../../stores/tabs'
+import { clearTreeSelectionUnder } from '../../stores/connectionNavigation'
 import { affectedByResource } from '../../workspaces/lifecycle'
 import { createResourceRef } from '../../utils/resourceRef'
 import FlexSpacer from '../base/FlexSpacer.vue'
@@ -36,10 +37,12 @@ async function confirm() {
     invalidateConnectionResources(props.target.connectionId)
     // Containment closes every tab scoped into the dropped collection (find/aggregate/
     // SQL/import/export/indexes/schema), and only those. closeTab runs disposal.
-    closeWhere(affectedByResource(createResourceRef(props.target.connectionId, [
+    const dropped = createResourceRef(props.target.connectionId, [
       { kind: 'database', name: props.target.dbName },
       { kind: 'collection', name: props.target.collectionName },
-    ])))
+    ])
+    closeWhere(affectedByResource(dropped))
+    clearTreeSelectionUnder(dropped)
     showToast(`Collection "${props.target.collectionName}" dropped`)
     emit('close')
   } catch (e) {

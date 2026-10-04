@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { treeSelection, setTreeSelection } from './connectionNavigation'
+import { treeSelection, setTreeSelection, clearTreeSelectionUnder } from './connectionNavigation'
 import {
   connectionOpenRequest,
   consumeConnectionOpenRequest,
@@ -56,6 +56,48 @@ describe('treeSelection', () => {
   it('clears to null', () => {
     setTreeSelection({ connectionId: 'a', kind: 'connection' })
     setTreeSelection(null)
+    expect(treeSelection.value).toBeNull()
+  })
+})
+
+// ozendb-9gf: a dropped node must not stay selected for the menu to act on.
+describe('clearTreeSelectionUnder', () => {
+  const db = { connectionId: 'a', segments: [{ kind: 'database', name: 'shop' }] }
+  beforeEach(() => { treeSelection.value = null })
+
+  it('clears the dropped node itself', () => {
+    setTreeSelection({ connectionId: 'a', dbName: 'shop', kind: 'database' })
+    clearTreeSelectionUnder(db)
+    expect(treeSelection.value).toBeNull()
+  })
+
+  it('clears a node inside the dropped one', () => {
+    setTreeSelection({ connectionId: 'a', dbName: 'shop', collectionName: 'orders', kind: 'collection' })
+    clearTreeSelectionUnder(db)
+    expect(treeSelection.value).toBeNull()
+  })
+
+  it('clears a PostgreSQL table inside a dropped schema', () => {
+    setTreeSelection({
+      connectionId: 'a', engine: 'postgresql', database: 'app', schema: 'public', table: 'widgets', kind: 'table',
+    })
+    clearTreeSelectionUnder({
+      connectionId: 'a', segments: [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }],
+    })
+    expect(treeSelection.value).toBeNull()
+  })
+
+  it('keeps a selection outside the dropped node', () => {
+    setTreeSelection({ connectionId: 'a', dbName: 'other', collectionName: 'orders', kind: 'collection' })
+    clearTreeSelectionUnder(db)
+    expect(treeSelection.value).not.toBeNull()
+    setTreeSelection({ connectionId: 'a', kind: 'connection' })
+    clearTreeSelectionUnder(db)
+    expect(treeSelection.value).not.toBeNull()
+  })
+
+  it('does nothing with no selection', () => {
+    clearTreeSelectionUnder(db)
     expect(treeSelection.value).toBeNull()
   })
 })
