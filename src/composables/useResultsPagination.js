@@ -11,7 +11,7 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
   )
 
   async function fetchCount(tab) {
-    const parsed = parseField(tab.filter || '')
+    const parsed = parseField(tab.state.query.filter || '')
     if (!parsed.ok) throw new Error(parsed.error)
     const total = await countDocuments(
       { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
@@ -22,15 +22,15 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
     return total
   }
 
-  function goFirst() { const tab = activeTab(); if (tab) { tab.skip = 0; requery(false) } }
-  function goPrev() { const tab = activeTab(); if (tab) { tab.skip = Math.max(0, (tab.skip || 0) - (tab.limit || 50)); requery(false) } }
-  function goNext() { const tab = activeTab(); if (tab) { tab.skip = (tab.skip || 0) + (tab.limit || 50); requery(false) } }
+  function goFirst() { const tab = activeTab(); if (tab) { tab.state.query.skip = 0; requery(false) } }
+  function goPrev() { const tab = activeTab(); if (tab) { tab.state.query.skip = Math.max(0, (tab.state.query.skip || 0) - (tab.state.query.limit || 50)); requery(false) } }
+  function goNext() { const tab = activeTab(); if (tab) { tab.state.query.skip = (tab.state.query.skip || 0) + (tab.state.query.limit || 50); requery(false) } }
   async function goLast() {
     const tab = activeTab()
     if (!tab) return
     try {
       const total = await fetchCount(tab)
-      tab.skip = total === 0 ? 0 : Math.floor((total - 1) / (tab.limit || 50)) * (tab.limit || 50)
+      tab.state.query.skip = total === 0 ? 0 : Math.floor((total - 1) / (tab.state.query.limit || 50)) * (tab.state.query.limit || 50)
       requery(false)
     } catch (e) { showToast('Count failed: ' + errText(e)) }
   }
@@ -45,19 +45,19 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
   function setPageSize(size) {
     const tab = activeTab()
     if (!tab) return
-    tab.limit = size
+    tab.state.query.limit = size
     requery(true)
   }
   const rangeText = computed(() => {
-    const tab = activeTab(); const len = tab?.results?.length ?? 0
+    const tab = activeTab(); const len = tab?.runtime?.results?.length ?? 0
     if (!len) return '-- to --'
-    const base = `${(tab.skip || 0) + 1} to ${(tab.skip || 0) + len}`
-    const parsed = parseField(tab.filter || '')
+    const base = `${(tab.state.query.skip || 0) + 1} to ${(tab.state.query.skip || 0) + len}`
+    const parsed = parseField(tab.state.query.filter || '')
     return tab.total != null && parsed.ok && tab.totalFilter === parsed.ejson ? `${base} of ${tab.total.toLocaleString()}` : base
   })
   const countText = computed(() => {
     const tab = activeTab(); if (!tab || isCountDisabled.value || tab.total == null || !tab.countShown) return null
-    const parsed = parseField(tab.filter || '')
+    const parsed = parseField(tab.state.query.filter || '')
     return parsed.ok && tab.totalFilter === parsed.ejson ? tab.total.toLocaleString() : null
   })
   function onCountContext(e) {

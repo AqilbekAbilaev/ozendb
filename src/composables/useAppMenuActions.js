@@ -261,7 +261,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
   // collection tab with a selected row/field, so this only needs to signal the panel.
   function requestDocMenuAction(action) {
     const tab = tabs.value.find(t => t.id === activeTabId.value)
-    if (!tab || tab.kind !== 'collection' || (tab.selectedRow ?? -1) < 0) {
+    if (!tab || tab.kind !== 'collection' || (tab.runtime.selectedRow ?? -1) < 0) {
       showToast('Select a document in the results first')
       return
     }

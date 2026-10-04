@@ -10,6 +10,8 @@
 // definition's `hydrate` hook re-establishes them after the lifecycle's deep clone.
 // Migrating those call sites and deleting the accessors is the rest of this work.
 
+import { createSelection } from '../../../composables/useRowSelection'
+
 export const COLLECTION_STATE_VERSION = 1
 
 export function createCollectionState({ queryLimit } = {}) {
@@ -39,10 +41,7 @@ export function createCollectionUi({ resultView } = {}) {
 // replaying state onto a shared runtime is how two tabs end up showing one set of
 // results.
 export function createCollectionRuntime() {
-  return {
-    results: [], hasRun: false, isRunning: false, runError: null,
-    selectedRow: -1, selectedRows: [], elapsedMs: null,
-  }
+  return { results: [], hasRun: false, isRunning: false, runError: null, elapsedMs: null, ...createSelection() }
 }
 
 // The flat shape sessions have been written in until now: the query fields sat at the
@@ -73,7 +72,7 @@ export function migrateCollectionState(saved = {}) {
 }
 
 const QUERY_FIELDS = ['filter', 'projection', 'sort', 'skip', 'limit', 'pipeline', 'vqb', 'colOrder']
-const RUNTIME_FIELDS = ['results', 'hasRun', 'isRunning', 'runError', 'selectedRow', 'selectedRows', 'elapsedMs']
+const RUNTIME_FIELDS = ['results', 'hasRun', 'isRunning', 'runError', 'selectedRow', 'selectedRows', 'selectedField', 'elapsedMs']
 const UI_FIELDS = ['resultView']
 
 // `holder` returns the object the value actually lives on, so a nested path
