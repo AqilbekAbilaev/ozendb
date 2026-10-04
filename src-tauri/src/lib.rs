@@ -47,6 +47,8 @@ mod pg_ssh_integration_tests;
 #[cfg(test)]
 mod pg_roles_integration_tests;
 #[cfg(test)]
+mod pg_transfer_integration_tests;
+#[cfg(test)]
 mod pg_ddl_integration_tests;
 #[cfg(test)]
 mod pg_activity_integration_tests;
@@ -238,6 +240,7 @@ pub fn run() {
             create_pg_role,
             drop_pg_role,
             list_pg_grants,
+            export_pg_data,
             create_pg_schema,
             drop_pg_schema,
             create_pg_table,
