@@ -1,7 +1,7 @@
 import { computed, watch } from 'vue'
 import { setMenuContext } from '../appApi/menu'
 import { deriveMenuContext, resolveMenuTarget, resolvePgMenuTarget } from '../utils/menuContext'
-import { activeTab } from '../stores/tabs'
+import { activeTab, tabs } from '../stores/tabs'
 import { treeSelection } from '../stores/connectionNavigation'
 import { openConnections } from '../stores/openConnections'
 import { selectedIndex } from '../stores/indexes'
@@ -24,6 +24,7 @@ export function useMenu() {
     openConnections.value.length,
     !!selectedIndex.value,
     canRefreshWorkspace(activeTab.value),
+    tabs.value,
   ))
 
   // Push the context down to the native menu so gated items enable/disable in step
