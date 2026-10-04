@@ -1,18 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import { refreshFindWorkspacesAfterDocumentSave } from './documentSaveRefresh'
 
-const matchingFind = (fields = {}) => ({
+const matchingFind = ({ hasRun = true, ...fields } = {}) => ({
   id: 'find-1',
   type: 'mongodb.find',
-  hasRun: true,
   connectionId: 'c1',
   dbName: 'shop',
   collectionName: 'orders',
-  filter: '{ status: "open" }',
-  projection: '{ total: 1 }',
-  sort: '{ createdAt: -1 }',
-  skip: '2',
-  limit: '25',
+  state: {
+    query: { filter: '{ status: "open" }', projection: '{ total: 1 }', sort: '{ createdAt: -1 }', skip: '2', limit: '25' },
+  },
+  runtime: { hasRun },
   ...fields,
 })
 

@@ -76,10 +76,11 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   // view only — never the sidebar. The Document menu acts on the row/field the user
   // has selected in the grid, which only exists while a collection tab is active and
   // has run a query. A field selection implies a row selection.
-  const rowCount = tab && tab.kind === 'collection' ? (tab.results?.length ?? 0) : 0
-  const selectedRow = tab ? (tab.selectedRow ?? -1) : -1
+  const isCollection = tab?.kind === 'collection'
+  const rowCount = isCollection ? (tab.runtime.results?.length ?? 0) : 0
+  const selectedRow = isCollection ? (tab.runtime.selectedRow ?? -1) : -1
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount
-  const hasField = hasDocument && !!(tab && tab.selectedField)
+  const hasField = hasDocument && !!(tab && tab.runtime.selectedField)
 
   // PostgreSQL (ozendb-sxd), the same union as Connection/Database/Collection above:
   // a query tab names a schema, a table tab names a schema and a table, and the

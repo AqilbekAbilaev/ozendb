@@ -3,7 +3,7 @@ import { runTranslatedSql } from './sqlWorkspace'
 
 describe('runTranslatedSql', () => {
   it('runs and explains the workspace that started a delayed translation', async () => {
-    const first = { id: 'first', mode: 'sql', sql: 'SELECT * FROM orders', limit: 25 }
+    const first = { id: 'first', mode: 'sql', sql: 'SELECT * FROM orders', state: { query: { limit: 25 } } }
     let finishTranslation
     const translate = vi.fn(() => new Promise(resolve => { finishTranslation = resolve }))
     const runQuery = vi.fn()
@@ -24,7 +24,7 @@ describe('runTranslatedSql', () => {
   })
 
   it('keeps translation errors on the initiating workspace', async () => {
-    const tab = { id: 'first', mode: 'sql', sql: 'bad sql' }
+    const tab = { id: 'first', mode: 'sql', sql: 'bad sql', state: { query: {} } }
 
     await runTranslatedSql(tab, {
       translate: vi.fn().mockRejectedValue({ message: 'invalid SQL' }),
@@ -38,7 +38,7 @@ describe('runTranslatedSql', () => {
   })
 
   it('ignores an older translation that finishes after a newer one', async () => {
-    const tab = { id: 'first', mode: 'sql', sql: 'first', limit: 25 }
+    const tab = { id: 'first', mode: 'sql', sql: 'first', state: { query: { limit: 25 } } }
     const resolvers = []
     const translate = vi.fn(() => new Promise(resolve => resolvers.push(resolve)))
     const runQuery = vi.fn()
@@ -58,12 +58,12 @@ describe('runTranslatedSql', () => {
     resolvers[0]({ filter: '{ "old": true }', projection: '{}', sort: '{}', limit: 10 })
     await first
 
-    expect(tab.filter).toBe('{ "new": true }')
+    expect(tab.state.query.filter).toBe('{ "new": true }')
     expect(runQuery).toHaveBeenCalledTimes(1)
   })
 
   it('ignores a translation after the workspace leaves SQL mode', async () => {
-    const tab = { id: 'first', mode: 'sql', sql: 'SELECT 1' }
+    const tab = { id: 'first', mode: 'sql', sql: 'SELECT 1', state: { query: {} } }
     let resolveTranslation
     const runQuery = vi.fn()
     const running = runTranslatedSql(tab, {
