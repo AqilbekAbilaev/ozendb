@@ -1,5 +1,4 @@
-// PostgreSQL server administration reads. Everything here is diagnostics: it reports
-// what the server is set to, and never sets anything.
+// PostgreSQL server administration: diagnostics, sessions, roles and their grants.
 
 import { invoke } from '@tauri-apps/api/core'
 
@@ -53,9 +52,18 @@ export function dropRole(connectionId, name) {
   return invoke('drop_pg_role', { id: connectionId, name })
 }
 
-// Read-only (ozendb-ahy): every schema/table/view/sequence this role holds a direct
-// privilege on — not what it inherits through group membership, and not per-object
-// GRANT/REVOKE itself, which is a separate, much larger surface.
+// Every schema/table/view/sequence this role holds a direct privilege on — not what it
+// inherits through group membership (ozendb-ahy).
 export function grants(connectionId, role) {
   return invoke('list_pg_grants', { id: connectionId, role })
+}
+
+// `change` is { role, objectKind, schema, object, privileges, grantOption?, cascade? };
+// see grantRows.js, which builds it. Both are refused on a read-only connection.
+export function grantPrivileges(connectionId, change) {
+  return invoke('grant_pg_privileges', { id: connectionId, change })
+}
+
+export function revokePrivileges(connectionId, change) {
+  return invoke('revoke_pg_privileges', { id: connectionId, change })
 }

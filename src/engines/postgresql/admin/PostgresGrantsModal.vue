@@ -1,16 +1,21 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { grants as listGrants } from '../api/admin'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { grants as listGrants, grantPrivileges, revokePrivileges } from '../api/admin'
+import { GRANT_KINDS, privilegesFor, groupGrants, revokeChange, grantChange } from './grantRows'
 import { errText, errCode } from '../../../utils/errors'
+import { showToast } from '../../../stores/toast'
 import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseModalBody from '../../../components/base/BaseModalBody.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseSelect from '../../../components/base/BaseSelect.vue'
+import BaseCheckbox from '../../../components/base/BaseCheckbox.vue'
+import FieldError from '../../../components/base/FieldError.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
 import HintText from '../../../components/base/HintText.vue'
 
-// Read-only "what can this role touch" (ozendb-ahy): every schema/table/view/
-// sequence this role holds a direct privilege on. Opened from the Roles modal's
-// detail panel. Per-object GRANT/REVOKE itself is a separate, larger surface —
-// see grants.rs's own doc comment for why this view alone is what shipped first.
+// What this role can touch, and GRANT/REVOKE on schemas, tables and sequences
+// (ozendb-ahy). Opened from the Roles modal's detail panel.
 const props = defineProps({
   target: { type: Object, required: true },  // { connId, connName, role }
 })
@@ -20,6 +25,7 @@ const loading = ref(true)
 const error = ref(null)
 const errorCode = ref(null)
 const all = ref([])
+const grouped = computed(() => groupGrants(all.value))
 
 async function load() {
   loading.value = true
@@ -35,24 +41,64 @@ async function load() {
 }
 onMounted(load)
 
-// Grouped by schema, then by object (null = the schema itself) — one row per
-// object with its privileges joined, not one row per privilege.
-const grouped = computed(() => {
-  const bySchema = new Map()
-  for (const g of all.value) {
-    if (!bySchema.has(g.schema)) bySchema.set(g.schema, new Map())
-    const objects = bySchema.get(g.schema)
-    const key = g.object ?? ''
-    if (!objects.has(key)) objects.set(key, { object: g.object, objectKind: g.objectKind, privileges: [] })
-    objects.get(key).privileges.push(g.privilege)
+const draft = reactive({ kind: 'table', schema: 'public', object: '', privileges: [], grantOption: false })
+const kindOptions = GRANT_KINDS.map(k => ({ value: k, label: k }))
+const draftPrivileges = computed(() => privilegesFor(draft.kind))
+const cascade = ref(false)
+const busy = ref(false)
+const actionError = ref(null)
+
+function togglePrivilege(privilege, on) {
+  draft.privileges = on ? [...draft.privileges, privilege] : draft.privileges.filter(p => p !== privilege)
+}
+
+async function apply(call, change, done) {
+  busy.value = true
+  actionError.value = null
+  try {
+    await call(props.target.connId, change)
+    showToast(done)
+    await load()
+  } catch (e) {
+    actionError.value = errText(e)
+  } finally {
+    busy.value = false
   }
-  return [...bySchema.entries()].map(([schema, objects]) => ({ schema, objects: [...objects.values()] }))
-})
+}
+
+function grant() {
+  const built = grantChange(props.target.role, draft)
+  if (built.error) { actionError.value = built.error; return }
+  apply(grantPrivileges, built.change, 'Privileges granted')
+}
+
+function revoke(schema, obj) {
+  apply(revokePrivileges, revokeChange(props.target.role, schema, obj, cascade.value), 'Privileges revoked')
+}
 </script>
 
 <template>
-  <BaseModal :title="`Grants — ${target.role}`" width="600px" max-width="calc(100vw - 40px)" height="calc(100vh - 80px)" max-height="calc(100vh - 80px)" @close="$emit('close')">
+  <BaseModal :title="`Grants — ${target.role}`" width="640px" max-width="calc(100vw - 40px)" height="calc(100vh - 80px)" max-height="calc(100vh - 80px)" @close="$emit('close')">
     <BaseModalBody>
+      <div class="pg-grant-form">
+        <div class="pg-grant-row">
+          <BaseSelect v-model="draft.kind" :options="kindOptions" />
+          <BaseInput v-model="draft.schema" placeholder="schema" />
+          <BaseInput v-if="draft.kind !== 'schema'" v-model="draft.object" :placeholder="`${draft.kind} name`" />
+        </div>
+        <div class="pg-grant-row">
+          <label v-for="p in draftPrivileges" :key="p" class="pg-check">
+            <BaseCheckbox :model-value="draft.privileges.includes(p)" @update:model-value="togglePrivilege(p, $event)" />{{ p }}
+          </label>
+        </div>
+        <div class="pg-grant-row">
+          <label class="pg-check"><BaseCheckbox v-model="draft.grantOption" />With grant option</label>
+          <label class="pg-check" title="Also revoke what this role granted onward"><BaseCheckbox v-model="cascade" />Revoke with CASCADE</label>
+          <BaseButton class="pg-grant-btn" bordered :disabled="busy" @click="grant">Grant</BaseButton>
+        </div>
+        <FieldError :text="actionError" spaced />
+      </div>
+
       <HintText dim>Direct privileges only — not what this role inherits through group membership.</HintText>
 
       <StateMessage v-if="loading" mode="loading" label="Loading grants…" />
@@ -64,6 +110,7 @@ const grouped = computed(() => {
           <div v-for="obj in entry.objects" :key="obj.object ?? ''" class="pg-item">
             <code class="pg-obj">{{ obj.object ? `${obj.objectKind}: ${obj.object}` : 'schema' }}</code>
             <span class="pg-privs">{{ obj.privileges.join(', ') }}</span>
+            <BaseButton size="sm" :disabled="busy" title="Revoke these privileges" @click="revoke(entry.schema, obj)">Revoke</BaseButton>
           </div>
         </div>
       </div>
@@ -72,6 +119,13 @@ const grouped = computed(() => {
 </template>
 
 <style scoped>
+.pg-grant-form {
+  display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;
+  padding: 10px; border: 1px solid var(--border-soft); border-radius: 7px;
+}
+.pg-grant-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.pg-check { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.pg-grant-btn { margin-left: auto; }
 .pg-list { display: flex; flex-direction: column; gap: 14px; }
 .pg-schema-name { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
 .pg-item {
