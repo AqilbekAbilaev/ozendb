@@ -36,12 +36,12 @@ const queryCode = computed(() => {
     collection: tab.collectionName,
     database: tab.dbName,
     mode: tab.mode,
-    filter: tab.filter,
-    projection: tab.projection,
-    sort: tab.sort,
-    skip: tab.skip,
-    limit: tab.limit,
-    pipeline: tab.pipeline,
+    filter: tab.state.query.filter,
+    projection: tab.state.query.projection,
+    sort: tab.state.query.sort,
+    skip: tab.state.query.skip,
+    limit: tab.state.query.limit,
+    pipeline: tab.state.query.pipeline,
   }, queryCodeLang.value)
 })
 

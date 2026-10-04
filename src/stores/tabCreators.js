@@ -34,7 +34,7 @@ export async function openCollectionTab({ connectionId, connectionName, dbName, 
   // parse is not retained — an empty query is what runs, so an empty editor is honest.
   if (filter) {
     const pf = parseField(filter)
-    if (pf.ok) tab.filter = filter
+    if (pf.ok) tab.state.query.filter = filter
     runQuery(id, {
       filter:     pf.ok ? pf.ejson : '{}',
       projection: '{}',
@@ -56,11 +56,11 @@ export async function openCollectionTab({ connectionId, connectionName, dbName, 
   if (def) {
     const tab = tabs.value.find(t => t.id === id)
     if (tab) {
-      tab.filter     = def.filter     || ''
-      tab.sort       = def.sort       || ''
-      tab.projection = def.projection || ''
-      tab.skip       = Number(def.skip)
-      tab.limit      = Number(def.limit)
+      tab.state.query.filter     = def.filter     || ''
+      tab.state.query.sort       = def.sort       || ''
+      tab.state.query.projection = def.projection || ''
+      tab.state.query.skip       = Number(def.skip)
+      tab.state.query.limit      = Number(def.limit)
     }
     const pf = parseField(def.filter     || '')
     const ps = parseField(def.sort       || '')
@@ -134,10 +134,10 @@ export function openExportSource(node) {
   const tab = tabs.value.find(t =>
     t.kind === 'collection' && t.connectionId === node.connId
     && t.dbName === node.dbName && t.collectionName === node.collName)
-  const pf = tab ? parseField(tab.filter) : null
-  const rows = (tab && tab.selectedRows) || []
+  const pf = tab ? parseField(tab.state.query.filter) : null
+  const rows = (tab && tab.runtime.selectedRows) || []
   const selectedIds = rows
-    .map(i => tab.results[i])
+    .map(i => tab.runtime.results[i])
     .filter(doc => doc && doc._id !== undefined)
     .map(doc => doc._id)
   const target = {

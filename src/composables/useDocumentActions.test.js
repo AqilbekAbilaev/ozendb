@@ -19,11 +19,8 @@ const collectionTab = (connectionId, collectionName) => reactive({
   connectionId,
   dbName: 'shop',
   collectionName,
-  results: [],
-  selectedRow: -1,
-  selectedRows: [],
-  selectedField: null,
-  isRunning: false,
+  state: { query: {} },
+  runtime: { results: [], selectedRow: -1, selectedRows: [], selectedField: null, isRunning: false },
 })
 
 describe('Paste Documents', () => {

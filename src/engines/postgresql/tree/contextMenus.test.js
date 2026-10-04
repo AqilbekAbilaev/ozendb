@@ -65,4 +65,17 @@ describe('PostgreSQL right-click menus', () => {
     PG_ACTIONS['Search in Schema…'](schemaNode)
     expect(openModal).toHaveBeenCalledWith('pgSearch', schemaNode)
   })
+
+  // ozendb-6v3: the whole table, through the export dialog.
+  it('exports the table it was opened on', () => {
+    expect(PG_MENUS.table.map(i => i.label)).toContain('Export Table…')
+    PG_ACTIONS['Export Table…'](table)
+    expect(openModal).toHaveBeenCalledWith('pgExport', table)
+  })
+
+  it('imports a CSV into the table it was opened on', () => {
+    expect(PG_MENUS.table.map(i => i.label)).toContain('Import CSV…')
+    PG_ACTIONS['Import CSV…'](table)
+    expect(openModal).toHaveBeenCalledWith('pgImport', table)
+  })
 })

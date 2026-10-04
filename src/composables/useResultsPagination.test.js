@@ -4,7 +4,7 @@ import { useResultsPagination } from './useResultsPagination'
 
 describe('useResultsPagination', () => {
   it('advances from the current page by the tab limit', () => {
-    const tab = reactive({ kind: 'collection', skip: 50, limit: 25, results: [] })
+    const tab = reactive({ kind: 'collection', state: { query: { skip: 50, limit: 25 } }, runtime: { results: [] } })
     const requery = vi.fn()
     const pagination = useResultsPagination({
       activeTab: () => tab,
@@ -15,7 +15,7 @@ describe('useResultsPagination', () => {
 
     pagination.goNext()
 
-    expect(tab.skip).toBe(75)
+    expect(tab.state.query.skip).toBe(75)
     expect(requery).toHaveBeenCalledWith(false)
   })
 })

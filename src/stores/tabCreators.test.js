@@ -134,8 +134,8 @@ describe('created tab shapes', () => {
     expect(tab.engine).toBe('mongodb')
     expect(tab.kind).toBe('collection')
     expect(tab.mode).toBe('find')
-    expect(tab.limit).toBe(50)
-    expect(tab.resultView).toBe('table')
+    expect(tab.state.query.limit).toBe(50)
+    expect(tab.ui.resultView).toBe('table')
     expect(tab.title).toBe('orders')
     expect(tab.connectionId).toBe('c1')
   })
@@ -145,7 +145,7 @@ describe('created tab shapes', () => {
     c.openCollectionTab(COLLECTION, 'aggregate')
     expect(lastTab().type).toBe('mongodb.aggregate')
     expect(lastTab().mode).toBe('aggregate')
-    expect(lastTab().pipeline).toBe('')
+    expect(lastTab().state.query.pipeline).toBe('')
   })
 
   it('opens SQL tabs with the seeded editor text', () => {
@@ -211,14 +211,14 @@ describe('initial query execution', () => {
     const c = harness()
     const filter = '{ "status": "open" }'
     await c.openCollectionTab({ ...COLLECTION, filter })
-    expect(lastTab().filter).toBe(filter) // exact text, not the parsed EJSON sent to the API
+    expect(lastTab().state.query.filter).toBe(filter) // exact text, not the parsed EJSON sent to the API
   })
 
   it('does not retain filter text that did not parse — an empty query is what ran', async () => {
     const c = harness()
     await c.openCollectionTab({ ...COLLECTION, filter: 'not json' })
     // Nothing was persisted for display/history/session to misread as the executed query.
-    expect(lastTab().filter).toBe('')
+    expect(lastTab().state.query.filter).toBe('')
     expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
       filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 50,
     })
@@ -232,8 +232,8 @@ describe('initial query execution', () => {
     await c.openCollectionTab(COLLECTION)
     expect(getDefaultQuery).toHaveBeenCalledWith({ connectionId: 'c1', database: 'shop', collection: 'orders' })
     const tab = lastTab()
-    expect(tab.filter).toBe('{ "x": 1 }')
-    expect(tab.limit).toBe(5)
+    expect(tab.state.query.filter).toBe('{ "x": 1 }')
+    expect(tab.state.query.limit).toBe(5)
     expect(c.runQuery).toHaveBeenCalledWith(tab.id, {
       filter: '{"x":{"$numberInt":"1"}}', sort: '{"y":{"$numberInt":"-1"}}',
       projection: '{"z":{"$numberInt":"1"}}', skip: 2, limit: 5,
@@ -270,8 +270,8 @@ describe('export source resolution', () => {
     const c = harness()
     tabs.value = [{
       id: 't1', kind: 'collection', connectionId: 'c1', dbName: 'shop', collectionName: 'orders',
-      filter: '{ "status": "open" }', results: [{ _id: 'a' }, { _id: 'b' }, { noId: true }],
-      selectedRows: [0, 1, 2],
+      state: { query: { filter: '{ "status": "open" }' } },
+      runtime: { results: [{ _id: 'a' }, { _id: 'b' }, { noId: true }], selectedRows: [0, 1, 2] },
     }]
     c.openExportSource(NODE)
     expect(openModal).toHaveBeenCalledWith('exportSource', {
@@ -300,11 +300,11 @@ describe('changed settings affect only future workspaces', () => {
   it('applies a new query limit to tabs opened after the setting changes', () => {
     const c = harness()
     c.openCollectionTab(COLLECTION)
-    expect(lastTab().limit).toBe(50)
+    expect(lastTab().state.query.limit).toBe(50)
     c.defaultQueryLimit.value = 100
     c.openCollectionTab(COLLECTION)
-    expect(lastTab().limit).toBe(100)
-    expect(tabs.value[1].limit).toBe(50)
+    expect(lastTab().state.query.limit).toBe(100)
+    expect(tabs.value[1].state.query.limit).toBe(50)
   })
 })
 

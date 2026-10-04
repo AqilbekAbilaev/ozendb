@@ -51,7 +51,7 @@ function setMode(mode) {
 // Sort spinner next to the Sort field: sets a one-key `_id` sort and runs.
 // dir 1 = ascending (oldest first), dir -1 = descending (newest first).
 function sortById(dir) {
-  props.activeTab.sort = `{ _id: ${dir} }`
+  props.activeTab.state.query.sort = `{ _id: ${dir} }`
   emit('run')
 }
 
@@ -95,14 +95,14 @@ async function applyHistoryEntry(entry) {
   if (!tab) return
   if (entry.mode === 'aggregate') {
     setCollectionQueryMode(tab, 'aggregate')
-    tab.pipeline = entry.pipeline
+    tab.state.query.pipeline = entry.pipeline
   } else {
     setCollectionQueryMode(tab, 'find')
-    tab.filter     = entry.filter
-    tab.sort       = entry.sort
-    tab.projection = entry.projection
-    tab.skip       = Number(entry.skip)
-    tab.limit      = Number(entry.limit)
+    tab.state.query.filter     = entry.filter
+    tab.state.query.sort       = entry.sort
+    tab.state.query.projection = entry.projection
+    tab.state.query.skip       = Number(entry.skip)
+    tab.state.query.limit      = Number(entry.limit)
   }
   historyMenu.value = false
   await nextTick()
@@ -134,12 +134,12 @@ async function setStoredDefaultQuery() {
       },
       {
         mode:       tab.mode       || 'find',
-        filter:     tab.filter     || '',
-        sort:       tab.sort       || '',
-        projection: tab.projection || '',
-        skip:       tab.skip       ?? 0,
-        limit:      tab.limit      ?? 50,
-        pipeline:   tab.pipeline   || '',
+        filter:     tab.state.query.filter     || '',
+        sort:       tab.state.query.sort       || '',
+        projection: tab.state.query.projection || '',
+        skip:       tab.state.query.skip       ?? 0,
+        limit:      tab.state.query.limit      ?? 50,
+        pipeline:   tab.state.query.pipeline   || '',
       },
     )
     showDefaultMenu.value = false
@@ -173,12 +173,12 @@ async function saveCurrentQuery() {
     await saveQuery({
       name:       name,
       mode:       tab.mode       || 'find',
-      filter:     tab.filter     || '',
-      sort:       tab.sort       || '',
-      projection: tab.projection || '',
-      skip:       tab.skip       ?? 0,
-      limit:      tab.limit      ?? 50,
-      pipeline:   tab.pipeline   || '',
+      filter:     tab.state.query.filter     || '',
+      sort:       tab.state.query.sort       || '',
+      projection: tab.state.query.projection || '',
+      skip:       tab.state.query.skip       ?? 0,
+      limit:      tab.state.query.limit      ?? 50,
+      pipeline:   tab.state.query.pipeline   || '',
     })
     showSaveForm.value = false
     saveName.value = ''
@@ -223,8 +223,8 @@ watch(() => props.activeTab && props.activeTab.id, () => {
       :options="[{ value: 'find', label: 'Find' }, { value: 'aggregate', label: 'Aggregate' }]"
       @update:model-value="setMode"
     />
-    <BaseButton variant="ghost" icon="run" class="run" @click="emit('run')" :disabled="activeTab.isRunning || !runValid">
-      {{ activeTab.isRunning ? 'Running…' : 'Run' }}
+    <BaseButton variant="ghost" icon="run" class="run" @click="emit('run')" :disabled="activeTab.runtime.isRunning || !runValid">
+      {{ activeTab.runtime.isRunning ? 'Running…' : 'Run' }}
     </BaseButton>
     <template v-if="!isAggregate">
       <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" @click="emit('open-browser')">Load query</BaseButton>
@@ -309,15 +309,15 @@ watch(() => props.activeTab && props.activeTab.id, () => {
       <div class="qinput">
         <BaseInput
           class="qval"
-          :model-value="activeTab.filter"
-          @update:model-value="activeTab.filter = $event"
+          :model-value="activeTab.state.query.filter"
+          @update:model-value="activeTab.state.query.filter = $event"
           placeholder="{}"
           @keydown.enter.prevent="emit('run')"
         />
       </div>
       <span class="qlabel">Sort</span>
       <div class="qinput">
-        <BaseInput class="qval" :model-value="activeTab.sort" @update:model-value="activeTab.sort = $event" placeholder="{}" @keydown.enter.prevent="emit('run')" />
+        <BaseInput class="qval" :model-value="activeTab.state.query.sort" @update:model-value="activeTab.state.query.sort = $event" placeholder="{}" @keydown.enter.prevent="emit('run')" />
         <span class="qicon-col">
           <BaseIcon name="caret" :size="11" style="transform: rotate(-90deg)" title="Sort by _id ascending (oldest first)" @click="sortById(1)" />
           <BaseIcon name="caret" :size="11" style="transform: rotate(90deg)" title="Sort by _id descending (newest first)" @click="sortById(-1)" />
@@ -327,15 +327,15 @@ watch(() => props.activeTab && props.activeTab.id, () => {
 
       <span class="qlabel">Projection</span>
       <div class="qinput">
-        <BaseInput class="qval" :model-value="activeTab.projection" @update:model-value="activeTab.projection = $event" placeholder="{}" @keydown.enter.prevent="emit('run')" />
+        <BaseInput class="qval" :model-value="activeTab.state.query.projection" @update:model-value="activeTab.state.query.projection = $event" placeholder="{}" @keydown.enter.prevent="emit('run')" />
       </div>
       <div class="num-cluster">
         <span class="qlabel">Limit</span>
-        <NumberStepper :model-value="activeTab.limit || 50" :min="1" placeholder="50"
-          @update:model-value="activeTab.limit = $event" @enter="emit('run')" />
+        <NumberStepper :model-value="activeTab.state.query.limit || 50" :min="1" placeholder="50"
+          @update:model-value="activeTab.state.query.limit = $event" @enter="emit('run')" />
         <span class="qlabel">Skip</span>
-        <NumberStepper :model-value="activeTab.skip || 0" :min="0" placeholder="0"
-          @update:model-value="activeTab.skip = $event" @enter="emit('run')" />
+        <NumberStepper :model-value="activeTab.state.query.skip || 0" :min="0" placeholder="0"
+          @update:model-value="activeTab.state.query.skip = $event" @enter="emit('run')" />
       </div>
     </div>
     <FieldError :text="queryErrorText" class="qparse-error" />

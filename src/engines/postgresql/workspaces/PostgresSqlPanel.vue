@@ -17,6 +17,7 @@ import { showToast } from '../../../stores/toast'
 import PostgresPlan from './PostgresPlan.vue'
 import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
+import { openModal } from '../../../stores/modals'
 
 // A SQL editor with its toolbar, results and status line. `sql` is the editor's text
 // (v-model:sql — the tab's lasting state); `run` is its runs (createSqlRun), written in
@@ -30,6 +31,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:sql'])
 const setSql = (text) => emit('update:sql', text)
+const exportQuery = () => openModal('pgExport', { connId: props.run.connectionId, database: props.run.database, query: props.sql })
 
 // Manual: runs go into one transaction, begun by the first of them, until Commit or
 // Rollback. The switch holds still while one is open.
@@ -111,6 +113,7 @@ const summary = computed(() => {
       <BaseButton variant="ghost" icon="close" :disabled="!run.running" title="Stop the running query" @click="cancelSql(run)">Cancel</BaseButton>
       <span class="qsep"></span>
       <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" :disabled="run.running || !sql.trim()" title="Lay the SQL out one clause per line" @click="format">Format</BaseButton>
+      <BaseButton variant="ghost" icon="export" class="qbar-hide-sm" :disabled="!sql.trim()" title="Export every row this query returns" @click="exportQuery" />
       <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
       <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save or open a saved query" @click="library = 'saved'" />
       <span class="qsep"></span>

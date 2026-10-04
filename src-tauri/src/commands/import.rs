@@ -33,6 +33,8 @@ impl Default for CsvOptions {
 }
 
 mod csv;
+// Shared with the PostgreSQL import, which streams the same RFC-4180 records into COPY.
+pub(crate) use csv::CsvRecords;
 
 // The importer inserts in batches of this many documents so peak memory stays O(batch)
 // rather than O(file). `insert_many` per batch is ordered, so a failure in a later batch

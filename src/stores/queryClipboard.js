@@ -7,12 +7,12 @@ export const clipboardQuery = ref(null)
 export function copyQuery(tab) {
   clipboardQuery.value = {
     mode:       tab.mode       || 'find',
-    filter:     tab.filter     || '',
-    sort:       tab.sort       || '',
-    projection: tab.projection || '',
-    skip:       tab.skip       ?? 0,
-    limit:      tab.limit      ?? 50,
-    pipeline:   tab.pipeline   || '',
+    filter:     tab.state.query.filter     || '',
+    sort:       tab.state.query.sort       || '',
+    projection: tab.state.query.projection || '',
+    skip:       tab.state.query.skip       ?? 0,
+    limit:      tab.state.query.limit      ?? 50,
+    pipeline:   tab.state.query.pipeline   || '',
   }
 }
 
@@ -22,11 +22,11 @@ export function pasteQuery(tab) {
   const q = clipboardQuery.value
   if (!q) return false
   setCollectionQueryMode(tab, q.mode)
-  tab.filter     = q.filter
-  tab.sort       = q.sort
-  tab.projection = q.projection
-  tab.skip       = Number(q.skip)
-  tab.limit      = Number(q.limit)
-  tab.pipeline   = q.pipeline
+  tab.state.query.filter     = q.filter
+  tab.state.query.sort       = q.sort
+  tab.state.query.projection = q.projection
+  tab.state.query.skip       = Number(q.skip)
+  tab.state.query.limit      = Number(q.limit)
+  tab.state.query.pipeline   = q.pipeline
   return true
 }

@@ -18,6 +18,7 @@
 // against a target it could not identify — but it does mean a new workspace kind must
 // be registered there or its menus stay dark.
 import { resourceFromLegacyTab, legacyTargetFromResource } from './legacyResourceRef'
+import { sameResource } from './resourceRef'
 
 // How many segments each gated level needs.
 const DEPTH = { connection: 0, database: 1, collection: 2 }
@@ -54,6 +55,11 @@ function menuEngine(tab, selDepth, pgSelDepth) {
   return MENU_ENGINES.includes(tab?.engine) ? tab.engine : 'none'
 }
 
+// MongoDB tabs carry the lock at the top level, PostgreSQL's table tab under `state`.
+function isLocked(tab) {
+  return !!(tab && (tab.readOnly || tab.state?.readOnly))
+}
+
 // -1 for "names no resource", so every comparison below is false for it.
 function depth(ref) {
   return ref ? ref.segments.length : -1
@@ -66,7 +72,8 @@ function depth(ref) {
 //   connectionCount  number of connections open in the tree
 //   indexSelected  whether an index row is selected in the open Indexes dialog
 //   canRefresh     whether the active tab can reload (workspaces/lifecycle's canRefreshWorkspace)
-export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false) {
+//   openTabs       every open workspace, for the lock of one showing the selected resource
+export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false, openTabs = []) {
   const tab = activeTab || null
   const tabDepth = depth(mongoResource(tab, resourceFromLegacyTab(tab)))
   const selDepth = depth(mongoResource(treeSelection, treeSelection?.resource))
@@ -76,10 +83,11 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   // view only — never the sidebar. The Document menu acts on the row/field the user
   // has selected in the grid, which only exists while a collection tab is active and
   // has run a query. A field selection implies a row selection.
-  const rowCount = tab && tab.kind === 'collection' ? (tab.results?.length ?? 0) : 0
-  const selectedRow = tab ? (tab.selectedRow ?? -1) : -1
+  const isCollection = tab?.kind === 'collection'
+  const rowCount = isCollection ? (tab.runtime.results?.length ?? 0) : 0
+  const selectedRow = isCollection ? (tab.runtime.selectedRow ?? -1) : -1
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount
-  const hasField = hasDocument && !!(tab && tab.selectedField)
+  const hasField = hasDocument && !!(tab && tab.runtime.selectedField)
 
   // PostgreSQL (ozendb-sxd), the same union as Connection/Database/Collection above:
   // a query tab names a schema, a table tab names a schema and a table, and the
@@ -100,11 +108,9 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     // Index-menu actions operate on the index selected in the Indexes dialog, which
     // is independent of the tab/tree selection — so it's passed in directly.
     hasIndex: !!indexSelected,
-    // The active tab's read-only lock disables the write actions (see writable.js).
-    // Only the tab can carry it — the sidebar selection never locks anything.
-    // MongoDB tabs carry it at the top level; PostgreSQL's table tab carries its
-    // own accidental-edit lock nested under `state` instead (tableState.js).
-    readOnly: !!(tab && (tab.readOnly || tab.state?.readOnly)),
+    // A read-only lock (see writable.js) disables the write actions: the active tab's,
+    // or that of an open tab showing the sidebar selection, which a write may target.
+    readOnly: isLocked(tab) || openTabs.some(t => isLocked(t) && sameResource(t.target, treeSelection?.resource)),
     // Refresh reloads the active tab, never the sidebar selection.
     canRefreshTab: !!canRefresh,
     hasPgSchema: hasPgSchema,
