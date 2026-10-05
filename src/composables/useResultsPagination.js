@@ -17,8 +17,8 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
       { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
       parsed.ejson,
     )
-    tab.total = total
-    tab.totalFilter = parsed.ejson
+    tab.runtime.total = total
+    tab.runtime.totalFilter = parsed.ejson
     return total
   }
 
@@ -36,11 +36,11 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
   }
   async function runCount() {
     const tab = activeTab()
-    if (!tab || isCountDisabled.value || tab.isCounting) return
-    tab.isCounting = true
-    try { await fetchCount(tab); tab.countShown = true }
+    if (!tab || isCountDisabled.value || tab.runtime.isCounting) return
+    tab.runtime.isCounting = true
+    try { await fetchCount(tab); tab.runtime.countShown = true }
     catch (e) { showToast('Count failed: ' + errText(e)) }
-    finally { tab.isCounting = false }
+    finally { tab.runtime.isCounting = false }
   }
   function setPageSize(size) {
     const tab = activeTab()
@@ -53,12 +53,12 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
     if (!len) return '-- to --'
     const base = `${(tab.state.query.skip || 0) + 1} to ${(tab.state.query.skip || 0) + len}`
     const parsed = parseField(tab.state.query.filter || '')
-    return tab.total != null && parsed.ok && tab.totalFilter === parsed.ejson ? `${base} of ${tab.total.toLocaleString()}` : base
+    return tab.runtime.total != null && parsed.ok && tab.runtime.totalFilter === parsed.ejson ? `${base} of ${tab.runtime.total.toLocaleString()}` : base
   })
   const countText = computed(() => {
-    const tab = activeTab(); if (!tab || isCountDisabled.value || tab.total == null || !tab.countShown) return null
+    const tab = activeTab(); if (!tab || isCountDisabled.value || tab.runtime.total == null || !tab.runtime.countShown) return null
     const parsed = parseField(tab.state.query.filter || '')
-    return parsed.ok && tab.totalFilter === parsed.ejson ? tab.total.toLocaleString() : null
+    return parsed.ok && tab.runtime.totalFilter === parsed.ejson ? tab.runtime.total.toLocaleString() : null
   })
   function onCountContext(e) {
     if (countText.value == null) return
@@ -67,7 +67,7 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
   }
   function copyCountValue() {
     const tab = activeTab(); countMenu.value = null
-    if (tab?.total != null) navigator.clipboard.writeText(String(tab.total)).catch(() => {})
+    if (tab?.runtime.total != null) navigator.clipboard.writeText(String(tab.runtime.total)).catch(() => {})
   }
   return { countMenu, isCountDisabled, rangeText, countText, goFirst, goPrev, goNext, goLast, runCount, setPageSize, onCountContext, copyCountValue }
 }

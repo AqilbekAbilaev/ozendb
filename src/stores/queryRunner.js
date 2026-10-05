@@ -19,7 +19,7 @@ function newRunId() {
 // documents still travelling home), so the cancel has to be honoured here too:
 // whatever arrives for a stale run is dropped instead of rendered.
 function isStale(tab, runId) {
-  return tab.cancelled || tab.runId !== runId
+  return tab.runtime.cancelled || tab.runtime.runId !== runId
 }
 
 // Cancel a tab's in-flight query: stop showing it as running straight away, and ask
@@ -27,21 +27,21 @@ function isStale(tab, runId) {
 // failure — the op can have finished already — so the cancel still holds locally.
 export async function cancelQuery(tabId) {
   const tab = tabs.value.find(t => t.id === tabId)
-  if (!tab || !tab.runtime.isRunning || !tab.runId) return
-  tab.cancelled = true
+  if (!tab || !tab.runtime.isRunning || !tab.runtime.runId) return
+  tab.runtime.cancelled = true
   tab.runtime.isRunning = false
   tab.runtime.runError = 'Query cancelled.'
-  tab.runErrorCode = null
+  tab.runtime.runErrorCode = null
   try {
-    await qapi.cancelRun(tab.connectionId, tab.runId)
+    await qapi.cancelRun(tab.connectionId, tab.runtime.runId)
     showToast('Query cancelled')
   } catch (e) {
     // The server refused to kill the op, so it is still running and its results are
     // still coming: put the tab back where it was rather than dropping them. Unless
     // the run has since settled (runId cleared) — restoring then strands a spinner
     // over a query nobody is waiting for.
-    if (tab.runId) {
-      tab.cancelled = false
+    if (tab.runtime.runId) {
+      tab.runtime.cancelled = false
       tab.runtime.isRunning = true
       tab.runtime.runError = null
     }
@@ -55,16 +55,16 @@ export async function runQuery(tabId, params) {
   tab.runtime.isRunning = true
   // Wall clock, and only for the live counter while the query is in flight — the
   // figure that stays behind is the server's (see below).
-  tab.startedAt = Date.now()
+  tab.runtime.startedAt = Date.now()
   tab.runtime.elapsedMs = null
   tab.runtime.runError = null
-  tab.runErrorCode = null
-  tab.cancelled = false
+  tab.runtime.runErrorCode = null
+  tab.runtime.cancelled = false
   // A new run invalidates any count shown on the footer's Count Documents button,
   // so it reverts to the plain label until the user counts again.
-  tab.countShown = false
+  tab.runtime.countShown = false
   const runId = newRunId()
-  tab.runId = runId
+  tab.runtime.runId = runId
   const { addToHistory = true, ...queryParams } = params
   try {
     const res = await qapi.runFind(
@@ -102,13 +102,13 @@ export async function runQuery(tabId, params) {
     // either way the tab already says what it needs to say.
     if (isStale(tab, runId)) return
     tab.runtime.runError = errText(e)
-    tab.runErrorCode = errCode(e)
+    tab.runtime.runErrorCode = errCode(e)
   } finally {
     // Clearing runId marks this run settled: a later response is stale, and a cancel
     // that lands now has nothing to restore.
-    if (tab.runId === runId) {
+    if (tab.runtime.runId === runId) {
       tab.runtime.isRunning = false
-      tab.runId = null
+      tab.runtime.runId = null
     }
   }
 }
@@ -119,16 +119,16 @@ export async function runAggregate(tabId, params) {
   tab.runtime.isRunning = true
   // Wall clock, and only for the live counter while the query is in flight — the
   // figure that stays behind is the server's (see below).
-  tab.startedAt = Date.now()
+  tab.runtime.startedAt = Date.now()
   tab.runtime.elapsedMs = null
   tab.runtime.runError = null
-  tab.runErrorCode = null
-  tab.cancelled = false
+  tab.runtime.runErrorCode = null
+  tab.runtime.cancelled = false
   // A new run invalidates any count shown on the footer's Count Documents button,
   // so it reverts to the plain label until the user counts again.
-  tab.countShown = false
+  tab.runtime.countShown = false
   const runId = newRunId()
-  tab.runId = runId
+  tab.runtime.runId = runId
   try {
     const res = await qapi.runAggregate(
       { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
@@ -161,13 +161,13 @@ export async function runAggregate(tabId, params) {
     // either way the tab already says what it needs to say.
     if (isStale(tab, runId)) return
     tab.runtime.runError = errText(e)
-    tab.runErrorCode = errCode(e)
+    tab.runtime.runErrorCode = errCode(e)
   } finally {
     // Clearing runId marks this run settled: a later response is stale, and a cancel
     // that lands now has nothing to restore.
-    if (tab.runId === runId) {
+    if (tab.runtime.runId === runId) {
       tab.runtime.isRunning = false
-      tab.runId = null
+      tab.runtime.runId = null
     }
   }
 }

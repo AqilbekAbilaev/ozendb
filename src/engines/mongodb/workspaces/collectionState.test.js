@@ -26,7 +26,9 @@ describe('createCollectionState', () => {
 describe('createCollectionRuntime', () => {
   it('starts empty: nothing run, nothing selected', () => {
     expect(createCollectionRuntime()).toEqual({
-      results: [], hasRun: false, isRunning: false, runError: null,
+      results: [], hasRun: false, isRunning: false, runError: null, runErrorCode: null,
+      runId: null, startedAt: null, cancelled: false,
+      total: null, totalFilter: null, isCounting: false, countShown: false,
       selectedRow: -1, selectedRows: [], selectedField: null, elapsedMs: null,
     })
   })
