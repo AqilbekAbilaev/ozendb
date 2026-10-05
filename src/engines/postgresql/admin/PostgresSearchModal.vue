@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { searchTables } from '../api/resources'
 import { cancelQuery } from '../api/queries'
+import { openPostgresTable } from '../../../stores/tabCreators'
 import { errText, errCode } from '../../../utils/errors'
 import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseModalBody from '../../../components/base/BaseModalBody.vue'
@@ -65,6 +66,13 @@ function cancel() {
   if (runId.value) cancelQuery(props.target.connId, runId.value).catch(() => {})
 }
 
+// A match opens its row in a new table tab, filtered by its primary key (#172). The
+// dialog stays open, so several matches can be looked at in turn.
+function openMatch(m) {
+  const { connId, connName, database, schema } = props.target
+  openPostgresTable({ connectionId: connId, connectionName: connName, database, schema, table: m.table, rowKey: m.primaryKey })
+}
+
 function keyText(pk) {
   return Object.entries(pk).map(([k, v]) => `${k} = ${v}`).join(', ')
 }
@@ -96,7 +104,10 @@ function keyText(pk) {
           <span v-if="result.skipped.length">· skipped (no primary key or no text column): {{ result.skipped.join(', ') }}</span>
         </HintText>
         <div class="ps-list">
-          <div v-for="(m, i) in result.matches" :key="i" class="ps-item">
+          <div
+            v-for="(m, i) in result.matches" :key="i" class="ps-item" role="button" tabindex="0"
+            title="Open this row in a table tab" @click="openMatch(m)" @keydown.enter="openMatch(m)"
+          >
             <code class="ps-loc">{{ m.table }}.{{ m.column }}</code>
             <span class="ps-value" :title="m.value">{{ m.value }}</span>
             <span class="ps-key">{{ keyText(m.primaryKey) }}</span>
@@ -115,8 +126,9 @@ function keyText(pk) {
 .ps-item {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 7px;
-  background: var(--bg-field);
+  background: var(--bg-field); cursor: pointer;
 }
+.ps-item:hover, .ps-item:focus-visible { background: var(--bg-hover); outline: none; }
 .ps-loc { flex: none; font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
 .ps-value { flex: 1; min-width: 0; font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ps-key { flex: none; font-size: 11px; color: var(--text-faint); }
