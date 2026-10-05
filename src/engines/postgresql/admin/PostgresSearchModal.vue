@@ -71,8 +71,10 @@ function keyText(pk) {
 </script>
 
 <template>
-  <BaseModal :title="`Search in Schema — ${target.schema}`" width="640px" max-width="calc(100vw - 40px)" height="calc(100vh - 80px)" max-height="calc(100vh - 80px)" @close="$emit('close')">
-    <BaseModalBody>
+  <BaseModal :title="`Search in Schema — ${target.schema}`" width="min(1000px, calc(100vw - 40px))" max-height="calc(100vh - 80px)" @close="$emit('close')">
+    <!-- Not scrollable as a whole: the controls and the match count stay put while
+         only the list scrolls (#171). -->
+    <BaseModalBody :scrollable="false" class="ps-body">
       <div class="ps-controls">
         <BaseInput v-model="term" placeholder="Search for…" class="ps-term" @keydown.enter="search" />
         <BaseButton v-if="!loading" bordered :disabled="!term.trim()" @click="search">Search</BaseButton>
@@ -96,7 +98,7 @@ function keyText(pk) {
         <div class="ps-list">
           <div v-for="(m, i) in result.matches" :key="i" class="ps-item">
             <code class="ps-loc">{{ m.table }}.{{ m.column }}</code>
-            <span class="ps-value">{{ m.value }}</span>
+            <span class="ps-value" :title="m.value">{{ m.value }}</span>
             <span class="ps-key">{{ keyText(m.primaryKey) }}</span>
           </div>
         </div>
@@ -106,9 +108,10 @@ function keyText(pk) {
 </template>
 
 <style scoped>
-.ps-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ps-body { min-height: 0; }
+.ps-controls { flex: none; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .ps-term, .ps-tables { flex: 1; }
-.ps-list { display: flex; flex-direction: column; gap: 6px; }
+.ps-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
 .ps-item {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 7px;
