@@ -1,4 +1,4 @@
-import { openPostgresQuery, openPostgresTable } from '../../../stores/tabCreators'
+import { openPostgresQuery, openPostgresTable, openPostgresSearch } from '../../../stores/tabCreators'
 import { openModal } from '../../../stores/modals'
 
 // The right-click menus for PostgreSQL's sidebar rows, in the same shape as
@@ -43,7 +43,7 @@ export const PG_ACTIONS = {
   'Server Activity…': (n) => openModal('pgActivity', n),
   'Roles…': (n) => openModal('pgRoles', n),
   'Functions & Procedures…': (n) => openModal('pgRoutines', n),
-  'Search in Schema…': (n) => openModal('pgSearch', n),
+  'Search in Schema…': (n) => openPostgresSearch({ connectionId: n.connId, connectionName: n.connName, database: n.database, schema: n.schema }),
   'Create Schema…': (n) => openModal('pgCreateSchema', n),
   'Drop Schema…': (n) => openModal('pgDrop', n),
   'Create Table…': (n) => openModal('pgCreateTable', n),

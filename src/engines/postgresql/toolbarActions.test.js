@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const openPostgresQuery = vi.fn()
 const openPostgresTable = vi.fn()
-vi.mock('../../stores/tabCreators', () => ({ openPostgresQuery, openPostgresTable }))
+const openPostgresSearch = vi.fn()
+vi.mock('../../stores/tabCreators', () => ({ openPostgresQuery, openPostgresTable, openPostgresSearch }))
 const openModal = vi.fn()
 vi.mock('../../stores/modals', () => ({ openModal }))
 const showToast = vi.fn()
@@ -61,7 +62,7 @@ describe('runPgTool', () => {
 
   it('opens Search in Schema on the schema in focus', () => {
     runPgTool('pgSearch', resolving(schema))
-    expect(openModal).toHaveBeenCalledWith('pgSearch', schema)
+    expect(openPostgresSearch).toHaveBeenCalledWith({ connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public' })
   })
 
   it('asks for a table when only a schema is in focus', () => {
