@@ -1,21 +1,26 @@
 <script setup>
-// The global toolbar strip. Presentational only: renders the TOOLS buttons and emits
-// `tool` with the clicked action id; App.vue routes that into its handleTool dispatcher.
-// `hidden` is driven by the View → Hide Global Toolbar toggle.
+// The global toolbar strip. Presentational only: renders the TOOLS buttons for the
+// engine in focus and emits `tool` with the clicked action id; App.vue routes that into
+// its handleTool dispatcher. `hidden` is driven by the View → Hide Global Toolbar toggle.
+import { computed } from 'vue'
 import ToolbarButton from '../base/ToolbarButton.vue'
 import { TOOLS } from '../../constants/tools'
+import { toolbarTools } from '../../utils/toolbarTools'
 
-defineProps({
+const props = defineProps({
   hidden: { type: Boolean, default: false },
+  // The native menu's engine ('mongodb' | 'postgresql' | 'none'), so the two agree.
+  engine: { type: String, default: 'none' },
 })
+const tools = computed(() => toolbarTools(TOOLS, props.engine))
 defineEmits(['tool'])
 </script>
 
 <template>
   <div class="toolbar" v-show="!hidden">
-    <template v-for="(t, i) in TOOLS" :key="i">
+    <template v-for="(t, i) in tools" :key="i">
       <div v-if="t.sep" class="tb-sep"></div>
-      <ToolbarButton v-else :icon="t.name" :label="t.label" :badge="t.badge" :drop="t.drop" :title="t.label" @click="$emit('tool', t.name)" />
+      <ToolbarButton v-else :icon="t.icon || t.name" :label="t.label" :badge="t.badge" :drop="t.drop" :title="t.label" @click="$emit('tool', t.name)" />
     </template>
   </div>
 </template>

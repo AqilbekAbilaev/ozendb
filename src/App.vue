@@ -30,7 +30,7 @@ const { operations, runningCount, clearFinished } = useOperations()
 const operationsPaneOpen = ref(false)
 const operationsPaneHeight = ref(200)
 
-const { menuTarget, pgMenuTarget } = useMenu()
+const { menuTarget, pgMenuTarget, menuEngine } = useMenu()
 
 const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({ menuTarget })
 
@@ -43,7 +43,7 @@ useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, refreshAll, 
          useAppMenuActions routes its clicks and, on Linux, its shortcuts. -->
 
     <!-- Toolbar -->
-    <Toolbar :hidden="toolbarHidden" @tool="handleTool" />
+    <Toolbar :hidden="toolbarHidden" :engine="menuEngine" @tool="handleTool" />
 
     <!-- Main row -->
     <div class="app-main">
