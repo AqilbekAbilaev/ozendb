@@ -12,6 +12,7 @@ import { treeSelection, setTreeSelection } from '../stores/connectionNavigation'
 import { contextMenu } from '../stores/contextMenu'
 import { TOOLS } from '../constants/tools'
 import { MODALS } from '../constants/modalRegistry'
+import { COLOR_ACTION } from '../constants/contextMenus'
 import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
@@ -32,13 +33,12 @@ import { runPgTool } from '../engines/postgresql/toolbarActions'
 // Dependencies are injected so this stays UI-agnostic and testable: `dbActions` is the
 // sibling composable API; the rest are shared refs and the tab creators, which remain in
 // App.vue. Tab state comes from the store; modals open through stores/modals.js directly.
-// Context-menu entries that are deliberately offered but not implemented yet. Naming
-// them is what lets an *unrecognised* action be treated as the bug it is: while
-// "absent from FEATURES" meant "coming soon", a renamed or mistyped label was
-// indistinguishable from a placeholder and quietly lied to the user.
-export const UNBUILT_ACTIONS = new Set([
-  'Duplicate Database…',
-  'Export URI…',
+// Context-menu entries that are deliberately offered but not implemented yet, by id,
+// with the name the "coming soon" toast uses. Naming them is what lets an unrecognised
+// id be treated as the wiring bug it is rather than as a placeholder.
+export const UNBUILT_ACTIONS = new Map([
+  ['db:duplicate', 'Duplicate Database…'],
+  ['conn:export_uri', 'Export URI…'],
 ])
 
 // `menuTarget` comes from useMenu, which App.vue constructs once because it also
@@ -55,11 +55,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // Toolbar tool name → registry action. Tools whose behavior is app-level
   // (connect/sql) or bespoke (collection/shell) are handled in handleTool.
   const TOOL_ALIASES = {
-    aggregate: 'Open Aggregation Editor',
-    export:    'Export…',
-    import:    'Import…',
-    schema:    'View Schema',
-    search:    'Search in…',
+    aggregate: 'coll:aggregation',
+    export:    'coll:export',
+    import:    'coll:import',
+    schema:    'coll:schema',
+    search:    'file:search',
   }
 
   function pick(node, fields) {
@@ -192,67 +192,68 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     }
   }
 
+  // Keyed by action id; the labels menus show are theirs, not ours. Ids match the
+  // native menu's where it offers the same action.
   const FEATURES = {
     // ── open a tab ──
-    'Open Collection':         { requires: 'collection', run: (n) => openCollectionTab(tabArgs(n)) },
-    'Open Aggregation Editor': { requires: 'collection', run: (n) => openCollectionTab(tabArgs(n), 'aggregate') },
-    'Open IntelliShell':       { requires: 'database',   run: (n) => openShellTab(shellArgs(n)) },
-    'Indexes…':                { requires: 'collection', run: (n) => openIndexManagerTab(pick(n, COLL)) },
+    'coll:open_tab':           { requires: 'collection', run: (n) => openCollectionTab(tabArgs(n)) },
+    'coll:aggregation':        { requires: 'collection', run: (n) => openCollectionTab(tabArgs(n), 'aggregate') },
+    'file:intellishell':       { requires: 'database',   run: (n) => openShellTab(shellArgs(n)) },
+    'coll:add_index':          { requires: 'collection', run: (n) => openIndexManagerTab(pick(n, COLL)) },
 
     // ── connection-scoped info modals ──
-    'Server Status':           modalFeature('serverStatus'),
-    'Server Status Charts':    modalFeature('serverCharts'),
-    'Current Operations':      { requires: 'connection', run: (n) => openCurrentOpsTab(pick(n, CONN)) },
-    'Build Info':              { requires: 'connection', run: (n) => openServerInfo(n, 'build',   'Build Info') },
-    'Host Info':               { requires: 'connection', run: (n) => openServerInfo(n, 'host',    'Host Info') },
-    'Replica Set Status':      { requires: 'connection', run: (n) => openServerInfo(n, 'replica', 'Replica Set Status') },
+    'file:server_status':      modalFeature('serverStatus'),
+    'file:server_charts':      modalFeature('serverCharts'),
+    'db:current_ops':          { requires: 'connection', run: (n) => openCurrentOpsTab(pick(n, CONN)) },
+    'file:server_build':       { requires: 'connection', run: (n) => openServerInfo(n, 'build',   'Build Info') },
+    'conn:host_info':          { requires: 'connection', run: (n) => openServerInfo(n, 'host',    'Host Info') },
+    'conn:replica_status':     { requires: 'connection', run: (n) => openServerInfo(n, 'replica', 'Replica Set Status') },
 
     // ── database-scoped modals ──
-    'Database Statistics':     modalFeature('dbStats'),
-    'Query Profiler':          modalFeature('profiler'),
-    'Manage Users':            modalFeature('users'),
-    'Manage Roles':            modalFeature('roles'),
-    'Stored Functions':        modalFeature('functions'),
-    'GridFS…':                 modalFeature('gridfs'),
-    'Search in…':              { requires: 'database', run: (n) => openSearchTab(pick(n, DB)) },
+    'db:database_stats':       modalFeature('dbStats'),
+    'db:profiler':             modalFeature('profiler'),
+    'db:manage_users':         modalFeature('users'),
+    'db:manage_roles':         modalFeature('roles'),
+    'db:functions':            modalFeature('functions'),
+    'gridfs:open':             modalFeature('gridfs'),
+    'file:search':             { requires: 'database', run: (n) => openSearchTab(pick(n, DB)) },
 
     // ── collection-scoped modals ──
-    'Add / Edit Validator…':   modalFeature('validator'),
-    'View Schema':             { requires: 'collection', run: (n) => openSchemaTab(pick(n, COLL)) },
-    'Collection History':      modalFeature('history'),
-    'Collection Stats':        modalFeature('stats'),
-    'Open Map-Reduce':         modalFeature('mapReduce'),
+    'coll:validator':          modalFeature('validator'),
+    'coll:schema':             { requires: 'collection', run: (n) => openSchemaTab(pick(n, COLL)) },
+    'coll:history':            modalFeature('history'),
+    'coll:stats':              modalFeature('stats'),
+    'coll:mapreduce':          modalFeature('mapReduce'),
 
     // ── create/edit dialogs (state + seeders owned by useDbActions) ──
-    'Add Collection…':         modalFeature('addCollection'),
-    'Add Database…':           modalFeature('addDatabase'),
-    'Add View…':               { requires: 'database',   run: (n) => openAddView(n, '') },
-    'Add View Here…':          { requires: 'collection', run: (n) => openAddView(n, n.collName || '') },
-    'Add GridFS Bucket…':      modalFeature('addBucket'),
-    'Drop Database…':          modalFeature('dropDatabase'),
-    'Drop Collection…':        modalFeature('dropCollection'),
-    'Rename Collection…':      modalFeature('renameCollection'),
-    'Duplicate Collection…':   modalFeature('duplicateCollection'),
+    'db:add_collection':       modalFeature('addCollection'),
+    'db:add_database':         modalFeature('addDatabase'),
+    'db:add_view':             { requires: 'database',   run: (n) => openAddView(n, '') },
+    'coll:add_view':           { requires: 'collection', run: (n) => openAddView(n, n.collName || '') },
+    'db:add_bucket':           modalFeature('addBucket'),
+    'db:drop_database':        modalFeature('dropDatabase'),
+    'coll:drop':               modalFeature('dropCollection'),
+    'coll:rename':             modalFeature('renameCollection'),
+    'coll:duplicate':          modalFeature('duplicateCollection'),
 
     // ── import / export (collection-level wizards; db-level exports many) ──
-    'Export…':                 { requires: 'collection', run: (n) => openExportSource(pick(n, COLL)) },
-    'Import…':                 { requires: 'collection', run: (n) => openImportWizard(pick(n, COLL)) },
-    'Export Collections…':     { requires: 'database',   run: (n) => exportDatabase(pick(n, COLL)) },
-    'Import Collections…':     { requires: 'database',   run: (n) => importDatabase(pick(n, COLL)) },
+    'coll:export':             { requires: 'collection', run: (n) => openExportSource(pick(n, COLL)) },
+    'coll:import':             { requires: 'collection', run: (n) => openImportWizard(pick(n, COLL)) },
+    'db:export':               { requires: 'database',   run: (n) => exportDatabase(pick(n, COLL)) },
+    'db:import':               { requires: 'database',   run: (n) => importDatabase(pick(n, COLL)) },
 
     // ── clipboard / copy-paste ──
-    'Copy Name':               { requires: null,         run: (n, ctx) => { navigator.clipboard.writeText(ctx.label); showToast('Copied') } },
-    'Copy Collection':         { requires: 'collection', run: (n) => copyToClipboard(n, 'collection') },
-    'Copy Database':           { requires: 'database',   run: (n) => copyToClipboard(n, 'database') },
-    'Paste Into Database':     { requires: 'database',   run: (n) => pasteClipboard(pick(n, COLL)) },
+    'node:copy_name':          { requires: null,         run: (n, ctx) => { navigator.clipboard.writeText(ctx.label); showToast('Copied') } },
+    'coll:copy':               { requires: 'collection', run: (n) => copyToClipboard(n, 'collection') },
+    'db:copy_database':        { requires: 'database',   run: (n) => copyToClipboard(n, 'database') },
+    'db:paste':                { requires: 'database',   run: (n) => pasteClipboard(pick(n, COLL)) },
 
     // ── connection lifecycle ──
-    'Disconnect':              { requires: 'connection', run: disconnectOne },
-    'Disconnect Others':       { requires: 'connection', run: disconnectOthers },
-    'Disconnect All':          { requires: null,         run: disconnectAll },
-    'Refresh Selected Item':   { requires: 'connection', run: refreshSelected },
-    'Refresh':                 { requires: 'connection', run: refreshSelected },
-    'Refresh All':             { requires: null,         run: refreshAll },
+    'conn:disconnect':         { requires: 'connection', run: disconnectOne },
+    'conn:disconnect_others':  { requires: 'connection', run: disconnectOthers },
+    'conn:disconnect_all':     { requires: null,         run: disconnectAll },
+    'node:refresh':            { requires: 'connection', run: refreshSelected },
+    'view:refresh_all':        { requires: null,         run: refreshAll },
   }
 
   // True when a node carries the fields a given level needs.
@@ -273,7 +274,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   function runFeature(action, node, ctx = {}) {
     const feat = FEATURES[action]
     if (!feat) {
-      if (UNBUILT_ACTIONS.has(action)) { showToast(action + ' — coming to OzenDB'); return }
+      if (UNBUILT_ACTIONS.has(action)) { showToast(UNBUILT_ACTIONS.get(action) + ' — coming to OzenDB'); return }
       // Offered by a menu but unknown here: a wiring bug, not a placeholder. Say so
       // loudly rather than telling the user their feature was never built.
       console.error(`useFeatures: no handler registered for action "${action}"`)
@@ -294,10 +295,10 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
       return
     }
 
-    // Choose Color carries the picked color as an ":<color>" suffix.
-    if (action.startsWith('Choose Color:')) {
+    // The colour submenu's pick carries the colour after COLOR_ACTION.
+    if (action.startsWith(COLOR_ACTION)) {
       try {
-        await applyColorTag({ type: saved.type, nodeData: saved.nodeData, color: action.split(':')[1] })
+        await applyColorTag({ type: saved.type, nodeData: saved.nodeData, color: action.slice(COLOR_ACTION.length) })
       } catch (e) {
         showToast(`Could not save color tag: ${errText(e)}`)
       }
@@ -389,8 +390,9 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
   // Bridges a native-menu item into the feature registry by synthesizing the
   // "selected node" from the current target (sidebar selection, or the active tab).
-  // `requiredType` guards the action; guides the user when context is missing.
-  function menuNode(action, requiredType) {
+  // `requiredType` (the feature's own level unless given) guards the action and guides
+  // the user when context is missing.
+  function menuNode(action, requiredType = FEATURES[action]?.requires ?? null) {
     const tab = menuTarget(requiredType)
     if (!tab || !tab.connectionId) {
       showToast('Open a connection, database, or collection first')
