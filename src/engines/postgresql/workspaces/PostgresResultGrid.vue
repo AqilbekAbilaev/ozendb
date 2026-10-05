@@ -23,6 +23,8 @@ const props = defineProps({
   selection:  { type: Object,   required: true },
   columnInfo: { type: Object,   default: () => ({}) },
   rowOffset:  { type: Number,   default: 0 },
+  // Overrides rowOffset's numbering, for a grid that mixes in rows not yet saved.
+  rowLabel:   { type: Function, default: null },
   orderBy:    { type: String,   default: null },
   descending: { type: Boolean,  default: false },
   sortable:   { type: Boolean,  default: false },
@@ -173,11 +175,11 @@ function setNull() {
   emit('save', row, column, null)
 }
 
-// A row added off the loaded page's end lands past the viewport with nothing to draw
-// attention to it — scroll it into view and open its first editable cell. Two ticks:
-// scrollToRow's scroll event re-renders virtualRows asynchronously, so the target row
-// isn't mounted yet on the first one.
-async function focusNewRow(rowIndex) {
+// A new row can land past the viewport with nothing to draw attention to it — scroll it
+// into view and select it, opening its first editable cell unless `edit` is false (a
+// duplicate already has values). Two ticks: scrollToRow's scroll event re-renders
+// virtualRows asynchronously, so the target row isn't mounted yet on the first one.
+async function focusNewRow(rowIndex, { edit = true } = {}) {
   // 'center', not 'end': the row height used for this scroll is still the last
   // measurement (remeasure() hasn't run for it yet), so an 'end' alignment flush
   // against the viewport's bottom edge has no margin for that estimate being off —
@@ -187,7 +189,7 @@ async function focusNewRow(rowIndex) {
   scrollToRow(rowIndex, 'center')
   await nextTick()
   await nextTick()
-  const column = props.columns.find(c => props.canEdit(c, rowIndex))
+  const column = edit && props.columns.find(c => props.canEdit(c, rowIndex))
   if (column) {
     selectCell(rowIndex, column)
     startEdit(rowIndex, column, null)
@@ -253,7 +255,7 @@ defineExpose({ focusNewRow })
             'pending-delete': rowStatus(vrow.index) === 'deleted', 'pending-insert': rowStatus(vrow.index) === 'inserted',
           }"
         >
-          <td class="rownum" @click="selectRow($event, vrow.index)">{{ rowOffset + vrow.index + 1 }}</td>
+          <td class="rownum" @click="selectRow($event, vrow.index)">{{ rowLabel ? rowLabel(vrow.index) : rowOffset + vrow.index + 1 }}</td>
           <td
             v-for="(value, c) in rows[vrow.index]"
             :key="c"

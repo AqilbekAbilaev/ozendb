@@ -95,6 +95,7 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
       'setSort', 'setShownColumns', 'moveColumn', 'applyFilters', 'clearFilters',
       'canEdit', 'canEditInsertColumn', 'editText', 'stageEdit', 'isDeleted', 'toggleDelete', 'restoreRow',
       'addRow', 'duplicateRow', 'stageInsertValue', 'removeInsert', 'insertRows', 'insertDrafts',
+      'gridRows', 'gridIndexOf', 'rowStatus', 'rowNumber',
       'pendingCount', 'deletedCount', 'reviewSql', 'saveChanges', 'discardAll'),
   }
 }
