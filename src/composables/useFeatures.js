@@ -15,7 +15,7 @@ import { MODALS } from '../constants/modalRegistry'
 import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
-import { resourceFromLegacyTab, legacyTargetFromResource } from '../utils/legacyResourceRef'
+import { legacyTargetFromResource } from '../utils/legacyResourceRef'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
@@ -99,15 +99,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     return { requires: level, run: (node) => openModal(id, modalTarget(node, level)) }
   }
 
-  // A workspace's identity in the long alias spelling, read through its ResourceRef so
-  // the short-alias tool workspaces resolve the same as collection ones, and so a
-  // Current Operations tab's dbName/collName filters are not mistaken for its scope.
+  // A workspace's identity in the long alias spelling, read from its canonical target,
+  // so a Current Operations tab's dbName/collName filters are never mistaken for scope.
   function workspaceTarget(workspace) {
     if (!workspace) return null
-    return legacyTargetFromResource(
-      resourceFromLegacyTab(workspace),
-      workspace.connectionName ?? workspace.connName ?? null,
-    )
+    return legacyTargetFromResource(workspace.target, workspace.connectionName ?? null)
   }
 
   // Normalize a tab (connectionId/collectionName keys) into a registry node.

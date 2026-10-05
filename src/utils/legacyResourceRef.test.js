@@ -194,6 +194,18 @@ describe('legacyTargetFromResource', () => {
     })
   })
 
+  // A tab's target is read straight into this now, and a PostgreSQL tab's target is
+  // database/schema/table: it has no MongoDB spelling, rather than a schema posing as
+  // a collection.
+  it('has no spelling for a ref that is not MongoDB-shaped', () => {
+    const pg = (segments) => createResourceRef('p1', segments)
+    expect(legacyTargetFromResource(pg([{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }]))).toBe(null)
+    expect(legacyTargetFromResource(pg([
+      { kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'widgets' },
+    ]))).toBe(null)
+    expect(legacyTargetFromResource(pg([{ kind: 'schema', name: 'public' }]))).toBe(null)
+  })
+
   // The display name is presentation, not identity, so it is passed in rather than
   // read back out of the ref — which never carried it.
   it('defaults the display name to null when none is given', () => {

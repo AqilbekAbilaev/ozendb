@@ -95,8 +95,9 @@ export function resourceFromMongoTarget(target) {
   return make(target.connectionId, collection([], target.database, target.collection))
 }
 
-// Tab scope is decided by the explicit kind table, never by field presence:
-// currentOps carries dbName/collName as *filters*, not as its identity.
+// Reads a tab record saved before tabs carried a target (see sessionMigration); a live
+// workspace's identity is its `target`. Scope is decided by the explicit kind table,
+// never by field presence: currentOps carries dbName/collName as *filters*.
 const TAB_SCOPES = {
   collection: 'collection',
   shell: 'database',
@@ -147,10 +148,15 @@ export function legacyNodeTagKey(resource) {
 // nothing downstream has to know which spelling its caller happened to use.
 //
 // The display name is presentation, never identity (a ref does not carry one), so it
-// is passed in by whoever has it.
+// is passed in by whoever has it. Anything deeper or differently kinded (a PostgreSQL
+// schema or table) has no such spelling and yields null.
 export function legacyTargetFromResource(resource, connectionName = null) {
   if (!isResourceRef(resource)) return null
+  // Only a MongoDB-shaped ref (connection, database, collection) has this spelling.
   const [database, collection] = resource.segments
+  if (resource.segments.length > 2) return null
+  if (database && database.kind !== 'database') return null
+  if (collection && collection.kind !== 'collection') return null
   return {
     connectionId: resource.connectionId,
     connectionName: connectionName ?? null,
