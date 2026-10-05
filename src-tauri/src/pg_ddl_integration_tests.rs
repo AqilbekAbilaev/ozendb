@@ -135,8 +135,8 @@ async fn a_drop_blocked_by_an_open_transaction_gives_up_instead_of_hanging() {
     let started = std::time::Instant::now();
     let error = drop_table_impl(&pool, schema, "t", false).await.expect_err("drop should give up");
     assert!(started.elapsed() < std::time::Duration::from_secs(15), "the drop waited {:?}", started.elapsed());
-    let json = serde_json::to_value(&error).unwrap();
-    assert!(json["message"].as_str().unwrap().contains("open transaction"), "{json}");
+    let message = error.user_message();
+    assert!(message.contains("open transaction"), "{message}");
 
     holder.rollback().await.unwrap();
     reset(&pool, schema).await;

@@ -6,9 +6,9 @@ use crate::commands::{cancel_query_impl, run_query_as};
 use crate::error::AppError;
 use crate::pg_integration_tests::{pool, test_config};
 
-// The message the frontend receives — the serialized `{ code, message }`.
+// The message the frontend receives.
 fn shown(err: &AppError) -> String {
-    serde_json::to_value(err).unwrap()["message"].as_str().unwrap().to_string()
+    err.user_message()
 }
 
 #[tokio::test]
