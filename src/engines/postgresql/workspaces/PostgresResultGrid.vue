@@ -197,7 +197,16 @@ async function focusNewRow(rowIndex, { edit = true } = {}) {
     rowSelection.setSingleRow(rowIndex)
   }
 }
-defineExpose({ focusNewRow })
+// The row a duplicate was copied from, highlighted for a moment so the copy right below
+// it reads as its (#170); cleared when the fade ends.
+const flashedRow = ref(-1)
+async function flashRow(rowIndex) {
+  // Off first, so flashing the same row again restarts the fade.
+  flashedRow.value = -1
+  await nextTick()
+  flashedRow.value = rowIndex
+}
+defineExpose({ focusNewRow, flashRow })
 </script>
 
 <template>
@@ -253,7 +262,9 @@ defineExpose({ focusNewRow })
           :class="{
             selrow: isRowSelected(vrow.index), stripe: vrow.index % 2 === 1,
             'pending-delete': rowStatus(vrow.index) === 'deleted', 'pending-insert': rowStatus(vrow.index) === 'inserted',
+            flash: flashedRow === vrow.index,
           }"
+          @animationend="flashedRow = -1"
         >
           <td class="rownum" @click="selectRow($event, vrow.index)">{{ rowLabel ? rowLabel(vrow.index) : rowOffset + vrow.index + 1 }}</td>
           <td
@@ -379,6 +390,10 @@ td.selcell { outline: 2px solid var(--accent); outline-offset: -2px; }
 tbody tr.pending-delete td { background: var(--danger-bg); color: var(--danger-text); text-decoration: line-through; }
 tbody tr.pending-delete td.rownum { text-decoration: none; }
 tbody tr.pending-insert td { background: var(--success-bg); }
+tbody tr.flash td { animation: row-flash 1.2s ease-out; }
+@keyframes row-flash { from { background: color-mix(in srgb, var(--accent) 30%, transparent); } }
+/* Reduced motion: hold the highlight, then drop it, rather than fade. */
+@media (prefers-reduced-motion: reduce) { tbody tr.flash td { animation-timing-function: steps(1, end); } }
 /* A dragged header's label follows the pointer; a line marks where it will land. */
 .drag-ghost {
   position: fixed; z-index: 200; pointer-events: none;

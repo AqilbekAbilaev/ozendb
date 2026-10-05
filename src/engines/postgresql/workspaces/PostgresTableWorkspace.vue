@@ -89,8 +89,11 @@ function deleteSelection() {
 }
 
 function duplicateSelection() {
-  const key = canDuplicate.value ? t.value.duplicateRow(selectedRowIndexes.value[0]) : null
-  if (key != null) resultGridRef.value?.focusNewRow(t.value.gridIndexOf(key), { edit: false })
+  const original = selectedRowIndexes.value[0]
+  const key = canDuplicate.value ? t.value.duplicateRow(original) : null
+  if (key == null) return
+  resultGridRef.value?.flashRow(original)
+  resultGridRef.value?.focusNewRow(t.value.gridIndexOf(key), { edit: false })
 }
 
 // One row or several, loaded or new. Last first: dropping a new row moves every row
