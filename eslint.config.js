@@ -2,6 +2,17 @@ import js from '@eslint/js'
 import globals from 'globals'
 import pluginVue from 'eslint-plugin-vue'
 
+const ENGINE_NAME_CHECKS = [
+  {
+    selector: "BinaryExpression[operator=/^[!=]==?$/] > Literal[value=/^(mongodb|postgresql)$/]",
+    message: 'Ask src/engines (engineOf, ENGINES, ui.js) instead of comparing engine names.',
+  },
+  {
+    selector: "Property > Identifier.key[name=/^(mongodb|postgresql)$/]",
+    message: 'Per-engine tables belong in src/engines.',
+  },
+]
+
 // ESLint's recommended rules catch general JavaScript mistakes; Vue's essentials
 // cover template correctness. Project-specific rules stay focused on dead code, not
 // style — there is still no formatter here, deliberately.
@@ -50,6 +61,17 @@ export default [
         group: ['**/components/*'],
         message: 'composables/ is imported by components, not the other way round.',
       }] }],
+    },
+  },
+  // Engine facts come from src/engines (engineOf, ENGINES, ui.js), never from comparing
+  // engine names, so a new engine is a new table entry rather than an edit everywhere.
+  // menuContext mirrors menu.rs's per-engine menus and is the one exception.
+  {
+    files: ['src/**/*.js', 'src/**/*.vue'],
+    ignores: ['src/engines/**', '**/*.test.js', '**/*.fixtures.js', 'src/utils/menuContext.js'],
+    rules: {
+      'no-restricted-syntax': ['error', ...ENGINE_NAME_CHECKS],
+      'vue/no-restricted-syntax': ['error', ...ENGINE_NAME_CHECKS],
     },
   },
   {
