@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isProtectedIndex, indexKeyLabel, indexSpecJson, isIndexHidden, indexType,
-  indexProperties, requestedIndexHidden,
+  isProtectedIndex, indexKeyLabel, indexSpecJson, isIndexHidden, indexType, indexProperties, requestedIndexHidden, indexSizesFrom, indexUsageFrom, indexSeedFromClipboard,
 } from './indexSpec'
 
 describe('isProtectedIndex', () => {
@@ -97,5 +96,39 @@ describe('indexProperties', () => {
   it('returns an empty list when no property applies', () => {
     expect(indexProperties({ name: 'a_1' })).toEqual([])
     expect(indexProperties(null)).toEqual([])
+  })
+})
+
+describe('indexSizesFrom', () => {
+  it('maps each index to its size and keeps the total', () => {
+    expect(indexSizesFrom({ indexes: [{ name: '_id_', size: 4096 }, { name: 'a_1', size: 8192 }], total_index_size: 12288 }))
+      .toEqual({ sizes: { _id_: 4096, a_1: 8192 }, total: 12288 })
+  })
+
+  it('copes with stats that carry no index list or total', () => {
+    expect(indexSizesFrom({})).toEqual({ sizes: {}, total: null })
+  })
+})
+
+describe('indexUsageFrom', () => {
+  it('reads each index\'s operation count, plain or as a $numberLong', () => {
+    expect(indexUsageFrom([
+      { name: '_id_', accesses: { ops: 3 } },
+      { name: 'a_1', accesses: { ops: { $numberLong: '12' } } },
+      { name: 'b_1', accesses: {} },
+    ])).toEqual({ _id_: 3, a_1: '12' })
+  })
+})
+
+describe('indexSeedFromClipboard', () => {
+  it('turns a copied index spec into a create-form seed without its name', () => {
+    expect(indexSeedFromClipboard('{ "key": { "a": 1 }, "name": "a_1", "unique": true }'))
+      .toEqual({ ok: true, seed: { key: { a: 1 }, unique: true } })
+  })
+
+  it('says why text is not a spec', () => {
+    expect(indexSeedFromClipboard('  ')).toEqual({ ok: false, message: 'Clipboard is empty' })
+    expect(indexSeedFromClipboard('{ nope')).toEqual({ ok: false, message: 'Clipboard is not a valid index spec' })
+    expect(indexSeedFromClipboard('{ "name": "x" }')).toEqual({ ok: false, message: 'Clipboard is not an index spec' })
   })
 })

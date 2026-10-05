@@ -57,3 +57,33 @@ export function indexProperties(index) {
   if (index.hidden) props.push('Hidden')
   return props
 }
+
+// Each index's size, and the collection's total index size, out of its collStats.
+export function indexSizesFrom(stats) {
+  const sizes = {}
+  for (const entry of (stats.indexes || [])) sizes[entry.name] = entry.size
+  return { sizes: sizes, total: stats.total_index_size ?? null }
+}
+
+// Each index's operation count out of $indexStats; the server may send it as a
+// plain number or a `$numberLong`.
+export function indexUsageFrom(stats) {
+  const usage = {}
+  for (const entry of stats) {
+    const ops = entry && entry.accesses && entry.accesses.ops
+    if (ops != null) usage[entry.name] = typeof ops === 'object' ? (ops.$numberLong ?? null) : ops
+  }
+  return usage
+}
+
+// A copied index spec as a seed for the create form: its name is dropped so the new
+// index gets its own.
+export function indexSeedFromClipboard(text) {
+  if (!text.trim()) return { ok: false, message: 'Clipboard is empty' }
+  let spec
+  try { spec = JSON.parse(text) } catch (e) { return { ok: false, message: 'Clipboard is not a valid index spec' } }
+  if (!spec || typeof spec.key !== 'object') return { ok: false, message: 'Clipboard is not an index spec' }
+  const seed = Object.assign({}, spec)
+  delete seed.name
+  return { ok: true, seed: seed }
+}
