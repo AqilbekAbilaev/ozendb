@@ -174,7 +174,7 @@ pub async fn save_connection(
     Ok(id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_connections(ctx: State<'_, AppContext>) -> Vec<ConnectionConfig> {
     ctx.storage.load()
 }
@@ -182,7 +182,7 @@ pub fn list_connections(ctx: State<'_, AppContext>) -> Vec<ConnectionConfig> {
 /// Assemble the connection string for a saved connection, in its engine's dialect. The
 /// password is deliberately omitted — credentials live in the OS keychain and are never
 /// handed to the frontend; the URI carries the username + auth/TLS options only.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn connection_uri(ctx: State<'_, AppContext>, id: String) -> Result<String, AppError> {
     let config = match ctx.storage.find(&id) {
         Some(val) => val,
@@ -225,7 +225,7 @@ fn copy_secrets(from: &str, to: &str) -> Result<(), AppError> {
 /// Duplicate a saved connection: clone its config under a new id and a "(copy)"
 /// name, carry over any keychain secrets to the new id, and persist it. The copy
 /// starts closed (not shown in the sidebar) and with no last-accessed time.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn duplicate_connection(
     ctx: State<'_, AppContext>,
     id: String,
@@ -256,7 +256,7 @@ pub fn duplicate_connection(
 /// Export all saved connections to a JSON file (a backup). Configs hold no
 /// secrets — passwords and SSH secrets live in the OS keychain, not in the
 /// config — so the exported file is inherently credential-free. Returns the count.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn export_connections(ctx: State<'_, AppContext>, path: String) -> Result<usize, AppError> {
     let connections = ctx.storage.load();
     let contents = match serde_json::to_string_pretty(&connections) {
@@ -274,7 +274,7 @@ pub fn export_connections(ctx: State<'_, AppContext>, path: String) -> Result<us
 /// overwrites an existing one) and starts closed. Imported connections carry no
 /// password (none was exported), so credentials must be re-entered. Returns the
 /// number imported.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn import_connections(ctx: State<'_, AppContext>, path: String) -> Result<usize, AppError> {
     let contents = match std::fs::read_to_string(&path) {
         Ok(val) => val,
@@ -392,7 +392,7 @@ pub async fn disconnect(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_connection_open(
     ctx: State<'_, AppContext>,
     id: String,
@@ -408,7 +408,7 @@ pub fn set_connection_open(
 /// Persist the colour tag chosen for a connection from the tree's Choose Color
 /// menu, so it survives a restart. The colour "none" clears the tag. Database and
 /// collection tags are handled separately by `set_node_tag`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_connection_tag(
     ctx: State<'_, AppContext>,
     id: String,
@@ -421,7 +421,7 @@ pub fn set_connection_tag(
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_last_accessed(
     ctx: State<'_, AppContext>,
     id: String,

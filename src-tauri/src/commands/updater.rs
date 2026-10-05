@@ -11,7 +11,7 @@
 
 /// True when an update can be installed in place: always on macOS and Windows, and on
 /// Linux only when running as an AppImage.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn can_self_update() -> bool {
     if cfg!(target_os = "linux") {
         std::env::var_os("APPIMAGE").is_some()

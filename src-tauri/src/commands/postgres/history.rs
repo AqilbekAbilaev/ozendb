@@ -10,7 +10,7 @@ use super::AppContext;
 
 /// Every recorded edit for one table, newest-first — backs the table workspace's
 /// history panel.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_pg_row_history(
     history: State<'_, PgRowHistoryStore>,
     id: String,
@@ -22,7 +22,7 @@ pub fn list_pg_row_history(
 }
 
 /// Forget all recorded edits for one table.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_pg_row_history(
     history: State<'_, PgRowHistoryStore>,
     id: String,

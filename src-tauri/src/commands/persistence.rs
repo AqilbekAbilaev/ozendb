@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use tauri::State;
 use uuid::Uuid;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_settings(settings: State<'_, SettingsStorage>) -> Settings {
     settings.load()
 }
@@ -19,7 +19,7 @@ pub fn get_settings(settings: State<'_, SettingsStorage>) -> Settings {
 /// Persist app preferences. Each field is optional and merged over the current
 /// settings, so a partial update (e.g. just toggling the theme) can't wipe the
 /// others. Values are clamped/validated so a bad value can't break the UI.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_settings(
     settings: State<'_, SettingsStorage>,
     default_query_limit: Option<i64>,
@@ -90,7 +90,7 @@ pub fn update_settings(
 /// Current keyboard-shortcut bindings (menu-action id -> accelerator string).
 /// Empty until the user customizes anything; the frontend layers these over its
 /// built-in defaults.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_keybindings(keybindings: State<'_, KeybindingStorage>) -> HashMap<String, String> {
     keybindings.load()
 }
@@ -98,7 +98,7 @@ pub fn get_keybindings(keybindings: State<'_, KeybindingStorage>) -> HashMap<Str
 /// Persist the full effective set of shortcut bindings. Blank accelerators are
 /// dropped so an unbound entry can't linger as a phantom binding; the native
 /// menu picks the new accelerators up on next launch.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_keybindings(
     keybindings: State<'_, KeybindingStorage>,
     bindings: HashMap<String, String>,
@@ -115,7 +115,7 @@ pub fn update_keybindings(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_default_query(
     dq:            State<'_, DefaultQueryStorage>,
     connection_id: String,
@@ -126,7 +126,7 @@ pub fn get_default_query(
     dq.get(&key)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_default_query(
     dq:            State<'_, DefaultQueryStorage>,
     connection_id: String,
@@ -156,7 +156,7 @@ pub fn set_default_query(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_default_query(
     dq:            State<'_, DefaultQueryStorage>,
     connection_id: String,
@@ -170,12 +170,12 @@ pub fn clear_default_query(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_open_tabs(ts: State<'_, TabStorage>) -> Option<serde_json::Value> {
     ts.load()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_open_tabs(
     ts:      State<'_, TabStorage>,
     session: serde_json::Value,
@@ -190,14 +190,14 @@ pub fn set_open_tabs(
 /// ("connId/db" or "connId/db/coll") to colour name. Loaded on startup so tags
 /// survive a restart. Connection-level tags are not here — they live on the
 /// connection config and come back with `list_connections`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_node_tags(tags: State<'_, NodeTagStorage>) -> HashMap<String, String> {
     tags.load()
 }
 
 /// Set or clear the colour tag on a database/collection tree node. The colour
 /// "none" clears the tag (removes the entry) rather than storing it.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_node_tag(
     tags:  State<'_, NodeTagStorage>,
     key:   String,
@@ -218,7 +218,7 @@ pub fn set_node_tag(
 /// a whole connection, or "connId/db/" for one database's collections). Used when
 /// a parent's colour changes, so its descendants drop their own tags and take the
 /// parent's colour.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_node_tags_under(
     tags:   State<'_, NodeTagStorage>,
     prefix: String,
@@ -229,12 +229,12 @@ pub fn clear_node_tags_under(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_saved_queries(sq: State<'_, SavedQueryStorage>) -> Vec<SavedQueryEntry> {
     sq.load()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_query(
     sq:         State<'_, SavedQueryStorage>,
     name:       String,
@@ -265,7 +265,7 @@ pub fn save_query(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_saved_query(sq: State<'_, SavedQueryStorage>, id: String) -> Result<(), AppError> {
     match sq.delete(&id) {
         Ok(val) => Ok(val),
@@ -273,7 +273,7 @@ pub fn delete_saved_query(sq: State<'_, SavedQueryStorage>, id: String) -> Resul
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_query_history(
     history: State<'_, HistoryStorage>,
     connection_id: String,
@@ -284,7 +284,7 @@ pub fn get_query_history(
     history.get(&key)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn push_query_history(
     history: State<'_, HistoryStorage>,
     connection_id: String,
@@ -316,7 +316,7 @@ pub fn push_query_history(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_query_history(
     history: State<'_, HistoryStorage>,
     connection_id: String,
