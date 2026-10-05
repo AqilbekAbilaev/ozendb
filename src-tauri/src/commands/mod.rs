@@ -1,12 +1,14 @@
 use crate::error::AppError;
 use crate::pool::ConnectionPool;
 use crate::storage::Storage;
+use access::{config_for, Access};
 use mongodb::bson;
 use mongodb::Client;
 use mongodb::Collection;
 use serde::Serialize;
 use std::time::Duration;
 
+mod access;
 pub mod connection;
 pub mod mongo;
 pub mod postgres;
@@ -84,11 +86,7 @@ impl AppContext {
     /// operates on a connection goes through here, so the config-lookup + connect
     /// dance lives in exactly one place (and the keychain read stays off the hot path).
     pub async fn client(&self, id: &str) -> Result<Client, AppError> {
-        let config = match self.storage.find(id) {
-            Some(val) => val,
-            None => return Err(AppError::UnknownConnection(id.to_string())),
-        };
-        self.pool.connect(&config).await
+        self.pool.connect(&config_for(&self.storage, id, Access::Read)?).await
     }
 
     /// The write-gated sibling of `client`: every mutating command resolves through
@@ -102,14 +100,7 @@ impl AppContext {
     /// paths must stay in step: a new mutating command belongs here, a new shell
     /// operation belongs there.
     pub async fn client_for_write(&self, id: &str) -> Result<Client, AppError> {
-        let config = match self.storage.find(id) {
-            Some(val) => val,
-            None => return Err(AppError::UnknownConnection(id.to_string())),
-        };
-        if config.read_only {
-            return Err(AppError::ReadOnly { name: config.name.clone() });
-        }
-        self.pool.connect(&config).await
+        self.pool.connect(&config_for(&self.storage, id, Access::Write)?).await
     }
 
     /// Resolve straight to a collection handle for the common
@@ -150,11 +141,7 @@ impl AppContext {
     /// `pg_pool`, but for a database other than the connection's own — opening a
     /// second database on the same server (ozendb-bj2). `None` is exactly `pg_pool`.
     pub async fn pg_pool_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
-        let config = match self.storage.find(id) {
-            Some(val) => val,
-            None => return Err(AppError::UnknownConnection(id.to_string())),
-        };
-        self.pool.connect_postgres(&config, database).await
+        self.pool.connect_postgres(&config_for(&self.storage, id, Access::Read)?, database).await
     }
 
     /// The write-gated sibling of `pg_pool`, mirroring `client_for_write`: a
@@ -166,14 +153,7 @@ impl AppContext {
     /// `pg_pool_for_write`'s sibling for a non-primary database, mirroring
     /// `pg_pool_for_database`.
     pub async fn pg_pool_for_write_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
-        let config = match self.storage.find(id) {
-            Some(val) => val,
-            None => return Err(AppError::UnknownConnection(id.to_string())),
-        };
-        if config.read_only {
-            return Err(AppError::ReadOnly { name: config.name.clone() });
-        }
-        self.pool.connect_postgres(&config, database).await
+        self.pool.connect_postgres(&config_for(&self.storage, id, Access::Write)?, database).await
     }
 
     /// Whether the connection is marked `read_only` — for a command that must
