@@ -5,6 +5,9 @@
 // `deny` (not `warn`) so a regression fails `cargo clippy` outright instead of
 // being lost among the crate's other (intentional, house-style) lint warnings.
 #![deny(clippy::await_holding_lock)]
+// The long-hand early return and explicit field names are house style (AGENTS.md →
+// Code quality → Rust style), so the lints against them would only be standing noise.
+#![allow(clippy::question_mark, clippy::needless_match, clippy::redundant_field_names)]
 
 mod commands;
 mod collection_history;

@@ -256,6 +256,15 @@ needs a reason a few lines of code can't cover, and the user approves it before 
 inverse also holds: don't hand-roll what an already-installed library does (the codebase uses
 `sqlparser`, `boa`, `russh` rather than home-grown equivalents).
 
+### Rust style
+
+Two long-hand forms are deliberate, not oversights: early returns written as a `match`
+(`Ok(val) => val, Err(e) => return Err(e)`) and struct fields written `pool: pool`. They keep
+every exit point and every field visible at a glance. `?` and shorthand are fine too: follow
+the file you're in, and never convert one into the other as a sweep. Clippy's
+`question_mark`, `needless_match` and `redundant_field_names` are allowed in `lib.rs` for
+this reason, so what clippy still reports is worth reading.
+
 ### Comments
 
 Comments say **why**, never what. The existing ones explain history and constraints — why
