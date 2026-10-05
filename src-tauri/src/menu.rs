@@ -218,7 +218,7 @@ pub enum Spec {
 // itself; emitting their ids too is harmless (the frontend has no case for them).
 pub fn handle_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     let id = event.id().as_ref().to_string();
-    let _ = app.emit("menu-action", id);
+    let _ = app.emit(crate::events::MENU_ACTION, id);
 }
 
 // Updates the enabled state of every gated item to match the current selection
