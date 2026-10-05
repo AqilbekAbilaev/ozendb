@@ -20,7 +20,7 @@ import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
 import { openModal } from '../stores/modals'
-import { PG_ACTIONS } from '../engines/postgresql/tree/contextMenus'
+import { contextAction } from '../engines/contextActions.js'
 import { runPgTool } from '../engines/postgresql/toolbarActions'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
@@ -304,8 +304,8 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
       return
     }
 
-    const pgAction = saved.nodeData?.engine === 'postgresql' && PG_ACTIONS[action]
-    if (pgAction) return pgAction(saved.nodeData)
+    const engineAction = contextAction(saved.nodeData, action)
+    if (engineAction) return engineAction(saved.nodeData)
     return runFeature(action, saved.nodeData, { label: saved.label })
   }
 

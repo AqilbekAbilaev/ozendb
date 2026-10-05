@@ -1,6 +1,5 @@
 import { ref } from 'vue'
-import { collectionStats, databaseStats } from '../engines/mongodb/api/admin'
-import { tableStats } from '../engines/postgresql/api/resources'
+import { engineOf } from '../engines/index.js'
 import { errText } from '../utils/errors'
 import { fmtClock } from '../utils/format'
 
@@ -24,13 +23,11 @@ export const HOVER_GRACE = 200
 // Exported for their spec: what a hovered row is called, and which set of numbers
 // its card should show.
 export function tipKind(target) {
-  if (target.engine === 'postgresql') return 'pgTable'
-  return target.collName ? 'collection' : 'database'
+  return engineOf(target).statsTip.kind(target)
 }
 
 export function tipLabel(target) {
-  if (target.engine === 'postgresql') return `${target.schema}.${target.table}`
-  return target.collName ? `${target.dbName}.${target.collName}` : target.dbName
+  return engineOf(target).statsTip.label(target)
 }
 
 export function useStatsTip({ delay = HOVER_DELAY, grace = HOVER_GRACE } = {}) {
@@ -53,15 +50,9 @@ export function useStatsTip({ delay = HOVER_DELAY, grace = HOVER_GRACE } = {}) {
     if (pending) pending = { x: e.clientX, y: e.clientY }
   }
 
-  // Which command answers for this row. A PostgreSQL target names its schema and
-  // table; a MongoDB one names a collection, or nothing beyond the database.
+  // Which command answers for this row is the row's engine's business.
   function read(target) {
-    if (target.engine === 'postgresql') {
-      return tableStats({ connectionId: target.connId, schema: target.schema, table: target.table })
-    }
-    return target.collName
-      ? collectionStats({ connectionId: target.connId, database: target.dbName, collection: target.collName })
-      : databaseStats({ connectionId: target.connId, database: target.dbName })
+    return engineOf(target).statsTip.read(target)
   }
 
   async function load(target, mine) {
