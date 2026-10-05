@@ -37,6 +37,11 @@ jobs:
       - name: Check file sizes
         run: npm run check:size
 
+      # The production Rollup build can break where the dev server doesn't (see the
+      # mongodb-query-parser alias in vite.config.js), so build it on every PR.
+      - name: Build the production bundle
+        run: npm run build
+
   backend:
     name: Backend tests (cargo)
     runs-on: ubuntu-22.04
