@@ -69,6 +69,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
@@ -87,6 +89,14 @@ jobs:
             libssl-dev \
             build-essential \
             file
+
+      # Default lint levels: only deny-level lints fail the job, which is what makes
+      # lib.rs's `deny(clippy::await_holding_lock)` an enforced guard.
+      - name: Clippy
+        working-directory: ./src-tauri
+        env:
+          RUST_MIN_STACK: '16777216'
+        run: cargo clippy --all-targets
 
       - name: Run unit tests
         working-directory: ./src-tauri
