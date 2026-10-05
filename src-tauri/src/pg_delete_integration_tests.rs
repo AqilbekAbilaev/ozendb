@@ -1,4 +1,4 @@
-//! Live-PostgreSQL coverage of `delete_rows_impl` (`ozendb-96o.4`) — split into
+//! Live-PostgreSQL coverage of `delete_rows_impl` (#138) — split into
 //! its own file rather than grown into `pg_command_integration_tests.rs`,
 //! mirroring how that file itself was split out of `pg_integration_tests.rs`.
 //! Shares that file's `test_config`/`pool` helpers and skip behavior; see its

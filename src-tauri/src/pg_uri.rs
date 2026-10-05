@@ -34,7 +34,7 @@ pub fn build_options_to(
 }
 
 /// `build_options`, but naming an explicit database rather than the config's own —
-/// for opening a second database on the same server (ozendb-bj2). Host,
+/// for opening a second database on the same server (#124). Host,
 /// credentials, TLS and the read-only/statement-timeout options are unchanged.
 pub fn build_options_for_database(
     config: &ConnectionConfig,

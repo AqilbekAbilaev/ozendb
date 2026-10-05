@@ -1,6 +1,6 @@
-// Fixtures for the session migration (Work 7A). Legacy records are shaped exactly
+// Fixtures for the session migration. Legacy records are shaped exactly
 // as the v1 session service projected them; each expected v2 record pins both the
-// migration output and the definitions' serialize hooks (7B), so changing either
+// migration output and the definitions' serialize hooks, so changing either
 // without updating the fixtures fails loudly.
 
 const CONN_REF = (db, coll) => ({

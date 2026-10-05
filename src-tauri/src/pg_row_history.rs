@@ -18,7 +18,7 @@ pub struct PgColumnChange {
 }
 
 /// One recorded row edit, enough to identify and reverse it later. Scoped to
-/// `update_pg_row` only (ozendb-h4y v1) — SQL-tab statement effects and inserts/
+/// `update_pg_row` only (#129 v1) — SQL-tab statement effects and inserts/
 /// deletes aren't tracked here, the same scope MongoDB's history draws per-command.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PgHistoryEntry {

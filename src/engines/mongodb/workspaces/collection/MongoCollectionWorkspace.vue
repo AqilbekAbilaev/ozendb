@@ -1,8 +1,7 @@
 <script setup>
 // The MongoDB collection workspace: find, aggregate, and SQL-to-MQL query behavior
-// and rendering, extracted whole from QueryWorkspace.vue (Work 3). It owns parsing,
-// validation, run dispatch, explain, and saved-query application for *collection*
-// tabs, and mutates the existing flat tab fields exactly as before. The host
+// and rendering. It owns parsing, validation, run dispatch, explain, and saved-query
+// application for *collection* tabs. The host
 // (WorkspaceArea.vue) owns the tab bar, other pane kinds, and the result sub-tab
 // compatibility ref this component reads/writes via v-model.
 import { computed, nextTick, watch } from 'vue'

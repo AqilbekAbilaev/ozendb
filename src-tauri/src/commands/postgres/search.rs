@@ -1,4 +1,4 @@
-//! Cross-table "Search in…" for PostgreSQL (ozendb-86k) — the sibling of MongoDB's
+//! Cross-table "Search in…" for PostgreSQL (#132) — the sibling of MongoDB's
 //! `commands/search/mod.rs`, built as one `UNION ALL` query across every candidate
 //! (table, text-like column) pair rather than a per-table scan: Postgres has typed,
 //! fixed columns, so "every table" can't mean "every field" the way a schemaless

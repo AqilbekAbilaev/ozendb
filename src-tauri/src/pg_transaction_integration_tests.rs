@@ -148,7 +148,7 @@ fn history_entry() -> PgHistoryEntry {
     }
 }
 
-/// `PgTransactions::execute`'s `history` argument (ozendb-h4y): queued while the
+/// `PgTransactions::execute`'s `history` argument (#129): queued while the
 /// transaction is open, flushed by `finish` only on an actual commit — never on a
 /// rollback, and never on a commit that turns out to be a no-op rollback because
 /// an earlier statement failed.

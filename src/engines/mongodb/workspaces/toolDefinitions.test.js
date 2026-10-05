@@ -348,7 +348,7 @@ describe('lifecycle — tool restore', () => {
     expect(tab.target.segments.map(s => s.name)).toEqual(['shop', 'orders'])
   })
 
-  it('restores schema and search as identity-only tabs (Work 7)', () => {
+  it('restores schema and search as identity-only tabs', () => {
     const schema = restoreWorkspace({ id: 's', kind: 'schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' })
     expect(schema.type).toBe('mongodb.schema')
     expect(schema.kind).toBe('schema')

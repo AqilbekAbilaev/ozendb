@@ -219,9 +219,9 @@ fn history_entry(conn_id: &str, database: &str, schema: &str, table: &str, set: 
 /// treat as a conflict, not silently ignore.
 ///
 /// `before` carries `set`'s columns' pre-edit values — the grid already has them
-/// loaded — so a successful edit can record a history entry (ozendb-h4y) without
+/// loaded — so a successful edit can record a history entry (#129) without
 /// an extra SELECT. `database` names which database this row's table lives in,
-/// for that entry; scoped to the connection's own for now, not ozendb-bj2's
+/// for that entry; scoped to the connection's own for now, not #124's
 /// cross-database browsing (table edits don't support that yet).
 ///
 /// A `tx_id` runs the update inside that held transaction instead of

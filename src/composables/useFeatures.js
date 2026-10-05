@@ -83,7 +83,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // A modal's target. Modals read the long alias spelling — the same one the tab
   // creators, the Mongo API and the menu target resolution use — so the short
   // connId/collName pair stops here and never reaches a component. The FEATURES nodes
-  // upstream are still short; converting those is the rest of audit §8.
+  // upstream are still short; converting those is the rest of #193.
   function modalTarget(node, level) {
     const short = pick(node, LEVEL_FIELDS[level])
     return {
