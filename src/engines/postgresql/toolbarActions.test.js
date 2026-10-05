@@ -7,6 +7,8 @@ const openModal = vi.fn()
 vi.mock('../../stores/modals', () => ({ openModal }))
 const showToast = vi.fn()
 vi.mock('../../stores/toast', () => ({ showToast }))
+const treeSelection = { value: null }
+vi.mock('../../stores/connectionNavigation', () => ({ treeSelection }))
 
 const { runPgTool } = await import('./toolbarActions.js')
 
@@ -16,8 +18,19 @@ const table = {
 }
 const schema = { ...table, table: null }
 const resolving = (target) => vi.fn(() => target)
+// A table highlighted in the sidebar, as the PostgreSQL tree stores it.
+const selectedTable = {
+  engine: 'postgresql', connectionId: 'p1', connectionName: 'Payments PG',
+  database: 'payments', schema: 'public', table: 'merchants',
+  resource: { connectionId: 'p1', segments: [
+    { kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' },
+  ] },
+}
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  treeSelection.value = null
+})
 
 describe('runPgTool', () => {
   it("leaves every other tool to the MongoDB dispatcher", () => {
@@ -25,19 +38,18 @@ describe('runPgTool', () => {
     expect(openPostgresTable).not.toHaveBeenCalled()
   })
 
-  it('opens the table in focus', () => {
-    const target = resolving(table)
-    expect(runPgTool('pgTable', target)).toBe(true)
-    expect(target).toHaveBeenCalledWith('table')
+  it('opens the table selected in the sidebar', () => {
+    treeSelection.value = selectedTable
+    expect(runPgTool('pgTable', resolving(null))).toBe(true)
     expect(openPostgresTable).toHaveBeenCalledWith({
       connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
     })
   })
 
-  it('asks for a table when only a schema is in focus', () => {
-    expect(runPgTool('pgTable', resolving(schema))).toBe(true)
+  it("doesn't reopen the active table tab when nothing is selected in the sidebar", () => {
+    expect(runPgTool('pgTable', resolving(table))).toBe(true)
     expect(openPostgresTable).not.toHaveBeenCalled()
-    expect(showToast).toHaveBeenCalledWith('Select a PostgreSQL table first')
+    expect(showToast).toHaveBeenCalledWith('Select a PostgreSQL table in the sidebar first')
   })
 
   it('opens a SQL tab on the database in focus', () => {
@@ -50,6 +62,12 @@ describe('runPgTool', () => {
   it('opens Search in Schema on the schema in focus', () => {
     runPgTool('pgSearch', resolving(schema))
     expect(openModal).toHaveBeenCalledWith('pgSearch', schema)
+  })
+
+  it('asks for a table when only a schema is in focus', () => {
+    runPgTool('pgExport', resolving(schema))
+    expect(openModal).not.toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalledWith('Select a PostgreSQL table first')
   })
 
   it('opens export and import on the table in focus', () => {
