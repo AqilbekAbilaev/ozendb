@@ -54,10 +54,9 @@ async function confirm() {
     <div class="del-body">
       <p v-if="isTable">Are you sure you want to drop "<strong>{{ name }}</strong>"? This deletes all of its rows and cannot be undone.</p>
       <p v-else>Are you sure you want to drop the schema "<strong>{{ name }}</strong>"? This cannot be undone.</p>
-      <label class="cascade">
-        <BaseCheckbox v-model="cascade" />
+      <BaseCheckbox v-model="cascade" class="cascade">
         {{ isTable ? 'Also drop views and foreign keys that depend on it (CASCADE)' : 'Also drop every table and object in it (CASCADE)' }}
-      </label>
+      </BaseCheckbox>
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">
@@ -71,5 +70,5 @@ async function confirm() {
 </template>
 
 <style scoped>
-.cascade { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.base-check.cascade { margin-top: 10px; }
 </style>

@@ -249,12 +249,11 @@ watch(() => {
         </section>
 
         <!-- validate (JSON only) -->
-        <label v-if="isJson" class="validate-row">
-          <BaseCheckbox v-model="t.validate" />
+        <BaseCheckbox v-if="isJson" v-model="t.validate" class="validate-row">
           Validate JSON before import
           <BaseIcon name="info" :size="14" class="info-ic"
             title="Checks each file parses before any documents are written." />
-        </label>
+        </BaseCheckbox>
 
         <!-- sources -->
         <section class="imp-sec">
@@ -395,14 +394,7 @@ watch(() => {
 .target-change:hover { text-decoration: underline; }
 
 /* validate */
-.validate-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  cursor: pointer;
-}
+.base-check.validate-row { color: var(--text-dim); }
 .info-ic { color: var(--text-faint); }
 
 /* source actions */

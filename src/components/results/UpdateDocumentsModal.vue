@@ -156,18 +156,16 @@ async function onRun() {
         </div>
 
         <div class="uw-opts">
-          <label class="uw-opt">
-            <BaseCheckbox v-model="upsert" />
+          <BaseCheckbox v-model="upsert">
             <span>Upsert</span>
             <BaseIcon name="info" :size="13" class="uw-info"
               title="Insert a new document when no existing document matches the query." />
-          </label>
-          <label class="uw-opt">
-            <BaseCheckbox v-model="multi" />
+          </BaseCheckbox>
+          <BaseCheckbox v-model="multi">
             <span>Multi</span>
             <BaseIcon name="info" :size="13" class="uw-info"
               title="Update every matching document. When off, only the first match is updated." />
-          </label>
+          </BaseCheckbox>
         </div>
 
         <div class="uw-count" v-if="matched !== null && countedFilter === filter">
@@ -211,7 +209,6 @@ async function onRun() {
 .pq-lbl { font-size: 12.5px; color: var(--text-dim); flex: none; }
 .pq-select { flex: 1; min-width: 0; }
 .uw-opts { display: flex; align-items: center; gap: 22px; }
-.uw-opt { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); cursor: pointer; }
 .uw-info { color: var(--accent); cursor: help; }
 .uw-count { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); }
 .uw-msg { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }

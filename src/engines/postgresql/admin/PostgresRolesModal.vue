@@ -192,10 +192,10 @@ async function confirmDrop() {
             <BaseInput v-model="draft.password" type="password" placeholder="Password (optional)" class="grow" />
           </div>
           <div class="pr-form-row">
-            <label><BaseCheckbox v-model="draft.canLogin" /> Can log in</label>
-            <label><BaseCheckbox v-model="draft.createDb" /> Create databases</label>
-            <label><BaseCheckbox v-model="draft.createRole" /> Create roles</label>
-            <label class="danger"><BaseCheckbox v-model="draft.superuser" /> Superuser</label>
+            <BaseCheckbox v-model="draft.canLogin" label="Can log in" />
+            <BaseCheckbox v-model="draft.createDb" label="Create databases" />
+            <BaseCheckbox v-model="draft.createRole" label="Create roles" />
+            <BaseCheckbox v-model="draft.superuser" class="danger" label="Superuser" />
           </div>
           <div v-if="draft.superuser" class="pr-warn">
             <BaseIcon name="warn" :size="14" /> A superuser bypasses every permission check on this server.
@@ -254,8 +254,7 @@ async function confirmDrop() {
 .pr-form-head { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
 .pr-form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .pr-form-row.end { justify-content: flex-end; margin-bottom: 0; }
-.pr-form-row label { display: flex; align-items: center; gap: 5px; font-size: 12.5px; }
-.pr-form-row label.danger { color: var(--warn); }
+.base-check.danger { color: var(--warn); }
 .grow { flex: 1; }
 .pr-warn { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; color: var(--warn); }
 .pr-error { margin-bottom: 8px; padding: 6px 8px; font-size: 12px; color: var(--danger-text); background: var(--danger-bg); border-radius: 5px; }

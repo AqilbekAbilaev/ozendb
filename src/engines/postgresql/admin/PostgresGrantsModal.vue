@@ -87,13 +87,11 @@ function revoke(schema, obj) {
           <BaseInput v-if="draft.kind !== 'schema'" v-model="draft.object" :placeholder="`${draft.kind} name`" />
         </div>
         <div class="pg-grant-row">
-          <label v-for="p in draftPrivileges" :key="p" class="pg-check">
-            <BaseCheckbox :model-value="draft.privileges.includes(p)" @update:model-value="togglePrivilege(p, $event)" />{{ p }}
-          </label>
+          <BaseCheckbox v-for="p in draftPrivileges" :key="p" :label="p" :model-value="draft.privileges.includes(p)" @update:model-value="togglePrivilege(p, $event)" />
         </div>
         <div class="pg-grant-row">
-          <label class="pg-check"><BaseCheckbox v-model="draft.grantOption" />With grant option</label>
-          <label class="pg-check" title="Also revoke what this role granted onward"><BaseCheckbox v-model="cascade" />Revoke with CASCADE</label>
+          <BaseCheckbox v-model="draft.grantOption" label="With grant option" />
+          <BaseCheckbox v-model="cascade" title="Also revoke what this role granted onward" label="Revoke with CASCADE" />
           <BaseButton class="pg-grant-btn" bordered :disabled="busy" @click="grant">Grant</BaseButton>
         </div>
         <FieldError :text="actionError" spaced />
@@ -124,7 +122,6 @@ function revoke(schema, obj) {
   padding: 10px; border: 1px solid var(--border-soft); border-radius: 7px;
 }
 .pg-grant-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.pg-check { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
 .pg-grant-btn { margin-left: auto; }
 .pg-list { display: flex; flex-direction: column; gap: 14px; }
 .pg-schema-name { font-weight: 600; font-size: 13px; margin-bottom: 6px; }

@@ -148,10 +148,10 @@ const updatedText = computed(() =>
     <!-- Filters -->
     <div class="cops-filters">
       <label class="tb-opt">Filters:</label>
-      <label class="cops-opt"><BaseCheckbox v-model="slowOnly" /> Show only slow ops</label>
+      <BaseCheckbox v-model="slowOnly" class="cops-opt" label="Show only slow ops" />
       <BaseSelect v-model="slowSecs" class="tb-select" size="sm" :options="SLOW_THRESHOLDS" :disabled="!slowOnly" />
-      <label class="cops-opt" title="Operations run by the user this connection authenticates as"><BaseCheckbox v-model="ownOnly" /> Show own ops only</label>
-      <label class="cops-opt" title="Internal server threads and idle connections"><BaseCheckbox v-model="showSys" /> Show sys ops</label>
+      <BaseCheckbox v-model="ownOnly" class="cops-opt" title="Operations run by the user this connection authenticates as" label="Show own ops only" />
+      <BaseCheckbox v-model="showSys" class="cops-opt" title="Internal server threads and idle connections" label="Show sys ops" />
     </div>
 
     <!-- Toolbar -->
@@ -233,7 +233,7 @@ const updatedText = computed(() =>
   padding: 6px 14px; flex: none;
   border-bottom: 1px solid var(--border);
 }
-.cops-opt { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+.base-check.cops-opt { color: var(--text-dim); }
 .cr-select { flex: none; width: 170px; }
 
 .cops-toolbar {
