@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { listen } from '@tauri-apps/api/event'
+import { onConnectionSaved, onConnectionUpdated, onConnectionDeleted } from '../appApi/events'
 import { errCode, errMessage } from '../utils/errors'
 import { activeTab, activeTabId } from '../stores/tabs'
 import {
@@ -83,10 +83,10 @@ export function useConnectionTree({ emit }) {
     // only the ones that were open before a restart come back.
     await loadOpenConnections()
     unlisten = [
-      listen('connection-saved', (e) => addOpenConnection(e.payload)),
-      listen('connection-updated', (e) => updateOpenConnection(e.payload)),
-      listen('connection-deleted', (e) => {
-        disconnectConn(e.payload.id, { persist: false })
+      onConnectionSaved(addOpenConnection),
+      onConnectionUpdated(updateOpenConnection),
+      onConnectionDeleted(({ id }) => {
+        disconnectConn(id, { persist: false })
       }),
     ]
     document.addEventListener('click', clearSelectionOnOutsideClick)

@@ -15,7 +15,7 @@ import { useSessionPersistence } from "./composables/useSessionPersistence";
 import { refreshFindWorkspacesAfterDocumentSave } from "./utils/documentSaveRefresh";
 import { runQuery } from "./stores/queryRunner";
 import { tabs } from "./stores/tabs";
-import { listen } from "@tauri-apps/api/event";
+import { onDocumentSaved } from "./appApi/events";
 
 prePaintTheme();
 
@@ -40,7 +40,7 @@ app.mount("#app");
 
 // The pop-out editor emits this after a save; refresh matching Find tabs explicitly,
 // since that isn't part of the restored-workspace lifecycle.
-listen("document-saved", (e) => refreshFindWorkspacesAfterDocumentSave(tabs.value, e.payload, runQuery));
+onDocumentSaved((saved) => refreshFindWorkspacesAfterDocumentSave(tabs.value, saved, runQuery));
 
 // Settings before the session, so restored workspaces adopt the stored defaults; the
 // update check last, so its dialog can't land on a tab strip that is still restoring.

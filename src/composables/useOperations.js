@@ -1,5 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { listen } from '@tauri-apps/api/event'
+import { onOperationsChanged } from '../appApi/events'
 import { listOperations, clearFinishedOperations } from '../appApi/operations'
 
 // The Operations pane's data layer. It holds NO authoritative state of its own — the
@@ -33,7 +33,7 @@ export function useOperations() {
 
   onMounted(async () => {
     await refresh()
-    unlisten = await listen('operations-changed', () => { refresh() })
+    unlisten = await onOperationsChanged(() => { refresh() })
   })
 
   onUnmounted(() => {
