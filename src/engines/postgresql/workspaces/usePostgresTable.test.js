@@ -166,6 +166,15 @@ describe('filtering', () => {
     expect(t.activeFilters.value).toBe(2)
   })
 
+  it('a tab opened on one row (#172) loads just that row, and Clear brings the table back', async () => {
+    const t = await loaded({ initial: createTableState({ rowKey: { id: 2 } }) })
+    const filters = [{ table: 0, column: 'id', op: 'eq', value: '2' }]
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ filters, offset: 0 }))
+    expect(t.activeFilters.value).toBe(1)
+    await t.clearFilters()
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ filters: [] }))
+  })
+
   it('keeps applying the same filters while paging and sorting', async () => {
     const t = await loaded()
     t.setFilterText('id', '1')

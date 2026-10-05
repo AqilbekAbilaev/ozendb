@@ -330,6 +330,12 @@ describe('PostgreSQL tables', () => {
     expect(lastTab()).toMatchObject({ kind: 'pgTable', engine: 'postgresql', schema: 'public', table: 'users' })
     expect(activeTabId.value).toBe(lastTab().id)
   })
+
+  it('opens filtered to one row when given its primary key', () => {
+    const c = harness()
+    c.openPostgresTable({ ...TABLE, rowKey: { id: 7 } })
+    expect(lastTab().state.query.filters).toEqual([{ key: 'id', op: 'eq', value: '7' }])
+  })
 })
 
 describe('PostgreSQL queries', () => {

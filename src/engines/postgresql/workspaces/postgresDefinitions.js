@@ -50,7 +50,7 @@ export const postgresDefinitions = [
     type: 'postgresql.table_browse',
     engine: 'postgresql',
     component: PostgresTableWorkspace,
-    create: (ctx) => tableWorkspace(ctx.target),
+    create: (ctx) => tableWorkspace(ctx.target, createTableState({ rowKey: ctx.options?.rowKey })),
     // Filter mode only reads; SQL mode runs whatever SQL the user wrote.
     canRefresh: (workspace) => workspace.state.mode === 'filter',
     // A copy keeps the query and the panel; rows load again.
