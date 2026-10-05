@@ -41,7 +41,7 @@ pub(super) fn data_op_meta(
 /// The `_id_` index is created and required by MongoDB and can never be dropped,
 /// hidden, or otherwise modified. The index-management guards share this check so
 /// the rule lives in one place (kept pure so it can be unit-tested).
-pub(super) fn is_protected_index(name: &str) -> bool {
+pub(in crate::commands) fn is_protected_index(name: &str) -> bool {
     name == "_id_"
 }
 

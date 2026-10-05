@@ -8,67 +8,30 @@ use serde::Serialize;
 use std::time::Duration;
 
 pub mod connection;
+pub mod mongo;
 pub mod postgres;
-pub mod query;
-pub mod admin;
 pub mod persistence;
-pub mod shell;
-pub mod schema;
-pub mod sql;
-pub mod stats;
-pub mod duplicate;
-pub mod serverinfo;
-pub mod profiler;
-pub mod search;
-pub mod gridfs;
-pub mod users;
-pub mod functions;
-pub mod mapreduce;
-pub mod copyops;
 pub mod folders;
-pub mod portmap;
-pub mod history;
 pub mod operations;
-pub mod ops;
 pub mod error_log;
 pub mod updater;
 
 pub use connection::*;
+pub use mongo::*;
 pub use postgres::*;
-pub use query::*;
-pub use admin::*;
 pub use persistence::*;
-pub use shell::*;
-pub use schema::*;
-pub use sql::*;
-pub use stats::*;
-pub use duplicate::*;
-pub use serverinfo::*;
-pub use profiler::*;
-pub use search::*;
-pub use gridfs::*;
-pub use users::*;
-pub use functions::*;
-pub use mapreduce::*;
-pub use copyops::*;
 pub use folders::*;
-pub use portmap::*;
-pub use history::*;
 pub use operations::*;
-pub use ops::*;
 pub use error_log::*;
 pub use updater::*;
 
 // Helper modules carved out of this file when it outgrew the size limit. Unlike the
-// command modules above these expose no Tauri commands — they're the shared parsing,
-// export and import machinery the commands call. Re-exported flat so every existing
-// `super::stream_import` / `crate::commands::parse_ejson_document` call site keeps
-// working without touching the caller.
-mod ejson;
+// command modules above these expose no Tauri commands — they're the export and import
+// machinery both engines' transfer commands call. Re-exported flat so every existing
+// `super::stream_import` call site keeps working without touching the caller.
 mod export;
 mod import;
 
-pub(crate) use ejson::*;
 pub(crate) use export::*;
 pub(crate) use import::*;
 
