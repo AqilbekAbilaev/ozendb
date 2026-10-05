@@ -11,9 +11,9 @@
 // Durable state is projected by the workspace definitions' serialize hooks (7B) —
 // the migration hands each legacy record to its definition, so there is exactly one
 // source of truth for what survives a session.
-import { getWorkspaceDefinition, workspaceTypeForSaved } from '../workspaces/registry'
-import { resourceFromLegacyTab } from './legacyResourceRef'
-import { isResourceRef } from './resourceRef'
+import { getWorkspaceDefinition, workspaceTypeForSaved } from './registry'
+import { resourceFromLegacyTab } from '../utils/legacyResourceRef'
+import { isResourceRef } from '../utils/resourceRef'
 
 function isValidId(id) {
   return typeof id === 'string' && id.length > 0
