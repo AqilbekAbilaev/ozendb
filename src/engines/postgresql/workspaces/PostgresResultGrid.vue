@@ -390,7 +390,7 @@ td.selcell { outline: 2px solid var(--accent); outline-offset: -2px; }
 tbody tr.pending-delete td { background: var(--danger-bg); color: var(--danger-text); text-decoration: line-through; }
 tbody tr.pending-delete td.rownum { text-decoration: none; }
 tbody tr.pending-insert td { background: var(--success-bg); }
-tbody tr.flash td { animation: row-flash 1.2s ease-out; }
+tbody tr.flash td { animation: row-flash 2.4s ease-out; }
 @keyframes row-flash { from { background: color-mix(in srgb, var(--accent) 30%, transparent); } }
 /* Reduced motion: hold the highlight, then drop it, rather than fade. */
 @media (prefers-reduced-motion: reduce) { tbody tr.flash td { animation-timing-function: steps(1, end); } }
