@@ -227,3 +227,14 @@ describe('two tabs at once', () => {
     expect(tab.ops).toEqual([])
   })
 })
+
+describe('opsDefaults', () => {
+  // The namespace pickers' database list is fetched per server, so two tabs never share it.
+  it('gives each tab its own, empty database list', () => {
+    const a = opsDefaults()
+    const b = opsDefaults()
+    expect(a.databases).toEqual([])
+    a.databases.push({ name: 'shop' })
+    expect(b.databases).toEqual([])
+  })
+})

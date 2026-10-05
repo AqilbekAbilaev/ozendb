@@ -74,7 +74,7 @@ const emptyLabel = computed(() =>
 
 // Namespace pickers. The database list is loaded once; an empty value is the "all" sentinel.
 const ALL = ''
-const databases = computed(() => props.activeTab._opsDatabases || [])
+const databases = computed(() => props.activeTab.databases)
 const dbOptions = computed(() => [
   { value: ALL, label: 'All databases' },
   ...databases.value.map(d => ({ value: d.name, label: d.name })),
@@ -89,7 +89,7 @@ const collOptions = computed(() => {
 // Reloaded when the pane moves to a tab on another server, for the same reason.
 watch(() => props.activeTab, async (tab) => {
   try {
-    tab._opsDatabases = await listDatabases(tab.connectionId)
+    tab.databases = await listDatabases(tab.connectionId)
   } catch (_) {
     // The pickers stay on "all" — a missing database list must not stop the ops view.
   }

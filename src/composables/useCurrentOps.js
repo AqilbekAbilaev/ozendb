@@ -55,6 +55,8 @@ export const opsDefaults = () => ({
   selectedRows: [],
   drillPath: [],
   colOrder: {},
+  // The server's databases and their collections, for the namespace pickers.
+  databases: [],
 })
 
 // The live state behind the Current Operations tab: what the server is doing, refreshed
