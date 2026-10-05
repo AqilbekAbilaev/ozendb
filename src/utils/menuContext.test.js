@@ -270,6 +270,13 @@ describe('deriveMenuContext (PostgreSQL)', () => {
     expect(ctx.hasPgTable).toBe(true)
   })
 
+  it('a search tab is schema-scoped, so it enables the schema gate (#180)', () => {
+    const searchTab = { id: 'p3', type: 'postgresql.search', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public' }
+    const ctx = deriveMenuContext(searchTab, null, 0)
+    expect(ctx.hasPgSchema).toBe(true)
+    expect(ctx.hasPgTable).toBe(false)
+  })
+
   it('a non-PostgreSQL tab, or none, enables neither', () => {
     expect(deriveMenuContext(collectionTab, null, 0).hasPgSchema).toBe(false)
     expect(deriveMenuContext(null, null, 0).hasPgSchema).toBe(false)

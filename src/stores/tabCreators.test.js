@@ -338,6 +338,18 @@ describe('PostgreSQL tables', () => {
   })
 })
 
+describe('PostgreSQL search', () => {
+  it('opens a search tab on the schema, every time, and activates it', () => {
+    const c = harness()
+    const SCHEMA = { connectionId: 'c9', connectionName: 'pg', database: 'app', schema: 'public' }
+    c.openPostgresSearch(SCHEMA)
+    c.openPostgresSearch(SCHEMA)
+    expect(tabs.value.filter(t => t.type === 'postgresql.search')).toHaveLength(2)
+    expect(lastTab()).toMatchObject({ kind: 'pgSearch', engine: 'postgresql', title: 'Search: public', schema: 'public' })
+    expect(activeTabId.value).toBe(lastTab().id)
+  })
+})
+
 describe('PostgreSQL queries', () => {
   it('opens a query tab against the connection\'s database, and activates it', () => {
     const c = harness()
