@@ -29,6 +29,7 @@ describe('createCollectionRuntime', () => {
       results: [], hasRun: false, isRunning: false, runError: null, runErrorCode: null,
       runId: null, startedAt: null, cancelled: false,
       total: null, totalFilter: null, isCounting: false, countShown: false,
+      explainResult: null, explainStorage: null, explainError: null, explainRunning: false, explainVerbosity: null,
       selectedRow: -1, selectedRows: [], selectedField: null, elapsedMs: null,
     })
   })

@@ -41,6 +41,8 @@ export function createCollectionRuntime() {
     runId: null, startedAt: null, cancelled: false,
     // The footer's optional count, and the filter it was counted for.
     total: null, totalFilter: null, isCounting: false, countShown: false,
+    // The Explain tab: its last plan, and the verbosity a re-run reuses.
+    explainResult: null, explainStorage: null, explainError: null, explainRunning: false, explainVerbosity: null,
     ...createSelection(),
   }
 }
