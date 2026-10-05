@@ -188,5 +188,5 @@ pub async fn tcp_probe(options: &PgConnectOptions) -> Result<(), AppError> {
 }
 
 #[cfg(test)]
-#[path = "pg_uri.test.rs"]
+#[path = "uri.test.rs"]
 mod tests;

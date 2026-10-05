@@ -1,12 +1,12 @@
 //! Integration tests against a live PostgreSQL for the connect path itself
-//! (`pg_uri`/`ConnectionPool::connect_postgres`) — the `commands::postgres::*`
+//! (`postgres::uri`/`ConnectionPool::connect_postgres`) — the `commands::postgres::*`
 //! command layer (schema browsing, query, row edit) has its own tests in
 //! `pg_command.rs`, which shares this file's `test_config`/
 //! `pool` helpers.
 //!
 //! These are skipped unless `OZENDB_TEST_POSTGRES` is set (to a `host` or
 //! `host:port`). When set, they exercise the real connect-options + driver path
-//! `pg_uri` (and, through it, `ConnectionPool::connect_postgres`) build — a plain
+//! `postgres::uri` (and, through it, `ConnectionPool::connect_postgres`) build — a plain
 //! query round-trip — against a throwaway table that is dropped at the end. Default
 //! `cargo test` stays green everywhere because each test returns early when the
 //! variable is absent.
@@ -17,7 +17,7 @@
 //! username (default "postgres") and password (default none) if the test server
 //! needs different credentials.
 
-use crate::pg_uri;
+use crate::postgres::uri as pg_uri;
 use crate::storage::{ConnectionConfig, EngineConfig, HostEntry, PostgresConfig};
 use sqlx::{Connection, Row};
 
@@ -160,7 +160,7 @@ async fn query_paging_and_count_round_trip() {
 
 /// `ConnectionPool::connect_postgres`'s `database` override (ozendb-bj2): the same
 /// connection's options, targeting a database other than the config's own, reusing
-/// everything else (host, credentials, TLS). Proven here at the `pg_uri` layer that
+/// everything else (host, credentials, TLS). Proven here at the `postgres::uri` layer that
 /// actually builds those options, since a live `ConnectionPool` needs an `AppHandle`
 /// a plain test can't build (see this file's own doc comment).
 #[tokio::test]

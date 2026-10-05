@@ -346,7 +346,7 @@ async fn a_read_only_connection_is_enforced_per_transaction_not_just_by_session_
     //    to be the *only* enforcement, and there wasn't one — `run_pg_query`
     //    always called it that way regardless of the connection's own flag.
     // 2. Even with the session-level `default_transaction_read_only=on` default
-    //    (`pg_uri::options_for`) and `read_only: true` passed through, a query
+    //    (`postgres::uri::options_for`) and `read_only: true` passed through, a query
     //    can flip that *default* off for the rest of the session with
     //    `set_config('default_transaction_read_only', 'off', false)` — confirmed
     //    live, and the change persisted to later queries on the same pooled

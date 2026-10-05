@@ -10,7 +10,7 @@ use tauri::State;
 
 use super::{cancel, primary_key_columns, quote_ident, AppContext};
 
-// A convenience cap, not a hard server-side one: `statement_timeout` (pg_uri.rs)
+// A convenience cap, not a hard server-side one: `statement_timeout` (postgres/uri.rs)
 // already bounds how long the underlying query can run.
 const DEFAULT_LIMIT: i64 = 200;
 const MAX_LIMIT: i64 = 1000;

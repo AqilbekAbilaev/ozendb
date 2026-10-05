@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::pg_row_history::PgHistoryEntry;
+use crate::postgres::row_history::PgHistoryEntry;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -138,7 +138,7 @@ pub async fn begin_pg_transaction(
 #[tauri::command]
 pub async fn commit_pg_transaction(
     txs: State<'_, PgTransactions>,
-    history: State<'_, crate::pg_row_history::PgRowHistoryStore>,
+    history: State<'_, crate::postgres::row_history::PgRowHistoryStore>,
     tx_id: String,
 ) -> Result<(), AppError> {
     let entries = txs.finish(&tx_id, true).await?;

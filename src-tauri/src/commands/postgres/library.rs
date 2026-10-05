@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::pg_query_library::{PgQueryLibraryStore, SavedSql, SqlHistoryEntry};
+use crate::postgres::query_library::{PgQueryLibraryStore, SavedSql, SqlHistoryEntry};
 use crate::time::now_ms;
 use tauri::State;
 

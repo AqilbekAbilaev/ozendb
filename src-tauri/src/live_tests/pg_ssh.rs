@@ -8,7 +8,7 @@
 
 use crate::commands::run_query_as;
 use crate::known_hosts::KnownHostsStore;
-use crate::pg_uri::build_options_to;
+use crate::postgres::uri::build_options_to;
 use crate::ssh::{establish, HostKeyPrompts, SshAuth, SshParams};
 use crate::storage::{ConnectionConfig, EngineConfig, PostgresConfig};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
