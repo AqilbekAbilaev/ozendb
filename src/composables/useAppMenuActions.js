@@ -1,6 +1,6 @@
 import { nextTick, onMounted, onUnmounted } from 'vue'
 import { showToast } from '../stores/toast'
-import { openCollectionTab, openQuickstart, openPostgresQuery } from '../stores/tabCreators'
+import { openCollectionTab, openQuickstart, openPostgresQuery, openPostgresSearch } from '../stores/tabCreators'
 import { useZoom } from './useZoom'
 import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh } from '../stores/menuRequests'
 import { listen } from '@tauri-apps/api/event'
@@ -240,7 +240,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       }
       case 'pg:search_schema': {
         const target = pgMenuTarget('schema')
-        if (target) openModal('pgSearch', target)
+        if (target) openPostgresSearch({ connectionId: target.connectionId, connectionName: target.connectionName, database: target.database, schema: target.schema })
         return
       }
       case 'pg:row_history': {

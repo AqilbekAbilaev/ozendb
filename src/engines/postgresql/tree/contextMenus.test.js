@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const openPostgresQuery = vi.fn()
 const openPostgresTable = vi.fn()
-vi.mock('../../../stores/tabCreators', () => ({ openPostgresQuery, openPostgresTable }))
+const openPostgresSearch = vi.fn()
+vi.mock('../../../stores/tabCreators', () => ({ openPostgresQuery, openPostgresTable, openPostgresSearch }))
 const openModal = vi.fn()
 vi.mock('../../../stores/modals', () => ({ openModal }))
 
@@ -63,7 +64,7 @@ describe('PostgreSQL right-click menus', () => {
     expect(PG_MENUS.schema.map(i => i.label)).toContain('Search in Schema…')
     const schemaNode = { connId: 'p1', connName: 'Payments PG', engine: 'postgresql', database: 'payments', schema: 'public' }
     PG_ACTIONS['Search in Schema…'](schemaNode)
-    expect(openModal).toHaveBeenCalledWith('pgSearch', schemaNode)
+    expect(openPostgresSearch).toHaveBeenCalledWith({ connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public' })
   })
 
   // ozendb-6v3: the whole table, through the export dialog.

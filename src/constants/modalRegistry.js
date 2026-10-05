@@ -43,7 +43,6 @@ export const MODALS = {
   pgCreateTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresCreateTableModal.vue')),  level: 'database' },
   pgDrop:         { component: lazy(() => import('../engines/postgresql/admin/PostgresDropModal.vue')),         level: 'database' },
   pgRenameTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresRenameTableModal.vue')),  level: 'database' },
-  pgSearch:       { component: lazy(() => import('../engines/postgresql/admin/PostgresSearchModal.vue')),       level: 'database' },
   // A table node, or a SQL editor's { connId, database, query }.
   pgExport:       { component: lazy(() => import('../engines/postgresql/admin/PostgresExportModal.vue')),       level: 'database' },
   pgImport:       { component: lazy(() => import('../engines/postgresql/admin/PostgresImportModal.vue')),       level: 'database' },
