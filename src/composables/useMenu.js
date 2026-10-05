@@ -66,5 +66,7 @@ export function useMenu() {
     )
   }
 
-  return { menuTarget: menuTarget, pgMenuTarget: pgMenuTarget }
+  const menuEngine = computed(() => menuContext.value.engine)
+
+  return { menuTarget: menuTarget, pgMenuTarget: pgMenuTarget, menuEngine: menuEngine }
 }
