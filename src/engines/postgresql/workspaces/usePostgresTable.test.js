@@ -719,6 +719,80 @@ describe('staged inserting', () => {
   })
 })
 
+// #170: a new row shows right after the row it was made from, and every grid position
+// past it still reaches the right loaded row.
+describe('where a new row appears', () => {
+  const names = (t) => t.gridRows.value.map(row => row[1])
+
+  it('shows a duplicate right after its original', async () => {
+    const t = await loaded()
+    const key = t.duplicateRow(0)
+    expect(names(t)).toEqual(['Ada', 'Ada', 'Linus'])
+    expect(t.gridIndexOf(key)).toBe(1)
+    expect(t.rowStatus(1)).toBe('inserted')
+  })
+
+  it('adds a row right after the selected loaded row', async () => {
+    const t = await loaded()
+    const key = t.addRow(0)
+    expect(t.gridIndexOf(key)).toBe(1)
+    expect(names(t)).toEqual(['Ada', null, 'Linus'])
+  })
+
+  it('adds a row right after a selected new row', async () => {
+    const t = await loaded()
+    const copy = t.duplicateRow(0)
+    const key = t.addRow(t.gridIndexOf(copy))
+    expect(t.gridIndexOf(key)).toBe(2)
+    expect(names(t)).toEqual(['Ada', 'Ada', null, 'Linus'])
+  })
+
+  it('adds a row at the end when nothing is selected', async () => {
+    const t = await loaded()
+    const key = t.addRow()
+    expect(t.gridIndexOf(key)).toBe(2)
+  })
+
+  it('still edits, deletes and restores the right rows past a new one', async () => {
+    const t = await loaded()
+    t.duplicateRow(0)
+    expect(t.stageEdit(1, 'name', 'Copy')).toBe(true)
+    expect(t.stageEdit(2, 'name', 'Linus T.')).toBe(true)
+    expect(t.rows.value[1][1]).toBe('Linus T.')
+    expect(names(t)).toEqual(['Ada', 'Copy', 'Linus T.'])
+
+    t.toggleDelete([1, 2])
+    expect(t.rowStatus(2)).toBe('deleted')
+    expect(t.isDeleted(2)).toBe(true)
+    expect(t.isDeleted(1)).toBe(false)
+
+    t.restoreRow(1)
+    expect(t.insertDrafts.value).toHaveLength(0)
+    expect(names(t)).toEqual(['Ada', 'Linus T.'])
+  })
+
+  it('numbers the loaded rows as the page does, and marks a new row with +', async () => {
+    const t = await loaded()
+    t.duplicateRow(0)
+    expect([0, 1, 2].map(t.rowNumber)).toEqual([1, '+', 2])
+  })
+
+  it('puts a new row at the end once its row has left the page', async () => {
+    const t = await loaded()
+    const key = t.duplicateRow(0)
+    browseTable.mockResolvedValue({ columns: ['id', 'name', 'tags', 'meta'], rows: [[2, 'Linus', [], null]], truncated: false, elapsedMs: 1 })
+    await t.refresh()
+    expect(t.gridIndexOf(key)).toBe(1)
+  })
+
+  it('puts a duplicate at the end in a table with no primary key, which has no way to name its original', async () => {
+    listColumns.mockResolvedValue(COLUMNS.map(c => ({ ...c, isPrimaryKey: false })))
+    const t = await loaded()
+    const key = t.duplicateRow(0)
+    expect(t.gridIndexOf(key)).toBe(2)
+  })
+})
+
 describe('reviewSql', () => {
   it('lists one statement per pending change', async () => {
     const t = await loaded()

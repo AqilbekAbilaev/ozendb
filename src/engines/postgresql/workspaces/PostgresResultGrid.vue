@@ -23,6 +23,8 @@ const props = defineProps({
   selection:  { type: Object,   required: true },
   columnInfo: { type: Object,   default: () => ({}) },
   rowOffset:  { type: Number,   default: 0 },
+  // Overrides rowOffset's numbering, for a grid that mixes in rows not yet saved.
+  rowLabel:   { type: Function, default: null },
   orderBy:    { type: String,   default: null },
   descending: { type: Boolean,  default: false },
   sortable:   { type: Boolean,  default: false },
@@ -173,11 +175,11 @@ function setNull() {
   emit('save', row, column, null)
 }
 
-// A row added off the loaded page's end lands past the viewport with nothing to draw
-// attention to it — scroll it into view and open its first editable cell. Two ticks:
-// scrollToRow's scroll event re-renders virtualRows asynchronously, so the target row
-// isn't mounted yet on the first one.
-async function focusNewRow(rowIndex) {
+// A new row can land past the viewport with nothing to draw attention to it — scroll it
+// into view and select it, opening its first editable cell unless `edit` is false (a
+// duplicate already has values). Two ticks: scrollToRow's scroll event re-renders
+// virtualRows asynchronously, so the target row isn't mounted yet on the first one.
+async function focusNewRow(rowIndex, { edit = true } = {}) {
   // 'center', not 'end': the row height used for this scroll is still the last
   // measurement (remeasure() hasn't run for it yet), so an 'end' alignment flush
   // against the viewport's bottom edge has no margin for that estimate being off —
@@ -187,7 +189,7 @@ async function focusNewRow(rowIndex) {
   scrollToRow(rowIndex, 'center')
   await nextTick()
   await nextTick()
-  const column = props.columns.find(c => props.canEdit(c, rowIndex))
+  const column = edit && props.columns.find(c => props.canEdit(c, rowIndex))
   if (column) {
     selectCell(rowIndex, column)
     startEdit(rowIndex, column, null)
@@ -195,7 +197,16 @@ async function focusNewRow(rowIndex) {
     rowSelection.setSingleRow(rowIndex)
   }
 }
-defineExpose({ focusNewRow })
+// The row a duplicate was copied from, highlighted for a moment so the copy right below
+// it reads as its (#170); cleared when the fade ends.
+const flashedRow = ref(-1)
+async function flashRow(rowIndex) {
+  // Off first, so flashing the same row again restarts the fade.
+  flashedRow.value = -1
+  await nextTick()
+  flashedRow.value = rowIndex
+}
+defineExpose({ focusNewRow, flashRow })
 </script>
 
 <template>
@@ -251,9 +262,11 @@ defineExpose({ focusNewRow })
           :class="{
             selrow: isRowSelected(vrow.index), stripe: vrow.index % 2 === 1,
             'pending-delete': rowStatus(vrow.index) === 'deleted', 'pending-insert': rowStatus(vrow.index) === 'inserted',
+            flash: flashedRow === vrow.index,
           }"
+          @animationend="flashedRow = -1"
         >
-          <td class="rownum" @click="selectRow($event, vrow.index)">{{ rowOffset + vrow.index + 1 }}</td>
+          <td class="rownum" @click="selectRow($event, vrow.index)">{{ rowLabel ? rowLabel(vrow.index) : rowOffset + vrow.index + 1 }}</td>
           <td
             v-for="(value, c) in rows[vrow.index]"
             :key="c"
@@ -377,6 +390,10 @@ td.selcell { outline: 2px solid var(--accent); outline-offset: -2px; }
 tbody tr.pending-delete td { background: var(--danger-bg); color: var(--danger-text); text-decoration: line-through; }
 tbody tr.pending-delete td.rownum { text-decoration: none; }
 tbody tr.pending-insert td { background: var(--success-bg); }
+tbody tr.flash td { animation: row-flash 2.4s ease-out; }
+@keyframes row-flash { from { background: color-mix(in srgb, var(--accent) 30%, transparent); } }
+/* Reduced motion: hold the highlight, then drop it, rather than fade. */
+@media (prefers-reduced-motion: reduce) { tbody tr.flash td { animation-timing-function: steps(1, end); } }
 /* A dragged header's label follows the pointer; a line marks where it will land. */
 .drag-ghost {
   position: fixed; z-index: 200; pointer-events: none;

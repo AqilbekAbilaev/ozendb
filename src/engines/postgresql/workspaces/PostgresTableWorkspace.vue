@@ -68,30 +68,20 @@ function copySql() {
   navigator.clipboard.writeText(t.value.currentSql).then(() => showToast('SQL copied')).catch(() => {})
 }
 
-// The loaded page plus any staged draft rows, appended after it — a draft's grid
-// index is always past the loaded page's own length (see tableStage.js's canEdit/
-// stageEdit, which route on that same boundary).
-const gridRows = computed(() => [...t.value.view.rows, ...t.value.insertRows])
-
-function rowStatus(rowIndex) {
-  if (rowIndex >= t.value.rows.length) return 'inserted'
-  return t.value.isDeleted(rowIndex) ? 'deleted' : null
-}
-
 // Rows the grid currently has selected, whether a range/multi-select or just the one
 // active cell's row — the same fallback the grid's own copySelection uses.
 const selectedRowIndexes = computed(() => {
   const sel = t.value.selection
   return sel.selectedRows.length ? sel.selectedRows : (sel.selectedRow >= 0 ? [sel.selectedRow] : [])
 })
-const canDuplicate = computed(() => selectedRowIndexes.value.length === 1 && selectedRowIndexes.value[0] < t.value.rows.length)
+const canDuplicate = computed(() => selectedRowIndexes.value.length === 1 && t.value.rowStatus(selectedRowIndexes.value[0]) !== 'inserted')
 
 const resultGridRef = ref(null)
+// A new row goes right after the selected one (the last, for several), or at the end.
 function onAddRow() {
-  const key = t.value.addRow()
-  if (key == null) return
-  const rowIndex = t.value.rows.length + t.value.insertDrafts.length - 1
-  resultGridRef.value?.focusNewRow(rowIndex)
+  const selected = selectedRowIndexes.value
+  const key = t.value.addRow(selected.length ? Math.max(...selected) : null)
+  if (key != null) resultGridRef.value?.focusNewRow(t.value.gridIndexOf(key))
 }
 
 function deleteSelection() {
@@ -99,20 +89,17 @@ function deleteSelection() {
 }
 
 function duplicateSelection() {
-  if (canDuplicate.value) t.value.duplicateRow(selectedRowIndexes.value[0])
+  const original = selectedRowIndexes.value[0]
+  const key = canDuplicate.value ? t.value.duplicateRow(original) : null
+  if (key == null) return
+  resultGridRef.value?.flashRow(original)
+  resultGridRef.value?.focusNewRow(t.value.gridIndexOf(key), { edit: false })
 }
 
-// One row or several, loaded or draft — restoreRow/removeInsert both already no-op
-// safely on a row with nothing staged, so this doesn't need to know which kind first.
+// One row or several, loaded or new. Last first: dropping a new row moves every row
+// after it up one, which would shift the positions still to visit.
 function restoreSelection() {
-  for (const idx of selectedRowIndexes.value) {
-    if (idx >= t.value.rows.length) {
-      const draft = t.value.insertDrafts[idx - t.value.rows.length]
-      if (draft) t.value.removeInsert(draft.key)
-    } else {
-      t.value.restoreRow(idx)
-    }
-  }
+  for (const idx of [...selectedRowIndexes.value].sort((a, b) => b - a)) t.value.restoreRow(idx)
 }
 
 const reviewSqlOpen = ref(false)
@@ -207,17 +194,17 @@ async function saveChanges() {
               v-else
               ref="resultGridRef"
               :columns="t.view.columns"
-              :rows="gridRows"
+              :rows="t.gridRows"
               :selection="t.selection"
               :column-info="t.columnInfo"
-              :row-offset="t.offset"
+              :row-label="t.rowNumber"
               :order-by="t.orderBy"
               :descending="t.descending"
               sortable
               reorderable
               :can-edit="t.canEdit"
               :edit-text="t.editText"
-              :row-status="rowStatus"
+              :row-status="t.rowStatus"
               :filter-text="t.filterText"
               @sort="t.sortBy"
               @move-column="t.moveColumn"

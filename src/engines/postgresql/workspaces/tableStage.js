@@ -3,6 +3,7 @@ import { updateRow, deleteRows as deleteRowsApi, insertRow, beginTransaction, co
 import { errMessage } from '../../../utils/errors'
 import { formatCell } from './formatCell.js'
 import { buildInsertSql, buildUpdateSql, buildDeleteSql } from './buildStagedSql.js'
+import { gridLayout } from './gridLayout.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 
@@ -28,7 +29,7 @@ function sqlLiteral(value) {
 // show immediately (the row's displayed value is updated in place), but only as a
 // local draft — reverted by restoreRow or a plain refresh, never auto-committed.
 export function useTableStage(t, connectionReadOnly) {
-  const { target, rows, columns, view, editError, refByKey, columnInfo, keyColumns, at, refresh, tabReadOnly } = t
+  const { target, rows, columns, view, editError, refByKey, columnInfo, keyColumns, at, refresh, tabReadOnly, offset } = t
   const staged = t.runtime.staged
 
   // Locked either way: `connectionReadOnly` is the backend's own refusal (static for
@@ -37,21 +38,45 @@ export function useTableStage(t, connectionReadOnly) {
   const locked = () => connectionReadOnly || tabReadOnly.value
 
   // A staged insert as the grid renders it: one row array in the same column order as
-  // everything else, appended after the loaded page — so a grid row index past
-  // `rows.value.length` is draft number `index - rows.value.length`, no separate
-  // rendering path needed.
-  const insertRows = computed(() => staged.inserts.map(draft => view.value.columns.map(column => draft.values[column] ?? null)))
+  // everything else.
+  const draftRow = (draft) => view.value.columns.map(column => draft.values[column] ?? null)
+  const insertRows = computed(() => staged.inserts.map(draftRow))
   const insertDrafts = computed(() => staged.inserts)
+
+  // The grid shows each new row right after the row it was made from (#170), so a grid
+  // position is looked up in the layout rather than compared with the page's length.
+  // Without a primary key every row's key would be the same, so nothing anchors there.
+  const rowKeys = computed(() => rows.value.map(row => (keyColumns.value.length ? rowKeyOf(keyColumns.value, row, at) : null)))
+  const layout = computed(() => gridLayout(rowKeys.value, staged.inserts))
+  const draftByKey = (key) => staged.inserts.find(d => d.key === key)
+  const gridRows = computed(() => layout.value.map(entry => ('row' in entry ? view.value.rows[entry.row] : draftRow(draftByKey(entry.draft)))))
+  const loadedAt = (index) => layout.value[index]?.row ?? null
+  const draftAt = (index) => {
+    const key = layout.value[index]?.draft
+    return key ? draftByKey(key) : null
+  }
+  const gridIndexOf = (key) => layout.value.findIndex(entry => entry.draft === key)
+
+  function rowStatus(index) {
+    if (draftAt(index)) return 'inserted'
+    return isDeleted(index) ? 'deleted' : null
+  }
+
+  // A loaded row keeps its number on the page; a new row has none yet.
+  function rowNumber(index) {
+    const row = loadedAt(index)
+    return row === null ? '+' : offset.value + row + 1
+  }
 
   // Only the browsed table's own cells are editable, by its primary key — and never
   // an identity-always or stored-generated column, which Postgres never accepts a
   // value for. Arrays aren't editable yet: their text form (`{a,b}`) isn't what the
-  // grid shows. A draft insert row (rowIndex past the loaded page) skips the
-  // primary-key gate entirely — an insert needs no WHERE clause.
-  function canEdit(key, rowIndex) {
+  // grid shows. A draft insert row skips the primary-key gate entirely — an insert
+  // needs no WHERE clause.
+  function canEdit(key, index) {
     const ref = refByKey.value[key]
     const column = ref?.info?.name ?? key
-    if (rowIndex >= rows.value.length) return canEditInsertColumn(column)
+    if (draftAt(index)) return canEditInsertColumn(column)
     if (locked() || keyColumns.value.length === 0 || ref?.table !== 0) return false
     return canEditInsertColumn(column)
   }
@@ -93,15 +118,14 @@ export function useTableStage(t, connectionReadOnly) {
 
   // Stages one cell's edit — no network call. Keeps the column's first-seen original
   // value alongside whatever's newest, so restoreRow has something to revert to even
-  // after several edits to the same cell. A draft insert row (past the loaded page)
-  // routes to stageInsertValue instead — same grid gesture, different staged bucket.
-  function stageEdit(rowIndex, key, text) {
-    if (rowIndex >= rows.value.length) {
-      const draft = staged.inserts[rowIndex - rows.value.length]
-      return draft ? stageInsertValue(draft.key, refByKey.value[key]?.info?.name ?? key, text) : false
-    }
+  // after several edits to the same cell. A draft insert row routes to
+  // stageInsertValue instead — same grid gesture, different staged bucket.
+  function stageEdit(index, key, text) {
+    const draft = draftAt(index)
+    if (draft) return stageInsertValue(draft.key, refByKey.value[key]?.info?.name ?? key, text)
+    const row = rows.value[loadedAt(index)]
+    if (!row) return false
     editError.value = null
-    const row = rows.value[rowIndex]
     try {
       const value = parseInput(key, text)
       const column = refByKey.value[key].name
@@ -116,8 +140,8 @@ export function useTableStage(t, connectionReadOnly) {
     }
   }
 
-  function isDeleted(rowIndex) {
-    const row = rows.value[rowIndex]
+  function isDeleted(index) {
+    const row = rows.value[loadedAt(index)]
     return row ? staged.deletedKeys.includes(rowKeyOf(keyColumns.value, row, at)) : false
   }
 
@@ -126,7 +150,7 @@ export function useTableStage(t, connectionReadOnly) {
   function toggleDelete(indexes) {
     if (locked()) return
     for (const i of indexes) {
-      const row = rows.value[i]
+      const row = rows.value[loadedAt(i)]
       if (!row) continue
       const key = rowKeyOf(keyColumns.value, row, at)
       const at_ = staged.deletedKeys.indexOf(key)
@@ -138,11 +162,12 @@ export function useTableStage(t, connectionReadOnly) {
     }
   }
 
-  // Undoes whatever's staged on this loaded row: un-deletes it, and/or reverts every
-  // staged cell back to its original value. A staged insert isn't reached through
-  // here — see removeInsert.
-  function restoreRow(rowIndex) {
-    const row = rows.value[rowIndex]
+  // Undoes whatever's staged on this grid row: drops a new row, or un-deletes a loaded
+  // one and/or reverts every staged cell back to its original value.
+  function restoreRow(index) {
+    const draft = draftAt(index)
+    if (draft) return removeInsert(draft.key)
+    const row = rows.value[loadedAt(index)]
     if (!row) return
     const key = rowKeyOf(keyColumns.value, row, at)
     const wasDeleted = staged.deletedKeys.indexOf(key)
@@ -157,30 +182,43 @@ export function useTableStage(t, connectionReadOnly) {
     }
   }
 
-  // A blank staged draft, appended to the pending inserts — rendering it into the
-  // grid, and populating its cells, is the caller's job (stageInsertValue below).
-  function addRow() {
+  // A new draft shown right after the grid row at `afterIndex` (#170): after a loaded
+  // row by its key, or right after another new row by sharing its anchor and following
+  // it in staged order. No `afterIndex` (nothing selected) puts it at the end.
+  function stageInsert(values, afterIndex) {
+    const draft = { key: crypto.randomUUID(), values, after: null }
+    const before = afterIndex == null ? null : draftAt(afterIndex)
+    if (before) {
+      draft.after = before.after
+      staged.inserts.splice(staged.inserts.indexOf(before) + 1, 0, draft)
+    } else {
+      const row = afterIndex == null ? null : loadedAt(afterIndex)
+      if (row !== null) draft.after = rowKeys.value[row]
+      staged.inserts.push(draft)
+    }
+    return draft.key
+  }
+
+  // A blank staged draft — populating its cells is the caller's job (stageInsertValue
+  // below).
+  function addRow(afterIndex = null) {
     if (locked()) return null
-    const key = crypto.randomUUID()
-    staged.inserts.push({ key, values: {} })
-    return key
+    return stageInsert({}, afterIndex)
   }
 
   // Same as addRow, seeded from a loaded row's current (possibly already-edited)
-  // values — identity/generated columns are left out, exactly as addRow leaves them
-  // for the server to fill in.
-  function duplicateRow(rowIndex) {
+  // values and shown right after it — identity/generated columns are left out, exactly
+  // as addRow leaves them for the server to fill in.
+  function duplicateRow(index) {
     if (locked()) return null
-    const row = rows.value[rowIndex]
+    const row = rows.value[loadedAt(index)]
     if (!row) return null
     const values = {}
     for (const column of columns.value) {
       if (!canEditInsertColumn(column)) continue
       values[column] = row[at(column)]
     }
-    const key = crypto.randomUUID()
-    staged.inserts.push({ key, values })
-    return key
+    return stageInsert(values, index)
   }
 
   function stageInsertValue(key, column, text) {
@@ -286,6 +324,6 @@ export function useTableStage(t, connectionReadOnly) {
   return {
     canEdit, canEditInsertColumn, editText, stageEdit, isDeleted, toggleDelete, restoreRow,
     addRow, duplicateRow, stageInsertValue, removeInsert, insertRows, insertDrafts,
-    pendingCount, deletedCount, reviewSql, saveChanges, discardAll,
+    gridRows, gridIndexOf, rowStatus, rowNumber, pendingCount, deletedCount, reviewSql, saveChanges, discardAll,
   }
 }
