@@ -1,10 +1,10 @@
 //! Live-PostgreSQL coverage of stopping a running query: Cancel (`cancel_query_impl`)
-//! and the statement timeout. Shares `pg_integration_tests.rs`'s helpers and skip
+//! and the statement timeout. Shares `pg.rs`'s helpers and skip
 //! behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{cancel_query_impl, run_query_as};
 use crate::error::AppError;
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 // The message the frontend receives — the serialized `{ code, message }`.
 fn shown(err: &AppError) -> String {

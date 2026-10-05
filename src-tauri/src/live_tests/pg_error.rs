@@ -1,9 +1,9 @@
 //! Live-PostgreSQL coverage of the error codes the frontend branches on for a table it
-//! can't read, or that's gone. Shares `pg_integration_tests.rs`'s helpers and skip
+//! can't read, or that's gone. Shares `pg.rs`'s helpers and skip
 //! behaviour; see its module doc comment for how to run these.
 
 use crate::error::AppError;
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 #[tokio::test]
 async fn permission_denied_and_missing_tables_get_their_own_codes() {

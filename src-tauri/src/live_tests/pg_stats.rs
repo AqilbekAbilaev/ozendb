@@ -1,10 +1,10 @@
 //! Live-PostgreSQL coverage of the stats reads (`table_stats_impl`, and the
 //! per-database size `list_databases_impl` reports). Shares
-//! `pg_integration_tests.rs`'s helpers and skip behaviour; see its module doc
+//! `pg.rs`'s helpers and skip behaviour; see its module doc
 //! comment for how to run these.
 
 use crate::commands::{list_databases_impl, table_stats_impl};
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 const SCHEMA: &str = "ozendb_it_stats";
 

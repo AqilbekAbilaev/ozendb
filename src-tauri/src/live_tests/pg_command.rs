@@ -1,6 +1,6 @@
 //! Integration tests against a live PostgreSQL for the `commands::postgres::*`
 //! command layer (schema browsing, query, row edit) — split out of
-//! `pg_integration_tests.rs` once that file grew past the size limit, since
+//! `pg.rs` once that file grew past the size limit, since
 //! most of what got added here is one regression test per review finding.
 //! Shares that file's `test_config`/`pool` helpers and skip behavior; see its
 //! module doc comment for how to run these.
@@ -9,7 +9,7 @@ use crate::commands::{
     browse_table_impl, count_table_impl, list_columns_impl, list_databases_impl, list_schemas_impl,
     list_tables_impl, run_query_as, search_tables_impl, update_row_impl, ColumnRef, ColumnValue,
 };
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 #[tokio::test]
 async fn postgres_commands_round_trip() {

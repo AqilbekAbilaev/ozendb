@@ -1,6 +1,6 @@
 //! Live-PostgreSQL coverage of the sidebar's schema changes (`create_schema_impl`,
 //! `create_table_impl`, `rename_table_impl`, `drop_table_impl`, `drop_schema_impl`).
-//! Shares `pg_integration_tests.rs`'s helpers and skip behaviour; see its module doc
+//! Shares `pg.rs`'s helpers and skip behaviour; see its module doc
 //! comment for how to run these.
 
 use crate::commands::{
@@ -8,7 +8,7 @@ use crate::commands::{
     list_tables_impl, rename_table_impl, NewPgColumn, NewPgTable,
 };
 use crate::error::AppError;
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 fn column(name: &str, data_type: &str, primary_key: bool) -> NewPgColumn {
     NewPgColumn { name: name.into(), data_type: data_type.into(), nullable: true, primary_key, identity: primary_key }

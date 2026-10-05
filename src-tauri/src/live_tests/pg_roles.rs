@@ -1,12 +1,12 @@
 //! Live-PostgreSQL coverage of role browsing and management (`list_roles_impl`,
-//! `create_role_impl`, `drop_role_impl`). Shares `pg_integration_tests.rs`'s helpers
+//! `create_role_impl`, `drop_role_impl`). Shares `pg.rs`'s helpers
 //! and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{
     change_privileges_impl, create_role_impl, drop_role_impl, list_grants_impl, list_roles_impl, NewPgRole,
     PgPrivilegeChange,
 };
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 use sqlx::Connection;
 
 fn role(name: &str) -> NewPgRole {

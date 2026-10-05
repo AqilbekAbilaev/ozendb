@@ -1,9 +1,9 @@
 //! Live-PostgreSQL coverage of the function/procedure browser reads
-//! (`list_routines_impl`, `routine_source_impl`). Shares `pg_integration_tests.rs`'s
+//! (`list_routines_impl`, `routine_source_impl`). Shares `pg.rs`'s
 //! helpers and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{list_routines_impl, routine_source_impl};
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 // Each test seeds a schema of its own: they run concurrently, and sharing one name
 // means racing on its DROP and CREATE.

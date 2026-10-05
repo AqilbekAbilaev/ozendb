@@ -1,12 +1,12 @@
 //! Live-PostgreSQL coverage of filtered table browsing (`browse_table_impl` /
-//! `count_table_impl` with filters). Shares `pg_integration_tests.rs`'s helpers
+//! `count_table_impl` with filters). Shares `pg.rs`'s helpers
 //! and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{
     browse_table_impl, count_table_impl, list_columns_impl, list_foreign_keys_impl, list_tables_impl, update_row_impl, ColumnFilter, ColumnRef, ColumnValue,
     FilterOp, JoinKind, JoinOn, TableJoin,
 };
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 fn by(column: &str) -> ColumnRef {
     ColumnRef { table: 0, column: column.to_string() }
