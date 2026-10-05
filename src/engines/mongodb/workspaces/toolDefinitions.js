@@ -56,6 +56,13 @@ function identityTool(kind, titlePrefix, anchor = (source) => source.collectionN
   return { duplicate: rebuild, restore: rebuild }
 }
 
+// A CSV import's options with each default filled in — the one copy create, serialize,
+// duplicate and restore share.
+const csvOptions = (csv) => ({
+  delimiter: csv?.delimiter ?? ',', other: csv?.other ?? '', qualifier: csv?.qualifier ?? '"',
+  skipLines: csv?.skipLines ?? 0, hasHeader: csv?.hasHeader ?? true,
+})
+
 export const toolDefinitions = [
   {
     type: 'mongodb.indexes',
@@ -123,7 +130,7 @@ export const toolDefinitions = [
             subTab: 'source',           // 'source' | 'target'
             sourceType: 'file',         // 'clipboard' | 'file'
             filePath: '',
-            csv: { delimiter: ',', other: '', qualifier: '"', skipLines: 0, hasHeader: true },
+            csv: csvOptions(),
             targetDb: ctx.target.dbName, targetColl: ctx.target.collName, mode: 'insert',
             fields: [],                 // column → field mapping (Target options)
           }
@@ -144,12 +151,7 @@ export const toolDefinitions = [
         return {
           format: 'csv',
           sourceType: workspace.sourceType ?? 'file', filePath: workspace.filePath ?? '',
-          csv: {
-            delimiter: workspace.csv?.delimiter ?? ',', other: workspace.csv?.other ?? '',
-            qualifier: workspace.csv?.qualifier ?? '"',
-            skipLines: workspace.csv?.skipLines ?? 0,
-            hasHeader: workspace.csv?.hasHeader ?? true,
-          },
+          csv: csvOptions(workspace.csv),
           targetDb: workspace.targetDb ?? '', targetColl: workspace.targetColl ?? '',
           mode: workspace.mode ?? 'insert',
         }
@@ -174,13 +176,7 @@ export const toolDefinitions = [
             kind: 'import', ...toolTarget(workspace), format: 'csv',
             subTab: 'source', sourceType: workspace.sourceType || 'file',
             filePath: workspace.filePath || '',
-            csv: {
-              delimiter: workspace.csv?.delimiter ?? ',',
-              other: workspace.csv?.other ?? '',
-              qualifier: workspace.csv?.qualifier ?? '"',
-              skipLines: workspace.csv?.skipLines ?? 0,
-              hasHeader: workspace.csv?.hasHeader ?? true,
-            },
+            csv: csvOptions(workspace.csv),
             targetDb: workspace.targetDb, targetColl: workspace.targetColl,
             mode: workspace.mode || 'insert',
             fields: [],
@@ -213,12 +209,7 @@ export const toolDefinitions = [
             kind: 'import', ...toolTarget(saved), format: 'csv',
             subTab: 'source',
             sourceType: saved.sourceType || 'file', filePath: saved.filePath || '',
-            csv: {
-              delimiter: saved.csv?.delimiter ?? ',', other: saved.csv?.other ?? '',
-              qualifier: saved.csv?.qualifier ?? '"',
-              skipLines: saved.csv?.skipLines ?? 0,
-              hasHeader: saved.csv?.hasHeader ?? true,
-            },
+            csv: csvOptions(saved.csv),
             targetDb: saved.targetDb, targetColl: saved.targetColl,
             mode: saved.mode || 'insert',
             fields: [],
