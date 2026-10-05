@@ -7,12 +7,15 @@ import { createSelection } from '../../../composables/useRowSelection'
 
 export const TABLE_STATE_VERSION = 2
 
-export function createTableState({ limit } = {}) {
+// `rowKey` (`{ column: value }`, a row's primary key) starts the tab filtered to that
+// one row (#172) with ordinary, clearable filters: an exact match per key column.
+export function createTableState({ limit, rowKey } = {}) {
+  const keyColumns = Object.entries(rowKey ?? {})
   return {
     v: TABLE_STATE_VERSION,
     query: {
-      filterText: {},
-      filters: [],
+      filterText: Object.fromEntries(keyColumns.map(([key, value]) => [key, `=${value}`])),
+      filters: keyColumns.map(([key, value]) => ({ key, op: 'eq', value: String(value) })),
       joins: [],
       nextJoin: 1,
       shownColumns: [],

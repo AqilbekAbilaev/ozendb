@@ -224,10 +224,12 @@ export function openQuickstart() {
   activateTab(tab.id)
 }
 
-// A PostgreSQL table, like a MongoDB collection, opens a new tab every time.
-export function openPostgresTable({ connectionId, connectionName, database, schema, table }) {
+// A PostgreSQL table, like a MongoDB collection, opens a new tab every time; `rowKey`
+// (a row's primary key) opens it filtered to that row.
+export function openPostgresTable({ connectionId, connectionName, database, schema, table, rowKey }) {
   const tab = newWorkspace('postgresql.table_browse', {
     target: { connectionId, connectionName, database, schema, table },
+    options: { rowKey },
   })
   tabs.value.push(tab)
   activateTab(tab.id)

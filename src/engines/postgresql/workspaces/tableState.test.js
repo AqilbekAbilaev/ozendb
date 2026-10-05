@@ -20,6 +20,28 @@ describe('createTableState', () => {
   })
 })
 
+// #172: Search in Schema opens a match's row, filtered by its primary key.
+describe('createTableState for one row', () => {
+  it('starts filtered to the row, exactly, with the header boxes showing it', () => {
+    const { query } = createTableState({ rowKey: { id: 157 } })
+    expect(query.filters).toEqual([{ key: 'id', op: 'eq', value: '157' }])
+    expect(query.filterText).toEqual({ id: '=157' })
+  })
+
+  it('filters on every column of a composite key', () => {
+    const { query } = createTableState({ rowKey: { order_id: 7, line_no: 2 } })
+    expect(query.filters).toEqual([
+      { key: 'order_id', op: 'eq', value: '7' },
+      { key: 'line_no', op: 'eq', value: '2' },
+    ])
+    expect(query.filterText).toEqual({ order_id: '=7', line_no: '=2' })
+  })
+
+  it('starts unfiltered without a row key', () => {
+    expect(createTableState().query.filters).toEqual([])
+  })
+})
+
 describe('migrateTableState', () => {
   it('reads a v1 state as one whose columns keep the order they come in', () => {
     const v1 = { v: 1, query: { ...createTableState().query, shownColumns: ['name'] }, mode: 'sql', sql: 'SELECT 1', paused: createTableState().paused }
