@@ -63,6 +63,10 @@ const csvOptions = (csv) => ({
   skipLines: csv?.skipLines ?? 0, hasHeader: csv?.hasHeader ?? true,
 })
 
+// A JSON import's run status. The pane is shared by every import tab, so this lives on
+// the tab — but fresh on each create, duplicate and restore, and never saved.
+const importRuntime = () => ({ running: false, error: null, errorCode: null, done: null })
+
 export const toolDefinitions = [
   {
     type: 'mongodb.indexes',
@@ -140,6 +144,7 @@ export const toolDefinitions = [
             sources: [],                // { path, name, targetDb, targetColl, mode }
             selectedSource: -1,
             previewOpen: false,
+            runtime: importRuntime(),
           }
       return { title: 'Import: ' + ctx.target.collName, target: resourceFromFeatureNode(target), fields }
     },
@@ -195,6 +200,7 @@ export const toolDefinitions = [
           })),
           selectedSource: -1,
           previewOpen: false,
+          runtime: importRuntime(),
         },
       }
     },
@@ -229,6 +235,7 @@ export const toolDefinitions = [
           sources,
           selectedSource: sources.length ? 0 : -1,
           previewOpen: false,
+          runtime: importRuntime(),
         },
       }
     },

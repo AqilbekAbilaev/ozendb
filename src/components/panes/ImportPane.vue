@@ -44,10 +44,10 @@ const fmt = computed(() => (t.value.format || 'json').toUpperCase())
 const isJson = computed(() => t.value.format === 'json')
 const lifecycle = useImportPaneLifecycle()
 
-const running = computed(() => !!t.value._importRunning)
-const error = computed(() => t.value._importError || null)
-const errorCode = computed(() => t.value._importErrorCode || null)
-const done = computed(() => t.value._importDone || null)
+const running = computed(() => !!t.value.runtime.running)
+const error = computed(() => t.value.runtime.error || null)
+const errorCode = computed(() => t.value.runtime.errorCode || null)
+const done = computed(() => t.value.runtime.done || null)
 
 const {
   loading: previewLoading,
@@ -69,8 +69,8 @@ watch(() => props.activeTab, (tab) => {
 }, { immediate: true })
 
 function setError(e, tab = t.value) {
-  tab._importError = errText(e)
-  tab._importErrorCode = errCode(e)
+  tab.runtime.error = errText(e)
+  tab.runtime.errorCode = errCode(e)
 }
 
 function baseName(p) {
@@ -80,8 +80,8 @@ function baseName(p) {
 // ── sources ────────────────────────────────────────────────────
 async function addSource() {
   const request = lifecycle.beginSource(t.value)
-  request.tab._importError = null
-  request.tab._importErrorCode = null
+  request.tab.runtime.error = null
+  request.tab.runtime.errorCode = null
   let picked
   try {
     picked = await openDialog({
@@ -125,8 +125,8 @@ function selectSource(i) {
 // path-based preview/import as a picked file.
 async function pasteSource() {
   const request = lifecycle.beginSource(t.value)
-  request.tab._importError = null
-  request.tab._importErrorCode = null
+  request.tab.runtime.error = null
+  request.tab.runtime.errorCode = null
   let text
   try {
     text = await navigator.clipboard.readText()
@@ -169,10 +169,10 @@ async function run() {
   if (!canRun.value || running.value) return
   const runTab = t.value
   const request = lifecycle.beginRun(runTab)
-  runTab._importRunning = true
-  runTab._importError = null
-  runTab._importErrorCode = null
-  runTab._importDone = null
+  runTab.runtime.running = true
+  runTab.runtime.error = null
+  runTab.runtime.errorCode = null
+  runTab.runtime.done = null
   try {
     // Optional early validation: confirm each file parses before writing anything.
     if (request.format === 'json' && request.validate) {
@@ -192,19 +192,19 @@ async function run() {
       total += count
     }
     showToast(`Imported ${total} document${total === 1 ? '' : 's'} from ${request.sources.length} source${request.sources.length === 1 ? '' : 's'}`)
-    runTab._importDone = { count: total }
+    runTab.runtime.done = { count: total }
   } catch (e) {
     setError(e, runTab)
     if (!lifecycle.isCurrentRun(request, props.activeTab)) showToast(`Import failed: ${errText(e)}`)
   } finally {
-    runTab._importRunning = false
+    runTab.runtime.running = false
   }
 }
 
 function reset() {
-  t.value._importDone = null
-  t.value._importError = null
-  t.value._importErrorCode = null
+  t.value.runtime.done = null
+  t.value.runtime.error = null
+  t.value.runtime.errorCode = null
 }
 
 // Include the path because removing a source can leave the selected index unchanged.
