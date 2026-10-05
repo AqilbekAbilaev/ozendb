@@ -1,7 +1,5 @@
-// Static component-only workspace registry (Work 4). It maps the current tab
-// compatibility keys to components; resolution rules keep the pre-registry
-// pane-dispatch behavior. This file is deliberately component-only: create,
-// duplicate, serialize, restore, and dispose metadata arrive in Works 5 and 6.
+// The workspace registry: every definition by type, and the panes the app-level and
+// MongoDB definitions render. A tab renders its type's component and nothing else.
 import { defineAsyncComponent } from 'vue'
 import QuickstartPane from '../components/panes/QuickstartPane.vue'
 import MongoCollectionWorkspace from '../engines/mongodb/workspaces/collection/MongoCollectionWorkspace.vue'
@@ -30,16 +28,15 @@ export const WORKSPACE_COMPONENTS = Object.freeze({
   'import:csv': CsvImportPane,
 })
 
-// A missing active tab resolves to Quickstart (as the old `!activeTab` branch did).
-// The kind map covers the original MongoDB panes; any other tab renders its type's
-// own definition component, so an engine adds a workspace without editing this file.
-// A tab with neither resolves to null, preserving the blank-pane behavior.
+// A tab's component comes from its type's definition: `componentFor(tab)` when the
+// definition picks between components (import's JSON and CSV panes), `component`
+// otherwise. No active tab shows Quickstart; an unknown type resolves to null, the
+// blank pane.
 export function workspaceComponentFor(tab) {
-  if (!tab || tab.kind === 'quickstart') return WORKSPACE_COMPONENTS.quickstart
-  if (tab.kind === 'import') {
-    return tab.format === 'csv' ? WORKSPACE_COMPONENTS['import:csv'] : WORKSPACE_COMPONENTS.import
-  }
-  return WORKSPACE_COMPONENTS[tab.kind] || definitions.get(tab.type)?.component || null
+  if (!tab) return WORKSPACE_COMPONENTS.quickstart
+  const def = definitions.get(tab.type)
+  if (!def) return null
+  return def.componentFor ? def.componentFor(tab) : def.component
 }
 
 // Definition registry (Work 5). Populated once at startup by registerDefinitions();

@@ -111,6 +111,7 @@ export const toolDefinitions = [
     type: 'mongodb.import',
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.import,
+    componentFor: (workspace) => (workspace.format === 'csv' ? WORKSPACE_COMPONENTS['import:csv'] : WORKSPACE_COMPONENTS.import),
     create(ctx) {
       const target = toolTarget(ctx.target)
       const format = ctx.options.format || 'json'
