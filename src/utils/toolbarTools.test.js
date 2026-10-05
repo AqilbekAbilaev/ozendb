@@ -11,6 +11,12 @@ describe('toolbarTools', () => {
     ])
   })
 
+  it("shows PostgreSQL's own buttons in their MongoDB counterparts' places", () => {
+    expect(names(toolbarTools(TOOLS, 'postgresql'))).toEqual([
+      'connect', 'pgTable', 'pgSql', 'pgSearch', '|', 'pgExport', 'pgImport',
+    ])
+  })
+
   it('keeps only Connect when no engine is in focus', () => {
     expect(names(toolbarTools(TOOLS, 'none'))).toEqual(['connect'])
   })

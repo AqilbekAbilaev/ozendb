@@ -32,7 +32,7 @@ const operationsPaneHeight = ref(200)
 
 const { menuTarget, pgMenuTarget, menuEngine } = useMenu()
 
-const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({ menuTarget })
+const { handleContextAction, handleTool, menuNode, refreshAll } = useFeatures({ menuTarget, pgMenuTarget })
 
 useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, refreshAll, toolbarHidden })
 </script>

@@ -21,6 +21,7 @@ import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
 import { openModal } from '../stores/modals'
 import { PG_ACTIONS } from '../engines/postgresql/tree/contextMenus'
+import { runPgTool } from '../engines/postgresql/toolbarActions'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
@@ -42,7 +43,7 @@ export const UNBUILT_ACTIONS = new Set([
 
 // `menuTarget` comes from useMenu, which App.vue constructs once because it also
 // owns the watcher that pushes the menu context to the native menu.
-export function useFeatures({ menuTarget }) {
+export function useFeatures({ menuTarget, pgMenuTarget }) {
   const { pasteClipboard } = useDbActions()
   const { applyColorTag } = useNodeTags()
   const { openImportWizard, exportDatabase, importDatabase } = useDbTransfer()
@@ -309,11 +310,12 @@ export function useFeatures({ menuTarget }) {
   }
 
   // Toolbar / native-menu tool dispatch. `connect`/`sql` are app-level (no
-  // node); `collection`/`shell` keep their bespoke selection + guidance logic; every
-  // other tool resolves the operating node (the passed sidebar selection, else the
-  // active tab) and routes through the shared feature registry.
+  // node); PostgreSQL's buttons go to runPgTool; `collection`/`shell` keep their bespoke
+  // selection + guidance logic; every other tool resolves the operating node (the passed
+  // sidebar selection, else the active tab) and routes through the shared feature registry.
   function handleTool(name, target = null) {
     if (name === 'connect') { openModal('connectionManager'); return }
+    if (runPgTool(name, pgMenuTarget)) return
 
     if (name === 'collection') {
       if (target && target.connectionId && target.dbName && target.collectionName) {
