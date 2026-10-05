@@ -184,14 +184,16 @@ async function saveChanges() {
             <BaseButton icon="undo" :icon-size="18" :disabled="!selectedRowIndexes.length" title="Undo the selected row's pending change" @click="restoreSelection" />
             <span v-if="t.deletedCount" class="stage-deleted"><BaseIcon name="trash" :size="12" /> {{ t.deletedCount }} deleted</span>
             <FlexSpacer />
-            <BaseButton icon="sql" :icon-size="18" :disabled="!t.pendingCount" title="Preview the SQL a save will run" @click="reviewSqlOpen = true" />
-            <BaseButton icon="close" :icon-size="18" :disabled="!t.pendingCount" title="Drop every pending change" @click="t.discardAll()" />
-            <BaseButton
-              variant="primary" icon="save" :disabled="!t.pendingCount || saving || t.tabReadOnly"
-              :title="t.tabReadOnly ? 'This tab is read-only' : 'Run every pending change'" @click="saveChanges"
-            >
-              {{ saving ? 'Saving…' : `Save changes${t.pendingCount ? ' (' + t.pendingCount + ')' : ''}` }}
-            </BaseButton>
+            <template v-if="t.pendingCount || saving">
+              <BaseButton icon="sql" :icon-size="18" :disabled="!t.pendingCount" title="Preview the SQL a save will run" @click="reviewSqlOpen = true" />
+              <BaseButton icon="close" :icon-size="18" :disabled="!t.pendingCount" title="Drop every pending change" @click="t.discardAll()" />
+              <BaseButton
+                variant="primary" icon="save" :disabled="!t.pendingCount || saving || t.tabReadOnly"
+                :title="t.tabReadOnly ? 'This tab is read-only' : 'Run every pending change'" @click="saveChanges"
+              >
+                {{ saving ? 'Saving…' : `Save changes${t.pendingCount ? ' (' + t.pendingCount + ')' : ''}` }}
+              </BaseButton>
+            </template>
           </div>
 
           <template v-if="t.panel.rtab === 'Result'">
