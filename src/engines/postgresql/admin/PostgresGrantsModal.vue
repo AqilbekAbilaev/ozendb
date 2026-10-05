@@ -78,8 +78,9 @@ function revoke(schema, obj) {
 </script>
 
 <template>
-  <BaseModal :title="`Grants — ${target.role}`" width="640px" max-width="calc(100vw - 40px)" height="calc(100vh - 80px)" max-height="calc(100vh - 80px)" @close="$emit('close')">
-    <BaseModalBody>
+  <BaseModal :title="`Grants — ${target.role}`" width="min(860px, calc(100vw - 40px))" max-height="calc(100vh - 80px)" @close="$emit('close')">
+    <!-- Only the list scrolls, under controls that stay put (#176). -->
+    <BaseModalBody :scrollable="false" class="pg-body">
       <div class="pg-grant-form">
         <div class="pg-grant-row">
           <BaseSelect v-model="draft.kind" :options="kindOptions" />
@@ -107,7 +108,7 @@ function revoke(schema, obj) {
           <div class="pg-schema-name">{{ entry.schema }}</div>
           <div v-for="obj in entry.objects" :key="obj.object ?? ''" class="pg-item">
             <code class="pg-obj">{{ obj.object ? `${obj.objectKind}: ${obj.object}` : 'schema' }}</code>
-            <span class="pg-privs">{{ obj.privileges.join(', ') }}</span>
+            <span class="pg-privs" :title="obj.privileges.join(', ')">{{ obj.privileges.join(', ') }}</span>
             <BaseButton size="sm" :disabled="busy" title="Revoke these privileges" @click="revoke(entry.schema, obj)">Revoke</BaseButton>
           </div>
         </div>
@@ -117,13 +118,14 @@ function revoke(schema, obj) {
 </template>
 
 <style scoped>
+.pg-body { min-height: 0; }
 .pg-grant-form {
-  display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;
+  flex: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;
   padding: 10px; border: 1px solid var(--border-soft); border-radius: 7px;
 }
 .pg-grant-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .pg-grant-btn { margin-left: auto; }
-.pg-list { display: flex; flex-direction: column; gap: 14px; }
+.pg-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
 .pg-schema-name { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
 .pg-item {
   display: flex; align-items: center; gap: 12px; margin-left: 10px;

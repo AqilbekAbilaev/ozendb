@@ -92,9 +92,9 @@ async function clearAll() {
 </script>
 
 <template>
-  <BaseModal :title="`Collection History — ${target.dbName}.${target.collectionName}`" width="640px" max-width="calc(100vw - 40px)" height="calc(100vh - 80px)" max-height="calc(100vh - 80px)" @close="$emit('close')">
-
-      <BaseModalBody>
+  <BaseModal :title="`Collection History — ${target.dbName}.${target.collectionName}`" width="min(860px, calc(100vw - 40px))" max-height="calc(100vh - 80px)" @close="$emit('close')">
+      <!-- Only the list scrolls, under controls that stay put (#176). -->
+      <BaseModalBody :scrollable="false" class="ch-body">
         <div class="ch-controls">
           <HintText dim v-if="!loading && !error">
             {{ entries.length }} recorded change{{ entries.length === 1 ? '' : 's' }}
@@ -117,7 +117,7 @@ async function clearAll() {
           <div v-for="entry in entries" :key="entry.id" class="ch-item">
             <span class="ch-op" :class="'op-' + entry.op">{{ OP_LABEL[entry.op] || entry.op }}</span>
             <div class="ch-mid">
-              <code class="ch-id">{{ idText(entry.doc_id) }}</code>
+              <code class="ch-id" :title="idText(entry.doc_id)">{{ idText(entry.doc_id) }}</code>
               <span class="ch-when">{{ whenText(entry.at) }}</span>
             </div>
             <BaseButton
@@ -134,10 +134,11 @@ async function clearAll() {
 
 <style scoped>
 
-.ch-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.ch-body { min-height: 0; }
+.ch-controls { flex: none; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .ch-ok { color: var(--green, #2f9e63); }
 
-.ch-list { display: flex; flex-direction: column; gap: 6px; }
+.ch-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
 .ch-item {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 7px;

@@ -76,8 +76,9 @@ async function clearAll() {
 </script>
 
 <template>
-  <BaseModal :title="`Row History — ${target.schema}.${target.table}`" width="640px" max-width="calc(100vw - 40px)" height="calc(100vh - 80px)" max-height="calc(100vh - 80px)" @close="$emit('close')">
-    <BaseModalBody>
+  <BaseModal :title="`Row History — ${target.schema}.${target.table}`" width="min(860px, calc(100vw - 40px))" max-height="calc(100vh - 80px)" @close="$emit('close')">
+    <!-- Only the list scrolls, under controls that stay put (#176). -->
+    <BaseModalBody :scrollable="false" class="rh-body">
       <div class="rh-controls">
         <HintText dim v-if="!loading && !error">
           {{ entries.length }} recorded edit{{ entries.length === 1 ? '' : 's' }}
@@ -95,7 +96,7 @@ async function clearAll() {
       <div v-else class="rh-list">
         <div v-for="entry in entries" :key="entry.id" class="rh-item">
           <div class="rh-mid">
-            <code class="rh-key">{{ keyText(entry.key) }}</code>
+            <code class="rh-key" :title="keyText(entry.key)">{{ keyText(entry.key) }}</code>
             <span v-for="change in entry.changes" :key="change.column" class="rh-change">
               {{ change.column }}: <code>{{ JSON.stringify(change.before) }}</code> → <code>{{ JSON.stringify(change.after) }}</code>
             </span>
@@ -111,10 +112,11 @@ async function clearAll() {
 </template>
 
 <style scoped>
-.rh-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.rh-body { min-height: 0; }
+.rh-controls { flex: none; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .rh-ok { color: var(--green, #2f9e63); }
 
-.rh-list { display: flex; flex-direction: column; gap: 6px; }
+.rh-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
 .rh-item {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 7px;
