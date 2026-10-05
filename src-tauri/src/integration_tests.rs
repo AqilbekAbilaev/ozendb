@@ -264,3 +264,51 @@ async fn aggregate_round_trip() {
         Err(e) => panic!("drop db: {}", e),
     }
 }
+
+/// IntelliShell on a read-only connection, end to end through the engine and driver:
+/// a read runs, while a write and a write command nobody listed are refused before
+/// anything reaches the server.
+#[tokio::test(flavor = "multi_thread")]
+async fn read_only_shell_runs_reads_and_refuses_the_rest() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_MONGODB=host[:port] to run live tests");
+            return;
+        }
+    };
+    let client = connect(&config).await;
+    let db = client.database("ozendb_it_shell_ro");
+    match db.drop().await {
+        Ok(_) => {}
+        Err(e) => panic!("drop db: {}", e),
+    }
+    let shell = crate::shell::ShellEngine::new();
+    let run = |code: &str| {
+        shell.submit_eval(
+            String::from("it-shell-ro"),
+            code.to_string(),
+            client.clone(),
+            true,
+            String::from("ozendb_it_shell_ro"),
+            tokio::runtime::Handle::current(),
+        )
+    };
+
+    let read = run("db.items.find().toArray()").await.expect("shell reply");
+    assert_eq!(read.error, None);
+
+    let search = run("db.runCommand({ createSearchIndexes: 'items', indexes: [] })").await.expect("shell reply");
+    let message = search.error.expect("createSearchIndexes should be refused");
+    assert!(message.contains("the `createSearchIndexes` command"), "{message}");
+
+    let insert = run("db.items.insertOne({ a: 1 })").await.expect("shell reply");
+    assert!(insert.error.expect("insertOne should be refused").contains("read-only"));
+    let count = match db.collection::<Document>("items").count_documents(doc! {}).await {
+        Ok(val) => val,
+        Err(e) => panic!("count_documents: {}", e),
+    };
+    assert_eq!(count, 0);
+
+    shell.close(String::from("it-shell-ro"));
+}

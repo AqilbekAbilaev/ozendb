@@ -134,10 +134,9 @@ impl AppContext {
     /// already read, so the read-only check and the connect see one consistent view.
     ///
     /// IntelliShell writes never reach this function — the shell talks to the driver
-    /// directly — so they are gated separately by `shell::bridge::op_writes`, which
-    /// refuses write methods, write `runCommand`s and `$out`/`$merge` pipelines. Both
-    /// paths must stay in step: a new mutating command belongs here, a new shell
-    /// operation belongs there.
+    /// directly — so they are gated separately by `shell::bridge::read_only_refusal`,
+    /// which runs only operations it knows are reads. A new mutating command belongs
+    /// here; a new shell operation is refused there until it's listed as a read.
     pub async fn client_for_write(&self, id: &str) -> Result<Client, AppError> {
         let config = match self.storage.find(id) {
             Some(val) => val,
