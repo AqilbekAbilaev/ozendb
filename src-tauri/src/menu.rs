@@ -25,7 +25,7 @@ mod build;
 mod document_window;
 mod table;
 
-pub use build::{build, install, MenuItems, MenuState};
+pub use build::{build, clear_accelerators, install, MenuItems, MenuState};
 pub use document_window::{open_document_window, DocumentTarget};
 pub use table::menus;
 
@@ -263,16 +263,18 @@ pub fn set_menu_context(
     let scope = menu_scope_from_id(&engine);
     if scope != state.scope {
         let overrides = app.state::<crate::keybindings::KeybindingStorage>().load();
-        let (native_menu, gated) = match build(&app, &overrides, scope) {
+        let built = match build(&app, &overrides, scope) {
             Ok(val) => val,
             Err(e) => return Err(e.to_string()),
         };
-        match install(&app, native_menu) {
+        clear_accelerators(&state.accelerated);
+        match install(&app, built.menu) {
             Ok(val) => val,
             Err(e) => return Err(e),
         };
         state.scope = scope;
-        state.gated = gated;
+        state.gated = built.gated;
+        state.accelerated = built.accelerated;
     }
     for (item, gate, is_write) in state.gated.iter() {
         let enabled = item_enabled(*gate, *is_write, &context);
