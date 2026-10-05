@@ -7,6 +7,7 @@ import { registerWorkspaceDefinitions } from "./workspaces/registerDefinitions";
 import { initializeTabs } from "./stores/tabs";
 import App from "./App.vue";
 import { installErrorReporting, describeError } from "./utils/errorReport";
+import { recordFrontendError } from "./appApi/errorLog";
 import { prePaintTheme } from "./utils/themeMirror";
 import { installInputUndo } from "./utils/inputUndo";
 import { checkOnLaunch } from "./stores/updater";
@@ -25,7 +26,7 @@ prePaintTheme();
 installInputUndo();
 
 // Installed before mount so an exception thrown during setup is still recorded.
-const report = installErrorReporting();
+const report = installErrorReporting(recordFrontendError);
 
 registerWorkspaceDefinitions();
 initializeTabs();
