@@ -70,6 +70,22 @@ Four rings, outermost first. A ring may import inwards, never outwards — **enf
 | `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (every "open a tab" entry point) · `queryRunner.js` · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `indexes.js` · `updater.js` · `toast.js` · `dbClipboard.js` · `queryClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
 | `src/utils/` | Pure functions. No Vue, no I/O. |
 
+The rest of `src/` sits around those rings, with its own lint rule where a direction holds:
+
+- **`appApi/` and `engines/*/api/`** are at the centre with `utils/`: anything may call them, and
+  they reach nothing that could call them back. `appApi/` imports no app code at all; an engine's
+  `api/` imports no components and no app state.
+- **`workspaces/`** is the machinery `stores/tabs.js` builds on, so it reads no stores or
+  composables. Its registry maps types to components and so imports them — the one outward edge,
+  which `importCycles.test.js` keeps from closing into a loop.
+- **`components/base/`** is the UI kit: other base components, `utils/`, `constants/`, `data/` and
+  `composables/`, never a store or a feature area. The one setting it honours (the editor's tab
+  width) is provided by each window's root under a key in `constants/injectionKeys.js`.
+- **`engines/<name>/`** is a vertical slice — components, workspaces, tree and API side by side —
+  and each part follows the ring of what it is.
+- **`constants/`** and **`data/`** are tables any ring may read. `constants/modalRegistry.js` names
+  modal components, but only through a lazy `import()`.
+
 ### The Tauri boundary
 
 Nothing outside two roots may call `invoke`. **This is enforced, not a convention** —

@@ -20,15 +20,62 @@ export default [
     },
   },
   // The layering rule from CLAUDE.md: a ring may import inwards, never outwards.
-  // Only the directions that already hold everywhere are enforced — utils' two reaches
-  // into appApi and workspaces predate this and are left to be dealt with separately.
   {
     files: ['src/utils/**/*.js'],
     ignores: ['**/*.test.js'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [{
-        group: ['**/stores/*', '**/composables/*', '**/components/*', '**/engines/*'],
+        group: ['**/stores/*', '**/composables/*', '**/components/*', '**/engines/*', '**/appApi/*', '**/workspaces/*'],
         message: 'utils/ holds pure functions — no Vue, no I/O, no app state.',
+      }] }],
+    },
+  },
+  // The two Tauri roots sit beside utils/, at the centre: everything may call them, and
+  // they reach nothing that could call them back.
+  {
+    files: ['src/appApi/**/*.js'],
+    ignores: ['**/*.test.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        regex: '^\\.\\./',
+        message: 'appApi/ wraps Tauri commands — it imports its own files and @tauri-apps, nothing app-side.',
+      }] }],
+    },
+  },
+  {
+    files: ['src/engines/*/api/**/*.js'],
+    ignores: ['**/*.test.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/components/*', '**/composables/*', '**/stores/*', '**/workspaces/*', '**/*.vue'],
+        message: 'An engine api/ turns targets into command payloads — no components, no app state.',
+      }] }],
+    },
+  },
+  // The kit every feature builds on. A setting it must honour arrives by injection
+  // (constants/injectionKeys.js); anything else, by props.
+  {
+    files: ['src/components/base/**/*.{js,vue}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+        {
+          group: ['**/stores/*', '**/appApi/*', '**/engines/*', '**/workspaces/*'],
+          message: 'components/base/ is the generic UI kit — app state reaches it through props.',
+        },
+        {
+          regex: '^\\.\\./(?!\\.\\./)',
+          message: 'components/base/ imports other base components only, never a feature area.',
+        },
+      ] }],
+    },
+  },
+  {
+    files: ['src/workspaces/**/*.js'],
+    ignores: ['**/*.test.js', '**/*.fixtures.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/stores/*', '**/composables/*'],
+        message: 'workspaces/ is the machinery the tab store builds on, so it reads no app state.',
       }] }],
     },
   },
