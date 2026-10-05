@@ -1,5 +1,5 @@
 // The toolbar for the engine in focus (#163), picked the way the native menu picks its
-// items (ozendb-izk): buttons with no `engine` (Connect) always show, an engine's own
+// items (#152): buttons with no `engine` (Connect) always show, an engine's own
 // only while that engine is in focus. Dividers are re-tidied so a group left empty
 // doesn't leave two in a row or one at either end.
 export function toolbarTools(tools, engine) {
