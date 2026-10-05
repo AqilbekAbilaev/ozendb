@@ -189,17 +189,18 @@ pub fn run() {
             // Neutral until the frontend reports a scope: launch shows Quickstart, and
             // building the full menu first would flash it.
             let key_overrides = app.state::<KeybindingStorage>().load();
-            let (native_menu, gated_items) = match menu::build(app.handle(), &key_overrides, menu::MenuScope::Neutral) {
+            let built = match menu::build(app.handle(), &key_overrides, menu::MenuScope::Neutral) {
                 Ok(val) => val,
                 Err(e) => return Err(e.into()),
             };
-            match menu::install(app.handle(), native_menu) {
+            match menu::install(app.handle(), built.menu) {
                 Ok(_val) => {}
                 Err(e) => return Err(e.into()),
             };
             app.manage(menu::MenuItems(std::sync::Mutex::new(menu::MenuState {
                 scope: menu::MenuScope::Neutral,
-                gated: gated_items,
+                gated: built.gated,
+                accelerated: built.accelerated,
             })));
             app.on_menu_event(menu::handle_event);
 

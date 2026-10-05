@@ -8,12 +8,32 @@ use tauri::{
 
 // Managed state: the gated items, their gate, and whether they are write actions
 // (so `set_menu_context` can also disable them under the read-only lock), plus the
-// scope the live menu was built for, so a rebuild happens only when it changes.
+// scope the live menu was built for, so a rebuild happens only when it changes, and
+// the items carrying an accelerator, which a rebuild clears first (see
+// `clear_accelerators`).
 pub struct MenuItems(pub Mutex<MenuState>);
 
 pub struct MenuState {
     pub scope: MenuScope,
     pub gated: Vec<(MenuItem<Wry>, Gate, bool)>,
+    pub accelerated: Vec<MenuItem<Wry>>,
+}
+
+// What `build` hands back: the menu, plus the item handles `MenuState` keeps.
+pub struct BuiltMenu {
+    pub menu: Menu<Wry>,
+    pub gated: Vec<(MenuItem<Wry>, Gate, bool)>,
+    pub accelerated: Vec<MenuItem<Wry>>,
+}
+
+// muda 0.19 on GTK removes an item's accelerator a second time when its menu is
+// destroyed, and GTK prints "no accelerator installed in accel group" for each one
+// (#174) — once per engine switch, since that rebuilds the menu. Clearing them while
+// the old menu is still attached leaves the destroy path nothing to remove twice.
+pub fn clear_accelerators(items: &[MenuItem<Wry>]) {
+    for item in items.iter() {
+        let _ = item.set_accelerator(None::<&str>);
+    }
 }
 
 // Whether native accelerators should be attached. On Linux/WebKitGTK, registering
@@ -25,13 +45,15 @@ fn accelerators_enabled() -> bool {
     !cfg!(target_os = "linux")
 }
 
-// Appends one submenu's specs, collecting gated item handles into `gated`.
+// Appends one submenu's specs, collecting gated item handles into `gated` and the
+// ones given an accelerator into `accelerated`.
 fn build_submenu(
     app: &AppHandle,
     name: &str,
     specs: &[Spec],
     overrides: &HashMap<String, String>,
     gated: &mut Vec<(MenuItem<Wry>, Gate, bool)>,
+    accelerated: &mut Vec<MenuItem<Wry>>,
 ) -> tauri::Result<Submenu<Wry>> {
     let submenu = match Submenu::new(app, name, true) {
         Ok(val) => val,
@@ -118,6 +140,9 @@ fn build_submenu(
                 };
                 if let Some(gate_value) = gate {
                     gated.push((item.clone(), *gate_value, is_write_action(id)));
+                }
+                if accelerator.is_some() {
+                    accelerated.push(item.clone());
                 }
             }
         }
@@ -230,17 +255,18 @@ fn build_app_menu(app: &AppHandle) -> tauri::Result<Submenu<Wry>> {
 }
 
 // Builds the full native menu and returns it together with the gated item handles
-// (for later enable/disable updates).
+// (for later enable/disable updates) and the accelerated ones.
 pub fn build(
     app: &AppHandle,
     overrides: &HashMap<String, String>,
     scope: MenuScope,
-) -> tauri::Result<(Menu<Wry>, Vec<(MenuItem<Wry>, Gate, bool)>)> {
+) -> tauri::Result<BuiltMenu> {
     let menu = match Menu::new(app) {
         Ok(val) => val,
         Err(e) => return Err(e),
     };
     let mut gated: Vec<(MenuItem<Wry>, Gate, bool)> = Vec::new();
+    let mut accelerated: Vec<MenuItem<Wry>> = Vec::new();
 
     #[cfg(target_os = "macos")]
     {
@@ -255,7 +281,7 @@ pub fn build(
     }
 
     for (name, specs) in menus_for(scope).iter() {
-        let submenu = match build_submenu(app, name, specs, overrides, &mut gated) {
+        let submenu = match build_submenu(app, name, specs, overrides, &mut gated, &mut accelerated) {
             Ok(val) => val,
             Err(e) => return Err(e),
         };
@@ -265,7 +291,7 @@ pub fn build(
         };
     }
 
-    Ok((menu, gated))
+    Ok(BuiltMenu { menu, gated, accelerated })
 }
 
 // Attaches a built menu. Shared by startup and the per-engine rebuild.
