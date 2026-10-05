@@ -10,7 +10,8 @@ import { installErrorReporting, describeError } from "./utils/errorReport";
 import { prePaintTheme } from "./utils/themeMirror";
 import { installInputUndo } from "./utils/inputUndo";
 import { checkOnLaunch } from "./stores/updater";
-import { loadSettings, restoreSessionEnabled } from "./stores/settings";
+import { loadSettings, restoreSessionEnabled, editorTabWidth } from "./stores/settings";
+import { EDITOR_TAB_WIDTH } from "./constants/injectionKeys";
 import { useSessionPersistence } from "./composables/useSessionPersistence";
 import { refreshFindWorkspacesAfterDocumentSave } from "./utils/documentSaveRefresh";
 import { runQuery } from "./stores/queryRunner";
@@ -30,6 +31,7 @@ registerWorkspaceDefinitions();
 initializeTabs();
 
 const app = createApp(App);
+app.provide(EDITOR_TAB_WIDTH, editorTabWidth);
 // Vue swallows errors thrown inside components (it logs and carries on), so they never
 // reach window.onerror — this is the only way they're seen.
 app.config.errorHandler = (err) => {
