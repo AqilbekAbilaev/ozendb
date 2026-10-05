@@ -73,14 +73,10 @@ pub async fn restore_history(
 
     // update / delete: put the pre-image back. Upsert so a since-deleted document returns,
     // and the filter's _id is preserved on insert.
-    let before_text = match entry.before {
-        Some(val) => val,
-        None => {
-            return Err(AppError::Validation(
-                "This change has no saved pre-image to restore.".to_string(),
-            ))
-        }
-    };
+    if let Some(reason) = entry.restore_blocker() {
+        return Err(AppError::Validation(reason.to_string()));
+    }
+    let before_text = entry.before.unwrap_or_default();
     let before_bson = match decode_bson(&before_text) {
         Ok(val) => val,
         Err(e) => return Err(e),
