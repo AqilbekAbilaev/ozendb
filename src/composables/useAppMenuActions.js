@@ -2,7 +2,7 @@ import { nextTick, onMounted, onUnmounted } from 'vue'
 import { showToast } from '../stores/toast'
 import { openCollectionTab, openQuickstart, openPostgresQuery, openPostgresSearch } from '../stores/tabCreators'
 import { useZoom } from './useZoom'
-import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh } from '../stores/menuRequests'
+import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh, requestIndexAction } from '../stores/menuRequests'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -22,11 +22,6 @@ import { isEditingTarget } from '../utils/editingTarget'
 export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, refreshAll, toolbarHidden }) {
   const { zoomIn, zoomOut, resetZoom } = useZoom()
   const appWindow = getCurrentWindow()
-
-  function indexMenuAction(method, ...args) {
-    const tab = tabs.value.find(t => t.id === activeTabId.value)
-    if (tab && tab._idxApi && tab._idxApi[method]) tab._idxApi[method](...args)
-  }
 
   // Routes menu-bar actions (emitted by id) to the same handlers the toolbar and
   // right-click menus already use. The menu bar never emits a disabled item.
@@ -126,12 +121,12 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       case 'coll:add_index':     menuNode('Indexes…', 'collection'); return
 
       // --- index scoped (act on the active tab's selected index) ---
-      case 'idx:edit':   indexMenuAction('startEditIndex'); return
-      case 'idx:view':   indexMenuAction('openIndexDetails'); return
-      case 'idx:copy':   indexMenuAction('copyIndex'); return
-      case 'idx:drop':   indexMenuAction('openDropIndexConfirm'); return
-      case 'idx:hide':   indexMenuAction('setIndexHidden', true); return
-      case 'idx:unhide': indexMenuAction('setIndexHidden', false); return
+      case 'idx:edit':   requestIndexAction('startEditIndex'); return
+      case 'idx:view':   requestIndexAction('openIndexDetails'); return
+      case 'idx:copy':   requestIndexAction('copyIndex'); return
+      case 'idx:drop':   requestIndexAction('openDropIndexConfirm'); return
+      case 'idx:hide':   requestIndexAction('setIndexHidden', true); return
+      case 'idx:unhide': requestIndexAction('setIndexHidden', false); return
       case 'coll:stats':
       case 'db:collection_stats': menuNode('Collection Stats', 'collection'); return
       case 'coll:schema':        menuNode('View Schema', 'collection'); return
