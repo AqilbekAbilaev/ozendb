@@ -18,7 +18,7 @@ import FlexSpacer from '../base/FlexSpacer.vue'
 // The list itself, the poll and the retention of finished ops live in useCurrentOps;
 // this renders them.
 const props = defineProps({
-  activeTab: { type: Object, required: true },  // { connId, connName }
+  activeTab: { type: Object, required: true },  // { connectionId, connectionName }
 })
 
 const {

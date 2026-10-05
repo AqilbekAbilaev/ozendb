@@ -99,7 +99,7 @@ export function useCurrentOps(tab) {
     const showSysAtRequest = targetTab.showSys
     const request = (async () => {
       try {
-        const reply = await currentOps(targetTab.connId, {
+        const reply = await currentOps(targetTab.connectionId, {
           ownOnly: ownOnlyAtRequest,
           all: showSysAtRequest,
         })
@@ -135,7 +135,7 @@ export function useCurrentOps(tab) {
   async function kill(opid) {
     const targetTab = tab()
     try {
-      await killOp(targetTab.connId, opid)
+      await killOp(targetTab.connectionId, opid)
       if (targetTab._opsInFlight) await targetTab._opsInFlight
       await load(targetTab)
       return true
