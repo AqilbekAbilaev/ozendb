@@ -3,7 +3,7 @@ use mongodb::options::IndexOptions;
 use mongodb::{Client, Collection, IndexModel};
 use tokio::runtime::Handle;
 
-use super::op_writes;
+use super::read_only_refusal;
 
 mod read;
 
@@ -25,10 +25,12 @@ pub(super) fn run_op(
         None => &empty,
     };
 
-    if read_only && op_writes(method, args) {
-        return Err(String::from(
-            "This connection is read-only — writes are disabled in the shell.",
-        ));
+    if read_only {
+        if let Some(refused) = read_only_refusal(method, args) {
+            return Err(format!(
+                "This connection is read-only, and the shell only runs what it knows is a read, so it won't run {refused}."
+            ));
+        }
     }
     let database = client.database(db_name);
 
