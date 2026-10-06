@@ -2,9 +2,11 @@
 // a table tab's panel as `ui`, and what it loaded or is running as `runtime`
 // (tableState.js). A session saves the state; runtime starts fresh and loads again.
 import { defineAsyncComponent } from 'vue'
+import PostgresSearchWorkspace from './PostgresSearchWorkspace.vue'
 import { createResourceRef } from '../../../utils/resourceRef'
 import { createTableState, createTableUi, createTableRuntime, migrateTableState } from './tableState.js'
 import { abandonTransaction, createSqlRun } from './runSql.js'
+import { createSearchState, createSearchRuntime, cancelSearch } from './searchRun.js'
 import { showToast } from '../../../stores/toast'
 
 // A closing tab can't ask first (closes are synchronous), so the safe side wins:
@@ -49,6 +51,22 @@ function queryWorkspace({ connectionId, connectionName, database }, sql = '') {
   }
 }
 
+// The typed search is the tab's state; its result is runtime, so a duplicate or a
+// restored tab starts without one (#180).
+function searchWorkspace({ connectionId, connectionName, database, schema }, state = createSearchState()) {
+  return {
+    title: 'Search: ' + schema,
+    target: createResourceRef(connectionId, [
+      { kind: 'database', name: database },
+      { kind: 'schema', name: schema },
+    ]),
+    fields: {
+      kind: 'pgSearch', connectionId, connectionName, database, schema,
+      state, runtime: createSearchRuntime(),
+    },
+  }
+}
+
 export const postgresDefinitions = [
   {
     type: 'postgresql.table_browse',
@@ -72,5 +90,15 @@ export const postgresDefinitions = [
     serialize: (workspace) => ({ sql: workspace.state.sql }),
     restore: (saved) => queryWorkspace(saved, saved.sql ?? ''),
     dispose: (workspace) => rollBackOnClose(workspace.runtime.run),
+  },
+  {
+    type: 'postgresql.search',
+    engine: 'postgresql',
+    component: PostgresSearchWorkspace,
+    create: (ctx) => searchWorkspace(ctx.target),
+    duplicate: (workspace) => searchWorkspace(workspace, copy(workspace.state)),
+    serialize: (workspace) => copy({ state: workspace.state }),
+    restore: (saved) => searchWorkspace(saved, { ...createSearchState(), ...saved.state }),
+    dispose: (workspace) => cancelSearch(workspace),
   },
 ]
