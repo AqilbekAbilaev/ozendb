@@ -43,9 +43,9 @@ fn matches_substring() {
 
 #[test]
 fn matches_numeric_text() {
-    let d = doc! { "age": 42_i32, "score": 3.14_f64 };
+    let d = doc! { "age": 42_i32, "score": 2.75_f64 };
     assert_eq!(paths(&find(&d, &ci("42"), &values_only())), vec!["age"]);
-    assert_eq!(paths(&find(&d, &ci("3.14"), &values_only())), vec!["score"]);
+    assert_eq!(paths(&find(&d, &ci("2.75"), &values_only())), vec!["score"]);
     assert!(find(&d, &ci("99"), &values_only()).is_empty());
 }
 

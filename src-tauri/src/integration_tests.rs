@@ -53,6 +53,22 @@ async fn connect(config: &ConnectionConfig) -> Client {
     }
 }
 
+/// Every live test skips itself, and still reports `ok`, when its variable is unset. CI
+/// provides both databases, so on GitHub Actions a missing variable means the workflow
+/// lost it and the live suites would pass without running: fail instead.
+#[test]
+fn github_actions_runs_the_live_tests() {
+    if std::env::var("GITHUB_ACTIONS").is_err() {
+        return;
+    }
+    for var in ["OZENDB_TEST_MONGODB", "OZENDB_TEST_POSTGRES"] {
+        assert!(
+            std::env::var(var).is_ok(),
+            "{var} is unset on GitHub Actions, so its live tests would skip and still pass"
+        );
+    }
+}
+
 #[tokio::test]
 async fn find_paging_and_count_round_trip() {
     let config = match test_config() {
