@@ -4197,7 +4197,7 @@ dependencies = [
 
 [[package]]
 name = "ozendb"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "boa_engine",
  "boa_gc",

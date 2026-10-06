@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.2.1
+
+- **PostgreSQL tables are fully editable now** — edit, insert and delete rows
+  in the grid. Changes are staged and shown as the SQL that will run before
+  you commit or roll them back together, every edit is kept in a per-tab
+  history with undo, and a new or duplicated row is highlighted and scrolled
+  into view. A connection or a single tab can also be locked read-only to
+  block writes entirely.
+- **Manage schema from the sidebar** — create and drop schemas, create a
+  table from a column editor, and rename or drop existing tables and
+  schemas.
+- **Roles and privileges** — browse and manage roles, see a role's direct
+  grants, and grant or revoke privileges on schemas, tables and sequences
+  from the Grants modal.
+- **Browse functions and procedures**, including their source, from the
+  sidebar.
+- **Server diagnostics** — a Server Info panel shows version, uptime,
+  settings and installed extensions; a Server Activity panel watches live
+  sessions and can cancel or terminate one; hovering a table shows its size,
+  bloat and index usage, and the sidebar shows each database's size.
+- **Search in Schema is now a tab**, like MongoDB's, so its filters and
+  results stay put while you work elsewhere; opening a match jumps straight
+  to that row in a table tab filtered to its primary key. Other databases on
+  the same server are now listed in the sidebar too, and searching or
+  opening one reuses the connection's credentials and SSH tunnel instead of
+  opening a second connection.
+- **Export and import** — export a table or query to CSV or JSON from the
+  table menu or the SQL panel, and import a CSV into a table with a
+  column-mapping preview before it runs.
+- **The toolbar and the native menu now show only the engine you're using** —
+  PostgreSQL actions when a PostgreSQL connection or tab is in focus,
+  MongoDB actions otherwise — and the engine picker is a dropdown so it
+  scales to more engines later.
+- **Large PostgreSQL result sets scroll smoothly** — the grid now
+  virtualizes rows instead of rendering all of them at once.
+- **Fixed** — the Search in Schema, History and Grants dialogs keep their
+  controls in view instead of being squeezed off the dialog.
+- **Fixed** — the native menu on macOS attaches correctly after the window
+  is recreated, and it no longer prints GTK warnings on Linux when it
+  rebuilds.
+- **Fixed** — Ctrl+Tab and Ctrl+Shift+Tab switch tabs reliably, and
+  rebinding a shortcut keeps Ctrl and Cmd distinct instead of merging them.
+- **Fixed** — the sidebar selection and the native menu's enabled state stay
+  in sync when a tab is locked, closed, renamed, or you switch tabs.
+- **Fixed** — a renamed table or schema updates its own open tabs, not just
+  the sidebar.
+- **Fixed** — the page-size and column-picker dropdowns close on an outside
+  click or Escape, and a PostgreSQL column stays wide enough to show its own
+  header.
+
 ## v0.2.0
 
 - **PostgreSQL (preview)** — OzenDB now connects to PostgreSQL as well as
