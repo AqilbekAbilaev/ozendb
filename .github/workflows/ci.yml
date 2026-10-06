@@ -40,12 +40,37 @@ jobs:
   backend:
     name: Backend tests (cargo)
     runs-on: ubuntu-22.04
+    # Live databases for the integration tests, which skip themselves (and still report
+    # `ok`) without them. The SSH tunnel tests need a bastion and stay opt-in.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
@@ -65,10 +90,22 @@ jobs:
             build-essential \
             file
 
+      # Default lint levels: only deny-level lints fail the job, which is what makes
+      # lib.rs's `deny(clippy::await_holding_lock)` an enforced guard.
+      - name: Clippy
+        working-directory: ./src-tauri
+        env:
+          RUST_MIN_STACK: '16777216'
+        run: cargo clippy --all-targets
+
       - name: Run unit tests
         working-directory: ./src-tauri
         env:
           # IntelliShell's boa_engine needs a larger compile-time stack or rustc
           # can overflow while building it (mirrors release.yml).
           RUST_MIN_STACK: '16777216'
+          OZENDB_TEST_POSTGRES: 127.0.0.1:5432
+          OZENDB_TEST_POSTGRES_USER: postgres
+          OZENDB_TEST_POSTGRES_PASSWORD: postgres
+          OZENDB_TEST_MONGODB: 127.0.0.1:27017
         run: cargo test

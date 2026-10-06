@@ -97,7 +97,16 @@ async fn terminating_a_session_closes_it() {
 
     assert!(terminate_backend_impl(&watcher, victim_pid).await.expect("terminate"));
 
-    // The backend is gone, so it drops out of the listing.
-    let after = list_sessions_impl(&watcher).await.expect("sessions after");
-    assert!(!after.iter().any(|s| s.pid == victim_pid), "the terminated session is still listed");
+    // Once the backend is gone it drops out of the listing. pg_terminate_backend only
+    // sends the signal, so the exit can land a moment after it returns.
+    let mut gone = false;
+    for _ in 0..100 {
+        let after = list_sessions_impl(&watcher).await.expect("sessions after");
+        if !after.iter().any(|s| s.pid == victim_pid) {
+            gone = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(gone, "the terminated session is still listed after 5s");
 }

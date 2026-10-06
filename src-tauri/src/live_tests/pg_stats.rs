@@ -5,8 +5,10 @@
 
 use crate::commands::{list_databases_impl, table_stats_impl};
 use super::pg::{pool, test_config};
+use crate::storage::{EngineConfig, PostgresConfig};
 
 const SCHEMA: &str = "ozendb_it_stats";
+const DEAD_DB: &str = "ozendb_it_stats_dead";
 
 #[tokio::test]
 async fn table_stats_report_sizes_indexes_and_vacuum_state() {
@@ -65,29 +67,38 @@ async fn dead_rows_appear_after_an_update_and_clear_after_a_vacuum() {
             return;
         }
     };
-    let pool = pool(&config).await;
-    let schema = format!("{SCHEMA}_dead");
+    // A database of its own: VACUUM keeps any dead row a snapshot anywhere in the same
+    // database might still need, and the cancel tests hold a query open in the shared one.
+    let server = pool(&config).await;
     for stmt in [
-        format!("DROP SCHEMA IF EXISTS {schema} CASCADE"),
-        format!("CREATE SCHEMA {schema}"),
-        format!("CREATE TABLE {schema}.t (id INT PRIMARY KEY, n INT)"),
-        format!("INSERT INTO {schema}.t SELECT i, i FROM generate_series(1, 200) AS i"),
-        // Every updated row leaves its old version behind as a dead tuple.
-        format!("UPDATE {schema}.t SET n = n + 1"),
-        format!("ANALYZE {schema}.t"),
+        format!("DROP DATABASE IF EXISTS {DEAD_DB} WITH (FORCE)"),
+        format!("CREATE DATABASE {DEAD_DB}"),
     ] {
-        sqlx::query(sqlx::AssertSqlSafe(stmt.clone())).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+        sqlx::query(sqlx::AssertSqlSafe(stmt.clone())).execute(&server).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+    let mut own = config.clone();
+    own.engine = EngineConfig::Postgres(PostgresConfig { database: Some(String::from(DEAD_DB)) });
+    let pool = pool(&own).await;
+    for stmt in [
+        "CREATE TABLE t (id INT PRIMARY KEY, n INT)",
+        "INSERT INTO t SELECT i, i FROM generate_series(1, 200) AS i",
+        // Every updated row leaves its old version behind as a dead tuple.
+        "UPDATE t SET n = n + 1",
+        "ANALYZE t",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
     }
 
-    let before = table_stats_impl(&pool, &schema, "t").await.expect("stats before vacuum");
+    let before = table_stats_impl(&pool, "public", "t").await.expect("stats before vacuum");
     assert!(before.dead_rows > 0, "no dead rows after updating every row");
 
-    sqlx::query(sqlx::AssertSqlSafe(format!("VACUUM {schema}.t"))).execute(&pool).await.expect("vacuum");
-    let after = table_stats_impl(&pool, &schema, "t").await.expect("stats after vacuum");
+    sqlx::query("VACUUM t").execute(&pool).await.expect("vacuum");
+    let after = table_stats_impl(&pool, "public", "t").await.expect("stats after vacuum");
     assert_eq!(after.dead_rows, 0);
     assert!(after.last_vacuum.is_some(), "last vacuum missing after VACUUM");
 
-    sqlx::query(sqlx::AssertSqlSafe(format!("DROP SCHEMA {schema} CASCADE"))).execute(&pool).await.ok();
+    pool.close().await;
+    sqlx::query(sqlx::AssertSqlSafe(format!("DROP DATABASE {DEAD_DB} WITH (FORCE)"))).execute(&server).await.ok();
 }
 
 #[tokio::test]
