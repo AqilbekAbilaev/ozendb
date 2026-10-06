@@ -33,7 +33,7 @@ function pgResource(source, ref) {
   return source?.engine === 'postgresql' ? ref : null
 }
 
-const PG_TAB_TYPES = ['postgresql.query', 'postgresql.table_browse']
+const PG_TAB_TYPES = ['postgresql.query', 'postgresql.table_browse', 'postgresql.search']
 
 // Every item behind the connection/database/collection gates is a MongoDB action, so
 // only a MongoDB selection or tab counts toward them — a PostgreSQL one names no

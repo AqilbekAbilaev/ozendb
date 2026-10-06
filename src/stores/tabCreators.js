@@ -235,6 +235,15 @@ export function openPostgresTable({ connectionId, connectionName, database, sche
   activateTab(tab.id)
 }
 
+// Search in Schema, a new tab every time, as MongoDB's Search in… is (#180).
+export function openPostgresSearch({ connectionId, connectionName, database, schema }) {
+  const tab = newWorkspace('postgresql.search', {
+    target: { connectionId, connectionName, database, schema },
+  })
+  tabs.value.push(tab)
+  activateTab(tab.id)
+}
+
 // A SQL editor against a PostgreSQL connection's database; a new tab every time.
 // `sql` seeds the editor — used when a tab is opened to edit something that already
 // exists, such as a function's CREATE OR REPLACE statement.
