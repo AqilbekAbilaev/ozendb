@@ -4,7 +4,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { ref, reactive, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { useCurrentOps, opsDefaults } from './useCurrentOps'
+import { useCurrentOps } from './useCurrentOps'
 import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
 
 // Switching workspace tabs unmounts the pane, so anything held in a plain ref inside it
