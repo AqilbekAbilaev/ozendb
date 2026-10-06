@@ -5,6 +5,7 @@
 //! how to run these.
 
 use crate::commands::{insert_row_impl, ColumnValue};
+use crate::error::AppError;
 use crate::pg_integration_tests::{pool, test_config};
 use serde_json::json;
 
@@ -105,7 +106,14 @@ async fn targeting_a_stored_generated_column_is_refused_by_postgres() {
     )
     .await
     .unwrap_err();
-    assert!(err.to_string().to_lowercase().contains("generated"), "{err}");
+    // By SQLSTATE (generated_always) rather than wording: PostgreSQL 16 reworded the
+    // message to "cannot insert a non-DEFAULT value into column" and moved "generated"
+    // into the detail line.
+    let code = match &err {
+        AppError::Postgres(sqlx::Error::Database(db)) => db.code().map(|c| c.into_owned()),
+        _ => None,
+    };
+    assert_eq!(code.as_deref(), Some("428C9"), "{err}");
 }
 
 #[tokio::test]
