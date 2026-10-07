@@ -64,6 +64,10 @@ impl PgRowHistoryStore {
         self.load().into_iter().find(|entry| entry.id == entry_id)
     }
 
+    pub fn remove_connection(&self, conn_id: &str) -> Result<(), AppError> {
+        self.inner.update(|entries| entries.retain(|entry| entry.conn_id != conn_id))
+    }
+
     pub fn clear_for(&self, conn_id: &str, database: &str, schema: &str, table: &str) -> Result<(), AppError> {
         self.inner.update(|entries| {
             entries.retain(|entry| {
