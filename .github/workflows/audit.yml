@@ -36,9 +36,10 @@ jobs:
         with:
           node-version: 24
 
-      # What ships: dev tooling never reaches the app.
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      # The whole tree: vite and rollup build the bundle that ships, and the dev server
+      # runs on contributors' machines.
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
 
   cargo:
     name: cargo audit
