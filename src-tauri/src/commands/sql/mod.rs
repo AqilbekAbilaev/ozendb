@@ -396,7 +396,7 @@ pub(crate) fn sql_to_mql(sql: &str) -> Result<MqlQuery, String> {
 
 /// Translate a SQL SELECT statement into the parts of an equivalent MongoDB find
 /// query. Pure and connection-free.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn translate_sql(sql: String) -> Result<MqlQuery, AppError> {
     match sql_to_mql(&sql) {
         Ok(val) => Ok(val),

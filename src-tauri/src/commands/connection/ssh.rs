@@ -24,14 +24,14 @@ pub(super) async fn open_test_tunnel(
     Ok(Some(tunnel))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn respond_ssh_host_key(
     prompts: State<'_, Arc<HostKeyPrompts>>, request_id: u64, trust: bool,
 ) {
     prompts.resolve(request_id, trust);
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn forget_ssh_host(
     known_hosts: State<'_, Arc<KnownHostsStore>>, host: String, port: u16,
 ) -> Result<(), AppError> {

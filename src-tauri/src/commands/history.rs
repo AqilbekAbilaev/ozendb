@@ -7,7 +7,7 @@ use super::AppContext;
 
 /// Every recorded change for one collection, newest-first — backs the Collection History
 /// panel (Studio-3T's undo-your-edits/deletes safety net).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_collection_history(
     history: State<'_, CollectionHistoryStore>,
     id: String,
@@ -18,7 +18,7 @@ pub fn list_collection_history(
 }
 
 /// Forget all history for one collection.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_collection_history(
     history: State<'_, CollectionHistoryStore>,
     id: String,
