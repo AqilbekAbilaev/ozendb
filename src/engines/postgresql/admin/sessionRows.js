@@ -47,3 +47,47 @@ export function matchSessions(sessions, { database, user, state, activeOnly } = 
     && (!state || s.state === state)
     && (!activeOnly || s.state === 'active'))
 }
+
+// Only a successful terminate should hide a row. Cancel leaves the session open, so
+// suppressing it would make a live connection vanish from the list — a worse bug than
+// the stale-row one this is fixing. A failed terminate didn't change anything either.
+export function shouldSuppressAfterSignal(kind, done) {
+  return kind === 'terminate' && done === true
+}
+
+// Two rows that report the same pid are the same backend only if `backendStart` also
+// matches — a pid is a short OS-level integer Postgres reuses once a backend exits, so
+// a later, unrelated session can land on the same pid while this modal is still open.
+// Either side missing `backendStart` (rare — the column is nullable in principle, see
+// activity.rs) means we can't tell the two apart; falling back to matching on pid alone
+// re-takes the small, TTL-bounded reuse risk this existed to close, rather than
+// silently never suppressing — losing the fix for that one row is worse than a bounded
+// risk of it reappearing a little late.
+function sameBackend(pendingBackendStart, sessionBackendStart) {
+  if (pendingBackendStart == null || sessionBackendStart == null) return true
+  return pendingBackendStart === sessionBackendStart
+}
+
+// `pg_terminate_backend` only sends the signal; the session can linger in
+// `pg_stat_activity` for a bit after it returns true, and the modal's own reload (fired
+// from the same action) lands before the server has caught up. `pending` is the set of
+// terminate signals the modal has sent but not yet seen take effect — hiding those rows
+// is what keeps a just-killed session from reappearing on that reload and on the
+// auto-refreshes after it, until a fresh read genuinely no longer has that backend.
+//
+// An entry is dropped from `pending` — stops being hidden — once the matching backend is
+// confirmed gone (including a pid that now belongs to a different backend: that is a
+// different session reusing the slot, and from the terminated one's point of view it has
+// left). It's also dropped once `ttlMs` passes, for the backend that genuinely never
+// leaves: a termination that silently didn't take would otherwise hide that row forever.
+const PENDING_TERMINATION_TTL_MS = 15000
+
+export function reconcilePendingTerminations(freshSessions, pending, now = new Date(), ttlMs = PENDING_TERMINATION_TTL_MS) {
+  const isMatch = (p, s) => p.pid === s.pid && sameBackend(p.backendStart, s.backendStart)
+  const stillPending = pending.filter(p =>
+    now - p.at < ttlMs && freshSessions.some(s => isMatch(p, s)))
+  return {
+    sessions: freshSessions.filter(s => !stillPending.some(p => isMatch(p, s))),
+    pending: stillPending,
+  }
+}

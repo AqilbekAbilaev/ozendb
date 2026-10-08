@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { matchSessions, queryText, fmtAge, sessionOptions } from './sessionRows'
+import { matchSessions, queryText, fmtAge, sessionOptions, reconcilePendingTerminations, shouldSuppressAfterSignal } from './sessionRows'
 
 const SESSIONS = [
-  { pid: 1, user: 'postgres', database: 'shop', state: 'active', query: 'SELECT 1', redacted: false, queryStart: '2026-09-30 12:00:00+00' },
-  { pid: 2, user: 'app', database: 'shop', state: 'idle', query: null, redacted: false, queryStart: null },
-  { pid: 3, user: 'app', database: 'billing', state: 'idle in transaction', query: null, redacted: true, queryStart: '2026-09-30 11:00:00+00' },
-  { pid: 4, user: null, database: null, state: null, query: null, redacted: false, queryStart: null },
+  { pid: 1, user: 'postgres', database: 'shop', state: 'active', query: 'SELECT 1', redacted: false, queryStart: '2026-09-30 12:00:00+00', backendStart: '2026-09-30 11:00:00+00' },
+  { pid: 2, user: 'app', database: 'shop', state: 'idle', query: null, redacted: false, queryStart: null, backendStart: '2026-09-30 11:05:00+00' },
+  { pid: 3, user: 'app', database: 'billing', state: 'idle in transaction', query: null, redacted: true, queryStart: '2026-09-30 11:00:00+00', backendStart: '2026-09-30 10:00:00+00' },
+  // A background worker: no backend_start reported, same as the rest of its fields.
+  { pid: 4, user: null, database: null, state: null, query: null, redacted: false, queryStart: null, backendStart: null },
 ]
 
 describe('queryText', () => {
@@ -86,5 +87,81 @@ describe('matchSessions', () => {
 
   it('finds nothing rather than everything when nothing matches', () => {
     expect(matchSessions(SESSIONS, { database: 'nope' })).toEqual([])
+  })
+})
+
+describe('reconcilePendingTerminations', () => {
+  const T0 = new Date('2026-09-30T12:00:00Z')
+  const PID1_BACKEND_START = '2026-09-30 11:00:00+00'   // matches SESSIONS[0]
+
+  it('hides a session whose terminate just succeeded, even though the reload right after it still reports the row', () => {
+    const pending = [{ pid: 1, backendStart: PID1_BACKEND_START, at: T0 }]
+    const { sessions } = reconcilePendingTerminations(SESSIONS, pending, T0)
+    expect(sessions.map(s => s.pid)).toEqual([2, 3, 4])
+  })
+
+  it('keeps hiding it across a later auto-refresh while the server has not caught up yet', () => {
+    const pending = [{ pid: 1, backendStart: PID1_BACKEND_START, at: T0 }]
+    const threeSecondsLater = new Date(T0.getTime() + 3000)
+    const { sessions, pending: next } = reconcilePendingTerminations(SESSIONS, pending, threeSecondsLater)
+    expect(sessions.map(s => s.pid)).not.toContain(1)
+    expect(next).toEqual(pending)
+  })
+
+  it('drops the pending entry once the session is actually gone, rather than carrying it forever', () => {
+    const withoutPid1 = SESSIONS.filter(s => s.pid !== 1)
+    const pending = [{ pid: 1, backendStart: PID1_BACKEND_START, at: T0 }]
+    const { sessions, pending: next } = reconcilePendingTerminations(withoutPid1, pending, T0)
+    expect(sessions).toEqual(withoutPid1)
+    expect(next).toEqual([])
+  })
+
+  it('stops suppressing a pid once the TTL elapses, for a backend that never leaves', () => {
+    const pending = [{ pid: 1, backendStart: PID1_BACKEND_START, at: T0 }]
+    const wayLater = new Date(T0.getTime() + 20000)
+    const { sessions, pending: next } = reconcilePendingTerminations(SESSIONS, pending, wayLater, 15000)
+    expect(sessions.map(s => s.pid)).toContain(1)
+    expect(next).toEqual([])
+  })
+
+  it('leaves the list untouched when nothing is pending', () => {
+    const { sessions, pending } = reconcilePendingTerminations(SESSIONS, [], T0)
+    expect(sessions).toEqual(SESSIONS)
+    expect(pending).toEqual([])
+  })
+
+  it('only hides pids that are actually pending, not everything', () => {
+    const pending = [{ pid: 3, backendStart: '2026-09-30 10:00:00+00', at: T0 }]
+    const { sessions } = reconcilePendingTerminations(SESSIONS, pending, T0)
+    expect(sessions.map(s => s.pid)).toEqual([1, 2, 4])
+  })
+
+  it('does not hide a row once its pid has been reused by a different backend', () => {
+    // The terminated backend had this backendStart; the row sharing its pid now is a
+    // later, unrelated session with a different one, so it must stay visible.
+    const pending = [{ pid: 1, backendStart: '2026-09-30 05:00:00+00', at: T0 }]
+    const { sessions, pending: next } = reconcilePendingTerminations(SESSIONS, pending, T0)
+    expect(sessions.map(s => s.pid)).toContain(1)
+    expect(next).toEqual([])
+  })
+
+  it('falls back to matching by pid alone when backendStart is null, since identity cannot be verified either way', () => {
+    const pending = [{ pid: 4, backendStart: null, at: T0 }]
+    const { sessions } = reconcilePendingTerminations(SESSIONS, pending, T0)
+    expect(sessions.map(s => s.pid)).not.toContain(4)
+  })
+})
+
+describe('shouldSuppressAfterSignal', () => {
+  it('suppresses a session that was actually terminated', () => {
+    expect(shouldSuppressAfterSignal('terminate', true)).toBe(true)
+  })
+
+  it('never suppresses a cancel — the session stays open and must stay listed', () => {
+    expect(shouldSuppressAfterSignal('cancel', true)).toBe(false)
+  })
+
+  it('does not suppress a terminate that reported it did nothing', () => {
+    expect(shouldSuppressAfterSignal('terminate', false)).toBe(false)
   })
 })

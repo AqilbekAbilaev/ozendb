@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { sessions as listSessions, cancelBackend, terminateBackend } from '../api/admin'
 import { errText, errCode } from '../../../utils/errors'
-import { matchSessions, sessionOptions, queryText, fmtAge } from './sessionRows'
+import { matchSessions, sessionOptions, queryText, fmtAge, reconcilePendingTerminations, shouldSuppressAfterSignal } from './sessionRows'
 import { showToast } from '../../../stores/toast'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
@@ -31,10 +31,16 @@ const auto = ref(true)
 const confirming = ref(null)   // the session a terminate is being confirmed for
 const now = ref(new Date())
 let timer = null
+// Terminates this modal has sent that `load()` hasn't yet seen take effect — see
+// reconcilePendingTerminations for why the row must stay hidden across this very reload.
+let pendingTerminations = []
 
 async function load() {
   try {
-    all.value = await listSessions(props.target.connId)
+    const fresh = await listSessions(props.target.connId)
+    const reconciled = reconcilePendingTerminations(fresh, pendingTerminations, new Date())
+    all.value = reconciled.sessions
+    pendingTerminations = reconciled.pending
     error.value = null
     errorCode.value = null
   } catch (e) {
@@ -61,6 +67,9 @@ async function signal(session, kind) {
   const call = kind === 'terminate' ? terminateBackend : cancelBackend
   try {
     const done = await call(props.target.connId, session.pid)
+    if (shouldSuppressAfterSignal(kind, done)) {
+      pendingTerminations = [...pendingTerminations, { pid: session.pid, backendStart: session.backendStart, at: new Date() }]
+    }
     showToast(done
       ? `${kind === 'terminate' ? 'Terminated' : 'Cancelled'} session ${session.pid}`
       : `Session ${session.pid} is already gone, or you may not signal it`)
