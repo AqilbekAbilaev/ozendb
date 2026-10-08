@@ -146,7 +146,7 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
             ],
         ),
         (
-            // PostgreSQL-only (ozendb-sxd): gated on the active tab naming a schema
+            // PostgreSQL-only (#145): gated on the active tab naming a schema
             // or table, not the sidebar tree — it doesn't yet feed a PostgreSQL
             // selection into the menu context (see menuContext.js). Every id here
             // reuses the same handlers the table workspace's own toolbar/context

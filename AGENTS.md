@@ -70,6 +70,22 @@ Four rings, outermost first. A ring may import inwards, never outwards — **enf
 | `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (every "open a tab" entry point) · `queryRunner.js` · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `indexes.js` · `updater.js` · `toast.js` · `dbClipboard.js` · `queryClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
 | `src/utils/` | Pure functions. No Vue, no I/O. |
 
+The rest of `src/` sits around those rings, with its own lint rule where a direction holds:
+
+- **`appApi/` and `engines/*/api/`** are at the centre with `utils/`: anything may call them, and
+  they reach nothing that could call them back. `appApi/` imports no app code at all; an engine's
+  `api/` imports no components and no app state.
+- **`workspaces/`** is the machinery `stores/tabs.js` builds on, so it reads no stores or
+  composables. Its registry maps types to components and so imports them — the one outward edge,
+  which `importCycles.test.js` keeps from closing into a loop.
+- **`components/base/`** is the UI kit: other base components, `utils/`, `constants/`, `data/` and
+  `composables/`, never a store or a feature area. The one setting it honours (the editor's tab
+  width) is provided by each window's root under a key in `constants/injectionKeys.js`.
+- **`engines/<name>/`** is a vertical slice — components, workspaces, tree and API side by side —
+  and each part follows the ring of what it is.
+- **`constants/`** and **`data/`** are tables any ring may read. `constants/modalRegistry.js` names
+  modal components, but only through a lazy `import()`.
+
 ### The Tauri boundary
 
 Nothing outside two roots may call `invoke`. **This is enforced, not a convention** —
@@ -126,6 +142,22 @@ an empty pane — closing the last tab seeds a Quickstart — lives in `tabs.js`
 it guards. Note: module-scope refs do not survive
 Vite HMR cleanly — restart the dev server before blaming the code for stale tab state.
 
+### Engines
+
+What differs between engines is asked of `src/engines/`, never decided by comparing engine
+names — **enforced by `no-restricted-syntax` in `eslint.config.js`**, which also rejects
+ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
+
+- **`src/engines/index.js`** — the component-free engine table (`ENGINES`, `engineOf`):
+  default port, connection-field builder, the sidebar's top-level loader, the stats card,
+  whether a connection names its database. Stores and composables read it.
+- **`src/engines/ui.js`** — the component half: connection editor sections, sidebar rows.
+- **`src/engines/contextActions.js`** — right-click menus and actions an engine handles itself.
+
+A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
+screens still sit in the shared `components/` folders and its sidebar rows in
+`ConnectionTree.vue`, and `utils/menuContext.js` mirrors `menu.rs`'s per-engine menus.
+
 ### Resource identity
 
 A connection/database/collection is named by a **ResourceRef** — `{ connectionId,
@@ -143,12 +175,34 @@ dbName, collName }` in tool tabs and modal props, `{ connectionId, connectionNam
 dbName, collectionName }` in collection and shell tabs — and retiring them is unfinished
 work, not a pattern to copy. New code takes a ResourceRef.
 
+### PostgreSQL (preview)
+
+The second engine runs on the same machinery as MongoDB rather than beside it: the same tab store,
+workspace registry, menu gates and Tauri boundary. Its resources are `database/schema/table`
+ResourceRefs.
+
+- **Frontend: `src/engines/postgresql/`.**
+  - `connection/` holds the connection fields and URI parsing.
+  - `tree/` holds the sidebar's database → schema → table nodes and their menus.
+  - `workspaces/` holds the table, query and search workspaces. `postgresDefinitions.js`
+    registers them as `postgresql.table_browse`, `postgresql.query` and `postgresql.search`.
+  - `admin/` holds the server-info, activity, roles, grants, routines, DDL, import/export and
+    row-history modals.
+  - `api/` is its half of the Tauri boundary.
+- **Backend: `src-tauri/src/commands/postgres/`**, one file per area, over `sqlx`.
+  - Commands resolve a pool through `ctx.pg_pool*`.
+  - Three modules sit in `src-tauri/src/postgres/`: `uri.rs` (connect options), and the
+    `query_library.rs` (saved SQL and run history) and `row_history.rs` (per-row undo)
+    stores.
+- **Tests:** the `live_tests/pg*.rs` files run against a live server when
+  `OZENDB_TEST_POSTGRES` is set, and are skipped otherwise.
+
 ### Rust backend (`src-tauri/src/`)
 
 | File | Responsibility |
 |---|---|
-| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds `AppContext` — the pool + storage bundle every connection-touching command takes as its single `State`, whose `client` / `client_for_write` / `collection` / `collection_for_write` methods are the one place a connection resolves to a live client — plus the EJSON/CSV parse helpers. |
-| `pool.rs` | `ConnectionPool`: one `Client` per connection id behind a `tokio::Mutex` (and the live `SshTunnel` for tunnelled connections). `connect()` returns the cached client on a hit and only reads the keychain / builds the URI on a miss. |
+| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds `AppContext` — the pool + storage bundle every connection-touching command takes as its single `State`, whose `client` / `client_for_write` / `collection` / `collection_for_write` methods (and `pg_pool` / `pg_pool_for_write` for PostgreSQL) are the one place a connection resolves to a live client — plus the EJSON/CSV parse helpers. PostgreSQL's commands live under `commands/postgres/`. |
+| `pool.rs` | `ConnectionPool`: one `Client` per MongoDB connection id, or one `PgPool` per PostgreSQL `(connection, database)` — Postgres has no per-query `USE` — behind a `tokio::Mutex` (and the live `SshTunnel` for tunnelled connections). `connect()` returns the cached client on a hit and only reads the keychain / builds the URI on a miss. |
 | `storage/mod.rs` | JSON persistence for `ConnectionConfig` (`connections.json`). Read-modify-write goes through the locked `update_with`; the raw `save` is private so writes can't bypass the lock. Most other JSON stores (`folders`, `history`, `saved_queries`, `default_queries`, `settings`, `shell_history`, `known_hosts`, `node_tags`, `collection_history`, `keybindings`, `export_watermarks`, `operations`) share the same shape via the generic `JsonStore<T>` in `json_store.rs`. `tabs.rs` and `storage/mod.rs` are deliberately bespoke — each carries a comment saying why. |
 | `persist.rs` | `atomic_write()` — write-to-temp-then-rename so a crash can't leave a truncated file. Shared by every JSON store. |
 | `keychain.rs` | Secrets (passwords, SSH key passphrases) in the OS keychain, keyed by connection id (SSH secrets under `id::ssh-*`). Configs on disk are credential-free. |
@@ -157,6 +211,9 @@ work, not a pattern to copy. New code takes a ResourceRef.
 | `uri/mod.rs` | `build_uri()` assembles the connection string from a config; `with_timeout()` appends MongoDB timeout params; `tcp_probe()` does a fast TCP check before the MongoDB handshake. |
 | `error.rs` | `AppError` enum serialized as `{ code, message }` so the frontend gets a stable category plus a human-readable message. |
 | `menu.rs` | Native OS menu (source of truth). Also opens the document editor/viewer as a **second Tauri webview window** at `src/pages/document.html` (registered as a Vite entry in `vite.config.js`). See "Native menu" below. |
+| `commands/mongo/`, `commands/postgres/` | Each engine's commands. The rest of `commands/` is engine-neutral: connections, persistence, folders, operations, the error log, the updater, and the CSV import/export helpers both engines' transfers use. `commands/access.rs` is the one lookup and read-only gate behind every `AppContext` resolver. |
+| `postgres/` | PostgreSQL outside the command layer: `uri.rs` (connect options) and the `query_library` / `row_history` stores. |
+| `live_tests/` | Tests against a live server, skipped unless `OZENDB_TEST_MONGODB` / `OZENDB_TEST_POSTGRES` is set. `cargo test live_tests::pg` runs just the PostgreSQL ones. |
 
 ### Native menu
 
@@ -166,15 +223,19 @@ Windows/Linux). There is no in-window Vue menu bar — the old `src/components/M
 removed.
 
 - **Structure** is a data table (`menus()`): each item has an id, label, optional accelerator, and
-  an optional `Gate` (`Connection` / `Database` / `Collection` / `AnyConnection` / `Document` /
-  `DocumentField` / `Index`). Placeholders are
+  an optional `Gate` naming what must be resolvable for it to enable (`Connection`, `Collection`,
+  `Document`, `Index`, `PgTable`, … — the `Gate` enum lists them). Placeholders are
   the `built:false` features — carried over as present-but-disabled items.
+- **Engine scope**: an item whose gate belongs to one engine is hidden while the selection is
+  another engine's (`menus_for`). It is read off the gate rather than tagged per item, so what is
+  hidden is exactly what could never enable there.
 - **Clicks** → `handle_event` emits `menu-action` with the item id → `App.vue` listens and routes
   through the existing `handleMenuAction` (same handlers the toolbar/right-click use). Actions are
   never reimplemented in Rust.
 - **Enable/disable** reflects the current selection, which is the UNION of the active tab **and the
-  sidebar/tree selection** (`ConnectionTree` emits `select-node` / `connections-changed`). The
-  frontend `menuContext` (see `src/utils/menuContext.js`, unit-tested) is pushed to Rust via the
+  sidebar/tree selection** (`treeSelection` in `stores/connectionNavigation.js`, which the tree
+  writes). `useMenu` derives the `menuContext` (see `src/utils/menuContext.js`, unit-tested) from
+  those and the open connections, and pushes it to Rust via the
   `set_menu_context` command, which flips each gated item's `enabled`. Menu actions resolve their
   target via `resolveMenuTarget`, which is level-aware: it picks whichever of the sidebar selection
   or active tab actually satisfies the action's required depth (`connection`/`database`/`collection`),
@@ -235,10 +296,10 @@ cases it covers; a limit that counts them buys shorter files by deleting coverag
 
 The limit was 600 while the repo still had god files. They're gone, so it dropped to the 400 this
 document had already named as the soft limit — with 500 as the hard gate for now, on the way to
-400 once the over-limit files clear.
+400 once the files past the soft limit clear.
 
-**Eight files are over 500 today** and the check names them on every run — that listing is the debt
-register, so don't copy the numbers here. New files get no grace.
+**The check names every file past 400 on each run** — that listing is the debt register, so don't
+copy the count here. New files get no grace.
 
 **Splitting a god file is its own change.** Never bundle it with a feature or a fix (see Workflow).
 When you touch an over-limit file for another reason, leave it no bigger than you found it.
@@ -254,7 +315,7 @@ When you touch an over-limit file for another reason, leave it no bigger than yo
 
 ### Dependencies
 
-Six devDependencies and a deliberately small crate list — keep it that way. A new dependency
+A short devDependency list and a deliberately small crate list — keep it that way. A new dependency
 needs a reason a few lines of code can't cover, and the user approves it before it lands. The
 inverse also holds: don't hand-roll what an already-installed library does (the codebase uses
 `sqlparser`, `boa`, `russh` rather than home-grown equivalents).

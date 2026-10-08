@@ -125,7 +125,7 @@ impl OperationsRegistry {
         };
         let mut terminal = self.store.load();
         result.append(&mut terminal);
-        result.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        result.sort_by_key(|o| std::cmp::Reverse(o.started_at));
         result.truncate(MAX_OPERATIONS);
         result
     }

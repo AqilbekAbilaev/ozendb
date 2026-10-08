@@ -13,7 +13,7 @@ import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 
-// Import a CSV into a table (ozendb-6v3): pick a file, check the column mapping against
+// Import a CSV into a table (#128): pick a file, check the column mapping against
 // the first rows, then import it in one transaction.
 const props = defineProps({
   target: { type: Object, required: true },  // { connId, database, schema, table }

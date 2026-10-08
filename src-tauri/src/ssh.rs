@@ -191,10 +191,10 @@ impl client::Handler for ClientHandler {
             HostKeyCheck::Unknown => {
                 let (request_id, receiver) = self.prompts.register();
                 let event = HostKeyPromptEvent {
-                    request_id: request_id,
+                    request_id,
                     host: self.host.clone(),
                     port: self.port,
-                    fingerprint: fingerprint,
+                    fingerprint,
                 };
                 match (self.emit)(crate::events::SSH_HOST_KEY_PROMPT, serde_json::to_value(event).unwrap_or_default()) {
                     Ok(()) => {}
@@ -255,7 +255,7 @@ impl client::Handler for ClientHandler {
                 let event = HostKeyChangedEvent {
                     host: self.host.clone(),
                     port: self.port,
-                    stored_fingerprint: stored_fingerprint,
+                    stored_fingerprint,
                     presented_fingerprint: fingerprint,
                 };
                 // Best-effort notify; we refuse regardless of whether it lands.
@@ -280,14 +280,15 @@ pub async fn establish<R: Runtime>(
     prompts: Arc<HostKeyPrompts>,
     app: AppHandle<R>,
 ) -> Result<SshTunnel, AppError> {
-    let mut config = client::Config::default();
-    // Send keepalives so a dropped session is detected instead of hanging.
-    config.keepalive_interval = Some(std::time::Duration::from_secs(30));
-    let config = Arc::new(config);
+    let config = Arc::new(client::Config {
+        // Send keepalives so a dropped session is detected instead of hanging.
+        keepalive_interval: Some(std::time::Duration::from_secs(30)),
+        ..Default::default()
+    });
     let reject_reason = Arc::new(Mutex::new(None));
     let handler = ClientHandler {
-        known_hosts: known_hosts,
-        prompts: prompts,
+        known_hosts,
+        prompts,
         emit: Arc::new(move |name: &str, payload: serde_json::Value| app.emit(name, payload).map_err(|e| e.to_string())),
         host: params.ssh_host.clone(),
         port: params.ssh_port,
@@ -417,9 +418,9 @@ pub async fn establish<R: Runtime>(
     });
 
     Ok(SshTunnel {
-        local_addr: local_addr,
+        local_addr,
         _session: session,
-        accept_task: accept_task,
-        alive: alive,
+        accept_task,
+        alive,
     })
 }

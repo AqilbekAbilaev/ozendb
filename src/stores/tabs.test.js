@@ -145,32 +145,32 @@ describe('closeTab — workspace disposal', () => {
 describe('bulk close — iterating while the array reindexes', () => {
   it('closes every tab to the left of the target', () => {
     seed(['a', 'b', 'c', 'd', 'e'], 'e')
-    handleTabAction('Close Tabs to the Left', 'd')
+    handleTabAction('tab:close_left', 'd')
     expect(idsOf()).toEqual(['d', 'e'])
   })
 
   it('closes every tab to the right of the target', () => {
     seed(['a', 'b', 'c', 'd', 'e'], 'a')
-    handleTabAction('Close Tabs to the Right', 'b')
+    handleTabAction('tab:close_right', 'b')
     expect(idsOf()).toEqual(['a', 'b'])
   })
 
   it('keeps only the target tab and makes it active', () => {
     seed(['a', 'b', 'c', 'd'], 'a')
-    handleTabAction('Close Other Tabs', 'c')
+    handleTabAction('tab:close_others', 'c')
     expect(idsOf()).toEqual(['c'])
     expect(activeTabId.value).toBe('c')
   })
 
   it('closes all tabs, leaving a fresh Quickstart', () => {
     seed(['a', 'b', 'c'], 'b')
-    handleTabAction('Close All Tabs', 'b')
+    handleTabAction('tab:close_all', 'b')
     expect(tabs.value.map(t => t.kind)).toEqual(['quickstart'])
   })
 
   it('ignores a side-close against an unknown tab id', () => {
     seed(['a', 'b'], 'a')
-    handleTabAction('Close Tabs to the Left', 'nope')
+    handleTabAction('tab:close_left', 'nope')
     expect(idsOf()).toEqual(['a', 'b'])
   })
 })

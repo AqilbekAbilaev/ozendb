@@ -25,7 +25,7 @@ beforeEach(() => {
   vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn(text => { written = text }) } })
 })
 
-// ozendb-4dt: a MongoDB tab keeps its results and selection in its runtime, while the
+// #157: a MongoDB tab keeps its results and selection in its runtime, while the
 // shell and Current Operations hand over one flat object.
 describe('useMongoCellActions holder', () => {
   it('reads results and selection from a separate holder when given one', () => {

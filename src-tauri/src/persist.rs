@@ -56,10 +56,7 @@ pub fn quarantine_corrupt(path: &Path) {
         .unwrap_or(0);
     // Preserve the original extension so the backup keeps its `.json` shape;
     // `with_extension` swaps only the extension, so the base name is kept.
-    let ext = match path.extension().and_then(|e| e.to_str()) {
-        Some(value) => value,
-        None => "bak",
-    };
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("bak");
     let backup = path.with_extension(format!("corrupt-{}.{}", ms, ext));
     eprintln!(
         "storage: quarantining unreadable file {} -> {}",
