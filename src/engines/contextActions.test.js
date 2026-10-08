@@ -8,14 +8,14 @@ const { PG_ACTIONS, PG_MENUS } = await import('./postgresql/tree/contextMenus.js
 
 describe('contextAction', () => {
   it('finds an engine\'s own handler for a node of that engine', () => {
-    expect(contextAction({ engine: 'postgresql' }, 'Server Info')).toBe(PG_ACTIONS['Server Info'])
+    expect(contextAction({ engine: 'postgresql' }, 'pg:server_info')).toBe(PG_ACTIONS['pg:server_info'])
   })
 
   it('leaves everything else to the shared dispatcher', () => {
-    expect(contextAction({ engine: 'mongodb' }, 'Server Info')).toBe(null)
-    expect(contextAction({}, 'Server Info')).toBe(null)
-    expect(contextAction(undefined, 'Server Info')).toBe(null)
-    expect(contextAction({ engine: 'postgresql' }, 'Open Collection')).toBe(null)
+    expect(contextAction({ engine: 'mongodb' }, 'pg:server_info')).toBe(null)
+    expect(contextAction({}, 'pg:server_info')).toBe(null)
+    expect(contextAction(undefined, 'pg:server_info')).toBe(null)
+    expect(contextAction({ engine: 'postgresql' }, 'coll:open_tab')).toBe(null)
   })
 })
 

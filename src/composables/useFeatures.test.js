@@ -26,6 +26,7 @@ const { tabs, activeTabId } = await import('../stores/tabs')
 const { showToast } = await import('../stores/toast')
 const { openCollectionTab, openShellTab, openSqlTab, openPostgresQuery } = await import('../stores/tabCreators')
 const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
+const { MENU_ALIASES } = await import('./useAppMenuActions')
 const { MENUS } = await import('../constants/contextMenus')
 const { PG_MENUS, PG_ACTIONS } = await import('../engines/postgresql/tree/contextMenus')
 const { contextMenu } = await import('../stores/contextMenu')
@@ -81,14 +82,14 @@ beforeEach(() => {
 
 describe('resource refresh actions', () => {
   it('refreshes the selected connection without a tree refresh method', async () => {
-    await makeFeatures().runFeature('Refresh', { connId: 'c1' })
+    await makeFeatures().runFeature('node:refresh', { connId: 'c1' })
     expect(refreshConnectionResources).toHaveBeenCalledWith('c1')
     expect(showToast).toHaveBeenCalledWith('Refreshed')
   })
 
   it('reports selected refresh failure without rejecting', async () => {
     refreshConnectionResources.mockRejectedValue({ code: 'network', message: 'offline' })
-    await makeFeatures().runFeature('Refresh', { connId: 'c1' })
+    await makeFeatures().runFeature('node:refresh', { connId: 'c1' })
     expect(showToast).toHaveBeenCalledWith("Refresh failed: Can't reach the server")
   })
 
@@ -98,7 +99,7 @@ describe('resource refresh actions', () => {
     addOpenConnection({ id: 'c1' })
     addOpenConnection({ id: 'c2' })
     const features = makeFeatures()
-    await features.runFeature('Refresh All', {})
+    await features.runFeature('view:refresh_all', {})
     expect(refreshConnectionResources.mock.calls).toEqual([['c1'], ['c2']])
     expect(showToast).toHaveBeenCalledWith('Refreshed 1 connection, 1 failed')
   })
@@ -114,7 +115,7 @@ describe('disconnect paths read the registry from the store', () => {
   it('disconnects one connection without touching the sidebar component', async () => {
     addOpenConnection({ id: 'c1', name: 'One' })
     addOpenConnection({ id: 'c2', name: 'Two' })
-    await makeFeatures().runFeature('Disconnect', { connId: 'c1' }, { label: 'One' })
+    await makeFeatures().runFeature('conn:disconnect', { connId: 'c1' }, { label: 'One' })
     expect(disconnect).toHaveBeenCalledWith('c1')
     expect(openConnections.value.map(c => c.id)).toEqual(['c2'])
   })
@@ -123,14 +124,14 @@ describe('disconnect paths read the registry from the store', () => {
     addOpenConnection({ id: 'c1', name: 'One' })
     addOpenConnection({ id: 'c2', name: 'Two' })
     addOpenConnection({ id: 'c3', name: 'Three' })
-    await makeFeatures().runFeature('Disconnect Others', { connId: 'c1' })
+    await makeFeatures().runFeature('conn:disconnect_others', { connId: 'c1' })
     expect(openConnections.value.map(c => c.id)).toEqual(['c1'])
   })
 
   it('disconnects all of them', async () => {
     addOpenConnection({ id: 'c1', name: 'One' })
     addOpenConnection({ id: 'c2', name: 'Two' })
-    await makeFeatures().runFeature('Disconnect All', {})
+    await makeFeatures().runFeature('conn:disconnect_all', {})
     expect(openConnections.value).toEqual([])
   })
 })
@@ -147,7 +148,7 @@ describe('disconnect paths close affected workspaces through the store', () => {
     resetOpenConnections()
     addOpenConnection({ id: 'c1' })
     const features = makeFeatures()
-    await features.runFeature('Disconnect', { connId: 'c1', connName: 'Sales' }, { label: 'Sales' })
+    await features.runFeature('conn:disconnect', { connId: 'c1', connName: 'Sales' }, { label: 'Sales' })
     expect(disconnect).toHaveBeenCalledWith('c1')
     const ids = tabs.value.map(t => t.id)
     expect(ids).not.toContain('f')
@@ -168,7 +169,7 @@ describe('disconnect paths close affected workspaces through the store', () => {
     addOpenConnection({ id: 'c1' })
     addOpenConnection({ id: 'c2' })
     const features = makeFeatures()
-    await features.runFeature('Disconnect Others', { connId: 'c1', connName: 'Sales' })
+    await features.runFeature('conn:disconnect_others', { connId: 'c1', connName: 'Sales' })
     expect(disconnect).toHaveBeenCalledWith('c2')
     const ids = tabs.value.map(t => t.id)
     expect(ids).toEqual(['q', 'f', 'sh'])
@@ -186,7 +187,7 @@ describe('disconnect paths close affected workspaces through the store', () => {
     addOpenConnection({ id: 'c1' })
     addOpenConnection({ id: 'c2' })
     const features = makeFeatures()
-    await features.runFeature('Disconnect All', {})
+    await features.runFeature('conn:disconnect_all', {})
     expect(disconnect).toHaveBeenCalledWith('c1')
     expect(disconnect).toHaveBeenCalledWith('c2')
     expect(tabs.value.map(t => t.id)).toEqual(['q'])
@@ -251,7 +252,7 @@ describe('color tag persistence', () => {
     applyColorTag.mockRejectedValue({ code: 'command', message: 'disk full' })
     const features = makeFeatures()
 
-    await features.handleContextAction('Choose Color:red')
+    await features.handleContextAction('node:color:red')
 
     expect(showToast).toHaveBeenCalledWith('Could not save color tag: disk full')
   })
@@ -320,11 +321,9 @@ describe('handleTool falling back to the active workspace', () => {
   })
 })
 
-// The dispatcher is keyed on each menu item's own display label, so a renamed or
-// mistyped one stops matching and the user is told the feature is "coming soon".
-// These lock the coupling until actions move onto the stable ids the native menu
-// already emits (#194): every action a menu offers must be dispatchable, and
-// every one that is not must be an acknowledged placeholder.
+// The dispatcher is keyed on action ids, never on the labels menus show, so a renamed
+// or translated label can't break an action. Every id a menu offers must be
+// dispatchable, and every one that is not must be an acknowledged placeholder.
 describe('context menu coverage', () => {
   // A `sub` item only opens a flyout; its `subItems` are the real actions. The tab
   // menu is excluded because handleContextAction routes it to the tab store before
@@ -333,9 +332,9 @@ describe('context menu coverage', () => {
     const out = []
     for (const item of items) {
       if (item.sep) continue
-      if (item.subItems) out.push(...item.subItems)
+      if (item.subItems) out.push(...item.subItems.map((sub) => sub.value))
       if (item.sub) continue
-      if (item.label) out.push(item.label)
+      out.push(item.value)
     }
     return out
   }
@@ -345,6 +344,11 @@ describe('context menu coverage', () => {
 
   it('scrapes a plausible number of actions, so a silently-empty check cannot pass', () => {
     expect(offered.length).toBeGreaterThan(30)
+  })
+
+  it('gives every item an id, so no label is ever the action', () => {
+    const all = [...Object.values(MENUS), ...Object.values(PG_MENUS)].flatMap(actionsIn)
+    expect(all.filter((id) => typeof id !== 'string' || !id.includes(':'))).toEqual([])
   })
 
   it('can dispatch every action the menus offer', () => {
@@ -362,25 +366,49 @@ describe('context menu coverage', () => {
   it('runs a PostgreSQL node\'s own action, not the MongoDB one of the same level', () => {
     const node = { connId: 'p1', connName: 'Payments PG', engine: 'postgresql', database: 'payments' }
     contextMenu.value = { type: 'pg:database', x: 0, y: 0, label: 'payments', nodeData: node, items: PG_MENUS.database }
-    makeFeatures().handleContextAction('New SQL Query')
+    makeFeatures().handleContextAction('pg:new_sql')
     expect(openPostgresQuery).toHaveBeenCalledWith({ connectionId: 'p1', connectionName: 'Payments PG', database: 'payments' })
   })
 
   it('keeps no placeholder for an action that is in fact implemented', () => {
     const { knownActions } = makeFeatures()
-    expect([...UNBUILT_ACTIONS].filter(a => knownActions.has(a))).toEqual([])
+    expect([...UNBUILT_ACTIONS.keys()].filter(a => knownActions.has(a))).toEqual([])
   })
 
   it('reports an unknown action as a fault instead of an unbuilt feature', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    makeFeatures().runFeature('Definitely Not A Feature', { connId: 'c1' })
-    expect(showToast).toHaveBeenCalledWith('Could not run "Definitely Not A Feature"')
+    makeFeatures().runFeature('nope:not_a_feature', { connId: 'c1' })
+    expect(showToast).toHaveBeenCalledWith('Could not run "nope:not_a_feature"')
     expect(error).toHaveBeenCalled()
     error.mockRestore()
   })
 
-  it('still says "coming soon" for the acknowledged placeholders', () => {
-    makeFeatures().runFeature('Export URI…', { connId: 'c1' })
+  it('still says "coming soon", by name, for the acknowledged placeholders', () => {
+    makeFeatures().runFeature('conn:export_uri', { connId: 'c1' })
     expect(showToast).toHaveBeenCalledWith('Export URI… — coming to OzenDB')
+  })
+})
+
+// The native menu items that used to reach a feature through a hand-written
+// `menuNode('Label', level)` arm now reach it by id. Each must still name one.
+describe('native menu ids that run features', () => {
+  const NODE_ITEMS = [
+    'file:server_status', 'file:server_charts', 'file:server_build', 'file:add_database',
+    'db:database_stats', 'db:current_ops', 'db:profiler', 'db:add_collection', 'db:add_database',
+    'db:add_view', 'db:export', 'db:import', 'db:add_bucket', 'db:manage_users', 'db:manage_roles',
+    'db:functions', 'db:copy_database', 'db:copy_all', 'db:paste', 'db:paste_database',
+    'db:drop_database', 'db:collection_stats', 'gridfs:open',
+    'coll:add_view', 'coll:validator', 'coll:mapreduce', 'coll:copy', 'coll:aggregation', 'coll:add_index',
+    'coll:stats', 'coll:schema', 'coll:history', 'coll:rename', 'coll:duplicate', 'coll:drop',
+  ]
+
+  it('resolves each, directly or through an alias, to a dispatchable feature', () => {
+    const { knownActions } = makeFeatures()
+    expect(NODE_ITEMS.filter((id) => !knownActions.has(MENU_ALIASES[id] ?? id))).toEqual([])
+  })
+
+  it('aliases only to features that exist', () => {
+    const { knownActions } = makeFeatures()
+    expect(Object.values(MENU_ALIASES).filter((id) => !knownActions.has(id))).toEqual([])
   })
 })
