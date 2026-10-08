@@ -185,19 +185,19 @@ pub(crate) async fn update_row_impl(
 /// already had loaded (`before`) and what it set them to — never a server round
 /// trip to re-SELECT a pre-image. Not yet actually recorded: the caller decides
 /// when (immediately for auto-commit, only on commit for a held transaction).
-fn history_entry(conn_id: &str, database: &str, schema: &str, table: &str, set: &[ColumnValue], before: &[ColumnValue], r#where: &[ColumnValue]) -> crate::pg_row_history::PgHistoryEntry {
+fn history_entry(conn_id: &str, database: &str, schema: &str, table: &str, set: &[ColumnValue], before: &[ColumnValue], r#where: &[ColumnValue]) -> crate::postgres::row_history::PgHistoryEntry {
     let changes = set
         .iter()
         .map(|after| {
             let prior = before.iter().find(|b| b.column == after.column);
-            crate::pg_row_history::PgColumnChange {
+            crate::postgres::row_history::PgColumnChange {
                 column: after.column.clone(),
                 before: prior.map(|b| b.value.clone()).unwrap_or(serde_json::Value::Null),
                 after: after.value.clone(),
             }
         })
         .collect();
-    crate::pg_row_history::PgHistoryEntry {
+    crate::postgres::row_history::PgHistoryEntry {
         id: uuid::Uuid::new_v4().to_string(),
         conn_id: conn_id.to_string(),
         database: database.to_string(),
@@ -219,9 +219,9 @@ fn history_entry(conn_id: &str, database: &str, schema: &str, table: &str, set: 
 /// treat as a conflict, not silently ignore.
 ///
 /// `before` carries `set`'s columns' pre-edit values — the grid already has them
-/// loaded — so a successful edit can record a history entry (ozendb-h4y) without
+/// loaded — so a successful edit can record a history entry (#129) without
 /// an extra SELECT. `database` names which database this row's table lives in,
-/// for that entry; scoped to the connection's own for now, not ozendb-bj2's
+/// for that entry; scoped to the connection's own for now, not #124's
 /// cross-database browsing (table edits don't support that yet).
 ///
 /// A `tx_id` runs the update inside that held transaction instead of
@@ -237,7 +237,7 @@ fn history_entry(conn_id: &str, database: &str, schema: &str, table: &str, set: 
 pub async fn update_pg_row(
     ctx: State<'_, AppContext>,
     txs: State<'_, super::PgTransactions>,
-    history: State<'_, crate::pg_row_history::PgRowHistoryStore>,
+    history: State<'_, crate::postgres::row_history::PgRowHistoryStore>,
     id: String,
     database: String,
     schema: String,

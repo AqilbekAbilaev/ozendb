@@ -8,7 +8,7 @@ import { migrateSession, toLegacyRecord, sessionRestoreNotice } from '../workspa
 import { showToast } from '../stores/toast'
 import { recordFrontendError } from '../appApi/errorLog'
 
-// Tab-session persistence (Work 7). On-disk sessions are canonical v2 records;
+// Tab-session persistence. On-disk sessions are canonical v2 records;
 // legacy unversioned files migrate in memory on load and are written back as v2.
 // Result sets and other runtime state are rebuilt on demand, so paging through
 // data never saves. The tab spine (`tabs`, `activeTabId`) comes from the store.

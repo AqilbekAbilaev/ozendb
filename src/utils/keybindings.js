@@ -64,9 +64,8 @@ export function mergeBindings(overrides) {
 }
 
 // Parse a Tauri accelerator string into a normalized matcher. `cmdOrCtrl` means
-// "either", matched leniently; `ctrl`/`cmd` are the physical keys, matched exactly
-// (ozendb-wpy) — a binding that asked for one specific key must not also fire for
-// the other, which is exactly the bug this distinction fixes.
+// "either", matched leniently; `ctrl`/`cmd` are the physical keys, matched exactly —
+// a binding that asked for one specific key must not also fire for the other.
 export function parseAccel(accel) {
   const matcher = { cmdOrCtrl: false, ctrl: false, cmd: false, shift: false, alt: false, key: '' }
   for (const raw of String(accel).split('+')) {
@@ -139,8 +138,8 @@ export function accelToTokens(accel, isMac) {
 // usable global shortcut. Requires either a modifier or a function key — a bare
 // letter would fire while typing. Used by the "press a key" capture field.
 //
-// ctrlKey and metaKey are captured as the distinct physical keys they are
-// (ozendb-wpy) — collapsing both into one "CmdOrCtrl" token meant a user
+// ctrlKey and metaKey are captured as the distinct physical keys they are —
+// collapsing both into one "CmdOrCtrl" token meant a user
 // rebinding to a Control-only chord on macOS (e.g. Ctrl+Shift+J) silently got
 // Cmd+Shift+J saved instead, since CmdOrCtrl always resolves to Cmd there, with
 // no sign the captured combo differed from what they pressed. A rebind now

@@ -6,6 +6,15 @@ import { deriveMenuContext, resolveMenuTarget, resolvePgMenuTarget } from './men
 // enables the matching items even while the context-less Quickstart tab is active.
 
 import { resourceFromTreeSelection } from './legacyResourceRef'
+import { createResourceRef } from './resourceRef'
+
+// A tab's identity is the `target` its definition gives it; these mirror those.
+function ref(connectionId, dbName, collectionName) {
+  const segments = []
+  if (dbName) segments.push({ kind: 'database', name: dbName })
+  if (collectionName) segments.push({ kind: 'collection', name: collectionName })
+  return createResourceRef(connectionId, segments)
+}
 
 // Selections are built exactly the way useConnectionTree builds them, so these
 // fixtures cannot drift from the payload the menu actually receives at runtime.
@@ -16,7 +25,7 @@ function selection(connectionId, connectionName, dbName, collectionName, kind, e
 
 const quickstart = { id: 't0', kind: 'quickstart', title: 'Quickstart' }
 const collectionTab = {
-  id: 't1', kind: 'collection',
+  id: 't1', kind: 'collection', target: ref('c1', 'shop', 'orders'),
   connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders',
   runtime: { results: [], selectedRow: -1, selectedField: null },
 }
@@ -129,7 +138,7 @@ describe('deriveMenuContext', () => {
   // A Current Operations tab carries dbName/collName as *filters*, not identity. The
   // old field-presence check read them as identity and lit the whole Database menu.
   it('does not let Current Operations filters enable the database menu', () => {
-    const ops = { id: 't2', kind: 'currentOps', connId: 'c1', connName: 'Local', dbName: 'shop', collName: 'orders' }
+    const ops = { id: 't2', kind: 'currentOps', target: ref('c1'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collName: 'orders' }
     const ctx = deriveMenuContext(ops, null, 1)
     expect(ctx.hasConnection).toBe(true)
     expect(ctx.hasDatabase).toBe(false)
@@ -139,7 +148,7 @@ describe('deriveMenuContext', () => {
   // Schema/Indexes/Export/Import are collection-scoped workspaces, so collection
   // actions apply to them just as they do to a find tab.
   it('enables collection actions for collection-scoped tool tabs', () => {
-    const schema = { id: 't3', kind: 'schema', connId: 'c1', connName: 'Local', dbName: 'shop', collName: 'orders' }
+    const schema = { id: 't3', kind: 'schema', target: ref('c1', 'shop', 'orders'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders' }
     const ctx = deriveMenuContext(schema, null, 1)
     expect(ctx.hasDatabase).toBe(true)
     expect(ctx.hasCollection).toBe(true)
@@ -158,6 +167,7 @@ describe('PostgreSQL never reaches the MongoDB gates', () => {
   const pgConnection = selection('p1', 'Payments PG', null, null, 'connection', 'postgresql')
   const pgTableTab = {
     id: 't9', kind: 'pgTable', engine: 'postgresql',
+    target: createResourceRef('p1', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }]),
     connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
   }
 
@@ -240,18 +250,17 @@ describe('resolveMenuTarget', () => {
     expect(resolveMenuTarget(quickstart, connSel, 'collection').connectionId).toBe('c2')
   })
 
-  // Tool tabs spell their fields connId/collName; handlers downstream read
-  // connectionId/collectionName. Resolving through ResourceRef normalises both to one
-  // shape, so an action fired from a Schema tab cannot land on undefined.
-  it('normalises a short-alias tool tab to the long spelling', () => {
-    const schema = { id: 't3', kind: 'schema', connId: 'c1', connName: 'Local', dbName: 'shop', collName: 'orders' }
+  // A tool tab resolves through its target, like every other tab, to the long spelling
+  // the handlers read.
+  it('resolves a tool tab through its target', () => {
+    const schema = { id: 't3', kind: 'schema', target: ref('c1', 'shop', 'orders'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders' }
     expect(resolveMenuTarget(schema, null, 'collection')).toEqual({
       connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
     })
   })
 })
 
-// ozendb-sxd: the PostgreSQL gates are the union of the active tab and the sidebar
+// #145: the PostgreSQL gates are the union of the active tab and the sidebar
 // selection, the same as the Mongo ones above — PostgresTreeNodes feeds its clicked
 // schema/table row into the shared tree-selection store.
 const pgQueryTab = { id: 'p1', type: 'postgresql.query', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public' }
@@ -379,7 +388,7 @@ describe('resolvePgMenuTarget', () => {
   })
 })
 
-describe('deriveMenuContext engine (ozendb-izk)', () => {
+describe('deriveMenuContext engine (#152)', () => {
   const mongoTab = { ...collectionTab, engine: 'mongodb' }
   const pgTab = { ...pgTableTab, engine: 'postgresql' }
 
@@ -431,7 +440,7 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
   })
 })
 
-// ozendb-7dz: a write action aimed at the sidebar selection must respect the lock of an
+// #156: a write action aimed at the sidebar selection must respect the lock of an
 // open tab on that same resource, not only the active tab's.
 describe('deriveMenuContext read-only for a sidebar target', () => {
   const app = { ...quickstart, engine: 'app' }

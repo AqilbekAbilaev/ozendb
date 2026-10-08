@@ -31,7 +31,7 @@ where
     T: Serialize + DeserializeOwned + Default,
 {
     pub fn new(path: PathBuf) -> Self {
-        Self { path: path, lock: Mutex::new(()), marker: PhantomData }
+        Self { path, lock: Mutex::new(()), marker: PhantomData }
     }
 
     // Snapshot read — no lock. `atomic_write` swaps the whole file with a rename,
@@ -40,10 +40,7 @@ where
     // aside (not silently emptied) so the next save can't overwrite it. See
     // persist::read_json.
     pub fn load(&self) -> T {
-        match crate::persist::read_json(&self.path) {
-            Some(value) => value,
-            None => T::default(),
-        }
+        crate::persist::read_json(&self.path).unwrap_or_default()
     }
 
     // Replace the whole value under the lock.
@@ -57,10 +54,7 @@ where
     // caller can, e.g., report whether anything changed.
     pub fn update<R>(&self, mutate: impl FnOnce(&mut T) -> R) -> Result<R, AppError> {
         let _guard = self.guard();
-        let mut value: T = match crate::persist::read_json(&self.path) {
-            Some(value) => value,
-            None => T::default(),
-        };
+        let mut value: T = crate::persist::read_json(&self.path).unwrap_or_default();
         let result = mutate(&mut value);
         match self.write(&value) {
             Ok(()) => Ok(result),
@@ -104,11 +98,11 @@ where
 macro_rules! json_store_wrapper {
     ($name:ident, $type:ty) => {
         pub struct $name {
-            pub(crate) inner: crate::json_store::JsonStore<$type>,
+            pub(crate) inner: $crate::json_store::JsonStore<$type>,
         }
         impl $name {
             pub fn new(path: std::path::PathBuf) -> Self {
-                Self { inner: crate::json_store::JsonStore::new(path) }
+                Self { inner: $crate::json_store::JsonStore::new(path) }
             }
             pub fn load(&self) -> $type {
                 self.inner.load()

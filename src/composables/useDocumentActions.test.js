@@ -38,7 +38,7 @@ describe('Paste Documents', () => {
     const original = active
     const actions = useDocumentActions({
       activeTab: () => active,
-      docMenuRequest: () => null,
+      docMenuRequest: ref(null),
       viewMode: ref('table'),
       showToast: vi.fn(),
       requery,
@@ -54,5 +54,28 @@ describe('Paste Documents', () => {
       collection: 'people',
     }, '[{ "name": "Ada" }]')
     expect(requery).toHaveBeenCalledWith(true, original)
+  })
+})
+
+// The collection workspace loads on first use, so a native-menu action that opens the
+// tab sends its request before any results panel is listening.
+describe('a Document/Collection menu request', () => {
+  const panel = (docMenuRequest) => useDocumentActions({
+    activeTab: () => collectionTab('c1', 'people'),
+    docMenuRequest,
+    viewMode: ref('table'),
+    showToast: vi.fn(),
+    requery: vi.fn(),
+  })
+
+  it('runs when it arrived before the panel mounted', () => {
+    const request = ref({ action: 'coll:update_dialog', nonce: 1 })
+    expect(panel(request).showUpdateDialog.value).toBe(true)
+  })
+
+  it('runs once: the next panel to mount does not replay it', () => {
+    const request = ref({ action: 'coll:update_dialog', nonce: 1 })
+    panel(request)
+    expect(panel(request).showUpdateDialog.value).toBe(false)
   })
 })

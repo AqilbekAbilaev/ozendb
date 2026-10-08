@@ -99,7 +99,7 @@ const {
   onFieldEditSave, onRemoveFieldConfirm, onClearConfirm, onUpdateDialogDone, onDeleteDialogDone,
 } = useDocumentActions({
   activeTab: () => props.activeTab,
-  docMenuRequest: () => docMenuRequest.value,
+  docMenuRequest,
   viewMode: viewMode,
   showToast: showToast,
   requery: (history, tab) => emit('requery', history, tab),

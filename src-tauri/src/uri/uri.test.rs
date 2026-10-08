@@ -107,7 +107,7 @@ fn build_uri_appends_passthrough_options() {
         ..base_config()
     };
     let mongo = MongoConfig {
-        options: options,
+        options,
         ..Default::default()
     };
     let uri = build_uri(&config, &mongo, None);
@@ -358,7 +358,7 @@ fn build_uri_oidc_emits_canonical_mechanism_and_properties() {
     };
     let mongo = MongoConfig {
         auth_mechanism: Some(String::from("OIDC")),
-        options: options,
+        options,
         ..Default::default()
     };
     let uri = build_uri(&config, &mongo, None);

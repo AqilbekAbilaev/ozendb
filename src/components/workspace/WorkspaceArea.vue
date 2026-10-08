@@ -1,7 +1,6 @@
 <script setup>
-// Generic workspace host (Work 4): active-tab lookup, tab bar, and dynamic rendering
-// of the component resolved from the registry. Replaces the hard-coded pane-selection
-// chain in QueryWorkspace.vue while preserving the App-facing contract unchanged.
+// Generic workspace host: active-tab lookup, tab bar, and dynamic rendering of the
+// component resolved from the registry.
 // Props/listeners are built per resolved key so collection-only attributes never leak
 // onto ordinary panes' root DOM nodes.
 import { ref, computed, watch } from 'vue'

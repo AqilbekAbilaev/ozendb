@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::known_hosts::KnownHostsStore;
-use crate::pg_uri;
+use crate::postgres::uri as pg_uri;
 use crate::ssh::{self, HostKeyPrompts, SshAuth, SshParams, SshTunnel};
 use crate::storage::{ConnectionConfig, Engine, MongoConfig, PostgresConfig, SshAuthMethod};
 use crate::uri;
@@ -25,7 +25,7 @@ pub struct ConnectionPool {
     clients: Mutex<HashMap<String, Client>>,
     // Keyed by (connection id, database) rather than just id: a connection's own
     // tunnel/credentials are shared, but Postgres has no per-query `USE`, so
-    // opening a second database on the same server (ozendb-bj2) needs its own pool.
+    // opening a second database on the same server (#124) needs its own pool.
     pg_pools: Mutex<HashMap<(String, String), PgPool>>,
     tunnels: Mutex<HashMap<String, Arc<SshTunnel>>>,
     // One lock per connection id, held while a tunnel is established. Without it,
@@ -53,9 +53,9 @@ impl ConnectionPool {
             pg_pools: Mutex::new(HashMap::new()),
             tunnels: Mutex::new(HashMap::new()),
             setup_locks: Mutex::new(HashMap::new()),
-            known_hosts: known_hosts,
-            prompts: prompts,
-            app: app,
+            known_hosts,
+            prompts,
+            app,
         }
     }
 
@@ -169,7 +169,7 @@ impl ConnectionPool {
     /// Postgres sibling of `connect`: same tunnel-then-cache shape, resolving a
     /// `PgPool` from the parallel `pg_pools` map instead of a `mongodb::Client`.
     /// `database` names a database other than the config's own — opening a second
-    /// database on the same server (ozendb-bj2) — reusing the same tunnel,
+    /// database on the same server (#124) — reusing the same tunnel,
     /// credentials and TLS/read-only options; `None` behaves exactly as before.
     pub async fn connect_postgres(&self, config: &ConnectionConfig, database: Option<&str>) -> Result<PgPool, AppError> {
         let postgres = postgres_config(config)?;

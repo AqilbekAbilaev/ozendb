@@ -1,4 +1,4 @@
-// Pure session migration (Work 7A). Turns whatever is on disk into a canonical v2
+// Pure session migration. Turns whatever is on disk into a canonical v2
 // session — or an explicit failure result the service must not overwrite. Every
 // repair rule lives here and is pinned by fixtures, so a schema change can never
 // silently change what a user's saved session means. Inputs are never mutated.
@@ -8,7 +8,7 @@
 //   { ok: false, reason: 'invalid-session'|'future-version'|'unknown-workspace-type',
 //     schemaVersion }
 //
-// Durable state is projected by the workspace definitions' serialize hooks (7B) —
+// Durable state is projected by the workspace definitions' serialize hooks —
 // the migration hands each legacy record to its definition, so there is exactly one
 // source of truth for what survives a session.
 import { getWorkspaceDefinition, workspaceTypeForSaved } from './registry'
@@ -185,7 +185,7 @@ const LEGACY_KEYS = {
   'postgresql.query': { kind: 'pgQuery', identity: ([db]) => ({ database: db.name }) },
 }
 
-// The v2 → legacy bridge. Restore hooks (Work 6) consume the flat legacy shape and
+// The v2 → legacy bridge. Restore hooks consume the flat legacy shape and
 // are deliberately unchanged; this un-projects the canonical record back into it,
 // with the display name re-resolved from the connection list (names are not
 // identity, so they are never stored). Returns null for types outside the table.
@@ -195,7 +195,7 @@ export function toLegacyRecord(v2, connectionName = null) {
   const [db] = v2.target.segments
   const coll = v2.target.segments[1]
   // Every workspace kind now takes the long spelling, so there is one projection
-  // rather than a per-type flag choosing between two (audit §8).
+  // rather than a per-type flag choosing between two.
   const identity = conf.identity
     ? { connectionId: v2.target.connectionId, connectionName, ...conf.identity(v2.target.segments) }
     : {

@@ -1,4 +1,4 @@
-// Session migration specs (Work 7A). The round-trip tests at the bottom pin the
+// Session migration specs. The round-trip tests at the bottom pin the
 // v2 → legacy bridge against every definition's restore hook, so serialize,
 // bridge and restore can never drift from each other.
 import { describe, it, expect } from 'vitest'
@@ -235,7 +235,7 @@ describe('toLegacyRecord bridge', () => {
   }
 
   // What each restore hook is trusted to bring back. Collection-mode names are
-  // re-injected by the service from the connection list (see Work 7C), so they are
+  // re-injected by the service from the connection list (see useSessionPersistence), so they are
   // deliberately not asserted here.
   const DURABLE = {
     'mongodb.find': ['filter', 'sort', 'projection', 'skip', 'limit', 'pipeline', 'vqb', 'colOrder', 'readOnly'],

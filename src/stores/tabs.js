@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { COLOR_ACTION } from '../constants/contextMenus'
 import { createWorkspace } from '../workspaces/createWorkspace'
 import { duplicateWorkspace, disposeWorkspace } from '../workspaces/lifecycle'
 
@@ -148,20 +149,20 @@ export function confirmRenameTab() {
 }
 
 export function handleTabAction(action, tabId) {
-  if (action.startsWith('Choose Color:')) {
-    const color = action.split(':')[1]
+  if (action.startsWith(COLOR_ACTION)) {
+    const color = action.slice(COLOR_ACTION.length)
     const tab = tabs.value.find(t => t.id === tabId)
     if (tab) tab.color = color === 'none' ? null : color
     return
   }
   switch (action) {
-    case 'Close Tab':               closeTab(tabId); break
-    case 'Close Other Tabs':        closeTabsExcept(tabId); break
-    case 'Close Tabs to the Left':  closeTabsToSide(tabId, 'left'); break
-    case 'Close Tabs to the Right': closeTabsToSide(tabId, 'right'); break
-    case 'Close All Tabs':          closeAllTabs(); break
-    case 'Duplicate Tab':           duplicateTab(tabId); break
-    case 'Move Tab to the Front':   moveTabToFront(tabId); break
-    case 'Rename Tab…':             openRenameTab(tabId); break
+    case 'tab:close':        closeTab(tabId); break
+    case 'tab:close_others': closeTabsExcept(tabId); break
+    case 'tab:close_left':   closeTabsToSide(tabId, 'left'); break
+    case 'tab:close_right':  closeTabsToSide(tabId, 'right'); break
+    case 'tab:close_all':    closeAllTabs(); break
+    case 'tab:duplicate':    duplicateTab(tabId); break
+    case 'tab:move_front':   moveTabToFront(tabId); break
+    case 'tab:rename':       openRenameTab(tabId); break
   }
 }
