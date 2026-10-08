@@ -66,7 +66,7 @@ russh = { version = "0.61", default-features = false, features = ["ring", "flate
 boa_engine = "0.22"
 # Direct dependency so boa's `#[derive(Trace, Finalize)]` macros (which expand to
 # `::boa_gc::…` paths) resolve. Version must track boa_engine's.
-boa_gc = "0.21"
+boa_gc = "0.22"
 # Streaming JSON pull-parser used by the collection importer to read a top-level
 # JSON array element-by-element (bounded memory), instead of loading the whole
 # file. The `serde` feature lets each element deserialize straight into a value.

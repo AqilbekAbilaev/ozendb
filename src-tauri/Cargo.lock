@@ -497,7 +497,7 @@ checksum = "9221b0a090572b4a118b46c5874c0781fe4bc9546b85f0a615b8bfb609ca4ed7"
 dependencies = [
  "bitflags 2.13.1",
  "boa_interner",
- "boa_macros 0.22.0",
+ "boa_macros",
  "boa_string",
  "indexmap 2.14.0",
  "num-bigint 0.5.1",
@@ -516,9 +516,9 @@ dependencies = [
  "async-channel",
  "bitflags 2.13.1",
  "boa_ast",
- "boa_gc 0.22.0",
+ "boa_gc",
  "boa_interner",
- "boa_macros 0.22.0",
+ "boa_macros",
  "boa_parser",
  "boa_string",
  "bytemuck",
@@ -563,22 +563,12 @@ dependencies = [
 
 [[package]]
 name = "boa_gc"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17323a98cf2e631afacf1a6d659c1212c48a68bacfa85afab0a66ade80582e51"
-dependencies = [
- "boa_macros 0.21.1",
- "hashbrown 0.16.1",
-]
-
-[[package]]
-name = "boa_gc"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af82119558ab1002d1978c8459b53a3ebb506177d29a3aca37c07c1777b1d966"
 dependencies = [
  "arrayvec",
- "boa_macros 0.22.0",
+ "boa_macros",
  "boa_string",
  "hashbrown 0.17.1",
  "thin-vec",
@@ -590,28 +580,14 @@ version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "317c631e791f5cb7d0017e43c0a758b0eaffd40c34c4c360e2a6be7752b78cd1"
 dependencies = [
- "boa_gc 0.22.0",
- "boa_macros 0.22.0",
+ "boa_gc",
+ "boa_macros",
  "hashbrown 0.17.1",
  "indexmap 2.14.0",
  "once_cell",
  "phf 0.14.0",
  "rustc-hash",
  "static_assertions",
-]
-
-[[package]]
-name = "boa_macros"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5822cb4f146d243060e588bc5a5f2e709683fdad3d7111f42c48e6b5c921d23d"
-dependencies = [
- "cfg-if",
- "cow-utils",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
- "synstructure 0.13.2",
 ]
 
 [[package]]
@@ -637,7 +613,7 @@ dependencies = [
  "bitflags 2.13.1",
  "boa_ast",
  "boa_interner",
- "boa_macros 0.22.0",
+ "boa_macros",
  "fast-float2",
  "icu_properties",
  "num-bigint 0.5.1",
@@ -1256,7 +1232,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d045de693cb712d0b22c6a64be5b953f67b3ce00ab5ad3dd5d8b441886ab8e1a"
 dependencies = [
  "quote",
- "syn 3.0.3",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2188,7 +2164,7 @@ checksum = "9fb9654ba8355388abeb8dcb4fc62f511300867002afc858860463bdd9fe0c44"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -4298,7 +4274,7 @@ name = "ozendb"
 version = "0.2.1"
 dependencies = [
  "boa_engine",
- "boa_gc 0.21.1",
+ "boa_gc",
  "chrono",
  "docx-rs",
  "futures-util",
