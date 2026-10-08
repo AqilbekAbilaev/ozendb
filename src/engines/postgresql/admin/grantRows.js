@@ -1,4 +1,4 @@
-// What the Grants modal shows and sends (ozendb-ahy). The privilege lists mirror
+// What the Grants modal shows and sends (#141). The privilege lists mirror
 // kind_rules in src-tauri/src/commands/postgres/grants.rs, which refuses anything else.
 
 export const GRANT_KINDS = ['schema', 'table', 'sequence']

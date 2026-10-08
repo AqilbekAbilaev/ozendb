@@ -1,6 +1,7 @@
 # Contributing to OzenDB
 
-Thanks for your interest in improving OzenDB — an open-source, free desktop GUI for MongoDB.
+Thanks for your interest in improving OzenDB — an open-source, free desktop GUI for MongoDB, with
+PostgreSQL support in preview.
 Contributions of all kinds are welcome: bug reports, features, docs, and fixes.
 
 ## Contributor License Agreement (required)
@@ -36,10 +37,14 @@ npm run tauri dev        # Vite dev server + Tauri shell
 **Verify your changes**
 
 ```bash
-cd src-tauri && cargo build   # Rust must compile after any backend change
-cd src-tauri && cargo test    # Rust unit tests
+npm run lint                  # ESLint, including the layering rules
 npm test                      # Frontend unit tests (Vitest)
+npm run check:size            # The 500-line file limit
+(cd src-tauri && cargo test)  # Rust tests — not `cargo build`, which skips the test tree
 ```
+
+This is what CI runs. The Rust integration tests against a live MongoDB or PostgreSQL are skipped
+unless `OZENDB_TEST_MONGODB` / `OZENDB_TEST_POSTGRES` point at a server.
 
 ## Making a change
 
@@ -50,8 +55,8 @@ npm test                      # Frontend unit tests (Vitest)
 3. **Match the surrounding code.** Follow the naming, structure, and comment style already in the
    file you're editing. Project-wide architecture notes live in
    [`CLAUDE.md`](CLAUDE.md) and [`ROADMAP.md`](ROADMAP.md).
-4. **Keep the build green** — `cargo build`, `cargo test`, and `npm test` should all pass before you
-   open the PR.
+4. **Keep the build green** — everything under *Verify your changes* should pass before you open
+   the PR.
 5. **Describe what changed and why** in the PR, in plain language, and include the CLA agreement
    line above.
 

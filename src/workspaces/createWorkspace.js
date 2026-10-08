@@ -1,4 +1,4 @@
-// The generic workspace factory (Work 5A): the single place a fresh workspace of
+// The generic workspace factory: the single place a fresh workspace of
 // any type is assembled. The type's definition owns the engine-specific shape; this
 // file owns the canonical envelope — id, type, engine, title, color, target — which
 // definitions can never override, plus the ID policy every definition shares.

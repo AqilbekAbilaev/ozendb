@@ -102,8 +102,8 @@ impl serde::Serialize for AppError {
             _ => self.to_string(),
         };
         let wire = WireError {
-            code: code,
-            message: message,
+            code,
+            message,
         };
         wire.serialize(s)
     }

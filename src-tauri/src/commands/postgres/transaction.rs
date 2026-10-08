@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::pg_row_history::PgHistoryEntry;
+use crate::postgres::row_history::PgHistoryEntry;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -13,7 +13,7 @@ use super::AppContext;
 // `failed`: PostgreSQL answers COMMIT of a transaction that hit an error by rolling
 // it back, and reports success — so a failed run is remembered to say so instead.
 // `pending_history`: row edits recorded only once the transaction actually commits
-// (ozendb-h4y) — recording them as each statement runs would log edits a later
+// (#129) — recording them as each statement runs would log edits a later
 // rollback undoes, which is worse than not recording them at all.
 struct Held {
     tx: Option<Transaction<'static, Postgres>>,
@@ -119,7 +119,7 @@ impl PgTransactions {
 }
 
 /// `database`, when given, targets a database other than the connection's own —
-/// opening a second database on the same server (ozendb-bj2).
+/// opening a second database on the same server (#124).
 #[tauri::command]
 pub async fn begin_pg_transaction(
     ctx: State<'_, AppContext>,
@@ -132,13 +132,13 @@ pub async fn begin_pg_transaction(
     txs.begin(&pool, &tx_id, ctx.is_read_only(&id)).await
 }
 
-/// Commits, then records any row edits the transaction queued (ozendb-h4y) — a
+/// Commits, then records any row edits the transaction queued (#129) — a
 /// best-effort write to the history store; a failure to record never fails the
 /// commit that already happened.
 #[tauri::command]
 pub async fn commit_pg_transaction(
     txs: State<'_, PgTransactions>,
-    history: State<'_, crate::pg_row_history::PgRowHistoryStore>,
+    history: State<'_, crate::postgres::row_history::PgRowHistoryStore>,
     tx_id: String,
 ) -> Result<(), AppError> {
     let entries = txs.finish(&tx_id, true).await?;

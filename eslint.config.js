@@ -2,6 +2,17 @@ import js from '@eslint/js'
 import globals from 'globals'
 import pluginVue from 'eslint-plugin-vue'
 
+const ENGINE_NAME_CHECKS = [
+  {
+    selector: "BinaryExpression[operator=/^[!=]==?$/] > Literal[value=/^(mongodb|postgresql)$/], SwitchCase > Literal.test[value=/^(mongodb|postgresql)$/]",
+    message: 'Ask src/engines (engineOf, ENGINES, ui.js) instead of comparing engine names.',
+  },
+  {
+    selector: "Property > Identifier.key[name=/^(mongodb|postgresql)$/], Property > Literal.key[value=/^(mongodb|postgresql)$/]",
+    message: 'Per-engine tables belong in src/engines.',
+  },
+]
+
 // ESLint's recommended rules catch general JavaScript mistakes; Vue's essentials
 // cover template correctness. Project-specific rules stay focused on dead code, not
 // style — there is still no formatter here, deliberately.
@@ -20,15 +31,62 @@ export default [
     },
   },
   // The layering rule from CLAUDE.md: a ring may import inwards, never outwards.
-  // Only the directions that already hold everywhere are enforced — utils' two reaches
-  // into appApi and workspaces predate this and are left to be dealt with separately.
   {
     files: ['src/utils/**/*.js'],
     ignores: ['**/*.test.js'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [{
-        group: ['**/stores/*', '**/composables/*', '**/components/*', '**/engines/*'],
+        group: ['**/stores/*', '**/composables/*', '**/components/*', '**/engines/*', '**/appApi/*', '**/workspaces/*'],
         message: 'utils/ holds pure functions — no Vue, no I/O, no app state.',
+      }] }],
+    },
+  },
+  // The two Tauri roots sit beside utils/, at the centre: everything may call them, and
+  // they reach nothing that could call them back.
+  {
+    files: ['src/appApi/**/*.js'],
+    ignores: ['**/*.test.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        regex: '^\\.\\./',
+        message: 'appApi/ wraps Tauri commands — it imports its own files and @tauri-apps, nothing app-side.',
+      }] }],
+    },
+  },
+  {
+    files: ['src/engines/*/api/**/*.js'],
+    ignores: ['**/*.test.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/components/*', '**/composables/*', '**/stores/*', '**/workspaces/*', '**/*.vue'],
+        message: 'An engine api/ turns targets into command payloads — no components, no app state.',
+      }] }],
+    },
+  },
+  // The kit every feature builds on. A setting it must honour arrives by injection
+  // (constants/injectionKeys.js); anything else, by props.
+  {
+    files: ['src/components/base/**/*.{js,vue}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+        {
+          group: ['**/stores/*', '**/appApi/*', '**/engines/*', '**/workspaces/*'],
+          message: 'components/base/ is the generic UI kit — app state reaches it through props.',
+        },
+        {
+          regex: '^\\.\\./(?!\\.\\./)',
+          message: 'components/base/ imports other base components only, never a feature area.',
+        },
+      ] }],
+    },
+  },
+  {
+    files: ['src/workspaces/**/*.js'],
+    ignores: ['**/*.test.js', '**/*.fixtures.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/stores/*', '**/composables/*'],
+        message: 'workspaces/ is the machinery the tab store builds on, so it reads no app state.',
       }] }],
     },
   },
@@ -50,6 +108,17 @@ export default [
         group: ['**/components/*'],
         message: 'composables/ is imported by components, not the other way round.',
       }] }],
+    },
+  },
+  // Engine facts come from src/engines (engineOf, ENGINES, ui.js), never from comparing
+  // engine names, so a new engine is a new table entry rather than an edit everywhere.
+  // menuContext mirrors menu.rs's per-engine menus and is the one exception.
+  {
+    files: ['src/**/*.js', 'src/**/*.vue'],
+    ignores: ['src/engines/**', '**/*.test.js', '**/*.fixtures.js', 'src/utils/menuContext.js'],
+    rules: {
+      'no-restricted-syntax': ['error', ...ENGINE_NAME_CHECKS],
+      'vue/no-restricted-syntax': ['error', ...ENGINE_NAME_CHECKS],
     },
   },
   {

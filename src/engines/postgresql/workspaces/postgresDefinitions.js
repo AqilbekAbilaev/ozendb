@@ -1,8 +1,7 @@
 // PostgreSQL workspace definitions. A tab is plain data: what the user built as `state`,
 // a table tab's panel as `ui`, and what it loaded or is running as `runtime`
 // (tableState.js). A session saves the state; runtime starts fresh and loads again.
-import PostgresTableWorkspace from './PostgresTableWorkspace.vue'
-import PostgresQueryWorkspace from './PostgresQueryWorkspace.vue'
+import { defineAsyncComponent } from 'vue'
 import PostgresSearchWorkspace from './PostgresSearchWorkspace.vue'
 import { createResourceRef } from '../../../utils/resourceRef'
 import { createTableState, createTableUi, createTableRuntime, migrateTableState } from './tableState.js'
@@ -15,6 +14,11 @@ import { showToast } from '../../../stores/toast'
 async function rollBackOnClose(run) {
   if (await abandonTransaction(run)) showToast('The closed tab had a transaction open; it was rolled back.')
 }
+
+// Both carry the SQL editor (CodeMirror), so they load when the first tab opens rather
+// than at launch. Module scope keeps each one a single component identity.
+const PostgresTableWorkspace = defineAsyncComponent(() => import('./PostgresTableWorkspace.vue'))
+const PostgresQueryWorkspace = defineAsyncComponent(() => import('./PostgresQueryWorkspace.vue'))
 
 // Tabs are reactive, which structuredClone can't copy; state and ui are JSON-only.
 const copy = (value) => JSON.parse(JSON.stringify(value))
