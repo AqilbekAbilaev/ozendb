@@ -1,5 +1,5 @@
 //! Bulk export of a table or a query's results to a file, and CSV import into a table
-//! (ozendb-6v3). Unlike the grid,
+//! (#128). Unlike the grid,
 //! nothing stops at ROW_RESULT_CAP: rows go to disk as they arrive. CSV is Postgres's
 //! own `COPY … TO STDOUT`, so quoting and value formatting are the server's; JSON
 //! writes each row's `row_to_json` text untouched, keeping column order and types.
@@ -142,7 +142,7 @@ pub(crate) async fn export_impl(
 }
 
 /// Export a table or a query to `path` as CSV or JSON. A read, so it uses `pg_pool`;
-/// `database` targets a database other than the connection's own (ozendb-bj2).
+/// `database` targets a database other than the connection's own (#124).
 #[tauri::command]
 pub async fn export_pg_data(
     ctx: State<'_, AppContext>,

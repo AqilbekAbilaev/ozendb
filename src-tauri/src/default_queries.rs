@@ -32,4 +32,10 @@ impl DefaultQueryStorage {
             map.remove(key);
         })
     }
+
+    // Keys are "connId::db::coll" (see commands/persistence.rs).
+    pub fn remove_connection(&self, conn_id: &str) -> Result<(), AppError> {
+        let prefix = format!("{}::", conn_id);
+        self.inner.update(|map| map.retain(|key, _| !key.starts_with(&prefix)))
+    }
 }

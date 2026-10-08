@@ -1,0 +1,61 @@
+name: Advisories
+
+# Known-vulnerability checks for both lockfiles. Kept out of ci.yml so an advisory
+# published against a dependency we already ship turns this red on its own schedule,
+# rather than failing whichever unrelated PR happens to run next. A PR that changes a
+# lockfile runs it too, so a dependency bump can't bring a known vulnerability in.
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  pull_request:
+    paths:
+      - package-lock.json
+      - src-tauri/Cargo.lock
+      - src-tauri/.cargo/audit.toml
+      - .github/workflows/audit.yml
+  push:
+    branches: [main]
+    paths:
+      - package-lock.json
+      - src-tauri/Cargo.lock
+      - src-tauri/.cargo/audit.toml
+      - .github/workflows/audit.yml
+  workflow_dispatch:
+
+jobs:
+  npm:
+    name: npm audit
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # The whole tree: vite and rollup build the bundle that ships, and the dev server
+      # runs on contributors' machines.
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
+
+  cargo:
+    name: cargo audit
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      # Called directly rather than as `cargo audit`, so rustup doesn't install the
+      # pinned toolchain just to read a lockfile. Ignores, each with its reason, live in
+      # src-tauri/.cargo/audit.toml.
+      - name: Audit Rust dependencies
+        working-directory: ./src-tauri
+        run: cargo-audit audit

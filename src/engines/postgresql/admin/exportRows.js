@@ -1,6 +1,6 @@
 import { fmtBytes } from '../../../utils/format'
 
-// What the export dialog sends and says (ozendb-6v3). A target is a sidebar table node
+// What the export dialog sends and says (#128). A target is a sidebar table node
 // `{ connId, database, schema, table }` or a SQL editor's `{ connId, database, query }`.
 
 export const EXPORT_FORMATS = [

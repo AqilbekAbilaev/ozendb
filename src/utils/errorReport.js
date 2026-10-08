@@ -1,4 +1,3 @@
-import { recordFrontendError } from '../appApi/errorLog'
 import { HELP_REPO } from '../constants/helpLinks'
 
 // Frontend half of error reporting. Two jobs: hand uncaught exceptions to the backend
@@ -28,7 +27,9 @@ export function describeError(err) {
   return stack.startsWith(err.name || 'Error') ? stack : `${headline}\n${stack}`
 }
 
-export function installErrorReporting() {
+// `record` hands one message to the backend log (appApi/errorLog's recordFrontendError);
+// it comes in from main.js so this file stays free of I/O imports.
+export function installErrorReporting(record) {
   let sent = 0
 
   // Never throws and never rejects: a reporter that can fail is a reporter that
@@ -36,7 +37,7 @@ export function installErrorReporting() {
   function report(message) {
     if (sent >= MAX_PER_SESSION || !message) return
     sent++
-    recordFrontendError(message).catch(() => {})
+    record(message).catch(() => {})
   }
 
   window.addEventListener('error', (e) => {

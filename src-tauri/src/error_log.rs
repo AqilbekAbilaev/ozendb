@@ -5,8 +5,8 @@
 // server or credentials — nothing a code change fixes, and reporting it would bury the
 // real defects in noise. `is_defect` below is the allowlist, and it is the whole policy.
 //
-// Fed from `impl Serialize for AppError` (error.rs) — the single funnel every error
-// returned to the frontend passes through. That impl is a plain trait method with no
+// Fed from `impl From<AppError> for InvokeError` (error.rs) — the single funnel every
+// error returned to the frontend passes through. That impl is a plain trait method with no
 // `AppHandle` in scope, so the store lives in a process global here rather than in
 // Tauri's managed state like every other store. `init` is called once during setup.
 //

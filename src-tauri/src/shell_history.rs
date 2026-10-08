@@ -37,4 +37,10 @@ impl ShellHistoryStorage {
             map.remove(key);
         })
     }
+
+    // Keyed by the connection id itself, so this is `clear` under the name the
+    // connection delete calls on every store.
+    pub fn remove_connection(&self, conn_id: &str) -> Result<(), AppError> {
+        self.clear(conn_id)
+    }
 }

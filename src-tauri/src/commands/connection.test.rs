@@ -54,9 +54,9 @@ fn into_config_carries_every_editable_field() {
     assert_eq!(c.name, "prod");
     assert_eq!(c.hosts, vec![HostEntry { host: String::from("db1"), port: 27018 }]);
     assert_eq!(c.username.as_deref(), Some("admin"));
-    assert_eq!(c.tls, true);
+    assert!(c.tls);
     assert_eq!(c.tls_ca_file.as_deref(), Some("/ca.pem"));
-    assert_eq!(c.tls_allow_invalid_certificates, true);
+    assert!(c.tls_allow_invalid_certificates);
 
     // The form's MongoDB half.
     let mongo = c.engine.as_mongo().expect("MongoDB fields build a MongoDB connection");
@@ -66,14 +66,14 @@ fn into_config_carries_every_editable_field() {
     assert_eq!(mongo.auth_mechanism.as_deref(), Some("X509"));
     assert_eq!(mongo.options.get("retryWrites").map(String::as_str), Some("true"));
     assert_eq!(mongo.tls_cert_key_file.as_deref(), Some("/cert.pem"));
-    assert_eq!(c.ssh_enabled, true);
+    assert!(c.ssh_enabled);
     assert_eq!(c.ssh_host.as_deref(), Some("bastion"));
     assert_eq!(c.ssh_port, 2222);
     assert_eq!(c.ssh_user.as_deref(), Some("ubuntu"));
     assert_eq!(c.ssh_auth.as_deref(), Some("key"));
     assert_eq!(c.ssh_key_file.as_deref(), Some("/id_ed25519"));
     assert_eq!(c.tag.as_deref(), Some("red"));
-    assert_eq!(c.read_only, true);
+    assert!(c.read_only);
 }
 
 fn postgres_fields(database: Option<&str>) -> ConnectionFields {
@@ -167,7 +167,7 @@ fn into_config_takes_the_non_editable_fields_from_the_caller() {
     assert_eq!(c.id, "c1");
     assert_eq!(c.folder_id.as_deref(), Some("folder-7"));
     assert_eq!(c.last_accessed.as_deref(), Some("2026-01-01"));
-    assert_eq!(c.open, false);
+    assert!(!c.open);
 }
 
 #[test]
@@ -182,8 +182,8 @@ fn secrets_are_lifted_out_and_never_reach_the_config() {
     // `ConnectionConfig` is what gets written to connections.json, so a secret
     // landing in it would be a credential on disk.
     let json = serde_json::to_string(&f.into_config(String::from("c1"), None, None, None, true).unwrap()).unwrap();
-    assert_eq!(json.contains("pw"), false);
-    assert_eq!(json.contains("phrase"), false);
+    assert!(!json.contains("pw"));
+    assert!(!json.contains("phrase"));
 }
 
 #[test]
@@ -198,25 +198,25 @@ fn a_tested_form_is_dialled_the_way_it_will_be_saved() {
         Some("pw"),
     );
 
-    assert_eq!(uri.contains("replicaSet=rs0"), true, "replica set must reach the URI");
-    assert_eq!(uri.contains("authMechanism=MONGODB-X509"), true, "short names are mapped");
+    assert!(uri.contains("replicaSet=rs0"), "replica set must reach the URI");
+    assert!(uri.contains("authMechanism=MONGODB-X509"), "short names are mapped");
 }
 
 #[test]
 fn a_username_keeps_the_password() {
     let mut c = config();
     c.username = Some(String::from("admin"));
-    assert_eq!(usable_secrets(&c).0, true);
+    assert!(usable_secrets(&c).0);
 }
 
 #[test]
 fn no_username_retires_the_password() {
     // Nothing to authenticate as, so the stored password can never be used again.
-    assert_eq!(usable_secrets(&config()).0, false);
+    assert!(!usable_secrets(&config()).0);
 
     let mut blank = config();
     blank.username = Some(String::new());
-    assert_eq!(usable_secrets(&blank).0, false, "an empty username is no username");
+    assert!(!usable_secrets(&blank).0, "an empty username is no username");
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn auth_mechanism_none_retires_the_password() {
         auth_mechanism: Some(String::from("none")),
         ..Default::default()
     });
-    assert_eq!(usable_secrets(&c).0, false);
+    assert!(!usable_secrets(&c).0);
 }
 
 #[test]
@@ -236,8 +236,8 @@ fn ssh_disabled_retires_both_ssh_secrets() {
     let mut c = config();
     c.ssh_auth = Some(String::from("password"));
     let (_, ssh_password, ssh_passphrase) = usable_secrets(&c);
-    assert_eq!(ssh_password, false);
-    assert_eq!(ssh_passphrase, false);
+    assert!(!ssh_password);
+    assert!(!ssh_passphrase);
 }
 
 #[test]
@@ -245,18 +245,18 @@ fn each_ssh_auth_method_keeps_only_its_own_secret() {
     let mut password_auth = config();
     password_auth.ssh_enabled = true;
     password_auth.ssh_auth = Some(String::from("password"));
-    assert_eq!(usable_secrets(&password_auth).1, true, "password auth keeps ssh-pass");
-    assert_eq!(
-        usable_secrets(&password_auth).2, false,
+    assert!(usable_secrets(&password_auth).1, "password auth keeps ssh-pass");
+    assert!(
+        !usable_secrets(&password_auth).2,
         "switching to password auth retires the key passphrase"
     );
 
     let mut key_auth = config();
     key_auth.ssh_enabled = true;
     key_auth.ssh_auth = Some(String::from("key"));
-    assert_eq!(usable_secrets(&key_auth).2, true, "key auth keeps the passphrase");
-    assert_eq!(
-        usable_secrets(&key_auth).1, false,
+    assert!(usable_secrets(&key_auth).2, "key auth keeps the passphrase");
+    assert!(
+        !usable_secrets(&key_auth).1,
         "switching to key auth retires the ssh password"
     );
 }

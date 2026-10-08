@@ -58,7 +58,7 @@ fn the_json_writer_counts_rows() {
     assert_eq!(array.rows, 2);
 }
 
-// ── import (ozendb-6v3) ──
+// ── import (#128) ──
 
 fn column(name: &str, generated: bool) -> PgImportColumn {
     PgImportColumn { name: name.into(), data_type: "text".into(), nullable: true, has_default: false, generated }

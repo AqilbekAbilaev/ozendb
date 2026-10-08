@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 // `runId` names the run so cancelQuery can stop it while it's in flight; `txId` runs it
 // in a transaction held open by beginTransaction. `database`, when given, targets a
 // database other than the connection's own — opening a second database on the same
-// server (ozendb-bj2).
+// server (#124).
 export function runQuery(connectionId, sql, runId = null, txId = null, database = null) {
   return invoke('run_pg_query', { id: connectionId, sql, runId, txId, database })
 }
@@ -59,7 +59,7 @@ export function countTable({ connectionId, schema, table }, filters = [], joins 
 
 // `where` holds the row's primary-key columns and their original values. `before`
 // holds `set`'s columns' own pre-edit values — the grid already has them loaded —
-// so the backend can record an undo-able history entry (ozendb-h4y) without a
+// so the backend can record an undo-able history entry (#129) without a
 // second read. `txId` runs it in a transaction held open by beginTransaction, the
 // same as runQuery.
 export function updateRow({ connectionId, database, schema, table }, set, before, where, txId = null) {
@@ -86,7 +86,7 @@ export function readTableSelect({ schema, table }, sql) {
   return invoke('read_pg_table_select', { sql, schema, table })
 }
 
-// Row-edit history (ozendb-h4y) — `updateRow`'s pre-images, newest first. Distinct
+// Row-edit history (#129) — `updateRow`'s pre-images, newest first. Distinct
 // from `library.js`'s `listHistory`: that is the SQL *statements* a connection ran,
 // this is what *data* a table's rows actually changed to and from.
 export function listRowHistory({ connectionId, database, schema, table }) {

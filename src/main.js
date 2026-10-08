@@ -7,15 +7,17 @@ import { registerWorkspaceDefinitions } from "./workspaces/registerDefinitions";
 import { initializeTabs } from "./stores/tabs";
 import App from "./App.vue";
 import { installErrorReporting, describeError } from "./utils/errorReport";
+import { recordFrontendError } from "./appApi/errorLog";
 import { prePaintTheme } from "./utils/themeMirror";
 import { installInputUndo } from "./utils/inputUndo";
 import { checkOnLaunch } from "./stores/updater";
-import { loadSettings, restoreSessionEnabled } from "./stores/settings";
+import { loadSettings, restoreSessionEnabled, editorTabWidth } from "./stores/settings";
+import { EDITOR_TAB_WIDTH } from "./constants/injectionKeys";
 import { useSessionPersistence } from "./composables/useSessionPersistence";
 import { refreshFindWorkspacesAfterDocumentSave } from "./utils/documentSaveRefresh";
 import { runQuery } from "./stores/queryRunner";
 import { tabs } from "./stores/tabs";
-import { listen } from "@tauri-apps/api/event";
+import { onDocumentSaved } from "./appApi/events";
 
 prePaintTheme();
 
@@ -24,12 +26,13 @@ prePaintTheme();
 installInputUndo();
 
 // Installed before mount so an exception thrown during setup is still recorded.
-const report = installErrorReporting();
+const report = installErrorReporting(recordFrontendError);
 
 registerWorkspaceDefinitions();
 initializeTabs();
 
 const app = createApp(App);
+app.provide(EDITOR_TAB_WIDTH, editorTabWidth);
 // Vue swallows errors thrown inside components (it logs and carries on), so they never
 // reach window.onerror — this is the only way they're seen.
 app.config.errorHandler = (err) => {
@@ -40,7 +43,7 @@ app.mount("#app");
 
 // The pop-out editor emits this after a save; refresh matching Find tabs explicitly,
 // since that isn't part of the restored-workspace lifecycle.
-listen("document-saved", (e) => refreshFindWorkspacesAfterDocumentSave(tabs.value, e.payload, runQuery));
+onDocumentSaved((saved) => refreshFindWorkspacesAfterDocumentSave(tabs.value, saved, runQuery));
 
 // Settings before the session, so restored workspaces adopt the stored defaults; the
 // update check last, so its dialog can't land on a tab strip that is still restoring.

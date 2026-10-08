@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { guessType, formatCell, columns, getAtPath } from './resultGrid'
+import { guessType, formatCell, columns, getAtPath, drillRows, cellRows, findMatches } from './resultGrid'
 
 describe('guessType', () => {
   it('classifies _id and $oid as id', () => {
@@ -97,5 +97,52 @@ describe('getAtPath', () => {
     expect(getAtPath(doc, ['a', 'nope', 'c'])).toBeUndefined()
     expect(getAtPath(doc, ['a', 'b', 'c', 'deeper'])).toBeUndefined()
     expect(getAtPath(null, ['a'])).toBeUndefined()
+  })
+})
+
+describe('drillRows', () => {
+  const results = [
+    { _id: 1, address: { city: 'Oslo' }, tags: ['a', 'b'] },
+    { _id: 2, address: { city: 'Rome' } },
+  ]
+
+  it('is the results themselves at the top level', () => {
+    expect(drillRows(results, [])).toBe(results)
+  })
+
+  it('gives one row per document at the path, blank where the path is missing', () => {
+    expect(drillRows(results, ['address'])).toEqual([{ city: 'Oslo' }, { city: 'Rome' }])
+    expect(drillRows(results, ['nope'])).toEqual([{}, {}])
+  })
+
+  it('spreads an array into index-keyed columns', () => {
+    expect(drillRows(results, ['tags'])[0]).toEqual({ 0: 'a', 1: 'b' })
+  })
+
+  it('is empty with no results', () => {
+    expect(drillRows(null, [])).toEqual([])
+  })
+})
+
+describe('cellRows', () => {
+  it('formats each cell once, aligned to the column order', () => {
+    const rows = cellRows([{ name: 'ann', nested: { a: 1 } }], ['nested', 'name', 'missing'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].map(c => c.col)).toEqual(['nested', 'name', 'missing'])
+    expect(rows[0][0]).toMatchObject({ drillable: true, typeClass: 't-obj' })
+    expect(rows[0][1]).toMatchObject({ display: 'ann', drillable: false, typeClass: 't-str', valClass: 'cell-str' })
+  })
+})
+
+describe('findMatches', () => {
+  const cols = ['name', 'city']
+  const cells = cellRows([{ name: 'Ann', city: 'Oslo' }, { name: 'Bob', city: 'Annecy' }], cols)
+
+  it('finds every cell whose shown text contains the query, ignoring case', () => {
+    expect(findMatches(cells, cols, 'ann')).toEqual([{ row: 0, col: 'name' }, { row: 1, col: 'city' }])
+  })
+
+  it('finds nothing for an empty query', () => {
+    expect(findMatches(cells, cols, '')).toEqual([])
   })
 })

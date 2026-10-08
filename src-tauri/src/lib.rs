@@ -2,21 +2,26 @@
 // (or `RwLock`) guard across an `.await` can stall or deadlock the runtime. The
 // stores here are deliberately written to lock-clone-drop *before* awaiting; this
 // lint keeps that invariant from silently regressing as new async code is added.
-// `deny` (not `warn`) so a regression fails `cargo clippy` outright instead of
-// being lost among the crate's other (intentional, house-style) lint warnings.
+// `deny` (not `warn`) so a regression fails a local `cargo clippy` too, not only CI's.
 #![deny(clippy::await_holding_lock)]
+// A #[tauri::command]'s parameters are the frontend's payload keys, so bundling them
+// into a struct would change the wire shape to satisfy a style lint.
+#![allow(clippy::too_many_arguments)]
+// sqlx reads rows into tuples written out at the query; an alias would only move them.
+#![allow(clippy::type_complexity)]
 
 mod commands;
 mod collection_history;
 mod default_queries;
 mod error;
 mod error_log;
+mod events;
 mod export_watermarks;
 mod folders;
 mod history;
 mod keybindings;
 #[cfg(test)]
-mod integration_tests;
+mod live_tests;
 mod json_store;
 mod keychain;
 mod known_hosts;
@@ -24,49 +29,9 @@ mod menu;
 mod node_tags;
 mod operations;
 mod persist;
-#[cfg(test)]
-mod pg_command_integration_tests;
-#[cfg(test)]
-mod pg_delete_integration_tests;
-#[cfg(test)]
-mod pg_insert_integration_tests;
-#[cfg(test)]
-mod pg_browse_integration_tests;
-#[cfg(test)]
-mod pg_cancel_integration_tests;
-#[cfg(test)]
-mod pg_explain_integration_tests;
-#[cfg(test)]
-mod pg_statement_integration_tests;
-#[cfg(test)]
-mod pg_transaction_integration_tests;
-#[cfg(test)]
-mod pg_error_integration_tests;
-#[cfg(test)]
-mod pg_ssh_integration_tests;
-#[cfg(test)]
-mod pg_roles_integration_tests;
-#[cfg(test)]
-mod pg_transfer_integration_tests;
-#[cfg(test)]
-mod pg_ddl_integration_tests;
-#[cfg(test)]
-mod pg_activity_integration_tests;
-#[cfg(test)]
-mod pg_routines_integration_tests;
-#[cfg(test)]
-mod pg_serverinfo_integration_tests;
-#[cfg(test)]
-mod pg_schema_integration_tests;
-#[cfg(test)]
-mod pg_stats_integration_tests;
-#[cfg(test)]
-mod pg_integration_tests;
-mod pg_uri;
+mod postgres;
 mod pool;
 mod saved_queries;
-mod pg_query_library;
-mod pg_row_history;
 mod settings;
 mod shell;
 mod ssh;
@@ -79,7 +44,7 @@ mod uri;
 
 use commands::*;
 use collection_history::CollectionHistoryStore;
-use pg_row_history::PgRowHistoryStore;
+use postgres::row_history::PgRowHistoryStore;
 use default_queries::DefaultQueryStorage;
 use export_watermarks::ExportWatermarkStorage;
 use folders::FolderStorage;
@@ -91,7 +56,7 @@ use operations::OperationsRegistry;
 use pool::ConnectionPool;
 use std::sync::Arc;
 use saved_queries::SavedQueryStorage;
-use pg_query_library::PgQueryLibraryStore;
+use postgres::query_library::PgQueryLibraryStore;
 use settings::SettingsStorage;
 use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;
@@ -147,7 +112,7 @@ pub fn run() {
                 app.handle().clone(),
             );
             let storage = Storage::new(data_dir.join("connections.json"));
-            app.manage(AppContext { pool: pool, storage: storage });
+            app.manage(AppContext { pool, storage });
             app.manage(ShellEngine::new());
             app.manage(ShellHistoryStorage::new(
                 data_dir.join("shell_history.json"),
