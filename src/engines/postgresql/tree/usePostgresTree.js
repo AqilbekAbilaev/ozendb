@@ -120,7 +120,7 @@ export function activeTableSchema(tab, connectionId) {
 }
 
 // Whether `selection` (the shared sidebar selection) names this very row — what the
-// tree highlights, and the same selection the native menu gates on (ozendb-sxd).
+// tree highlights, and the same selection the native menu gates on (#145).
 // The engine is part of the comparison because a MongoDB collection sits at the same
 // depth as a PostgreSQL schema.
 export function isSelectedNode(selection, connectionId, kind, schema = null, table = null) {

@@ -50,7 +50,7 @@ pub(super) struct DbContext {
 
 /// Register `__mongo` and install the `db` Proxy preamble on a context.
 pub(super) fn install_db(context: &mut Context, slot: Rc<RefCell<Option<DbInner>>>) {
-    let captures = DbContext { slot: slot };
+    let captures = DbContext { slot };
     let mongo = NativeFunction::from_copy_closure_with_captures(
         |_this, args, captures: &DbContext, context| mongo_call(args, captures, context),
         captures,
@@ -193,107 +193,90 @@ fn throw(message: &str) -> JsError {
     JsNativeError::error().with_message(message.to_string()).into()
 }
 
-/// Shell methods that mutate data or schema. On a read-only connection these are
-/// refused before they reach the driver (see the gate in `run_op`).
-pub(crate) fn is_write_method(method: &str) -> bool {
-    matches!(
-        method,
-        "insertOne" | "insertMany" | "updateOne" | "updateMany" | "replaceOne"
-            | "deleteOne" | "deleteMany" | "drop" | "createIndex" | "dropIndex"
-            | "renameCollection"
-    )
+/// What a read-only connection refuses to run in the shell, described for the error
+/// message, or `None` for a known read. Known reads are listed rather than writes: a
+/// write the server or the shell adds later is then refused until someone decides it
+/// is a read, instead of going through because nobody listed it.
+pub(crate) fn read_only_refusal(method: &str, args: &[serde_json::Value]) -> Option<String> {
+    match method {
+        "find" | "findOne" | "countDocuments" | "estimatedDocumentCount" | "distinct" => None,
+        "aggregate" => match args.first() {
+            Some(pipeline) if pipeline_writes(pipeline) => Some(String::from(WRITING_PIPELINE)),
+            _ => None,
+        },
+        "runCommand" => command_refusal(args.first()),
+        other => Some(format!("`{other}`")),
+    }
 }
 
-/// Whether one decoded shell operation writes, and so must be refused on a
-/// read-only connection. Three ways an op can write:
-///   - the method itself mutates (`insertOne`, `drop`, …);
-///   - `runCommand` carrying a write command (`{ drop: "users" }`);
-///   - an aggregation whose pipeline ends in `$out` / `$merge`.
-pub(crate) fn op_writes(method: &str, args: &[serde_json::Value]) -> bool {
-    if is_write_method(method) {
-        return true;
+const WRITING_PIPELINE: &str = "an aggregation ending in $out or $merge";
+
+fn command_refusal(command: Option<&serde_json::Value>) -> Option<String> {
+    let map = match command.and_then(|value| value.as_object()) {
+        Some(map) => map,
+        None => return Some(String::from("that command")),
+    };
+    // The server takes the first key as the command name, and the document it receives
+    // is built from this same map, so checking the first key checks what will run. If
+    // key order were ever lost (it survives only through a transitive
+    // `serde_json/preserve_order`), the first key would be some argument instead, which
+    // isn't on the list either: refused, never let through.
+    let name = match map.keys().next() {
+        Some(name) => name,
+        None => return Some(String::from("an empty command")),
+    };
+    if !is_read_command(name) {
+        return Some(format!("the `{name}` command"));
     }
-    if method == "aggregate" {
-        return match args.first() {
-            Some(pipeline) => pipeline_writes(pipeline),
-            None => false,
-        };
+    // `{ aggregate: "c", pipeline: [ { $out: … } ] }` writes under a read's name.
+    match map.get("pipeline") {
+        Some(pipeline) if pipeline_writes(pipeline) => Some(String::from(WRITING_PIPELINE)),
+        _ => None,
     }
-    if method == "runCommand" {
-        let command = match args.first().and_then(|value| value.as_object()) {
-            Some(map) => map,
-            None => return false,
-        };
-        if command.keys().any(|key| is_write_command(key)) {
-            return true;
-        }
-        // `{ aggregate: "c", pipeline: [ { $out: … } ] }` writes without naming a
-        // write command.
-        return match command.get("pipeline") {
-            Some(pipeline) => pipeline_writes(pipeline),
-            None => false,
-        };
-    }
-    false
 }
 
-/// MongoDB command names that write, for gating `runCommand` on a read-only
-/// connection.
-///
-/// Checked against *every* top-level key of the command document rather than just
-/// the first. MongoDB's rule is that the command name comes first, and today that
-/// survives the trip through `serde_json::Value` — but only because a transitive
-/// dependency (`schemars`, via tauri) turns on `serde_json/preserve_order`, which
-/// this crate neither requests nor controls. If that flag ever goes away the map
-/// falls back to a `BTreeMap` and `{ insert: …, documents: [...] }` would present
-/// `documents` first, silently letting the write through. Scanning every key costs
-/// nothing and cannot be broken that way.
-pub(crate) fn is_write_command(name: &str) -> bool {
+/// MongoDB commands that only read, for `runCommand` on a read-only connection.
+fn is_read_command(name: &str) -> bool {
     matches!(
         name,
-        "insert"
-            | "update"
-            | "delete"
-            | "findAndModify"
-            | "findandmodify"
-            | "drop"
-            | "dropDatabase"
-            | "dropIndexes"
-            | "create"
-            | "createIndexes"
-            | "renameCollection"
-            | "collMod"
-            | "convertToCapped"
-            | "cloneCollectionAsCapped"
-            | "emptycapped"
-            | "compact"
-            | "createUser"
-            | "updateUser"
-            | "dropUser"
-            | "dropAllUsersFromDatabase"
-            | "grantRolesToUser"
-            | "revokeRolesFromUser"
-            | "createRole"
-            | "updateRole"
-            | "dropRole"
-            | "dropAllRolesFromDatabase"
-            | "grantPrivilegesToRole"
-            | "revokePrivilegesFromRole"
-            | "grantRolesToRole"
-            | "revokeRolesFromRole"
-            | "applyOps"
-            | "setParameter"
-            | "shutdown"
-            | "killOp"
-            | "fsync"
-            | "mapReduce"
-            | "mapreduce"
+        "find"
+            | "aggregate"
+            | "count"
+            | "distinct"
+            | "explain"
+            | "listCollections"
+            | "listIndexes"
+            | "listDatabases"
+            | "collStats"
+            | "collstats"
+            | "dbStats"
+            | "dbstats"
+            | "dataSize"
+            | "serverStatus"
+            | "buildInfo"
+            | "buildinfo"
+            | "hostInfo"
+            | "ping"
+            | "hello"
+            | "isMaster"
+            | "ismaster"
+            | "connectionStatus"
+            | "listCommands"
+            | "getParameter"
+            | "getCmdLineOpts"
+            | "getLog"
+            | "usersInfo"
+            | "rolesInfo"
+            | "currentOp"
+            | "top"
+            | "replSetGetStatus"
+            | "replSetGetConfig"
     )
 }
 
-/// True when an aggregation pipeline ends in a stage that writes. `$out` replaces a
+/// True when an aggregation pipeline has a stage that writes. `$out` replaces a
 /// collection and `$merge` upserts into one, so an aggregate is only a read as long
-/// as neither appears — which is why `aggregate` isn't in `is_write_method`.
+/// as neither appears.
 pub(crate) fn pipeline_writes(pipeline: &serde_json::Value) -> bool {
     match pipeline.as_array() {
         Some(stages) => stages.iter().any(|stage| match stage.as_object() {
@@ -303,9 +286,6 @@ pub(crate) fn pipeline_writes(pipeline: &serde_json::Value) -> bool {
         None => false,
     }
 }
-
-/// Dispatch one decoded `{ collection, method, args }` operation to the driver,
-/// blocking on the async call via the provided runtime handle.
 
 #[cfg(test)]
 use driver::{arg_doc, to_document};

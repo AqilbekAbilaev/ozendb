@@ -21,10 +21,10 @@ const files = execFileSync(
 
 // Tests are exempt. A spec grows with the number of cases it covers, and a limit that
 // counts them pushes toward fewer cases — the opposite of what this repo wants. Covers
-// the `.test.js`/`.test.rs` sidecars, the `mod tests` files pulled in by path, and the
-// fixture modules that exist only to feed them.
+// the `.test.js`/`.test.rs` sidecars, the `mod tests` files pulled in by path, the
+// live-server suites under `live_tests/`, and the fixture modules that exist only to feed them.
 function isTest(file) {
-  return /\.test\.|\.fixtures\./.test(file) || /(^|\/)(tests|integration_tests)\.rs$/.test(file)
+  return /\.test\.|\.fixtures\./.test(file) || /(^|\/)tests\.rs$/.test(file) || file.includes('/live_tests/')
 }
 
 const problems = []

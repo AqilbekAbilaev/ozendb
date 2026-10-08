@@ -356,7 +356,7 @@ pub struct Storage {
 
 impl Storage {
     pub fn new(path: PathBuf) -> Self {
-        Self { path: path, cache: Mutex::new(None) }
+        Self { path, cache: Mutex::new(None) }
     }
 
     // The poison-tolerant cache guard. A panic in another thread while the lock is

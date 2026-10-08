@@ -1,0 +1,8 @@
+# Read by `cargo audit` (see .github/workflows/audit.yml). Every ignore says why.
+[advisories]
+ignore = [
+    # rsa, through russh, for RSA SSH keys: the Marvin timing side channel. No fixed
+    # release exists, and dropping russh's `rsa` feature would lock out every RSA key.
+    # Revisit when rsa ships a fix.
+    "RUSTSEC-2023-0071",
+]

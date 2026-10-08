@@ -7,17 +7,13 @@
 // active (which at launch is always the context-less Quickstart tab).
 //
 // Identity is a ResourceRef, never a set of tab fields. The tree hands its selection's
-// ref straight over (see useConnectionTree); a tab's comes from its declared kind. So
-// depth is counted once — segments — rather than re-derived per field per level, and a
-// tab's scope is what it says it is rather than whichever fields happen to be set.
-// That is what keeps Current Operations, which carries dbName/collName as *filters*,
-// from enabling the Database menu.
-//
-// A workspace kind missing from legacyResourceRef's TAB_SCOPES resolves to no
-// resource and gates everything off. That fails closed — a menu action can never fire
-// against a target it could not identify — but it does mean a new workspace kind must
-// be registered there or its menus stay dark.
-import { resourceFromLegacyTab, legacyTargetFromResource } from './legacyResourceRef'
+// ref straight over (see useConnectionTree); a tab's is the `target` its definition
+// gave it. So depth is counted once — segments — rather than re-derived per field per
+// level, and a tab's scope is what it says it is rather than whichever fields happen to
+// be set. That is what keeps Current Operations, which carries dbName/collName as
+// *filters*, from enabling the Database menu. A tab without a target (Quickstart)
+// names no resource and gates everything off.
+import { legacyTargetFromResource } from './legacyResourceRef'
 import { sameResource } from './resourceRef'
 
 // How many segments each gated level needs.
@@ -46,7 +42,7 @@ function mongoResource(source, ref) {
 // The engines the native menu has items of its own for (menu.rs's MenuEngine).
 const MENU_ENGINES = ['mongodb', 'postgresql']
 
-// Which engine's items the menu shows (ozendb-izk); 'none' hides both. A sidebar
+// Which engine's items the menu shows (#152); 'none' hides both. A sidebar
 // selection wins, as it does in resolveMenuTarget, but only when it enables something:
 // a PostgreSQL row above a schema enables nothing, so the tab decides instead.
 function menuEngine(tab, selDepth, pgSelDepth) {
@@ -75,7 +71,7 @@ function depth(ref) {
 //   openTabs       every open workspace, for the lock of one showing the selected resource
 export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false, openTabs = []) {
   const tab = activeTab || null
-  const tabDepth = depth(mongoResource(tab, resourceFromLegacyTab(tab)))
+  const tabDepth = depth(mongoResource(tab, tab?.target ?? null))
   const selDepth = depth(mongoResource(treeSelection, treeSelection?.resource))
   const reaches = (level) => tabDepth >= DEPTH[level] || selDepth >= DEPTH[level]
 
@@ -89,7 +85,7 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount
   const hasField = hasDocument && !!(tab && tab.runtime.selectedField)
 
-  // PostgreSQL (ozendb-sxd), the same union as Connection/Database/Collection above:
+  // PostgreSQL (#145), the same union as Connection/Database/Collection above:
   // a query tab names a schema, a table tab names a schema and a table, and the
   // sidebar contributes whichever level its clicked row named.
   const pgSelDepth = depth(pgResource(treeSelection, treeSelection?.resource))
@@ -136,7 +132,7 @@ export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null
   const sel = treeSelection || null
   const tab = activeTab || null
   const selRef = mongoResource(sel, sel?.resource ?? null)
-  const tabRef = mongoResource(tab, resourceFromLegacyTab(tab))
+  const tabRef = mongoResource(tab, tab?.target ?? null)
   const needed = DEPTH[requiredLevel] ?? DEPTH.connection
 
   if (depth(selRef) >= needed) return nodeFrom(sel, selRef)
@@ -146,7 +142,7 @@ export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null
   return nodeFrom(sel, selRef) || nodeFrom(tab, tabRef)
 }
 
-// The PostgreSQL sibling of resolveMenuTarget (ozendb-sxd), with the same precedence:
+// The PostgreSQL sibling of resolveMenuTarget (#145), with the same precedence:
 // the sidebar selection wins when it is deep enough for the action, the active tab is
 // the fallback, and `null` means neither can name a PostgreSQL target.
 // `requiredLevel` is 'schema' | 'table' | null.

@@ -294,13 +294,10 @@ fn collect_import(
     batch_size: usize,
 ) -> Result<(usize, Vec<Vec<bson::Document>>), AppError> {
     let mut batches: Vec<Vec<bson::Document>> = Vec::new();
-    let total = match stream_documents(input, format, CsvOptions::default(), batch_size, |batch| {
+    let total = stream_documents(input, format, CsvOptions::default(), batch_size, |batch| {
         batches.push(batch);
         Ok(())
-    }) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    })?;
     Ok((total, batches))
 }
 
@@ -394,13 +391,10 @@ fn collect_import_csv(
     options: CsvOptions,
 ) -> Result<(usize, Vec<Vec<bson::Document>>), AppError> {
     let mut batches: Vec<Vec<bson::Document>> = Vec::new();
-    let total = match stream_documents(input, "csv", options, IMPORT_BATCH_SIZE, |batch| {
+    let total = stream_documents(input, "csv", options, IMPORT_BATCH_SIZE, |batch| {
         batches.push(batch);
         Ok(())
-    }) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    })?;
     Ok((total, batches))
 }
 
@@ -507,4 +501,44 @@ fn import_csv_flushes_multiple_batches_across_the_boundary() {
     assert_eq!(batches.len(), 2);
     assert_eq!(batches[0].len(), IMPORT_BATCH_SIZE);
     assert_eq!(batches[1].len(), 1);
+}
+
+// A command declared as a plain `fn` runs on the main thread, which also paints the
+// window, so its file or keychain I/O freezes the UI. Every command is `async` or
+// `#[tauri::command(async)]`, except these, which touch the native menu or create a
+// window and are left where Tauri runs them by default.
+const MAIN_THREAD_COMMANDS: &[&str] = &["open_document_window", "set_menu_context"];
+
+#[test]
+fn no_command_runs_on_the_main_thread_unless_listed() {
+    fn rust_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                rust_files(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                out.push(path);
+            }
+        }
+    }
+    let mut files = Vec::new();
+    rust_files(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
+
+    let mut on_main_thread = Vec::new();
+    for file in files {
+        let source = std::fs::read_to_string(&file).unwrap();
+        let mut lines = source.lines().map(str::trim);
+        while let Some(line) = lines.next() {
+            if line != "#[tauri::command]" {
+                continue;
+            }
+            let signature = lines.find(|l| l.contains("fn ")).unwrap_or("");
+            if let Some(rest) = signature.strip_prefix("pub fn ") {
+                let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                on_main_thread.push(name);
+            }
+        }
+    }
+    on_main_thread.sort();
+    assert_eq!(on_main_thread, MAIN_THREAD_COMMANDS);
 }

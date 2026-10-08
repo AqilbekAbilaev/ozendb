@@ -33,7 +33,7 @@ pub(crate) async fn list_databases_impl(pool: &sqlx::PgPool) -> Result<Vec<PgDat
 /// Postgres sibling of `list_databases`' MongoDB server-level listing. A
 /// connection is bound to one database at a time (Postgres has no per-query
 /// `USE`); the sidebar lists the others from here and opens a SQL tab against
-/// one via `run_pg_query`'s `database` override (ozendb-bj2), which reuses this
+/// one via `run_pg_query`'s `database` override (#124), which reuses this
 /// connection's pool infrastructure (tunnel, credentials, TLS) per database.
 #[tauri::command]
 pub async fn list_pg_databases(
@@ -320,5 +320,5 @@ pub async fn list_pg_foreign_keys(
 mod tests;
 
 // Live-Postgres coverage of `list_databases_impl`/`list_schemas_impl`/
-// `list_tables_impl`/`list_columns_impl` lives in pg_integration_tests.rs
+// `list_tables_impl`/`list_columns_impl` lives in live_tests/pg.rs
 // alongside this crate's other real-server tests, not here.
