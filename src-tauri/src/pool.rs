@@ -53,9 +53,9 @@ impl ConnectionPool {
             pg_pools: Mutex::new(HashMap::new()),
             tunnels: Mutex::new(HashMap::new()),
             setup_locks: Mutex::new(HashMap::new()),
-            known_hosts: known_hosts,
-            prompts: prompts,
-            app: app,
+            known_hosts,
+            prompts,
+            app,
         }
     }
 

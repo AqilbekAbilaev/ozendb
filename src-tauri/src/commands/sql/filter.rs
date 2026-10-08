@@ -70,7 +70,7 @@ fn can_merge(parts: &[J]) -> bool {
         match part {
             J::Obj(entries) if entries.len() == 1 => {
                 let key = entries[0].0.as_str();
-                if keys.iter().any(|existing| *existing == key) {
+                if keys.contains(&key) {
                     return false;
                 }
                 keys.push(key);

@@ -207,7 +207,7 @@ pub async fn find_documents(
         Ok(val) => val,
         Err(e) => return Err(e),
     };
-    Ok(FindResult { documents: documents, elapsed_ms: started.elapsed().as_millis() as u64 })
+    Ok(FindResult { documents, elapsed_ms: started.elapsed().as_millis() as u64 })
 }
 
 /// Count the documents matching `filter` (the same filter shape `find_documents`
@@ -384,8 +384,8 @@ pub async fn run_aggregate(
         documents.push(serde_json::Value::from(bson::Bson::Document(doc)));
     }
     Ok(AggregateResult {
-        documents: documents,
-        truncated: truncated,
+        documents,
+        truncated,
         elapsed_ms: started.elapsed().as_millis() as u64,
     })
 }

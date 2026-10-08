@@ -202,22 +202,13 @@ pub fn with_timeout(uri: &str) -> String {
 /// Extracts "host:port" from a standard `mongodb://` URI for the TCP probe.
 /// Returns `None` for `mongodb+srv://` or URIs we cannot parse safely.
 pub fn extract_host_port(uri: &str) -> Option<String> {
-    let rest = match uri.strip_prefix("mongodb://") {
-        Some(val) => val,
-        None => return None,
-    };
+    let rest = uri.strip_prefix("mongodb://")?;
     // Drop credentials (user:pass@host → host)
     let rest = rest.find('@').map_or(rest, |i| &rest[i + 1..]);
     // Take the host section before any '/' or '?'
-    let hosts = match rest.split(|c: char| c == '/' || c == '?').next() {
-        Some(val) => val,
-        None => return None,
-    };
+    let hosts = rest.split(['/', '?']).next()?;
     // A multi-host seed list — probe just the first host.
-    let host_port = match hosts.split(',').next() {
-        Some(val) => val,
-        None => return None,
-    };
+    let host_port = hosts.split(',').next()?;
     if host_port.is_empty() {
         return None;
     }

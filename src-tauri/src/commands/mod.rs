@@ -91,10 +91,7 @@ pub(crate) async fn tracked<F, T>(
 where
     F: std::future::Future<Output = Result<T, AppError>>,
 {
-    let id = match meta {
-        Some(op_meta) => Some(registry.start(op_meta)),
-        None => None,
-    };
+    let id = meta.map(|op_meta| registry.start(op_meta));
     let result = fut.await;
     if let Some(op_id) = id {
         match &result {

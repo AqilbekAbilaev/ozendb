@@ -50,7 +50,7 @@ pub(super) struct DbContext {
 
 /// Register `__mongo` and install the `db` Proxy preamble on a context.
 pub(super) fn install_db(context: &mut Context, slot: Rc<RefCell<Option<DbInner>>>) {
-    let captures = DbContext { slot: slot };
+    let captures = DbContext { slot };
     let mongo = NativeFunction::from_copy_closure_with_captures(
         |_this, args, captures: &DbContext, context| mongo_call(args, captures, context),
         captures,

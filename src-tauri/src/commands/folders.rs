@@ -16,7 +16,7 @@ pub fn create_folder(
 ) -> Result<Folder, AppError> {
     let folder = Folder {
         id: Uuid::new_v4().to_string(),
-        name: name,
+        name,
         parent_id: None,
         created_at: crate::time::now_ms(),
     };

@@ -86,7 +86,7 @@ pub fn clear_shell_history(
 pub fn read_shell_script(path: String) -> Result<String, AppError> {
     match std::fs::read_to_string(&path) {
         Ok(val) => Ok(val),
-        Err(e) => return Err(AppError::Io(e)),
+        Err(e) => Err(AppError::Io(e)),
     }
 }
 
@@ -96,6 +96,6 @@ pub fn read_shell_script(path: String) -> Result<String, AppError> {
 pub fn write_shell_script(path: String, contents: String) -> Result<(), AppError> {
     match std::fs::write(&path, contents) {
         Ok(_) => Ok(()),
-        Err(e) => return Err(AppError::Io(e)),
+        Err(e) => Err(AppError::Io(e)),
     }
 }

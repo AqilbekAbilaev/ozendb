@@ -173,11 +173,8 @@ pub fn apply_field_map(doc: &bson::Document, mapping: &[FieldMap]) -> bson::Docu
         if map.target.trim().is_empty() {
             continue;
         }
-        match doc.get(&map.source) {
-            Some(value) => {
-                out.insert(map.target.clone(), coerce(value.clone(), &map.kind));
-            }
-            None => {}
+        if let Some(value) = doc.get(&map.source) {
+            out.insert(map.target.clone(), coerce(value.clone(), &map.kind));
         }
     }
     out
@@ -315,8 +312,8 @@ pub async fn import_preview(
         .map(|doc| serde_json::Value::from(bson::Bson::Document(doc)))
         .collect();
     Ok(ImportPreview {
-        columns: columns,
-        rows: rows,
+        columns,
+        rows,
     })
 }
 

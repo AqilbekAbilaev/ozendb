@@ -83,7 +83,7 @@ pub fn update_settings(
     };
     match settings.save(&new_settings) {
         Ok(_) => Ok(new_settings),
-        Err(e) => return Err(e),
+        Err(e) => Err(e),
     }
 }
 
@@ -105,13 +105,13 @@ pub fn update_keybindings(
 ) -> Result<HashMap<String, String>, AppError> {
     let mut cleaned: HashMap<String, String> = HashMap::new();
     for (id, accel) in bindings.into_iter() {
-        if accel.trim().is_empty() == false {
+        if !accel.trim().is_empty() {
             cleaned.insert(id, accel);
         }
     }
     match keybindings.save(&cleaned) {
         Ok(_) => Ok(cleaned),
-        Err(e) => return Err(e),
+        Err(e) => Err(e),
     }
 }
 
@@ -142,18 +142,15 @@ pub fn set_default_query(
 ) -> Result<(), AppError> {
     let key = format!("{}::{}::{}", connection_id, database, collection);
     let entry = DefaultQuery {
-        mode:       mode,
-        filter:     filter,
-        sort:       sort,
-        projection: projection,
-        skip:       skip,
-        limit:      limit,
-        pipeline:   pipeline,
+        mode,
+        filter,
+        sort,
+        projection,
+        skip,
+        limit,
+        pipeline,
     };
-    match dq.set(&key, entry) {
-        Ok(val) => Ok(val),
-        Err(e)  => Err(e),
-    }
+    dq.set(&key, entry)
 }
 
 #[tauri::command(async)]
@@ -164,10 +161,7 @@ pub fn clear_default_query(
     collection:    String,
 ) -> Result<(), AppError> {
     let key = format!("{}::{}::{}", connection_id, database, collection);
-    match dq.clear(&key) {
-        Ok(val) => Ok(val),
-        Err(e)  => Err(e),
-    }
+    dq.clear(&key)
 }
 
 #[tauri::command(async)]
@@ -180,10 +174,7 @@ pub fn set_open_tabs(
     ts:      State<'_, TabStorage>,
     session: serde_json::Value,
 ) -> Result<(), AppError> {
-    match ts.save(&session) {
-        Ok(val) => Ok(val),
-        Err(e)  => Err(e),
-    }
+    ts.save(&session)
 }
 
 /// All persisted database/collection colour tags, as a map of node key
@@ -203,14 +194,11 @@ pub fn set_node_tag(
     key:   String,
     color: String,
 ) -> Result<(), AppError> {
-    let result = if color == "none" {
+    
+    if color == "none" {
         tags.clear(&key)
     } else {
         tags.set(&key, &color)
-    };
-    match result {
-        Ok(val) => Ok(val),
-        Err(e)  => Err(e),
     }
 }
 
@@ -223,10 +211,7 @@ pub fn clear_node_tags_under(
     tags:   State<'_, NodeTagStorage>,
     prefix: String,
 ) -> Result<(), AppError> {
-    match tags.remove_under(&prefix) {
-        Ok(val) => Ok(val),
-        Err(e)  => Err(e),
-    }
+    tags.remove_under(&prefix)
 }
 
 #[tauri::command(async)]
@@ -249,14 +234,14 @@ pub fn save_query(
     let id = Uuid::new_v4().to_string();
     let entry = SavedQueryEntry {
         id:         id.clone(),
-        name:       name,
-        mode:       mode,
-        filter:     filter,
-        sort:       sort,
-        projection: projection,
-        skip:       skip,
-        limit:      limit,
-        pipeline:   pipeline,
+        name,
+        mode,
+        filter,
+        sort,
+        projection,
+        skip,
+        limit,
+        pipeline,
         saved_at:   now_ms(),
     };
     match sq.insert(entry) {
@@ -267,10 +252,7 @@ pub fn save_query(
 
 #[tauri::command(async)]
 pub fn delete_saved_query(sq: State<'_, SavedQueryStorage>, id: String) -> Result<(), AppError> {
-    match sq.delete(&id) {
-        Ok(val) => Ok(val),
-        Err(e)  => Err(e),
-    }
+    sq.delete(&id)
 }
 
 #[tauri::command(async)]
@@ -301,19 +283,16 @@ pub fn push_query_history(
     let key = format!("{}::{}::{}", connection_id, database, collection);
     let entry = QueryHistoryEntry {
         id: Uuid::new_v4().to_string(),
-        mode: mode,
-        filter: filter,
-        sort: sort,
-        projection: projection,
-        skip: skip,
-        limit: limit,
-        pipeline: pipeline,
+        mode,
+        filter,
+        sort,
+        projection,
+        skip,
+        limit,
+        pipeline,
         ran_at: now_ms(),
     };
-    match history.push(&key, entry) {
-        Ok(val) => Ok(val),
-        Err(e) => Err(e),
-    }
+    history.push(&key, entry)
 }
 
 #[tauri::command(async)]
@@ -324,8 +303,5 @@ pub fn clear_query_history(
     collection: String,
 ) -> Result<(), AppError> {
     let key = format!("{}::{}::{}", connection_id, database, collection);
-    match history.clear(&key) {
-        Ok(val) => Ok(val),
-        Err(e) => Err(e),
-    }
+    history.clear(&key)
 }

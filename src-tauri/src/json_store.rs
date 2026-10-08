@@ -31,7 +31,7 @@ where
     T: Serialize + DeserializeOwned + Default,
 {
     pub fn new(path: PathBuf) -> Self {
-        Self { path: path, lock: Mutex::new(()), marker: PhantomData }
+        Self { path, lock: Mutex::new(()), marker: PhantomData }
     }
 
     // Snapshot read — no lock. `atomic_write` swaps the whole file with a rename,
@@ -104,11 +104,11 @@ where
 macro_rules! json_store_wrapper {
     ($name:ident, $type:ty) => {
         pub struct $name {
-            pub(crate) inner: crate::json_store::JsonStore<$type>,
+            pub(crate) inner: $crate::json_store::JsonStore<$type>,
         }
         impl $name {
             pub fn new(path: std::path::PathBuf) -> Self {
-                Self { inner: crate::json_store::JsonStore::new(path) }
+                Self { inner: $crate::json_store::JsonStore::new(path) }
             }
             pub fn load(&self) -> $type {
                 self.inner.load()

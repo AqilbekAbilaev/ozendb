@@ -12,7 +12,7 @@ use super::collect_values;
 // rather than sending a bogus command.
 pub(crate) fn profile_command(level: i32, slowms: i32) -> Result<bson::Document, String> {
     match level {
-        0 | 1 | 2 => Ok(bson::doc! { "profile": level, "slowms": slowms }),
+        0..=2 => Ok(bson::doc! { "profile": level, "slowms": slowms }),
         other => Err(format!("Invalid profiling level: {other} (expected 0, 1, or 2)")),
     }
 }

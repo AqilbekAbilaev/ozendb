@@ -294,13 +294,10 @@ fn collect_import(
     batch_size: usize,
 ) -> Result<(usize, Vec<Vec<bson::Document>>), AppError> {
     let mut batches: Vec<Vec<bson::Document>> = Vec::new();
-    let total = match stream_documents(input, format, CsvOptions::default(), batch_size, |batch| {
+    let total = stream_documents(input, format, CsvOptions::default(), batch_size, |batch| {
         batches.push(batch);
         Ok(())
-    }) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    })?;
     Ok((total, batches))
 }
 
@@ -394,13 +391,10 @@ fn collect_import_csv(
     options: CsvOptions,
 ) -> Result<(usize, Vec<Vec<bson::Document>>), AppError> {
     let mut batches: Vec<Vec<bson::Document>> = Vec::new();
-    let total = match stream_documents(input, "csv", options, IMPORT_BATCH_SIZE, |batch| {
+    let total = stream_documents(input, "csv", options, IMPORT_BATCH_SIZE, |batch| {
         batches.push(batch);
         Ok(())
-    }) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    })?;
     Ok((total, batches))
 }
 

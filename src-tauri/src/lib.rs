@@ -147,7 +147,7 @@ pub fn run() {
                 app.handle().clone(),
             );
             let storage = Storage::new(data_dir.join("connections.json"));
-            app.manage(AppContext { pool: pool, storage: storage });
+            app.manage(AppContext { pool, storage });
             app.manage(ShellEngine::new());
             app.manage(ShellHistoryStorage::new(
                 data_dir.join("shell_history.json"),
