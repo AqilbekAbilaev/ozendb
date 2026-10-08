@@ -5,7 +5,7 @@ fn storage_with(read_only: bool) -> (Storage, tempfile::TempDir) {
     let dir = tempdir().unwrap();
     let storage = Storage::new(dir.path().join("connections.json"));
     storage
-        .add(ConnectionConfig { id: "c1".into(), name: "Prod".into(), read_only: read_only, ..Default::default() })
+        .add(ConnectionConfig { id: "c1".into(), name: "Prod".into(), read_only, ..Default::default() })
         .unwrap();
     (storage, dir)
 }
