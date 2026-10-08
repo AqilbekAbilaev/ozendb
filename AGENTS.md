@@ -123,6 +123,22 @@ an empty pane — closing the last tab seeds a Quickstart — lives in `tabs.js`
 it guards. Note: module-scope refs do not survive
 Vite HMR cleanly — restart the dev server before blaming the code for stale tab state.
 
+### Engines
+
+What differs between engines is asked of `src/engines/`, never decided by comparing engine
+names — **enforced by `no-restricted-syntax` in `eslint.config.js`**, which also rejects
+ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
+
+- **`src/engines/index.js`** — the component-free engine table (`ENGINES`, `engineOf`):
+  default port, connection-field builder, the sidebar's top-level loader, the stats card,
+  whether a connection names its database. Stores and composables read it.
+- **`src/engines/ui.js`** — the component half: connection editor sections, sidebar rows.
+- **`src/engines/contextActions.js`** — right-click menus and actions an engine handles itself.
+
+A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
+screens still sit in the shared `components/` folders and its sidebar rows in
+`ConnectionTree.vue`, and `utils/menuContext.js` mirrors `menu.rs`'s per-engine menus.
+
 ### Resource identity
 
 A connection/database/collection is named by a **ResourceRef** — `{ connectionId,

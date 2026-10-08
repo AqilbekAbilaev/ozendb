@@ -1,6 +1,5 @@
-// What each engine's connection editor shows: its tabs, the section for each of them,
-// and the few strings and switches that differ. NewConnection.vue looks everything up
-// here rather than branching on the engine.
+// The component half of the engine table (engines/index.js), for components only:
+// what each engine's connection editor shows, and its own sidebar rows.
 import MongoServerFields from './mongodb/connection/MongoServerFields.vue'
 import MongoAuthFields from './mongodb/connection/MongoAuthFields.vue'
 import MongoSslFields from './mongodb/connection/MongoSslFields.vue'
@@ -11,6 +10,7 @@ import PostgresSslFields from './postgresql/connection/PostgresSslFields.vue'
 import { parsePostgresUri } from './postgresql/connection/parseUri.js'
 import { parseConnectionUri } from '../utils/connectionUri.js'
 import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
+import PostgresTreeNodes from './postgresql/tree/PostgresTreeNodes.vue'
 
 // Tabs whose body is the same for every engine, so NewConnection.vue renders them itself.
 export const SHARED_TABS = ['ssh', 'general']
@@ -21,6 +21,8 @@ const SSH     = ['ssh', 'SSH Tunnel']
 const SSL     = ['ssl', 'SSL']
 const GENERAL = ['general', 'General']
 
+// Each connection editor's tabs, the section for each of them, and the few strings and
+// switches that differ. NewConnection.vue looks everything up here.
 export const CONNECTION_EDITORS = Object.freeze({
   mongodb: {
     tabs: [SERVER, AUTH, SSH, SSL, GENERAL, ['advanced', 'Advanced']],
@@ -48,4 +50,10 @@ export const CONNECTION_EDITORS = Object.freeze({
     uriRefusal: 'That doesn’t look like a PostgreSQL connection string this editor can hold (expected postgresql:// with one host).',
     sshHint: '',
   },
+})
+
+// An engine's rows under an expanded connection in the sidebar. MongoDB has none here yet:
+// its rows are still built into ConnectionTree.vue, which falls back to them.
+export const TREE_NODES = Object.freeze({
+  postgresql: PostgresTreeNodes,
 })

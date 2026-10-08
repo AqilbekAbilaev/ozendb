@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CONNECTION_EDITORS, SHARED_TABS } from './connectionEditor.js'
+import { CONNECTION_EDITORS, SHARED_TABS } from './ui.js'
 import { ENGINE_OPTIONS } from '../data/connectionOptions.js'
 
 describe('CONNECTION_EDITORS', () => {
