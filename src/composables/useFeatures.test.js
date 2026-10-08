@@ -304,6 +304,20 @@ describe('handleTool falling back to the active workspace', () => {
     expect(openShellTab).not.toHaveBeenCalled()
     expect(showToast).toHaveBeenCalled()
   })
+
+  // A PostgreSQL SQL tab's target is database-deep, the same depth as a MongoDB
+  // database: only its engine says it names nothing a MongoDB tool can act on.
+  it('does not treat a PostgreSQL tab as a MongoDB database', () => {
+    tabs.value = [{
+      id: 'p1', kind: 'pgQuery', type: 'postgresql.query', engine: 'postgresql',
+      connectionId: 'pg1', connectionName: 'Payments', database: 'app',
+      target: createResourceRef('pg1', [{ kind: 'database', name: 'app' }]),
+    }]
+    activeTabId.value = 'p1'
+    makeFeatures().handleTool('shell')
+    expect(openShellTab).not.toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalled()
+  })
 })
 
 // The dispatcher is keyed on each menu item's own display label, so a renamed or

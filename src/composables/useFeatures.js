@@ -15,7 +15,7 @@ import { MODALS } from '../constants/modalRegistry'
 import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
-import { legacyTargetFromResource } from '../utils/legacyResourceRef'
+import { resolveMenuTarget } from '../utils/menuContext'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
@@ -97,13 +97,6 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   function modalFeature(id) {
     const level = MODALS[id].level
     return { requires: level, run: (node) => openModal(id, modalTarget(node, level)) }
-  }
-
-  // A workspace's identity in the long alias spelling, read from its canonical target,
-  // so a Current Operations tab's dbName/collName filters are never mistaken for scope.
-  function workspaceTarget(workspace) {
-    if (!workspace) return null
-    return legacyTargetFromResource(workspace.target, workspace.connectionName ?? null)
   }
 
   // Normalize a tab (connectionId/collectionName keys) into a registry node.
@@ -336,13 +329,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
       return
     }
 
-    // The remaining actions operate on a specific node. From the toolbar that's the
-    // active workspace; from the native menu the caller passes an already-resolved
-    // target. Only the former needs normalising — and it must be, because a tool
-    // workspace spells its fields connId/collName, so reading the long names straight
-    // off it yields undefined and the action degrades into a "select something first"
-    // toast while a perfectly good collection is on screen.
-    const tab = target || workspaceTarget(activeTab.value)
+    // The remaining actions operate on a specific node. From the native menu the caller
+    // passes an already-resolved target; from the toolbar it is the active workspace,
+    // resolved the way the menu resolves it — through its target, and only when that
+    // names a MongoDB resource.
+    const tab = target || resolveMenuTarget(activeTab.value, null)
 
     if (name === 'shell') {
       if (tab && tab.connectionId && tab.dbName) {
