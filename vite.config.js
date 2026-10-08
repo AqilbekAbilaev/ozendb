@@ -11,17 +11,20 @@ export default defineConfig(async () => ({
   clearScreen: false,
   resolve: {
     alias: {
-      // mongodb-query-parser resolves (via its "import" export condition) to an
-      // ESM wrapper (dist/.esm-wrapper.mjs) that re-exports the CJS build with
-      // `import mod from "./index.js"; export const parseFilter = mod.parseFilter`.
-      // Under Rollup's default CJS-default interop, `mod` becomes the module's
-      // `default` export, so `mod.parseFilter` (and every other named re-export)
-      // is undefined — freezing parseFilter as undefined in the PRODUCTION bundle
-      // only. The dev server pre-bundles the dep with esbuild and is unaffected,
-      // which is why this passed in `tauri dev` but threw "… is not a function"
-      // in the packaged app. Aliasing to the CJS entry lets Rollup bundle it
-      // correctly. See the ESM-wrapper re-export shape in the package's dist/.
-      "mongodb-query-parser": require.resolve("mongodb-query-parser"),
+      // mongodb-query-parser (the package this replaced) resolved, via its "import"
+      // export condition, to an ESM wrapper (dist/.esm-wrapper.mjs) that re-exports the
+      // CJS build with `import mod from "./index.js"; export const parseFilter =
+      // mod.parseFilter`. Under Rollup's default CJS-default interop, `mod` became the
+      // module's `default` export, so `mod.parseFilter` (and every other named
+      // re-export) was undefined — freezing parseFilter as undefined in the PRODUCTION
+      // bundle only; `tauri dev` pre-bundles with esbuild and was unaffected, which is
+      // why this passed there but threw "… is not a function" in the packaged app.
+      // @mongodb-js/shell-bson-parser has the identical wrapper shape, but this project
+      // now builds with Rolldown (vite 8, since #245) rather than Rollup, and
+      // queryParser.build.test.js — which builds through this config and calls the
+      // result — passes with the alias removed. The alias stays anyway as cheap
+      // insurance should that bundler behaviour return; the test is the real guard.
+      "@mongodb-js/shell-bson-parser": require.resolve("@mongodb-js/shell-bson-parser"),
     },
   },
   server: {
