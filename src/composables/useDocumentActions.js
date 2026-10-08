@@ -13,9 +13,9 @@ import { valueToClipboard, valueToEjson, documentToClipboard, fieldPath } from '
 import { useDocumentPaste } from './useDocumentPaste'
 
 // Document CRUD + field-edit + native Document/Collection menu dispatch for the results
-// grid. UI-agnostic: `activeTab`/`docMenuRequest` are getters onto ResultsPanel's props,
-// `viewMode` is the shared view ref the menu's View items flip, and `showToast`/`requery`
-// are injected callbacks (ResultsPanel forwards them to its `toast`/`requery` emits).
+// grid. UI-agnostic: `activeTab` is a getter onto ResultsPanel's props, `docMenuRequest`
+// the store's one-shot request ref, `viewMode` the shared view ref the menu's View items
+// flip, and `showToast`/`requery` are injected callbacks (ResultsPanel's emits).
 export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showToast, requery }) {
   // ── drill into nested object cells ─────────────────────
   // field-name path navigated into, e.g. ['bank_account', 'account']. Owned here
@@ -305,10 +305,13 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     }
   }
 
-  watch(() => docMenuRequest() && docMenuRequest().nonce, (nonce) => {
+  // Immediate: the menu may signal before this lazily loaded panel mounts. Cleared: runs once.
+  watch(() => docMenuRequest.value?.nonce, (nonce) => {
     if (nonce == null) return
-    runDocMenuAction(docMenuRequest().action)
-  })
+    const { action } = docMenuRequest.value
+    docMenuRequest.value = null
+    runDocMenuAction(action)
+  }, { immediate: true })
 
   // The selected cell's value: the field on the container at the current drill path.
   // (When not drilled the container is the document root.) Returns undefined if the
