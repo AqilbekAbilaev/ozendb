@@ -1,6 +1,8 @@
 // The production Rollup build once bundled mongodb-query-parser with `parseFilter`
 // undefined, while the dev server and the unit tests, which run the source, were fine
-// (see the alias in vite.config.js). A successful build doesn't prove it either, so
+// (see the alias in vite.config.js). @mongodb-js/shell-bson-parser, which replaced it,
+// has the identical .esm-wrapper.mjs re-export shape, so the same failure is possible
+// again under a bundler that hits it. A successful build doesn't prove it either, so
 // build the parser through the app's own Vite config and call the result.
 import { describe, it, expect } from 'vitest'
 import { build, loadConfigFromFile } from 'vite'

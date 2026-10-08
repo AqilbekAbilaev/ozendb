@@ -2,7 +2,7 @@
 // canonical Extended JSON for the Rust backend, which already decodes EJSON into BSON.
 // This replaces the old regex passes (toStrictJson / expandShellTypes / …), which could
 // corrupt string values because a regex has no concept of "inside a string".
-import { parseFilter } from 'mongodb-query-parser'
+import { parse, ParseMode } from '@mongodb-js/shell-bson-parser'
 import { EJSON } from 'bson'
 
 const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/
@@ -30,7 +30,7 @@ export function parseField(raw) {
   }
   const source = OBJECT_ID_RE.test(s) ? `{ _id: ObjectId("${s}") }` : s
   try {
-    const parsed = parseFilter(source)
+    const parsed = parse(source, { mode: ParseMode.Loose, allowMethods: true })
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return { ok: false, ejson: null, error: 'Expected a document, e.g. { field: value }' }
     }
@@ -48,7 +48,7 @@ export function parsePipeline(raw) {
     return { ok: true, ejson: '[]', error: null }
   }
   try {
-    const parsed = parseFilter(s) // parseFilter handles arrays as well as documents
+    const parsed = parse(s, { mode: ParseMode.Loose, allowMethods: true }) // handles arrays as well as documents
     if (!Array.isArray(parsed)) {
       return { ok: false, ejson: null, error: 'Pipeline must be an array of stages, e.g. [ { $match: {} } ]' }
     }
