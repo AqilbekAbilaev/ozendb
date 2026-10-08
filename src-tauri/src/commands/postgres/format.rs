@@ -22,7 +22,7 @@ pub(crate) fn format_sql(sql: &str) -> Result<String, String> {
     Ok(statements.iter().map(|s| format!("{s:#};")).collect::<Vec<_>>().join("\n\n"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn format_pg_sql(sql: String) -> Result<String, AppError> {
     format_sql(&sql).map_err(AppError::Sql)
 }

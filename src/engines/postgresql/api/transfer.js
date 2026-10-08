@@ -1,4 +1,4 @@
-// PostgreSQL bulk transfer (ozendb-6v3). Export is a read, allowed on a read-only
+// PostgreSQL bulk transfer (#128). Export is a read, allowed on a read-only
 // connection, and always runs in a read-only transaction.
 
 import { invoke } from '@tauri-apps/api/core'

@@ -18,10 +18,7 @@ pub fn get(id: &str) -> Option<String> {
         Ok(entry) => entry,
         Err(_) => return None,
     };
-    match entry.get_password() {
-        Ok(password) => Some(password),
-        Err(_) => None,
-    }
+    entry.get_password().ok()
 }
 
 pub fn delete(id: &str) {

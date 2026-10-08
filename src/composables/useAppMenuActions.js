@@ -190,7 +190,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
         return
       }
 
-      // PostgreSQL (ozendb-sxd) — the same handlers the table workspace's own
+      // PostgreSQL (#145) — the same handlers the table workspace's own
       // toolbar/context menu already call (PG_ACTIONS). Each asks pgMenuTarget for
       // the depth its gate required, so a sidebar selection deep enough for the
       // action wins over the active tab and a shallower one falls back to it. The
@@ -297,7 +297,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
   // Linux — where WebKitGTK swallows native accelerators, so menu.rs attaches none —
   // the webview matches the keyboard against the user's bindings itself.
   const nativeMenuOwnsShortcuts = !/Linux/i.test(navigator.userAgent)
-  // ozendb-4b8: macOS reserves Ctrl+Tab/Ctrl+Shift+Tab for Cocoa's key-view-loop
+  // #146: macOS reserves Ctrl+Tab/Ctrl+Shift+Tab for Cocoa's key-view-loop
   // navigation, claimed earlier in the dispatch pipeline than any menu accelerator —
   // so the native menu item for these two never fires from the keyboard (clicking it
   // still works). The keystroke still reaches the webview as an ordinary keydown, so

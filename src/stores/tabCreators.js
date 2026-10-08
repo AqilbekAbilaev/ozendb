@@ -144,7 +144,7 @@ export function openExportSource(node) {
     ...node,
     // The modal reads the long spelling; openExportTab still builds a tool
     // workspace from the short one, so this object carries both until the node
-    // path is migrated too (audit §8).
+    // path is migrated too (#193).
     connectionId: node.connId,
     connectionName: node.connName,
     collectionName: node.collName,

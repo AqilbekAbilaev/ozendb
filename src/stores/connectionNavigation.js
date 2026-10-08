@@ -32,7 +32,7 @@ export function setTreeSelection(sel) {
 }
 
 // Called beside closeWhere(affectedByResource(drop)) so a dropped node, or one inside it,
-// doesn't stay selected for the native menu to act on (ozendb-9gf).
+// doesn't stay selected for the native menu to act on (#154).
 export function clearTreeSelectionUnder(drop) {
   const sel = treeSelection.value?.resource
   if (sel && (sameResource(sel, drop) || isResourceAncestor(drop, sel))) treeSelection.value = null

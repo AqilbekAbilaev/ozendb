@@ -258,16 +258,20 @@ describe('color tag persistence', () => {
   })
 })
 
-// A real tool workspace carries ONLY the short aliases — see toolDefinitions'
-// shortTarget. The `tab` helper above sets both spellings, which hides the mismatch,
-// so these build the honest shape.
-const toolTab = (id, connId, db, coll, kind) => ({
-  id, kind, type: 'mongodb.' + kind,
-  connId, connName: 'Sales', dbName: db, collName: coll,
-  target: createResourceRef(connId, [
-    { kind: 'database', name: db }, { kind: 'collection', name: coll },
-  ]),
-})
+// A tool workspace as toolDefinitions builds it: the long spelling, and a target at the
+// tool's own scope. Current Operations is connection-scoped; its dbName and collName are
+// filters, and only the target says so.
+const toolTab = (id, connId, db, coll, kind) => {
+  const connectionScoped = kind === 'currentOps'
+  return {
+    id, kind, type: connectionScoped ? 'mongodb.current_operations' : 'mongodb.' + kind,
+    connectionId: connId, connectionName: 'Sales', dbName: db,
+    ...(connectionScoped ? { collName: coll } : { collectionName: coll }),
+    target: createResourceRef(connId, connectionScoped ? [] : [
+      { kind: 'database', name: db }, { kind: 'collection', name: coll },
+    ]),
+  }
+}
 
 describe('handleTool falling back to the active workspace', () => {
   beforeEach(() => {
@@ -275,9 +279,8 @@ describe('handleTool falling back to the active workspace', () => {
     activeTabId.value = 's1'
   })
 
-  // The toolbar passes no target, so the active workspace is it. Reading
-  // `tab.connectionId` off a short-alias tool tab yields undefined, and the action
-  // silently degrades into a "select something first" toast.
+  // The toolbar passes no target, so the active workspace is it, read through its
+  // target rather than whichever identity fields it happens to carry.
   it('opens IntelliShell for the database a Schema tab is scoped to', () => {
     makeFeatures().handleTool('shell')
     expect(openShellTab).toHaveBeenCalledWith({
@@ -298,6 +301,20 @@ describe('handleTool falling back to the active workspace', () => {
   it('does not treat Current Operations filters as a database', () => {
     tabs.value = [toolTab('o1', 'c1', 'shop', 'orders', 'currentOps')]
     activeTabId.value = 'o1'
+    makeFeatures().handleTool('shell')
+    expect(openShellTab).not.toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalled()
+  })
+
+  // A PostgreSQL SQL tab's target is database-deep, the same depth as a MongoDB
+  // database: only its engine says it names nothing a MongoDB tool can act on.
+  it('does not treat a PostgreSQL tab as a MongoDB database', () => {
+    tabs.value = [{
+      id: 'p1', kind: 'pgQuery', type: 'postgresql.query', engine: 'postgresql',
+      connectionId: 'pg1', connectionName: 'Payments', database: 'app',
+      target: createResourceRef('pg1', [{ kind: 'database', name: 'app' }]),
+    }]
+    activeTabId.value = 'p1'
     makeFeatures().handleTool('shell')
     expect(openShellTab).not.toHaveBeenCalled()
     expect(showToast).toHaveBeenCalled()

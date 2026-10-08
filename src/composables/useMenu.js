@@ -57,7 +57,7 @@ export function useMenu() {
     )
   }
 
-  // The PostgreSQL sibling of menuTarget (ozendb-sxd) — see resolvePgMenuTarget.
+  // The PostgreSQL sibling of menuTarget (#145) — see resolvePgMenuTarget.
   function pgMenuTarget(requiredLevel = null) {
     return resolvePgMenuTarget(
       activeTab.value,

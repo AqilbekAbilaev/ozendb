@@ -172,7 +172,7 @@ pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[S
 /// runs `inner_sql` inside its own transaction that starts with `SET TRANSACTION
 /// READ ONLY`, then always rolls back (this path never writes, so there is
 /// nothing to commit). This is the real enforcement for arbitrary caller SQL —
-/// `pg_uri::options_for`'s `default_transaction_read_only` session default is
+/// `postgres::uri::options_for`'s `default_transaction_read_only` session default is
 /// only a *default*: a query can flip it off for the rest of the session with
 /// `set_config('default_transaction_read_only', 'off', false)` (confirmed live),
 /// but can't do the same to a transaction that already explicitly set itself
@@ -205,7 +205,7 @@ pub(crate) async fn run_query_as(pool: &sqlx::PgPool, sql: &str, read_only: bool
 /// connection can still query — constrained by `run_wrapped_read_only`. A `run_id`
 /// lets `cancel_pg_query` stop it; a `tx_id` runs it in that held transaction instead
 /// (see transaction.rs). `database`, when given, targets a database other than the
-/// connection's own — opening a second database on the same server (ozendb-bj2).
+/// connection's own — opening a second database on the same server (#124).
 #[tauri::command]
 pub async fn run_pg_query(
     ctx: State<'_, AppContext>,

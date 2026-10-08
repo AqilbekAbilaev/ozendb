@@ -67,7 +67,7 @@ describe('PostgreSQL right-click menus', () => {
     expect(openPostgresSearch).toHaveBeenCalledWith({ connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public' })
   })
 
-  // ozendb-6v3: the whole table, through the export dialog.
+  // #128: the whole table, through the export dialog.
   it('exports the table it was opened on', () => {
     expect(PG_MENUS.table.map(i => i.value)).toContain('pg:export_table')
     PG_ACTIONS['pg:export_table'](table)

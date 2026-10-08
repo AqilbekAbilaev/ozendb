@@ -1,8 +1,8 @@
-// MongoDB tool workspace definitions (Work 5D): indexes, schema, search, import,
-// export, and current operations. Same contract as the query definitions — fresh
-// flat legacy fields, canonical envelope owned by the generic factory. Work 6 adds
-// the duplicate/restore hooks: tool tabs clone their durable configuration (import
-// sources, export mapping, ops settings) and reset their runtime previews/rows.
+// MongoDB tool workspace definitions: indexes, schema, search, import, export, and
+// current operations. Same contract as the query definitions — fresh flat legacy
+// fields, canonical envelope owned by the generic factory. Their duplicate/restore
+// hooks clone the durable configuration (import sources, export mapping, ops settings)
+// and reset the runtime previews/rows.
 import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
@@ -12,7 +12,7 @@ import { opsDefaults } from '../../../composables/useCurrentOps'
 // which kind of tab it is looking at.
 //
 // Reads either spelling because its callers differ: `create` is handed a feature node
-// (still short — see audit §8), while `duplicate` and `restore` are handed a workspace
+// (still short — see #193), while `duplicate` and `restore` are handed a workspace
 // or saved record, which are long.
 function toolTarget(source) {
   return {
@@ -45,8 +45,8 @@ function opsTarget(node) {
 }
 
 // Indexes/Schema/Search tabs are identity-only: the pane reloads its data on mount,
-// so a duplicate is just the same target with a fresh id. Work 7 makes Schema and
-// Search persist (identity only, like Indexes) — the restore hook is shared too.
+// so a duplicate is just the same target with a fresh id. Schema and Search persist
+// too (identity only, like Indexes) — the restore hook is shared.
 function identityTool(kind, titlePrefix, anchor = (source) => source.collectionName || source.dbName) {
   const rebuild = (source) => ({
     title: source.title || titlePrefix + ' ' + anchor(source),
@@ -111,6 +111,7 @@ export const toolDefinitions = [
     type: 'mongodb.import',
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.import,
+    componentFor: (workspace) => (workspace.format === 'csv' ? WORKSPACE_COMPONENTS['import:csv'] : WORKSPACE_COMPONENTS.import),
     create(ctx) {
       const target = toolTarget(ctx.target)
       const format = ctx.options.format || 'json'

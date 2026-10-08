@@ -16,12 +16,12 @@ import { COLOR_ACTION } from '../constants/contextMenus'
 import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef } from '../utils/resourceRef'
-import { resourceFromLegacyTab, legacyTargetFromResource } from '../utils/legacyResourceRef'
+import { resolveMenuTarget } from '../utils/menuContext'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
 import { openModal } from '../stores/modals'
-import { PG_ACTIONS } from '../engines/postgresql/tree/contextMenus'
+import { contextAction } from '../engines/contextActions.js'
 import { runPgTool } from '../engines/postgresql/toolbarActions'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
@@ -83,7 +83,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // A modal's target. Modals read the long alias spelling — the same one the tab
   // creators, the Mongo API and the menu target resolution use — so the short
   // connId/collName pair stops here and never reaches a component. The FEATURES nodes
-  // upstream are still short; converting those is the rest of audit §8.
+  // upstream are still short; converting those is the rest of #193.
   function modalTarget(node, level) {
     const short = pick(node, LEVEL_FIELDS[level])
     return {
@@ -97,17 +97,6 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   function modalFeature(id) {
     const level = MODALS[id].level
     return { requires: level, run: (node) => openModal(id, modalTarget(node, level)) }
-  }
-
-  // A workspace's identity in the long alias spelling, read through its ResourceRef so
-  // the short-alias tool workspaces resolve the same as collection ones, and so a
-  // Current Operations tab's dbName/collName filters are not mistaken for its scope.
-  function workspaceTarget(workspace) {
-    if (!workspace) return null
-    return legacyTargetFromResource(
-      resourceFromLegacyTab(workspace),
-      workspace.connectionName ?? workspace.connName ?? null,
-    )
   }
 
   // Normalize a tab (connectionId/collectionName keys) into a registry node.
@@ -305,8 +294,8 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
       return
     }
 
-    const pgAction = saved.nodeData?.engine === 'postgresql' && PG_ACTIONS[action]
-    if (pgAction) return pgAction(saved.nodeData)
+    const engineAction = contextAction(saved.nodeData, action)
+    if (engineAction) return engineAction(saved.nodeData)
     return runFeature(action, saved.nodeData, { label: saved.label })
   }
 
@@ -341,13 +330,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
       return
     }
 
-    // The remaining actions operate on a specific node. From the toolbar that's the
-    // active workspace; from the native menu the caller passes an already-resolved
-    // target. Only the former needs normalising — and it must be, because a tool
-    // workspace spells its fields connId/collName, so reading the long names straight
-    // off it yields undefined and the action degrades into a "select something first"
-    // toast while a perfectly good collection is on screen.
-    const tab = target || workspaceTarget(activeTab.value)
+    // The remaining actions operate on a specific node. From the native menu the caller
+    // passes an already-resolved target; from the toolbar it is the active workspace,
+    // resolved the way the menu resolves it — through its target, and only when that
+    // names a MongoDB resource.
+    const tab = target || resolveMenuTarget(activeTab.value, null)
 
     if (name === 'shell') {
       if (tab && tab.connectionId && tab.dbName) {

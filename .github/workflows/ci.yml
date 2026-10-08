@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -36,6 +36,11 @@ jobs:
 
       - name: Check file sizes
         run: npm run check:size
+
+      # The release is the only other place the production bundle is built; with no
+      # component tests, this is what catches a .vue file that won't compile.
+      - name: Build the production bundle
+        run: npm run build
 
   backend:
     name: Backend tests (cargo)
@@ -67,9 +72,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Read the pinned Rust version
+        id: rust
+        shell: bash
+        run: |
+          version=$(sed -n 's/^channel *= *"\([^"]*\)".*/\1/p' src-tauri/rust-toolchain.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ steps.rust.outputs.version }}
           components: clippy
 
       - name: Cache Rust build
@@ -90,13 +104,12 @@ jobs:
             build-essential \
             file
 
-      # Default lint levels: only deny-level lints fail the job, which is what makes
-      # lib.rs's `deny(clippy::await_holding_lock)` an enforced guard.
+      # Any warning fails the job, so the count can't creep back up.
       - name: Clippy
         working-directory: ./src-tauri
         env:
           RUST_MIN_STACK: '16777216'
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Run unit tests
         working-directory: ./src-tauri

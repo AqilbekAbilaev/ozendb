@@ -1,7 +1,7 @@
 {
   "name": "ozendb",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "An open-source, free desktop GUI for managing MongoDB — a community alternative to Studio 3T.",
   "author": "Akhilbek Abilaev <abilaevaqil@gmail.com>",
