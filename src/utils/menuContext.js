@@ -29,7 +29,7 @@ function pgResource(source, ref) {
   return source?.engine === 'postgresql' ? ref : null
 }
 
-const PG_TAB_TYPES = ['postgresql.query', 'postgresql.table_browse']
+const PG_TAB_TYPES = ['postgresql.query', 'postgresql.table_browse', 'postgresql.search']
 
 // Every item behind the connection/database/collection gates is a MongoDB action, so
 // only a MongoDB selection or tab counts toward them — a PostgreSQL one names no
@@ -42,7 +42,7 @@ function mongoResource(source, ref) {
 // The engines the native menu has items of its own for (menu.rs's MenuEngine).
 const MENU_ENGINES = ['mongodb', 'postgresql']
 
-// Which engine's items the menu shows (ozendb-izk); 'none' hides both. A sidebar
+// Which engine's items the menu shows (#152); 'none' hides both. A sidebar
 // selection wins, as it does in resolveMenuTarget, but only when it enables something:
 // a PostgreSQL row above a schema enables nothing, so the tab decides instead.
 function menuEngine(tab, selDepth, pgSelDepth) {
@@ -85,7 +85,7 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount
   const hasField = hasDocument && !!(tab && tab.runtime.selectedField)
 
-  // PostgreSQL (ozendb-sxd), the same union as Connection/Database/Collection above:
+  // PostgreSQL (#145), the same union as Connection/Database/Collection above:
   // a query tab names a schema, a table tab names a schema and a table, and the
   // sidebar contributes whichever level its clicked row named.
   const pgSelDepth = depth(pgResource(treeSelection, treeSelection?.resource))
@@ -142,7 +142,7 @@ export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null
   return nodeFrom(sel, selRef) || nodeFrom(tab, tabRef)
 }
 
-// The PostgreSQL sibling of resolveMenuTarget (ozendb-sxd), with the same precedence:
+// The PostgreSQL sibling of resolveMenuTarget (#145), with the same precedence:
 // the sidebar selection wins when it is deep enough for the action, the active tab is
 // the fallback, and `null` means neither can name a PostgreSQL target.
 // `requiredLevel` is 'schema' | 'table' | null.

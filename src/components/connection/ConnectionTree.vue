@@ -10,9 +10,9 @@ import { colorHex, nodeTagName } from '../../utils/tabColor.js'
 import { connDatabases } from '../../stores/connectionData.js'
 import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
-import PostgresTreeNodes from '../../engines/postgresql/tree/PostgresTreeNodes.vue'
+import { TREE_NODES } from '../../engines/ui.js'
 import EngineBadge from '../base/EngineBadge.vue'
-import { PG_MENUS } from '../../engines/postgresql/tree/contextMenus'
+import { connectionMenu } from '../../engines/contextActions.js'
 
 const props = defineProps({
   width: { type: Number, default: 320 },
@@ -70,13 +70,12 @@ function onNodeContext(e, type, label, nodeData, items) {
   contextMenu.value = { type: type, x: e.clientX, y: e.clientY, label: label, nodeData: nodeData, items }
 }
 
-// A PostgreSQL connection keeps the `connection` menu type (so colour tags and the
-// right-click highlight work as for MongoDB) but offers only what works on it.
+// A connection whose engine has its own menu keeps the `connection` menu type (so colour
+// tags and the right-click highlight work as for MongoDB) but offers only what works on it.
 function onConnectionContext(e, conn) {
-  const node = { connId: conn.id, connName: conn.name }
-  if (conn.engine !== 'postgresql') return onNodeContext(e, 'connection', conn.name, node)
-  const pg = { ...node, engine: 'postgresql', database: conn.database || 'postgres' }
-  onNodeContext(e, 'connection', conn.name, pg, PG_MENUS.connection)
+  const own = connectionMenu(conn)
+  if (!own) return onNodeContext(e, 'connection', conn.name, { connId: conn.id, connName: conn.name })
+  onNodeContext(e, 'connection', conn.name, own.node, own.items)
 }
 // Hovering a database or collection row pops its stats card (see useStatsTip). The rows
 // pass their own target, so the card needs no per-kind handler here.
@@ -153,8 +152,9 @@ const { tip, ...statsTip } = useStatsTip()
         </div>
 
         <!-- Databases -->
-        <PostgresTreeNodes
-          v-if="expandedConns[conn.id] && connDatabases[conn.id] && conn.engine === 'postgresql'"
+        <component
+          :is="TREE_NODES[conn.engine]"
+          v-if="expandedConns[conn.id] && connDatabases[conn.id] && TREE_NODES[conn.engine]"
           :conn="conn"
           :schemas="connDatabases[conn.id]"
           :stats-tip="statsTip"

@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "document",
+  "description": "Capability for the document editor and viewer windows: events to talk to the main window, and closing or retitling themselves. Windows are created from Rust, so neither window may create one.",
+  "windows": ["doc-editor", "doc-view-*", "doc-insert"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-set-title"
+  ]
+}

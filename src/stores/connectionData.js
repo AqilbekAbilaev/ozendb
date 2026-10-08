@@ -1,6 +1,5 @@
 import { ref } from 'vue'
-import { listDatabases } from '../engines/mongodb/api/resources'
-import { listSchemas } from '../engines/postgresql/api/resources'
+import { engineOf } from '../engines/index.js'
 import { openConnections } from './openConnectionList'
 
 // The databases the sidebar has fetched for each connection, keyed by connection id.
@@ -22,11 +21,8 @@ const requestGenerations = new Map()
 const pendingRequests = new Map()
 const staleConnections = new Set()
 
-const LOADERS = { mongodb: listDatabases, postgresql: listSchemas }
-
 function loaderFor(id) {
-  const engine = openConnections.value.find(c => c.id === id)?.engine
-  return LOADERS[engine] ?? listDatabases
+  return engineOf(openConnections.value.find(c => c.id === id)).loadResources
 }
 
 function hasOwn(record, id) {

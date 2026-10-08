@@ -144,7 +144,7 @@ export function openExportSource(node) {
     ...node,
     // The modal reads the long spelling; openExportTab still builds a tool
     // workspace from the short one, so this object carries both until the node
-    // path is migrated too (audit §8).
+    // path is migrated too (#193).
     connectionId: node.connId,
     connectionName: node.connName,
     collectionName: node.collName,
@@ -230,6 +230,15 @@ export function openPostgresTable({ connectionId, connectionName, database, sche
   const tab = newWorkspace('postgresql.table_browse', {
     target: { connectionId, connectionName, database, schema, table },
     options: { rowKey },
+  })
+  tabs.value.push(tab)
+  activateTab(tab.id)
+}
+
+// Search in Schema, a new tab every time, as MongoDB's Search in… is (#180).
+export function openPostgresSearch({ connectionId, connectionName, database, schema }) {
+  const tab = newWorkspace('postgresql.search', {
+    target: { connectionId, connectionName, database, schema },
   })
   tabs.value.push(tab)
   activateTab(tab.id)

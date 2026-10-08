@@ -85,6 +85,42 @@ describe('postgresql.query', () => {
   })
 })
 
+// #180: Search in Schema as a tab, its typed search kept on the tab so it survives
+// switching tabs; the result is runtime.
+describe('postgresql.search', () => {
+  const def = byType['postgresql.search']
+  const schema = { connectionId: 'c1', connectionName: 'local', database: 'app', schema: 'public' }
+
+  it('opens an empty search on the schema', () => {
+    const created = def.create({ target: schema })
+    expect(created.title).toBe('Search: public')
+    expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }] })
+    expect(created.fields).toEqual({
+      kind: 'pgSearch', ...schema,
+      state: { term: '', tables: '', matchCase: false, regex: false },
+      runtime: { result: null, loading: false, error: null, errorCode: null, runId: null },
+    })
+  })
+
+  it('duplicates the typed search but not the result', () => {
+    const tab = { ...def.create({ target: schema }).fields }
+    tab.state.term = 'Ada'
+    tab.runtime.result = { matches: [] }
+    const copy = def.duplicate(tab)
+    expect(copy.fields.state.term).toBe('Ada')
+    expect(copy.fields.runtime.result).toBe(null)
+  })
+
+  it('saves the typed search and brings it back', () => {
+    const tab = { ...def.create({ target: schema }).fields }
+    tab.state.term = 'Ada'
+    tab.state.regex = true
+    const restored = def.restore({ ...schema, ...def.serialize(tab) })
+    expect(restored.fields.state).toEqual({ term: 'Ada', tables: '', matchCase: false, regex: true })
+    expect(restored.title).toBe('Search: public')
+  })
+})
+
 describe('closing a tab with a transaction open', () => {
   it('rolls a query tab\'s transaction back and says so', async () => {
     const def = byType['postgresql.query']

@@ -10,7 +10,7 @@ pub struct TabStorage {
 
 impl TabStorage {
     pub fn new(path: PathBuf) -> Self {
-        Self { path: path }
+        Self { path }
     }
 
     pub fn load(&self) -> Option<serde_json::Value> {

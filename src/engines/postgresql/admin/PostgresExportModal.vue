@@ -12,7 +12,7 @@ import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 
-// Export a table or a SQL editor's query to a file (ozendb-6v3).
+// Export a table or a SQL editor's query to a file (#128).
 const props = defineProps({
   target: { type: Object, required: true },  // { connId, database, schema, table } or { connId, database, query }
 })

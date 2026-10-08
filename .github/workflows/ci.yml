@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -37,15 +37,54 @@ jobs:
       - name: Check file sizes
         run: npm run check:size
 
+      # The release is the only other place the production bundle is built; with no
+      # component tests, this is what catches a .vue file that won't compile.
+      - name: Build the production bundle
+        run: npm run build
+
   backend:
     name: Backend tests (cargo)
     runs-on: ubuntu-22.04
+    # Live databases for the integration tests, which skip themselves (and still report
+    # `ok`) without them. The SSH tunnel tests need a bastion and stay opt-in.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Read the pinned Rust version
+        id: rust
+        shell: bash
+        run: |
+          version=$(sed -n 's/^channel *= *"\([^"]*\)".*/\1/p' src-tauri/rust-toolchain.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust.outputs.version }}
+          components: clippy
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
@@ -65,10 +104,21 @@ jobs:
             build-essential \
             file
 
+      # Any warning fails the job, so the count can't creep back up.
+      - name: Clippy
+        working-directory: ./src-tauri
+        env:
+          RUST_MIN_STACK: '16777216'
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: Run unit tests
         working-directory: ./src-tauri
         env:
           # IntelliShell's boa_engine needs a larger compile-time stack or rustc
           # can overflow while building it (mirrors release.yml).
           RUST_MIN_STACK: '16777216'
+          OZENDB_TEST_POSTGRES: 127.0.0.1:5432
+          OZENDB_TEST_POSTGRES_USER: postgres
+          OZENDB_TEST_POSTGRES_PASSWORD: postgres
+          OZENDB_TEST_MONGODB: 127.0.0.1:27017
         run: cargo test

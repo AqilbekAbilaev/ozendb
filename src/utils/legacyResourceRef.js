@@ -40,7 +40,7 @@ function collection(segments, databaseName, collectionName) {
 
 // PostgreSQL goes one level deeper than MongoDB: database/schema/table rather than
 // database/collection, which is why its selections carry their own kinds instead of
-// being squeezed into the Mongo pair (ozendb-sxd).
+// being squeezed into the Mongo pair (#145).
 function schema(segments, databaseName, schemaName) {
   return [...database(segments, databaseName), { kind: 'schema', name: schemaName }]
 }

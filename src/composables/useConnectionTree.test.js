@@ -229,7 +229,7 @@ it('unlistens from every backend event on unmount', async () => {
   for (const off of offs) expect(off).toHaveBeenCalledTimes(1)
 })
 
-// ozendb-xh3: a keyboard tab switch never clicks outside the sidebar, so the selection
+// #153: a keyboard tab switch never clicks outside the sidebar, so the selection
 // used to outlive it and the native menu kept acting on the old row.
 it('clears the selection when the active tab changes', async () => {
   tabs.value = [{ id: 't1', kind: 'quickstart' }, { id: 't2', kind: 'quickstart' }]
@@ -250,7 +250,7 @@ it('keeps the selection while the active tab stays put', async () => {
   expect(treeSelection.value).toEqual(expect.objectContaining({ collectionName: 'orders' }))
 })
 
-// ozendb-jh8: double-click, right-click Open Table and the auto-open after Create Table
+// #155: double-click, right-click Open Table and the auto-open after Create Table
 // all go through openPostgresTable, which always opens a new tab, so none may leave the
 // clicked row selected for the menu to act on.
 it('clears a PostgreSQL selection when a table is opened by any route', async () => {

@@ -73,17 +73,13 @@ fn a_valid_save_after_quarantine_starts_fresh() {
 #[test]
 fn unreadable_file_is_treated_as_missing_without_touching_it() {
     let store = storage("unreadable");
-    std::fs::write(&store.path, "{}").unwrap();
-    // Simulate an unreadable file (permissions): read_to_string fails, and the
-    // file must not be quarantined because we could not read its bytes to trust
-    // the rename.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&store.path, std::fs::Permissions::from_mode(0o000)).unwrap();
-        assert_eq!(store.load(), None);
-        assert!(store.path.exists(), "unreadable file is left in place");
-        std::fs::set_permissions(&store.path, std::fs::Permissions::from_mode(0o644)).unwrap();
-    }
-    assert_eq!(store.load().unwrap(), serde_json::json!({}));
+    let dir = store.path.parent().unwrap().to_path_buf();
+    // Something at the path that can't be read as a file. Permissions are the obvious
+    // simulation, but root reads straight through them, and tests often run as root.
+    std::fs::create_dir(&store.path).unwrap();
+    // read_to_string fails, and the entry must not be quarantined: we could not read
+    // its bytes, so there is nothing to trust the rename with.
+    assert_eq!(store.load(), None);
+    assert!(store.path.is_dir(), "unreadable entry is left in place");
+    assert!(quarantine_files(&dir).is_empty());
 }

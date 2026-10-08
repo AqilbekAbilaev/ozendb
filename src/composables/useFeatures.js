@@ -20,7 +20,7 @@ import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
 import { openModal } from '../stores/modals'
-import { PG_ACTIONS } from '../engines/postgresql/tree/contextMenus'
+import { contextAction } from '../engines/contextActions.js'
 import { runPgTool } from '../engines/postgresql/toolbarActions'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
@@ -83,7 +83,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // A modal's target. Modals read the long alias spelling — the same one the tab
   // creators, the Mongo API and the menu target resolution use — so the short
   // connId/collName pair stops here and never reaches a component. The FEATURES nodes
-  // upstream are still short; converting those is the rest of audit §8.
+  // upstream are still short; converting those is the rest of #193.
   function modalTarget(node, level) {
     const short = pick(node, LEVEL_FIELDS[level])
     return {
@@ -293,8 +293,8 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
       return
     }
 
-    const pgAction = saved.nodeData?.engine === 'postgresql' && PG_ACTIONS[action]
-    if (pgAction) return pgAction(saved.nodeData)
+    const engineAction = contextAction(saved.nodeData, action)
+    if (engineAction) return engineAction(saved.nodeData)
     return runFeature(action, saved.nodeData, { label: saved.label })
   }
 

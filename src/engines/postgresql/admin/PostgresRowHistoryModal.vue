@@ -10,7 +10,7 @@ import HintText from '../../../components/base/HintText.vue'
 import BaseModalBody from '../../../components/base/BaseModalBody.vue'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
-// Row History (ozendb-h4y): recorded `update_pg_row` edits for this table,
+// Row History (#129): recorded `update_pg_row` edits for this table,
 // newest-first, each undoable — the Postgres sibling of MongoDB's Collection
 // History, scoped to grid row edits rather than whole documents.
 const props = defineProps({

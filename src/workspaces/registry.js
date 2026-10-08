@@ -39,7 +39,7 @@ export function workspaceComponentFor(tab) {
   return def.componentFor ? def.componentFor(tab) : def.component
 }
 
-// Definition registry (Work 5). Populated once at startup by registerDefinitions();
+// Definition registry. Populated once at startup by registerDefinitions();
 // a duplicate type throws, so a definition file can never silently shadow another.
 // Definitions are kept separate from components on purpose: registerDefinitions
 // aggregates them, and nothing here imports a definition file — that would make the
@@ -59,10 +59,9 @@ export function getWorkspaceDefinition(type) {
   return def
 }
 
-// The unversioned persisted session records tabs by legacy kind/mode (Work 5 kept
-// the JSON format unchanged). Maps a saved record to its workspace type; null for
-// kinds that are never persisted (quickstart) or unreadable shapes. Work 7 adds
-// schema and search to the persisted set; unknown collection modes must never
+// The unversioned persisted session records tabs by legacy kind/mode. Maps a saved
+// record to its workspace type; null for kinds that are never persisted (quickstart)
+// or unreadable shapes. Unknown collection modes must never
 // silently become find workspaces, so they map to null and the migration skips
 // them with a warning.
 export function workspaceTypeForSaved(saved) {
