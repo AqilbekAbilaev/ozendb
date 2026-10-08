@@ -1,4 +1,4 @@
-//! Live-PostgreSQL coverage of bulk export (`export_impl`, ozendb-6v3). Shares
+//! Live-PostgreSQL coverage of bulk export (`export_impl`, #128). Shares
 //! `pg_integration_tests.rs`'s helpers and skip behaviour; see its module doc comment.
 
 use crate::commands::{export_impl, import_csv_impl, import_preview_impl, PgExportSource};
@@ -104,7 +104,7 @@ fn write_file(name: &str, text: &str) -> String {
     path
 }
 
-// ozendb-6v3: preview, mapped import, row-level failure, and an export → import round trip.
+// #128: preview, mapped import, row-level failure, and an export → import round trip.
 #[tokio::test]
 async fn imports_csv_through_a_mapping_all_or_nothing() {
     let config = match test_config() {

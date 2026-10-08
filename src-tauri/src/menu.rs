@@ -54,7 +54,7 @@ pub enum Gate {
     // (Refresh; see canRefreshWorkspace in the frontend's workspaces/lifecycle.js).
     RefreshableTab,
     // The active tab is a PostgreSQL workspace naming a schema (a query or table
-    // tab) — ozendb-sxd. Unlike Connection/Database/Collection, this is PostgreSQL-
+    // tab) — #145. Unlike Connection/Database/Collection, this is PostgreSQL-
     // only and resolved from the active tab alone; the sidebar tree doesn't yet
     // feed a PostgreSQL selection into the menu context (see menuContext.js).
     PgSchema,
@@ -130,7 +130,7 @@ pub enum MenuEngine {
     Postgres,
 }
 
-// Which engine-specific items the menu shows (ozendb-izk): one engine's, or neither.
+// Which engine-specific items the menu shows (#152): one engine's, or neither.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum MenuScope {
     Neutral,

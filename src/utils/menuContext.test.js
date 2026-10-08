@@ -251,7 +251,7 @@ describe('resolveMenuTarget', () => {
   })
 })
 
-// ozendb-sxd: the PostgreSQL gates are the union of the active tab and the sidebar
+// #145: the PostgreSQL gates are the union of the active tab and the sidebar
 // selection, the same as the Mongo ones above — PostgresTreeNodes feeds its clicked
 // schema/table row into the shared tree-selection store.
 const pgQueryTab = { id: 'p1', type: 'postgresql.query', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public' }
@@ -379,7 +379,7 @@ describe('resolvePgMenuTarget', () => {
   })
 })
 
-describe('deriveMenuContext engine (ozendb-izk)', () => {
+describe('deriveMenuContext engine (#152)', () => {
   const mongoTab = { ...collectionTab, engine: 'mongodb' }
   const pgTab = { ...pgTableTab, engine: 'postgresql' }
 
@@ -431,7 +431,7 @@ describe('deriveMenuContext engine (ozendb-izk)', () => {
   })
 })
 
-// ozendb-7dz: a write action aimed at the sidebar selection must respect the lock of an
+// #156: a write action aimed at the sidebar selection must respect the lock of an
 // open tab on that same resource, not only the active tab's.
 describe('deriveMenuContext read-only for a sidebar target', () => {
   const app = { ...quickstart, engine: 'app' }

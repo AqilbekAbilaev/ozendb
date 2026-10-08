@@ -184,7 +184,7 @@ impl AppContext {
     }
 
     /// `pg_pool`, but for a database other than the connection's own — opening a
-    /// second database on the same server (ozendb-bj2). `None` is exactly `pg_pool`.
+    /// second database on the same server (#124). `None` is exactly `pg_pool`.
     pub async fn pg_pool_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
         let config = match self.storage.find(id) {
             Some(val) => val,

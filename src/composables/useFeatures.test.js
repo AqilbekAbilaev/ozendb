@@ -306,7 +306,7 @@ describe('handleTool falling back to the active workspace', () => {
 // The dispatcher is keyed on each menu item's own display label, so a renamed or
 // mistyped one stops matching and the user is told the feature is "coming soon".
 // These lock the coupling until actions move onto the stable ids the native menu
-// already emits (audit §2): every action a menu offers must be dispatchable, and
+// already emits (#194): every action a menu offers must be dispatchable, and
 // every one that is not must be an acknowledged placeholder.
 describe('context menu coverage', () => {
   // A `sub` item only opens a flyout; its `subItems` are the real actions. The tab

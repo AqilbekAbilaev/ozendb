@@ -1,4 +1,4 @@
-//! "What can this role touch" (ozendb-ahy, split out of ozendb-5kp's cluster-level
+//! "What can this role touch" (#141, split out of #126's cluster-level
 //! role management), plus GRANT/REVOKE on the same objects it lists: schemas, the
 //! table-like relations and sequences, with `WITH GRANT OPTION` and `CASCADE`.
 //! Still out of scope: `ALTER DEFAULT PRIVILEGES`, ownership, row-level security,

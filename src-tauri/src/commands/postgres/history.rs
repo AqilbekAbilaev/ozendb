@@ -1,4 +1,4 @@
-//! Row-edit history for the table workspace (ozendb-h4y) — the Postgres sibling of
+//! Row-edit history for the table workspace (#129) — the Postgres sibling of
 //! MongoDB's `commands/history.rs`, scoped to `update_pg_row` edits only (see
 //! `pg_row_history.rs`'s own doc comment for why).
 use crate::error::AppError;

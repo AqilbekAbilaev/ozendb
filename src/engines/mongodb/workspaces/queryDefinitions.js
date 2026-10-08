@@ -1,8 +1,7 @@
-// MongoDB query workspace definitions (Work 5C): find, aggregate, SQL-to-MQL, and
-// shell. Each owns the full shape of its fresh tab; the canonical envelope comes from
+// MongoDB query workspace definitions: find, aggregate, SQL-to-MQL, and shell. Each
+// owns the full shape of its fresh tab and the lifecycle hooks (duplicate, restore,
+// dispose) the generic helpers dispatch through; the canonical envelope comes from
 // the factory.
-// Work 6 adds the lifecycle hooks (duplicate, restore, dispose) that generic helpers
-// dispatch through.
 import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { closeShellSession } from '../api/shell'
@@ -170,7 +169,7 @@ export const queryDefinitions = [
     create(ctx) {
       return createCollection(ctx, 'find')
     },
-    // Work 7: the durable editor state, projected from either a legacy record or a
+    // The durable editor state, projected from either a legacy record or a
     // live tab. Runtime fields (results, selection, errors) are never serialized.
     serialize(workspace) {
       return editorState(workspace)

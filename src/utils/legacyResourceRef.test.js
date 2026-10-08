@@ -29,7 +29,7 @@ describe('resourceFromTreeSelection', () => {
   })
 
   // PostgreSQL's hierarchy is database/schema/table, so its selections carry their
-  // own two kinds rather than being squeezed into database/collection (ozendb-sxd).
+  // own two kinds rather than being squeezed into database/collection (#145).
   it('converts PostgreSQL schema and table selections', () => {
     expect(resourceFromTreeSelection({
       connectionId: 'c1', connectionName: 'PG', engine: 'postgresql',
