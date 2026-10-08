@@ -1,4 +1,4 @@
-// What the CSV import dialog shows and sends (ozendb-6v3). The mapping holds one target
+// What the CSV import dialog shows and sends (#128). The mapping holds one target
 // column per CSV header; SKIP (a select can't hold null) leaves a header out.
 
 export const SKIP = ''

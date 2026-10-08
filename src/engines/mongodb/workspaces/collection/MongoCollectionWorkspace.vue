@@ -1,24 +1,16 @@
 <script setup>
-// The MongoDB collection workspace: find, aggregate, and SQL-to-MQL query behavior
-// and rendering, extracted whole from QueryWorkspace.vue (Work 3). It owns parsing,
-// validation, run dispatch, explain, and saved-query application for *collection*
-// tabs, and mutates the existing flat tab fields exactly as before. The host
-// (WorkspaceArea.vue) owns the tab bar, other pane kinds, and the result sub-tab
-// compatibility ref this component reads/writes via v-model.
-import { computed, nextTick, watch } from 'vue'
-import { translateSqlToMql, explainFind, explainAggregate, loadExplainStorage } from '../../api/queries'
-import { errText } from '../../../../utils/errors'
+// The MongoDB collection workspace: find, aggregate, and SQL-to-MQL query behavior and
+// rendering. What it does with the query lives in useCollectionRun; this component
+// renders it. The host (WorkspaceArea.vue) owns the tab bar, other pane kinds, and the
+// result sub-tab compatibility ref this component reads/writes via v-model.
 import QueryBar from '../../../../components/query/QueryBar.vue'
 import SqlQueryBar from '../../../../components/query/SqlQueryBar.vue'
 import PipelineEditor from '../../../../components/query/PipelineEditor.vue'
 import ResultsPanel from '../../../../components/results/ResultsPanel.vue'
 import CollectionCrumbs from '../../../../components/base/CollectionCrumbs.vue'
-import { parseField, parsePipeline } from '../../../../utils/queryParser'
-import { setCollectionQueryMode } from '../../../../utils/queryMode'
-import { runTranslatedSql } from '../../../../utils/sqlWorkspace'
-import { beginWorkspaceRequest } from '../../../../utils/workspaceRequest'
+import { computed } from 'vue'
 import { useInitialFindRun } from './useInitialFindRun'
-import { refreshRequest } from '../../../../stores/menuRequests'
+import { useCollectionRun } from './useCollectionRun'
 
 const props = defineProps({
   activeTab:        { type: Object, required: true },
@@ -32,263 +24,19 @@ const emit = defineEmits([
   'cancel-query', 'follow-reference', 'open-query-browser', 'saved-query-applied',
 ])
 
-const activeTab = computed(() => props.activeTab)
-const isAggregate = computed(() => activeTab.value && activeTab.value.mode === 'aggregate')
-const isSql = computed(() => activeTab.value && activeTab.value.mode === 'sql')
-
-useInitialFindRun(activeTab, {
+useInitialFindRun(computed(() => props.activeTab), {
   runQuery: (workspace, query) => emit('run-query', workspace.id, query),
 })
 
-// ── query parsing & validation ─────────────────────────────
-// Shell syntax is parsed to canonical Extended JSON by utils/queryParser.js (MongoDB's
-// own parser), which the Rust backend decodes to BSON. Fields are parsed live so we can
-// show an inline error and disable Run while the query is invalid, instead of silently
-// sending corrupted JSON.
-const parsedQuery = computed(() => {
-  const tab = activeTab.value
-  if (!tab || tab.kind !== 'collection') return null
-  return {
-    filter:     parseField(tab.state.query.filter),
-    projection: parseField(tab.state.query.projection),
-    sort:       parseField(tab.state.query.sort),
-  }
-})
-const parsedPipeline = computed(() => {
-  const tab = activeTab.value
-  if (!tab || tab.kind !== 'collection') return null
-  return parsePipeline(tab.state.query.pipeline)
-})
-const queryValid = computed(() => {
-  const p = parsedQuery.value
-  return !p || (p.filter.ok && p.projection.ok && p.sort.ok)
-})
-const pipelineValid = computed(() => {
-  const p = parsedPipeline.value
-  return !p || p.ok
-})
-// SQL validity is checked by the backend on translate, so the Run button is never
-// gated here for sql mode; find/aggregate gate on their parsed input as before.
-const runValid = computed(() =>
-  isSql.value ? true : (isAggregate.value ? pipelineValid.value : queryValid.value))
-// First offending field's message, shown under the query area / pipeline editor.
-const queryErrorText = computed(() => {
-  const p = parsedQuery.value
-  if (!p) return null
-  if (!p.filter.ok) return 'Query: ' + p.filter.error
-  if (!p.projection.ok) return 'Projection: ' + p.projection.error
-  if (!p.sort.ok) return 'Sort: ' + p.sort.error
-  return null
-})
-const pipelineErrorText = computed(() => {
-  const p = parsedPipeline.value
-  if (!p || p.ok) return null
-  return 'Pipeline: ' + p.error
-})
-
-// The Run button (and the result toolbar's refresh) dispatch on the tab's mode.
-function run(tab = activeTab.value) {
-  if (!tab || tab.kind !== 'collection') return
-  if (tab.mode === 'sql') {
-    runSql(tab)
-  } else if (tab.mode === 'aggregate') {
-    runAggregate(tab)
-  } else {
-    runQuery(true, tab)
-  }
-}
-
-// Translate the tab's SQL into a MongoDB find, then run it against the tab's
-// collection. The translated pieces are stored on the tab (as canonical JSON) so
-// the shared result stack — paging, the Query Code preview, and Explain — all
-// operate on the same query. The collection is fixed by the tab; the collection
-// named in the SQL FROM clause is intentionally ignored.
-async function runSql(tab = activeTab.value) {
-  if (!tab || tab.kind !== 'collection') return
-  await runTranslatedSql(tab, {
-    translate: translateSqlToMql,
-    runQuery: (workspace, query) => emit('run-query', workspace.id, query),
-    runExplain,
-    explainVisible: () => props.resultTab === 'Explain',
-    isCurrent: workspace => props.tabs.includes(workspace) && workspace.mode === 'sql',
-  })
-}
-
-function runAggregate(tab = activeTab.value) {
-  if (!tab || tab.kind !== 'collection') return
-  const parsed = parsePipeline(tab.state.query.pipeline)
-  if (!parsed || !parsed.ok) return  // inline error is already shown
-  emit('run-aggregate', tab.id, { pipeline: parsed.ejson })
-  // Keep the Explain plan in sync when it's the visible sub-tab.
-  if (props.resultTab === 'Explain') runExplain(tab)
-}
-
-function runQuery(addToHistory = true, tab = activeTab.value) {
-  if (!tab || tab.kind !== 'collection') return
-  expandIdFilter(tab)
-  const parsed = {
-    filter: parseField(tab.state.query.filter),
-    projection: parseField(tab.state.query.projection),
-    sort: parseField(tab.state.query.sort),
-  }
-  if (!parsed || !parsed.filter.ok || !parsed.projection.ok || !parsed.sort.ok) return
-  emit('run-query', tab.id, {
-    filter:        parsed.filter.ejson,
-    projection:    parsed.projection.ejson,
-    sort:          parsed.sort.ejson,
-    skip:          tab.state.query.skip || 0,
-    limit:         tab.state.query.limit || 50,
-    addToHistory:  addToHistory,
-  })
-  // Keep the Explain plan in sync when it's the visible sub-tab.
-  if (tab.id === activeTab.value?.id && props.resultTab === 'Explain') runExplain(tab)
-}
-
-// Switch result sub-tab; the Explain plan is fetched lazily the first time it's
-// shown (and re-fetched whenever the query re-runs while it's open).
-function selectRtab(t) {
-  emit('update:result-tab', t)
-  if (t === 'Explain') runExplain()
-}
-
-async function runExplain(tab = activeTab.value) {
-  if (!tab || tab.kind !== 'collection') return
-  const request = beginWorkspaceRequest(tab, 'explain')
-  const canApply = () => request.isCurrent() && props.tabs.includes(tab)
-  // The chosen verbosity is stored on the tab so re-runs (pagination, refresh) reuse it.
-  const verbosity = tab.explainVerbosity || 'executionStats'
-  tab.explainVerbosity = verbosity
-  // Storage sizes (Collection/Index target nodes) are find-only and fetched separately.
-  tab.explainStorage = null
-
-  // Aggregate tabs explain their pipeline; find tabs explain the find query. Explaining
-  // a find({}) on an aggregate tab (the old behavior) was silently misleading.
-  if (tab.mode === 'aggregate') {
-    const parsed = parsePipeline(tab.state.query.pipeline)
-    if (!parsed || !parsed.ok) {
-      tab.explainError = 'Fix the pipeline before running Explain.'
-      tab.explainResult = null
-      tab.explainRunning = false
-      return
-    }
-    tab.explainRunning = true
-    tab.explainError = null
-    try {
-      const result = await explainAggregate(
-        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
-        parsed.ejson,
-        verbosity,
-      )
-      if (canApply()) tab.explainResult = result
-    } catch (e) {
-      if (canApply()) {
-        tab.explainError = errText(e)
-        tab.explainResult = null
-      }
-    } finally {
-      if (canApply()) tab.explainRunning = false
-    }
-    return
-  }
-
-  const parsed = {
-    filter: parseField(tab.state.query.filter),
-    projection: parseField(tab.state.query.projection),
-    sort: parseField(tab.state.query.sort),
-  }
-  if (!parsed || !parsed.filter.ok || !parsed.projection.ok || !parsed.sort.ok) {
-    tab.explainError = 'Fix the query before running Explain.'
-    tab.explainResult = null
-    tab.explainRunning = false
-    return
-  }
-  tab.explainRunning = true
-  tab.explainError = null
-  try {
-    const result = await explainFind(
-      { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
-      {
-        filter:     parsed.filter.ejson,
-        projection: parsed.projection.ejson,
-        sort:       parsed.sort.ejson,
-        skip:       tab.state.query.skip || 0,
-        limit:      tab.state.query.limit || 50,
-      },
-      verbosity,
-    )
-    if (!canApply()) return
-    tab.explainResult = result
-    // Best-effort: fetch on-disk sizes for the Collection/Index target nodes. A failure
-    // here must never clear the explain or surface an error — just skip the size nodes.
-    try {
-      const storage = await loadExplainStorage({
-        connectionId: tab.connectionId,
-        database:     tab.dbName,
-        collection:   tab.collectionName,
-      })
-      if (canApply()) tab.explainStorage = storage
-    } catch (e) {
-      if (canApply()) tab.explainStorage = null
-    }
-  } catch (e) {
-    if (canApply()) {
-      tab.explainError = errText(e)
-      tab.explainResult = null
-    }
-  } finally {
-    if (canApply()) tab.explainRunning = false
-  }
-}
-
-// The Explain sub-tab's verbosity selector (in ResultsPanel) changed: store it and re-run.
-function onExplainVerbosity(v) {
-  const tab = activeTab.value
-  if (!tab) return
-  tab.explainVerbosity = v
-  runExplain(tab)
-}
-
-// When the whole Query value is a bare 24-hex ObjectId, build the _id filter so you
-// can drop a copied id straight into the box. Done at run time (not on every
-// keystroke) so the field stays a plain text input — rewriting its value on input is
-// what defeats the browser's native undo/redo.
-function expandIdFilter(tab) {
-  const v = (tab.state.query.filter || '').trim()
-  if (/^[0-9a-fA-F]{24}$/.test(v)) {
-    tab.state.query.filter = `{ _id: ObjectId("${v}") }`
-  }
-}
-
-async function applyFromBrowser(entry) {
-  const tab = activeTab.value
-  if (!tab) return
-  if (entry.mode === 'aggregate') {
-    setCollectionQueryMode(tab, 'aggregate')
-    tab.state.query.pipeline = entry.pipeline
-  } else {
-    setCollectionQueryMode(tab, 'find')
-    tab.state.query.filter     = entry.filter
-    tab.state.query.sort       = entry.sort
-    tab.state.query.projection = entry.projection
-    tab.state.query.skip       = Number(entry.skip)
-    tab.state.query.limit      = Number(entry.limit)
-  }
-  await nextTick()
-  run(tab)
-}
-
-// View → Refresh, which only reaches a find (see canRefreshWorkspace).
-watch(refreshRequest, () => run())
-
-watch(() => props.savedQueryRequest?.nonce, async (nonce) => {
-  const request = props.savedQueryRequest
-  if (nonce == null || request.tabId !== activeTab.value?.id) return
-  try {
-    await applyFromBrowser(request.entry)
-  } finally {
-    emit('saved-query-applied', nonce)
-  }
-}, { immediate: true })
+const {
+  isAggregate, isSql, runValid, queryErrorText, pipelineErrorText,
+  run, runQuery, selectRtab, onExplainVerbosity,
+} = useCollectionRun({
+  activeTab:         () => props.activeTab,
+  tabs:              () => props.tabs,
+  resultTab:         () => props.resultTab,
+  savedQueryRequest: () => props.savedQueryRequest,
+}, emit)
 </script>
 
 <template>

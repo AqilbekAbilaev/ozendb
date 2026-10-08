@@ -103,6 +103,7 @@ fn refuses_what_the_filter_boxes_cannot_show() {
         "SELECT * FROM users WHERE lower(a) = 'x'",
         "SELECT * FROM users WHERE a = b",
         "SELECT * FROM users ORDER BY a ASC, b DESC",
+        "SELECT * FROM users ORDER BY a USING >",
         "SELECT DISTINCT * FROM users",
         "SELECT * FROM users GROUP BY a",
         "WITH x AS (SELECT 1) SELECT * FROM users",

@@ -42,7 +42,7 @@ describe('cancelling', () => {
         return new Promise((_, reject) => setTimeout(() => reject(new Error('operation was interrupted')), 20))
       }
       if (cmd === 'kill_query') {
-        expect(args.comment).toBe(tab.runId)
+        expect(args.comment).toBe(tab.runtime.runId)
         return Promise.resolve(1)
       }
       return Promise.resolve()
@@ -54,7 +54,7 @@ describe('cancelling', () => {
 
     expect(tab.runtime.isRunning).toBe(false)
     expect(tab.runtime.runError).toBe('Query cancelled.')
-    expect(tab.runErrorCode).toBe(null)
+    expect(tab.runtime.runErrorCode).toBe(null)
     expect(tab.runtime.elapsedMs).toBe(null)
     expect(toasts).toContain('Query cancelled')
   })
@@ -130,5 +130,27 @@ describe('reported timing', () => {
 
     expect(tab.runtime.elapsedMs).toBe(7)
     expect(toasts[0]).toBe('Aggregation returned 2 documents in 0.007s')
+  })
+})
+
+// A collection tab is identity plus state / ui / runtime (collectionState.js). Run state
+// written beside them is saved, duplicated and compared by accident, so none may land there.
+describe('run state', () => {
+  it('stays inside tab.runtime through a run and a cancel', async () => {
+    const { api, tab } = harness()
+    const keys = Object.keys(tab).sort()
+    invoke.mockImplementation((cmd) => {
+      if (cmd === 'find_documents') return new Promise(r => setTimeout(() => r({ documents: [], elapsedMs: 1 }), 20))
+      return Promise.resolve(1)
+    })
+
+    const running = api.runQuery('t1', { filter: '{}', sort: '{}', projection: '{}', skip: 0, limit: 50 })
+    expect(typeof tab.runtime.runId).toBe('string')
+    expect(tab.runtime.startedAt).toEqual(expect.any(Number))
+    await api.cancelQuery('t1')
+    await running
+    await api.runAggregate('t1', { pipeline: '[]' })
+
+    expect(Object.keys(tab).sort()).toEqual(keys)
   })
 })

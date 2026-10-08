@@ -26,8 +26,8 @@ const emit = defineEmits(['explain-verbosity'])
 // stage tree).
 const explainTree = computed(() =>
   buildExplainTree(
-    props.activeTab && props.activeTab.explainResult,
-    props.activeTab && props.activeTab.explainStorage,
+    props.activeTab && props.activeTab.runtime.explainResult,
+    props.activeTab && props.activeTab.runtime.explainStorage,
   )
 )
 
@@ -37,9 +37,9 @@ const explainView = ref('graph')
 
 <template>
   <div class="explain-view">
-    <div v-if="activeTab.explainRunning" class="explain-msg">Running explain…</div>
-    <FieldError v-else-if="activeTab.explainError" :text="activeTab.explainError" class="run-error" />
-    <template v-else-if="activeTab.explainResult">
+    <div v-if="activeTab.runtime.explainRunning" class="explain-msg">Running explain…</div>
+    <FieldError v-else-if="activeTab.runtime.explainError" :text="activeTab.runtime.explainError" class="run-error" />
+    <template v-else-if="activeTab.runtime.explainResult">
       <div class="explain-toolbar">
         <SegmentedControl
           :model-value="explainView"
@@ -51,7 +51,7 @@ const explainView = ref('graph')
           <span class="et-verbosity-label">Detail</span>
           <BaseSelect
             class="et-select"
-            :model-value="activeTab.explainVerbosity || 'executionStats'"
+            :model-value="activeTab.runtime.explainVerbosity || 'executionStats'"
             :options="VERBOSITY_OPTIONS"
             size="sm"
             @update:model-value="v => emit('explain-verbosity', v)"
@@ -59,7 +59,7 @@ const explainView = ref('graph')
         </label>
       </div>
       <ExplainGraph v-if="explainView === 'graph'" :tree="explainTree" />
-      <JsonDoc v-else class="json-doc" :value="activeTab.explainResult" />
+      <JsonDoc v-else class="json-doc" :value="activeTab.runtime.explainResult" />
     </template>
     <div v-else class="explain-msg">Run a query, then this tab shows its execution plan.</div>
   </div>

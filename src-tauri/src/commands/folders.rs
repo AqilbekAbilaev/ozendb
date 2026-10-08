@@ -4,19 +4,19 @@ use super::AppContext;
 use tauri::State;
 use uuid::Uuid;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_folders(folders: State<'_, FolderStorage>) -> Vec<Folder> {
     folders.load()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_folder(
     folders: State<'_, FolderStorage>,
     name: String,
 ) -> Result<Folder, AppError> {
     let folder = Folder {
         id: Uuid::new_v4().to_string(),
-        name: name,
+        name,
         parent_id: None,
         created_at: crate::time::now_ms(),
     };
@@ -26,7 +26,7 @@ pub fn create_folder(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn rename_folder(
     folders: State<'_, FolderStorage>,
     id: String,
@@ -37,7 +37,7 @@ pub fn rename_folder(
 
 /// Delete a folder. Any connection inside it falls back to the root (its
 /// `folder_id` is cleared) rather than being deleted along with the folder.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_folder(
     folders: State<'_, FolderStorage>,
     ctx: State<'_, AppContext>,
@@ -59,7 +59,7 @@ pub fn delete_folder(
 
 /// Move a connection into a folder, or back to the root when `folder_id` is
 /// `None`. A single-field update on the connection.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn move_connection_to_folder(
     ctx: State<'_, AppContext>,
     id: String,

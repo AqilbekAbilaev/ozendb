@@ -5,6 +5,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 import { ref, reactive, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useCurrentOps, opsDefaults } from './useCurrentOps'
+import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
 
 // Switching workspace tabs unmounts the pane, so anything held in a plain ref inside it
 // is gone when the user comes back. The toolbar settings live on the tab object for that
@@ -13,8 +14,13 @@ import { useCurrentOps, opsDefaults } from './useCurrentOps'
 
 // Tabs live in a reactive store array in the app, so a plain object here would let a
 // computed over tab state cache forever and hide exactly the bugs these tests look for.
+// Built by the tab's own definition: a hand-written shape once let these tests pass on a
+// field name the real tab never had.
+const definition = toolDefinitions.find((d) => d.type === 'mongodb.current_operations')
 const newTab = (over = {}) => reactive({
-  id: 't1', connId: 'c1', connName: 'Local', ...opsDefaults(), ...over,
+  id: 't1',
+  ...definition.create({ target: { connId: 'c1', connName: 'Local' }, options: {} }).fields,
+  ...over,
 })
 
 beforeEach(() => {
@@ -138,8 +144,8 @@ describe('two tabs at once', () => {
   })
 
   it('keeps overlapping responses on the tabs that requested them', async () => {
-    const a = newTab({ id: 'a', connId: 'c1', frequency: 0, retention: 0 })
-    const b = newTab({ id: 'b', connId: 'c2', frequency: 0, retention: 0 })
+    const a = newTab({ id: 'a', connectionId: 'c1', frequency: 0, retention: 0 })
+    const b = newTab({ id: 'b', connectionId: 'c2', frequency: 0, retention: 0 })
     const active = ref(a)
     let resolveA
     const replyA = new Promise(resolve => { resolveA = resolve })
@@ -149,18 +155,18 @@ describe('two tabs at once', () => {
     const ops = useCurrentOps(() => active.value)
 
     const loadA = ops.load()
-    expect(a._opsLoading).toBe(true)
+    expect(a.loading).toBe(true)
     active.value = b
     const loadB = ops.load()
     await loadB
-    expect(b._opsLoading).toBe(false)
-    expect(a._opsLoading).toBe(true)
+    expect(b.loading).toBe(false)
+    expect(a.loading).toBe(true)
     resolveA({ inprog: [{ opid: 1, connectionId: 1, ns: 'a.items' }] })
     await loadA
 
     expect(a.ops.map(op => op.opid)).toEqual([1])
     expect(b.ops.map(op => op.opid)).toEqual([2])
-    expect(a._opsLoading).toBe(false)
+    expect(a.loading).toBe(false)
     expect(invoke).toHaveBeenCalledWith('current_ops', { id: 'c1', ownOnly: false, all: false })
     expect(invoke).toHaveBeenCalledWith('current_ops', { id: 'c2', ownOnly: false, all: false })
   })
@@ -185,8 +191,8 @@ describe('two tabs at once', () => {
   })
 
   it('refreshes the initiating server after a delayed kill', async () => {
-    const a = newTab({ id: 'a', connId: 'c1', frequency: 0 })
-    const b = newTab({ id: 'b', connId: 'c2', frequency: 0 })
+    const a = newTab({ id: 'a', connectionId: 'c1', frequency: 0 })
+    const b = newTab({ id: 'b', connectionId: 'c2', frequency: 0 })
     const active = ref(a)
     let resolveKill
     invoke.mockImplementation((command) => {
@@ -225,5 +231,28 @@ describe('two tabs at once', () => {
 
     expect(invoke.mock.calls.filter(([command]) => command === 'current_ops')).toHaveLength(2)
     expect(tab.ops).toEqual([])
+  })
+})
+
+describe('opsDefaults', () => {
+  // Everything a poll records is declared up front, so nothing ad hoc lands on the tab.
+  it('declares every field a load or a kill writes', async () => {
+    const tab = newTab()
+    const keys = Object.keys(tab).sort()
+    invoke.mockRejectedValueOnce(new Error('boom'))
+    const ops = useCurrentOps(() => tab)
+    await ops.load()
+    await ops.load()
+    await ops.kill(7)
+    expect(Object.keys(tab).sort()).toEqual(keys)
+  })
+
+  // The namespace pickers' database list is fetched per server, so two tabs never share it.
+  it('gives each tab its own, empty database list', () => {
+    const a = opsDefaults()
+    const b = opsDefaults()
+    expect(a.databases).toEqual([])
+    a.databases.push({ name: 'shop' })
+    expect(b.databases).toEqual([])
   })
 })

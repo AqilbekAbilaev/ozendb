@@ -20,22 +20,12 @@ function sameTarget(left, right) {
 // async responses must be tied explicitly to the workspace that started them.
 export function useIndexPaneLifecycle() {
   const formTarget = ref(null)
-  let attachedTab = null
   let formVersion = 0
   let loadVersion = 0
 
-  function attachMenuApi(tab, api) {
-    if (attachedTab && attachedTab._idxApi === api) delete attachedTab._idxApi
-    attachedTab = tab || null
-    if (attachedTab) attachedTab._idxApi = api
-    formTarget.value = null
-    formVersion++
-    loadVersion++
-  }
-
-  function detachMenuApi(api) {
-    if (attachedTab && attachedTab._idxApi === api) delete attachedTab._idxApi
-    attachedTab = null
+  // Another workspace now owns the pane, or none does: drop the open form and make
+  // every in-flight form submit and load stale.
+  function reset() {
     formTarget.value = null
     formVersion++
     loadVersion++
@@ -78,8 +68,7 @@ export function useIndexPaneLifecycle() {
   return {
     formTarget,
     targetForTab: targetOf,
-    attachMenuApi,
-    detachMenuApi,
+    reset,
     captureFormTarget,
     clearFormTarget,
     beginFormSubmit,

@@ -4,11 +4,11 @@ import { getOpenTabs, setOpenTabs } from '../appApi/session'
 import { tabs, activeTabId } from '../stores/tabs'
 import { restoreWorkspace } from '../workspaces/lifecycle'
 import { getWorkspaceDefinition } from '../workspaces/registry'
-import { migrateSession, toLegacyRecord, sessionRestoreNotice } from '../utils/sessionMigration'
+import { migrateSession, toLegacyRecord, sessionRestoreNotice } from '../workspaces/sessionMigration'
 import { showToast } from '../stores/toast'
 import { recordFrontendError } from '../appApi/errorLog'
 
-// Tab-session persistence (Work 7). On-disk sessions are canonical v2 records;
+// Tab-session persistence. On-disk sessions are canonical v2 records;
 // legacy unversioned files migrate in memory on load and are written back as v2.
 // Result sets and other runtime state are rebuilt on demand, so paging through
 // data never saves. The tab spine (`tabs`, `activeTabId`) comes from the store.

@@ -29,7 +29,7 @@ describe('resourceFromTreeSelection', () => {
   })
 
   // PostgreSQL's hierarchy is database/schema/table, so its selections carry their
-  // own two kinds rather than being squeezed into database/collection (ozendb-sxd).
+  // own two kinds rather than being squeezed into database/collection (#145).
   it('converts PostgreSQL schema and table selections', () => {
     expect(resourceFromTreeSelection({
       connectionId: 'c1', connectionName: 'PG', engine: 'postgresql',
@@ -192,6 +192,18 @@ describe('legacyTargetFromResource', () => {
       connectionId: 'c1', connectionName: 'Sales',
       dbName: null, collectionName: null, kind: 'connection',
     })
+  })
+
+  // A tab's target is read straight into this now, and a PostgreSQL tab's target is
+  // database/schema/table: it has no MongoDB spelling, rather than a schema posing as
+  // a collection.
+  it('has no spelling for a ref that is not MongoDB-shaped', () => {
+    const pg = (segments) => createResourceRef('p1', segments)
+    expect(legacyTargetFromResource(pg([{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }]))).toBe(null)
+    expect(legacyTargetFromResource(pg([
+      { kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'widgets' },
+    ]))).toBe(null)
+    expect(legacyTargetFromResource(pg([{ kind: 'schema', name: 'public' }]))).toBe(null)
   })
 
   // The display name is presentation, not identity, so it is passed in rather than

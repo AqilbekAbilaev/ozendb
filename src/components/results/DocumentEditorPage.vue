@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { emit, listen } from '@tauri-apps/api/event'
+import { emitDocumentSaved, onDocumentTarget } from '../../appApi/events'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import CodeEditor from '../base/CodeEditor.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -175,7 +175,7 @@ async function onSave(keepOpen) {
         parsed.ejson,
       )
     }
-    await emit('document-saved', {
+    await emitDocumentSaved({
       connId: target.value.connId,
       db: target.value.db,
       coll: target.value.coll,
@@ -218,9 +218,9 @@ onMounted(async () => {
   window.addEventListener('keydown', onWindowKeydown)
 
   // The single window is retargeted in place: reload when the backend emits a new target.
-  unlisten = await listen('document-target', (e) => {
+  unlisten = await onDocumentTarget((target) => {
     if (!confirmDiscardIfDirty()) return
-    loadTarget(e.payload)
+    loadTarget(target)
   })
 
   await loadTarget(targetFromUrl())

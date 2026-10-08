@@ -3,15 +3,15 @@ import { showToast } from '../../stores/toast'
 import { treeSelection } from '../../stores/connectionNavigation'
 import { resolvePgMenuTarget } from '../../utils/menuContext'
 
-// The PostgreSQL toolbar buttons (#163): each runs the right-click action of the same
-// name on whatever pgMenuTarget resolves at the depth it needs, so the toolbar, the
+// The PostgreSQL toolbar buttons (#163): each runs the right-click action with the same
+// id on whatever pgMenuTarget resolves at the depth it needs, so the toolbar, the
 // native menu and the sidebar all act on the same node.
 const PG_TOOLS = {
-  pgTable:  { action: 'Open Table',        level: 'table' },
-  pgSql:    { action: 'New SQL Query',     level: 'schema' },
-  pgSearch: { action: 'Search in Schema…', level: 'schema' },
-  pgExport: { action: 'Export Table…',     level: 'table' },
-  pgImport: { action: 'Import CSV…',       level: 'table' },
+  pgTable:  { action: 'pg:open_table',    level: 'table' },
+  pgSql:    { action: 'pg:new_sql',       level: 'schema' },
+  pgSearch: { action: 'pg:search_schema', level: 'schema' },
+  pgExport: { action: 'pg:export_table',  level: 'table' },
+  pgImport: { action: 'pg:import_csv',    level: 'table' },
 }
 
 const HINT = {

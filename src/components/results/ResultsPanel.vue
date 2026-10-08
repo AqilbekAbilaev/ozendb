@@ -99,7 +99,7 @@ const {
   onFieldEditSave, onRemoveFieldConfirm, onClearConfirm, onUpdateDialogDone, onDeleteDialogDone,
 } = useDocumentActions({
   activeTab: () => props.activeTab,
-  docMenuRequest: () => docMenuRequest.value,
+  docMenuRequest,
   viewMode: viewMode,
   showToast: showToast,
   requery: (history, tab) => emit('requery', history, tab),
@@ -120,7 +120,7 @@ const pasteHidden  = computed(() => Math.max(0, (pasteConfirm.value?.text?.lengt
 // own timing once the results land.
 const isRunning = computed(() => !!props.activeTab?.runtime?.isRunning)
 const now = useTicker(isRunning)
-const runningMs = computed(() => Math.max(0, now.value - (props.activeTab?.startedAt ?? now.value)))
+const runningMs = computed(() => Math.max(0, now.value - (props.activeTab?.runtime.startedAt ?? now.value)))
 
 // Count applies to a find filter; aggregate pipelines have no single filter.
 
@@ -221,7 +221,7 @@ function toggleReadOnly() {
       v-if="rtab === 'Result' && activeTab.runtime.runError"
       mode="error"
       :message="activeTab.runtime.runError"
-      :code="activeTab.runErrorCode"
+      :code="activeTab.runtime.runErrorCode"
       retryable
       @retry="emit('run')"
     />
@@ -291,9 +291,9 @@ function toggleReadOnly() {
         icon="count"
         :icon-size="14"
         :disabled="isCountDisabled"
-        :active="activeTab.isCounting"
+        :active="activeTab.runtime.isCounting"
         @click="runCount"
-        @contextmenu="onCountContext"><template v-if="activeTab.isCounting">Counting…</template><template v-else>Count Documents<template v-if="countText != null">: {{ countText }}</template></template></BaseButton>
+        @contextmenu="onCountContext"><template v-if="activeTab.runtime.isCounting">Counting…</template><template v-else>Count Documents<template v-if="countText != null">: {{ countText }}</template></template></BaseButton>
       <span class="fitem" v-if="activeTab.runtime.isRunning">
         <BaseIcon name="clock" :size="14" />
         {{ (runningMs / 1000).toFixed(1) }}s
