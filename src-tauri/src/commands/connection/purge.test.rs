@@ -134,6 +134,7 @@ fn document_change(conn: &str) -> HistoryEntry {
         at: 0,
         doc_id: String::from("{\"$oid\":\"x\"}"),
         before: Some(String::from("{\"secret\":\"pre-image\"}")),
+        pre_image_dropped: false,
     }
 }
 
