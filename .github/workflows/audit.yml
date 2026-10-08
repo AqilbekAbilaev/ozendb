@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
 
       # The whole tree: vite and rollup build the bundle that ships, and the dev server
       # runs on contributors' machines.
