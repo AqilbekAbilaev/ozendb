@@ -21,7 +21,10 @@ For now, indicate your agreement by adding this line to your pull request descri
 
 **Prerequisites**
 
-- [Node.js](https://nodejs.org/) (LTS) and npm
+- [Node.js](https://nodejs.org/) and npm. The version is pinned in `.nvmrc` — `nvm use` (or
+  `fnm use`) picks it up, and CI reads the same file, so local and CI agree. Below Node 22.12
+  the toolchain is unsupported: npm warns on install, and npm 10 (which ships with Node 20)
+  crashes resolving `vitest`'s dependencies.
 - [Rust](https://www.rust-lang.org/tools/install) via `rustup` (a recent stable toolchain — the
   embedded JS shell needs cargo ≥ 1.88)
 - Tauri 2 system dependencies for your OS — see the
