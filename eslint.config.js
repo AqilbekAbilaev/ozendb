@@ -4,11 +4,11 @@ import pluginVue from 'eslint-plugin-vue'
 
 const ENGINE_NAME_CHECKS = [
   {
-    selector: "BinaryExpression[operator=/^[!=]==?$/] > Literal[value=/^(mongodb|postgresql)$/]",
+    selector: "BinaryExpression[operator=/^[!=]==?$/] > Literal[value=/^(mongodb|postgresql)$/], SwitchCase > Literal.test[value=/^(mongodb|postgresql)$/]",
     message: 'Ask src/engines (engineOf, ENGINES, ui.js) instead of comparing engine names.',
   },
   {
-    selector: "Property > Identifier.key[name=/^(mongodb|postgresql)$/]",
+    selector: "Property > Identifier.key[name=/^(mongodb|postgresql)$/], Property > Literal.key[value=/^(mongodb|postgresql)$/]",
     message: 'Per-engine tables belong in src/engines.',
   },
 ]
