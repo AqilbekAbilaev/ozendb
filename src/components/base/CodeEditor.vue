@@ -1,12 +1,12 @@
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { EditorView, lineNumbers as lineNumbersExt, keymap } from '@codemirror/view'
-import { EditorState, Prec } from '@codemirror/state'
+import { EditorState, Prec, Compartment } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { syntaxHighlighting, indentUnit, bracketMatching } from '@codemirror/language'
 import { baseTheme, codeHighlightStyle, jsonHighlightStyle } from '../../utils/codemirror/theme'
-import { languageExtension } from '../../utils/codemirror/languages'
+import { loadLanguage } from '../../utils/codemirror/languages'
 import { useMomentumScroll } from '../../composables/useMomentumScroll'
 import { editorTabWidth } from '../../stores/settings'
 
@@ -37,6 +37,10 @@ const view = shallowRef(null)
 // True while we push an external modelValue into the view, so the resulting docChanged
 // doesn't echo straight back out as an update:modelValue.
 let applyingModelValue = false
+// Some grammars arrive asynchronously (see languages.js), so the language sits in its own
+// compartment: a rebuild keeps the last one loaded, and a new one swaps in when it lands.
+const languageSlot = new Compartment()
+let grammar = []
 
 function buildState() {
   const base = []
@@ -54,7 +58,7 @@ function buildState() {
   base.push(bracketMatching())
   base.push(history())
   base.push(Prec.low(keymap.of([indentWithTab, ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap])))
-  base.push(languageExtension(props.language))
+  base.push(languageSlot.of(grammar))
   base.push(syntaxHighlighting(props.highlight === 'json' ? jsonHighlightStyle : codeHighlightStyle))
   base.push(baseTheme)
   // readonly blocks edits but keeps the editor focusable (caret + keyboard select). A
@@ -67,8 +71,17 @@ function buildState() {
   return EditorState.create({ doc: props.modelValue ?? '', extensions: [...base, ...props.extensions] })
 }
 
+async function applyLanguage() {
+  const language = props.language
+  const loaded = await loadLanguage(language)
+  if (language !== props.language) return
+  grammar = loaded
+  view.value?.dispatch({ effects: languageSlot.reconfigure(loaded) })
+}
+
 onMounted(() => {
   view.value = new EditorView({ state: buildState(), parent: hostEl.value })
+  applyLanguage()
 })
 
 // Touchpad momentum on the editor's own scroller (CodeMirror scrolls .cm-scroller, not hostEl).
@@ -92,9 +105,10 @@ watch(() => props.modelValue, (val) => {
 
 // Config changes rebuild the whole state — these are infrequent (readonly/mode/target or
 // a new extensions array), unlike per-keystroke doc changes handled above.
-watch([() => props.readonly, () => props.highlight, () => props.language, () => props.lineNumbers, () => props.extensions], () => {
+watch([() => props.readonly, () => props.highlight, () => props.lineNumbers, () => props.extensions], () => {
   if (view.value) view.value.setState(buildState())
 })
+watch(() => props.language, applyLanguage)
 
 function focus() { if (view.value) view.value.focus() }
 // getView exposes the live EditorView for the few sites that read the cursor line or the

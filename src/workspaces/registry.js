@@ -2,18 +2,20 @@
 // MongoDB definitions render. A tab renders its type's component and nothing else.
 import { defineAsyncComponent } from 'vue'
 import QuickstartPane from '../components/panes/QuickstartPane.vue'
-import MongoCollectionWorkspace from '../engines/mongodb/workspaces/collection/MongoCollectionWorkspace.vue'
-import IndexManagerPane from '../components/panes/IndexManagerPane.vue'
-import SchemaPane from '../components/panes/SchemaPane.vue'
-import SearchPane from '../components/panes/SearchPane.vue'
-import CurrentOpsPane from '../components/panes/CurrentOpsPane.vue'
-import ImportPane from '../components/panes/ImportPane.vue'
-import CsvImportPane from '../components/panes/CsvImportPane.vue'
-import ExportPane from '../components/panes/ExportPane.vue'
 
-// Lazy-loaded so CodeMirror (a large dep) is only fetched when a shell tab opens.
+// Everything but Quickstart is fetched the first time a tab of its kind opens: the
+// collection, shell and Current Operations panes carry CodeMirror, which would
+// otherwise be parsed on every launch (src/startupImports.test.js holds that line).
 // Declared once at module scope so repeated resolution returns the same identity.
+const MongoCollectionWorkspace = defineAsyncComponent(() => import('../engines/mongodb/workspaces/collection/MongoCollectionWorkspace.vue'))
 const ShellConsole = defineAsyncComponent(() => import('../components/app/ShellConsole.vue'))
+const IndexManagerPane = defineAsyncComponent(() => import('../components/panes/IndexManagerPane.vue'))
+const SchemaPane = defineAsyncComponent(() => import('../components/panes/SchemaPane.vue'))
+const SearchPane = defineAsyncComponent(() => import('../components/panes/SearchPane.vue'))
+const CurrentOpsPane = defineAsyncComponent(() => import('../components/panes/CurrentOpsPane.vue'))
+const ImportPane = defineAsyncComponent(() => import('../components/panes/ImportPane.vue'))
+const CsvImportPane = defineAsyncComponent(() => import('../components/panes/CsvImportPane.vue'))
+const ExportPane = defineAsyncComponent(() => import('../components/panes/ExportPane.vue'))
 
 export const WORKSPACE_COMPONENTS = Object.freeze({
   quickstart: QuickstartPane,
