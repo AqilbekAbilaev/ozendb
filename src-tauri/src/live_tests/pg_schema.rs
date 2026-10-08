@@ -1,5 +1,5 @@
 //! Live-PostgreSQL coverage of `list_columns_impl`'s identity/generated
-//! classification (`ozendb-96o.1`) — split into its own file rather than grown
+//! classification (#135) — split into its own file rather than grown
 //! into `pg_command.rs`, mirroring how that file itself was
 //! split out of `pg.rs`. Shares that file's `test_config`/
 //! `pool` helpers and skip behavior; see its module doc comment for how to run

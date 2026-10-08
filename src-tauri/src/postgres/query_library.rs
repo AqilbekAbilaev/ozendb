@@ -76,6 +76,14 @@ impl PgQueryLibraryStore {
     pub fn delete_saved(&self, id: &str) -> Result<(), AppError> {
         self.inner.update(|lib| lib.saved.retain(|q| q.id != id))
     }
+
+    /// Both the run history and the saved SQL: a saved query is bound to its connection.
+    pub fn remove_connection(&self, connection_id: &str) -> Result<(), AppError> {
+        self.inner.update(|lib| {
+            lib.history.remove(connection_id);
+            lib.saved.retain(|q| q.connection_id != connection_id);
+        })
+    }
 }
 
 #[cfg(test)]

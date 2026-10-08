@@ -45,7 +45,7 @@ export function useConnectionTree({ emit }) {
   }
   const sidebarEl = ref(null)        // root element, used to detect outside clicks
 
-  // A single click anywhere outside the sidebar (e.g. in the QueryWorkspace) clears
+  // A single click anywhere outside the sidebar (e.g. in a workspace) clears
   // the single-click collection highlight. Clicks inside the sidebar are handled by
   // the per-row handlers, so they're ignored here.
   function clearSelectionOnOutsideClick(e) {

@@ -55,7 +55,7 @@ pub async fn close_shell_session(
 }
 
 /// Persisted IntelliShell command history for a connection (oldest first).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_shell_history(
     history: State<'_, ShellHistoryStorage>,
     connection_id: String,
@@ -63,7 +63,7 @@ pub fn get_shell_history(
     history.get(&connection_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn push_shell_command(
     history: State<'_, ShellHistoryStorage>,
     connection_id: String,
@@ -72,7 +72,7 @@ pub fn push_shell_command(
     history.push(&connection_id, command)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_shell_history(
     history: State<'_, ShellHistoryStorage>,
     connection_id: String,
@@ -82,7 +82,7 @@ pub fn clear_shell_history(
 
 /// Read a shell script file the user picked (Open Script). Returns its text so
 /// the editor can load it. The frontend chooses the path via the OS file dialog.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_shell_script(path: String) -> Result<String, AppError> {
     match std::fs::read_to_string(&path) {
         Ok(val) => Ok(val),
@@ -92,7 +92,7 @@ pub fn read_shell_script(path: String) -> Result<String, AppError> {
 
 /// Write the editor's contents to a shell script file (Save Script). The
 /// frontend chooses the path via the OS save dialog.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_shell_script(path: String, contents: String) -> Result<(), AppError> {
     match std::fs::write(&path, contents) {
         Ok(_) => Ok(()),

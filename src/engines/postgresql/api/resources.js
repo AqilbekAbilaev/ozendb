@@ -33,7 +33,7 @@ export function tableStats({ connectionId, schema, table }) {
   return invoke('pg_table_stats', { id: connectionId, schema, table })
 }
 
-// Cross-table "Search in…" (ozendb-86k): every text-like column of every table in
+// Cross-table "Search in…" (#132): every text-like column of every table in
 // `tables` (or, omitted, every ordinary table in the schema) for `term` as a
 // substring (default) or, with `regex`, a pattern Postgres itself evaluates.
 // `runId` lets `cancelQuery` (queries.js) stop it — it registers under the same

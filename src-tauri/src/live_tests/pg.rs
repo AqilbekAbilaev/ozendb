@@ -158,7 +158,7 @@ async fn query_paging_and_count_round_trip() {
     }
 }
 
-/// `ConnectionPool::connect_postgres`'s `database` override (ozendb-bj2): the same
+/// `ConnectionPool::connect_postgres`'s `database` override (#124): the same
 /// connection's options, targeting a database other than the config's own, reusing
 /// everything else (host, credentials, TLS). Proven here at the `postgres::uri` layer that
 /// actually builds those options, since a live `ConnectionPool` needs an `AppHandle`

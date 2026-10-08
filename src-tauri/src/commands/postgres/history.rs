@@ -1,4 +1,4 @@
-//! Row-edit history for the table workspace (ozendb-h4y) — the Postgres sibling of
+//! Row-edit history for the table workspace (#129) — the Postgres sibling of
 //! MongoDB's `commands/history.rs`, scoped to `update_pg_row` edits only (see
 //! `postgres/row_history.rs`'s own doc comment for why).
 use crate::error::AppError;
@@ -10,7 +10,7 @@ use super::AppContext;
 
 /// Every recorded edit for one table, newest-first — backs the table workspace's
 /// history panel.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_pg_row_history(
     history: State<'_, PgRowHistoryStore>,
     id: String,
@@ -22,7 +22,7 @@ pub fn list_pg_row_history(
 }
 
 /// Forget all recorded edits for one table.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_pg_row_history(
     history: State<'_, PgRowHistoryStore>,
     id: String,

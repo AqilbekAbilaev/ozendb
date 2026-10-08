@@ -95,10 +95,9 @@ impl AppContext {
     /// already read, so the read-only check and the connect see one consistent view.
     ///
     /// IntelliShell writes never reach this function — the shell talks to the driver
-    /// directly — so they are gated separately by `shell::bridge::op_writes`, which
-    /// refuses write methods, write `runCommand`s and `$out`/`$merge` pipelines. Both
-    /// paths must stay in step: a new mutating command belongs here, a new shell
-    /// operation belongs there.
+    /// directly — so they are gated separately by `shell::bridge::read_only_refusal`,
+    /// which runs only operations it knows are reads. A new mutating command belongs
+    /// here; a new shell operation is refused there until it's listed as a read.
     pub async fn client_for_write(&self, id: &str) -> Result<Client, AppError> {
         self.pool.connect(&config_for(&self.storage, id, Access::Write)?).await
     }
@@ -139,7 +138,7 @@ impl AppContext {
     }
 
     /// `pg_pool`, but for a database other than the connection's own — opening a
-    /// second database on the same server (ozendb-bj2). `None` is exactly `pg_pool`.
+    /// second database on the same server (#124). `None` is exactly `pg_pool`.
     pub async fn pg_pool_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
         self.pool.connect_postgres(&config_for(&self.storage, id, Access::Read)?, database).await
     }

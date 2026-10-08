@@ -7,7 +7,7 @@ use super::AppContext;
 
 /// Every recorded change for one collection, newest-first — backs the Collection History
 /// panel (Studio-3T's undo-your-edits/deletes safety net).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_collection_history(
     history: State<'_, CollectionHistoryStore>,
     id: String,
@@ -18,7 +18,7 @@ pub fn list_collection_history(
 }
 
 /// Forget all history for one collection.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_collection_history(
     history: State<'_, CollectionHistoryStore>,
     id: String,
@@ -73,14 +73,10 @@ pub async fn restore_history(
 
     // update / delete: put the pre-image back. Upsert so a since-deleted document returns,
     // and the filter's _id is preserved on insert.
-    let before_text = match entry.before {
-        Some(val) => val,
-        None => {
-            return Err(AppError::Validation(
-                "This change has no saved pre-image to restore.".to_string(),
-            ))
-        }
-    };
+    if let Some(reason) = entry.restore_blocker() {
+        return Err(AppError::Validation(reason.to_string()));
+    }
+    let before_text = entry.before.unwrap_or_default();
     let before_bson = match decode_bson(&before_text) {
         Ok(val) => val,
         Err(e) => return Err(e),

@@ -18,7 +18,7 @@ pub struct PgColumnChange {
 }
 
 /// One recorded row edit, enough to identify and reverse it later. Scoped to
-/// `update_pg_row` only (ozendb-h4y v1) — SQL-tab statement effects and inserts/
+/// `update_pg_row` only (#129 v1) — SQL-tab statement effects and inserts/
 /// deletes aren't tracked here, the same scope MongoDB's history draws per-command.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PgHistoryEntry {
@@ -62,6 +62,10 @@ impl PgRowHistoryStore {
 
     pub fn get(&self, entry_id: &str) -> Option<PgHistoryEntry> {
         self.load().into_iter().find(|entry| entry.id == entry_id)
+    }
+
+    pub fn remove_connection(&self, conn_id: &str) -> Result<(), AppError> {
+        self.inner.update(|entries| entries.retain(|entry| entry.conn_id != conn_id))
     }
 
     pub fn clear_for(&self, conn_id: &str, database: &str, schema: &str, table: &str) -> Result<(), AppError> {

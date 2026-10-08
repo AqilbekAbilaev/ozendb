@@ -19,4 +19,9 @@ impl ExportWatermarkStorage {
             map.insert(key.to_string(), watermark.to_string());
         })
     }
+
+    pub fn remove_connection(&self, conn_id: &str) -> Result<(), AppError> {
+        let prefix = format!("{}/", conn_id);
+        self.inner.update(|map| map.retain(|key, _| !key.starts_with(&prefix)))
+    }
 }

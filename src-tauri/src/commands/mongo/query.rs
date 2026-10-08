@@ -39,6 +39,7 @@ pub(super) fn record_history(
         at: chrono::Utc::now().timestamp_millis(),
         doc_id: history_ejson(doc_id),
         before: before.map(|doc| history_ejson(&bson::Bson::Document(doc.clone()))),
+        pre_image_dropped: false,
     };
     let _ = history.push(entry);
 }

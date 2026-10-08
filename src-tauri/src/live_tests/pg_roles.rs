@@ -292,7 +292,7 @@ fn holds(grants: &[crate::commands::PgGrant], object: Option<&str>, privilege: &
         .map(|g| g.grantable)
 }
 
-// ozendb-ahy: GRANT and REVOKE round-trip through what list_grants_impl reports.
+// #141: GRANT and REVOKE round-trip through what list_grants_impl reports.
 #[tokio::test]
 async fn grants_and_revokes_privileges_on_schemas_tables_and_sequences() {
     let config = match test_config() {

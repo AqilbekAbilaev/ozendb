@@ -1,4 +1,4 @@
-// Canonical, engine-neutral resource identity (Work 2 contract). A ResourceRef is a
+// Canonical, engine-neutral resource identity. A ResourceRef is a
 // connection plus an ordered list of { kind, name } segments from shallowest to
 // deepest, so deeper hierarchies (e.g. PostgreSQL database/schema/table) fit without
 // another redesign. Names are opaque — never parsed by `/` or `.` — and display names

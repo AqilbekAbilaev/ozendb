@@ -1,4 +1,4 @@
-//! Live-PostgreSQL coverage of `insert_row_impl` (`ozendb-96o.3`) — split into its
+//! Live-PostgreSQL coverage of `insert_row_impl` (#137) — split into its
 //! own file rather than grown into `pg_command.rs`, mirroring how
 //! that file itself was split out of `pg.rs`. Shares that file's
 //! `test_config`/`pool` helpers and skip behavior; see its module doc comment for
