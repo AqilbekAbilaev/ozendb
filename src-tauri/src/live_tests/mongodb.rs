@@ -9,6 +9,7 @@
 //! Run them with, e.g.:
 //!   OZENDB_TEST_MONGODB=127.0.0.1:27017 cargo test live_tests::mongodb
 
+use crate::commands::resolved_index_name;
 use crate::storage::{ConnectionConfig, HostEntry};
 use crate::uri;
 use mongodb::bson::{doc, Document};
@@ -308,4 +309,79 @@ async fn read_only_shell_runs_reads_and_refuses_the_rest() {
     assert_eq!(count, 0);
 
     shell.close(String::from("it-shell-ro"));
+}
+
+/// #237: a raw `createIndexes` command (what `create_index` sends) requires `name` in
+/// every spec, unlike the driver's typed index builder which fills it in — leaving the
+/// index dialog's name field blank used to fail against a real server. The driver is the
+/// authority on what that default name is, so this creates an index with the typed
+/// builder and no name, and asserts `resolved_index_name` computes the same thing the
+/// driver did — not merely that a name we made up is accepted (any non-empty name would
+/// be).
+#[tokio::test]
+async fn create_index_without_a_name_round_trip() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_MONGODB=host[:port] to run live tests");
+            return;
+        }
+    };
+    let client = connect(&config).await;
+    let db = client.database("ozendb_it_index");
+    let col = db.collection::<Document>("items");
+    match col.drop().await {
+        Ok(_) => {}
+        Err(e) => panic!("drop collection: {}", e),
+    }
+
+    let keys = doc! { "email": 1, "age": -1 };
+    let model = mongodb::IndexModel::builder().keys(keys.clone()).build();
+    match col.create_index(model).await {
+        Ok(_) => {}
+        Err(e) => panic!("create_index: {}", e),
+    }
+
+    let listed = match db.run_command(doc! { "listIndexes": "items" }).await {
+        Ok(val) => val,
+        Err(e) => panic!("listIndexes: {}", e),
+    };
+    let first_batch = match listed.get_document("cursor") {
+        Ok(cursor) => match cursor.get_array("firstBatch") {
+            Ok(val) => val,
+            Err(e) => panic!("firstBatch: {}", e),
+        },
+        Err(e) => panic!("cursor: {}", e),
+    };
+    let driver_name = first_batch
+        .iter()
+        .find_map(|entry| {
+            let entry_doc = entry.as_document()?;
+            if entry_doc.get_document("key").ok()? == &keys {
+                entry_doc.get_str("name").ok().map(str::to_string)
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| panic!("expected an index matching {:?} after create_index", keys));
+
+    assert_eq!(resolved_index_name(&Document::new(), &keys), driver_name);
+
+    // Also pins the actual shape `create_index` sends: a raw `createIndexes` whose only
+    // generated field is this same name, on a second field so it doesn't collide.
+    let other_keys = doc! { "country": 1 };
+    let other_name = resolved_index_name(&Document::new(), &other_keys);
+    let command = doc! {
+        "createIndexes": "items",
+        "indexes": [{ "key": other_keys, "name": &other_name }],
+    };
+    match db.run_command(command).await {
+        Ok(_) => {}
+        Err(e) => panic!("createIndexes with a generated name should succeed: {}", e),
+    }
+
+    match db.drop().await {
+        Ok(_) => {}
+        Err(e) => panic!("drop db: {}", e),
+    }
 }

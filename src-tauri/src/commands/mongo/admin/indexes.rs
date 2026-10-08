@@ -37,8 +37,10 @@ pub async fn list_indexes(
 /// `expireAfterSeconds`, `partialFilterExpression`, `collation`, text `weights`,
 /// geo tuning, `background`, `hidden`, … — so the JSON escape hatch and every form
 /// tab share one path and new options need no backend change. The `key` field is set
-/// from `keys` and always wins over any `key` in `options`. An empty `options`
-/// document (and no `name`) lets MongoDB auto-generate the name.
+/// from `keys` and always wins over any `key` in `options`. Unlike the driver's typed
+/// index builder, a raw `createIndexes` command requires `name` in every spec, so when
+/// `options` carries none (the dialog's "leave it blank" case) we generate MongoDB's
+/// own default name ourselves before sending the command.
 #[tauri::command]
 pub async fn create_index(
     ctx: State<'_, AppContext>,
@@ -62,7 +64,9 @@ pub async fn create_index(
     let run = async {
         let client = ctx.client_for_write(&id).await?;
         let keys_doc = parse_ejson_document(&keys)?;
-    let mut index_doc = parse_ejson_document(&options)?;
+        let mut index_doc = parse_ejson_document(&options)?;
+        let name = resolved_index_name(&index_doc, &keys_doc);
+        index_doc.insert("name", name);
         index_doc.insert("key", keys_doc);
         let command = bson::doc! {
             "createIndexes": &collection,
@@ -72,6 +76,39 @@ pub async fn create_index(
         Ok(())
     };
     tracked(&ops, Some(meta), run).await
+}
+
+/// The name to store on the index spec: the caller's own `name` when it gave a
+/// non-empty one, otherwise MongoDB's own default name computed from `keys`. An empty
+/// string is treated the same as "not provided" — "" is never a usable index name, and
+/// it's exactly what the dialog's blank field collapses to when the JSON escape hatch is
+/// used (the form tab omits the key entirely instead; both land here the same way).
+pub(crate) fn resolved_index_name(options: &bson::Document, keys: &bson::Document) -> String {
+    match options.get_str("name") {
+        Ok(name) if !name.is_empty() => name.to_string(),
+        _ => default_index_name(keys),
+    }
+}
+
+/// MongoDB's own default index name: each key rendered as `<field>_<value>` and joined
+/// with `_`, e.g. `{ a: 1, b: -1 }` -> "a_1_b_-1". Dotted field paths are used as
+/// written, matching what MongoDB generates for a raw key spec.
+fn default_index_name(keys: &bson::Document) -> String {
+    keys.iter()
+        .map(|(field, value)| format!("{}_{}", field, index_value_name(value)))
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
+// Renders one key's direction/type the way MongoDB's own name generator
+// (`IndexModel::update_name` in the driver) does.
+fn index_value_name(value: &bson::Bson) -> String {
+    match value {
+        // Every other BSON type's Display is already the form MongoDB uses; a String's
+        // is quoted, which an index name must not be.
+        bson::Bson::String(s) => s.clone(),
+        other => other.to_string(),
+    }
 }
 
 #[tauri::command]
@@ -161,3 +198,6 @@ pub async fn index_stats(
     collect_values(&mut cursor).await
 }
 
+#[cfg(test)]
+#[path = "indexes.test.rs"]
+mod tests;
