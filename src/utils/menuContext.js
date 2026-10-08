@@ -7,17 +7,13 @@
 // active (which at launch is always the context-less Quickstart tab).
 //
 // Identity is a ResourceRef, never a set of tab fields. The tree hands its selection's
-// ref straight over (see useConnectionTree); a tab's comes from its declared kind. So
-// depth is counted once — segments — rather than re-derived per field per level, and a
-// tab's scope is what it says it is rather than whichever fields happen to be set.
-// That is what keeps Current Operations, which carries dbName/collName as *filters*,
-// from enabling the Database menu.
-//
-// A workspace kind missing from legacyResourceRef's TAB_SCOPES resolves to no
-// resource and gates everything off. That fails closed — a menu action can never fire
-// against a target it could not identify — but it does mean a new workspace kind must
-// be registered there or its menus stay dark.
-import { resourceFromLegacyTab, legacyTargetFromResource } from './legacyResourceRef'
+// ref straight over (see useConnectionTree); a tab's is the `target` its definition
+// gave it. So depth is counted once — segments — rather than re-derived per field per
+// level, and a tab's scope is what it says it is rather than whichever fields happen to
+// be set. That is what keeps Current Operations, which carries dbName/collName as
+// *filters*, from enabling the Database menu. A tab without a target (Quickstart)
+// names no resource and gates everything off.
+import { legacyTargetFromResource } from './legacyResourceRef'
 import { sameResource } from './resourceRef'
 
 // How many segments each gated level needs.
@@ -75,7 +71,7 @@ function depth(ref) {
 //   openTabs       every open workspace, for the lock of one showing the selected resource
 export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false, openTabs = []) {
   const tab = activeTab || null
-  const tabDepth = depth(mongoResource(tab, resourceFromLegacyTab(tab)))
+  const tabDepth = depth(mongoResource(tab, tab?.target ?? null))
   const selDepth = depth(mongoResource(treeSelection, treeSelection?.resource))
   const reaches = (level) => tabDepth >= DEPTH[level] || selDepth >= DEPTH[level]
 
@@ -136,7 +132,7 @@ export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null
   const sel = treeSelection || null
   const tab = activeTab || null
   const selRef = mongoResource(sel, sel?.resource ?? null)
-  const tabRef = mongoResource(tab, resourceFromLegacyTab(tab))
+  const tabRef = mongoResource(tab, tab?.target ?? null)
   const needed = DEPTH[requiredLevel] ?? DEPTH.connection
 
   if (depth(selRef) >= needed) return nodeFrom(sel, selRef)
