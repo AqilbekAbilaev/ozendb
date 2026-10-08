@@ -74,7 +74,7 @@ struson = { version = "0.7", features = ["serde"] }
 # Pure-Rust .xlsx writer for the "Export to Excel" format. No C deps; the workbook
 # is assembled in memory then saved, so xlsx exports are bounded by the row limit
 # (CSV/JSON remain the streaming path for very large collections).
-rust_xlsxwriter = "0.96"
+rust_xlsxwriter = "0.99"
 # Pure-Rust .docx writer for "export schema documentation" as a Word document
 # (alongside the CSV form). Small reports, so the doc is built in memory then packed.
 docx-rs = "0.4"
