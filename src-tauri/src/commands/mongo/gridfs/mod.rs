@@ -41,11 +41,11 @@ pub(crate) fn extract_file(doc: &bson::Document) -> GridFsFile {
         _ => None,
     };
     GridFsFile {
-        id: id,
-        filename: filename,
+        id,
+        filename,
         length: crate::commands::bson_as_i64(doc.get("length")).unwrap_or(0),
-        upload_date: upload_date,
-        content_type: content_type,
+        upload_date,
+        content_type,
     }
 }
 
@@ -269,7 +269,7 @@ pub async fn gridfs_drop_bucket(
     let db = client.database(&database);
     for suffix in ["files", "chunks"] {
         let coll = db.collection::<bson::Document>(&format!("{bucket}.{suffix}"));
-        let _ = coll.drop().await?;
+        coll.drop().await?;
     }
     Ok(())
 }

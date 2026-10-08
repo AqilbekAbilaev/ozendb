@@ -59,8 +59,8 @@ pub async fn list_users(
                     _ => database.clone(),
                 };
                 users.push(UserInfo {
-                    user: user,
-                    db: db,
+                    user,
+                    db,
                     roles: extract_roles(user_doc),
                 });
             }
@@ -183,14 +183,14 @@ pub async fn copy_users_to_connection(
             match target_db.run_command(command).await {
                 Ok(_) => copied.push(CopiedUser {
                     user: username,
-                    roles: roles,
+                    roles,
                     status: String::from("created"),
                     temp_password: Some(temp_password),
                     message: None,
                 }),
                 Err(e) => copied.push(CopiedUser {
                     user: username,
-                    roles: roles,
+                    roles,
                     status: String::from("error"),
                     temp_password: None,
                     message: Some(format!("{e}")),

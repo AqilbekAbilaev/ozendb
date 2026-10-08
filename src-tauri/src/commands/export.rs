@@ -94,10 +94,7 @@ pub(crate) fn docs_to_csv(docs: &[bson::Document]) -> String {
 pub(crate) fn docs_to_json_array(docs: &[bson::Document]) -> Result<String, AppError> {
     let mut out = String::from("[");
     for (index, doc) in docs.iter().enumerate() {
-        let element = match json_array_element(doc, index == 0) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let element = json_array_element(doc, index == 0)?;
         out.push_str(&element);
     }
     if !docs.is_empty() {
@@ -442,7 +439,7 @@ pub(crate) fn docs_to_xlsx(docs: &[bson::Document], path: &str) -> Result<usize,
 
 // A file-writing failure from rust_xlsxwriter isn't user input, so report it as I/O.
 fn xlsx_error(e: rust_xlsxwriter::XlsxError) -> AppError {
-    AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+    AppError::Io(std::io::Error::other(e.to_string()))
 }
 
 // Write one BSON value into a worksheet cell, using a native Excel type where it maps

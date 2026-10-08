@@ -244,17 +244,17 @@ pub fn set_menu_context(
     has_pg_table: bool,
 ) -> Result<(), String> {
     let context = MenuContext {
-        has_connection: has_connection,
-        has_database: has_database,
-        has_collection: has_collection,
-        any_connection: any_connection,
-        has_document: has_document,
-        has_field: has_field,
-        has_index: has_index,
-        read_only: read_only,
-        can_refresh_tab: can_refresh_tab,
-        has_pg_schema: has_pg_schema,
-        has_pg_table: has_pg_table,
+        has_connection,
+        has_database,
+        has_collection,
+        any_connection,
+        has_document,
+        has_field,
+        has_index,
+        read_only,
+        can_refresh_tab,
+        has_pg_schema,
+        has_pg_table,
     };
     let mut state = match items.0.lock() {
         Ok(val) => val,
@@ -268,10 +268,7 @@ pub fn set_menu_context(
             Err(e) => return Err(e.to_string()),
         };
         clear_accelerators(&state.accelerated);
-        match install(&app, built.menu) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        install(&app, built.menu)?;
         state.scope = scope;
         state.gated = built.gated;
         state.accelerated = built.accelerated;

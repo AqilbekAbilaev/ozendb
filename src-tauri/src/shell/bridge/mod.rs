@@ -50,7 +50,7 @@ pub(super) struct DbContext {
 
 /// Register `__mongo` and install the `db` Proxy preamble on a context.
 pub(super) fn install_db(context: &mut Context, slot: Rc<RefCell<Option<DbInner>>>) {
-    let captures = DbContext { slot: slot };
+    let captures = DbContext { slot };
     let mongo = NativeFunction::from_copy_closure_with_captures(
         |_this, args, captures: &DbContext, context| mongo_call(args, captures, context),
         captures,
@@ -286,9 +286,6 @@ pub(crate) fn pipeline_writes(pipeline: &serde_json::Value) -> bool {
         None => false,
     }
 }
-
-/// Dispatch one decoded `{ collection, method, args }` operation to the driver,
-/// blocking on the async call via the provided runtime handle.
 
 #[cfg(test)]
 use driver::{arg_doc, to_document};

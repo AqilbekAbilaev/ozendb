@@ -37,7 +37,7 @@ fn capped_maps_size_and_max() {
         clustered_index_name: None,
     };
     let command = build_create_command("logs", Some(options)).unwrap();
-    assert_eq!(command.get_bool("capped").unwrap(), true);
+    assert!(command.get_bool("capped").unwrap());
     assert_eq!(command.get_i64("size").unwrap(), 1048576);
     assert_eq!(command.get_i64("max").unwrap(), 1000);
 }
@@ -132,7 +132,7 @@ fn clustered_maps_fixed_id_index() {
     let command = build_create_command("events", Some(options)).unwrap();
     let clustered = command.get_document("clusteredIndex").unwrap();
     assert_eq!(clustered.get_document("key").unwrap().get_i32("_id").unwrap(), 1);
-    assert_eq!(clustered.get_bool("unique").unwrap(), true);
+    assert!(clustered.get_bool("unique").unwrap());
     assert_eq!(clustered.get_str("name").unwrap(), "primary");
 }
 

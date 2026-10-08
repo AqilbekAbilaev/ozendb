@@ -80,7 +80,7 @@ impl KnownHostsStore {
             hosts.retain(|h| !(h.host == host && h.port == port));
             hosts.push(KnownHost {
                 host: host.to_string(),
-                port: port,
+                port,
                 key: key.to_string(),
                 added: crate::time::now_ms(),
             });

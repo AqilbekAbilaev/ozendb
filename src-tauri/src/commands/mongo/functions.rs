@@ -50,7 +50,7 @@ pub async fn list_functions(
             None => continue,
         };
         functions.push(StoredFunction {
-            name: name,
+            name,
             body: code_to_string(doc.get("value")),
         });
     }

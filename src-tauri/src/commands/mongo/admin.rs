@@ -30,7 +30,7 @@ pub(super) fn data_op_meta(
 ) -> OpMeta {
     OpMeta {
         op_type: op_type.to_string(),
-        label: label,
+        label,
         connection_id: Some(id.to_string()),
         conn_name: ctx.storage.find(id).map(|config| config.name),
         database: Some(database.to_string()),
@@ -59,7 +59,7 @@ pub async fn list_databases(
             Ok(val) => val,
             Err(_) => {
                 databases.push(DatabaseInfo {
-                    name: name,
+                    name,
                     collections: Vec::new(),
                     accessible: false,
                 });
@@ -67,8 +67,8 @@ pub async fn list_databases(
             }
         };
         databases.push(DatabaseInfo {
-            name: name,
-            collections: collections,
+            name,
+            collections,
             accessible: true,
         });
     }
@@ -268,10 +268,7 @@ pub async fn get_validator(
     let validator = match options.get("validator") {
         Some(bson::Bson::Document(doc)) if !doc.is_empty() => {
             let value = serde_json::Value::from(bson::Bson::Document(doc.clone()));
-            match serde_json::to_string_pretty(&value) {
-                Ok(text) => Some(text),
-                Err(_) => None,
-            }
+            serde_json::to_string_pretty(&value).ok()
         }
         _ => None,
     };
@@ -284,9 +281,9 @@ pub async fn get_validator(
         _ => None,
     };
     Ok(ValidatorInfo {
-        validator: validator,
-        validation_level: validation_level,
-        validation_action: validation_action,
+        validator,
+        validation_level,
+        validation_action,
     })
 }
 

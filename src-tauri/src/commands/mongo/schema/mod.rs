@@ -106,7 +106,7 @@ fn collect_paths(doc: &bson::Document, prefix: &str, seen: &mut BTreeMap<String,
 // only once for this document.
 fn record_type(path: &str, value: &bson::Bson, seen: &mut BTreeMap<String, Vec<String>>) {
     let type_name = bson_type_name(value).to_string();
-    let entry = seen.entry(path.to_string()).or_insert_with(Vec::new);
+    let entry = seen.entry(path.to_string()).or_default();
     if !entry.iter().any(|existing| existing == &type_name) {
         entry.push(type_name);
     }
@@ -126,7 +126,7 @@ pub(crate) fn infer_schema(docs: &[bson::Document]) -> SchemaReport {
         for (path, types) in seen {
             let present_entry = present.entry(path.clone()).or_insert(0);
             *present_entry += 1;
-            let counts = type_counts.entry(path).or_insert_with(BTreeMap::new);
+            let counts = type_counts.entry(path).or_default();
             for type_name in types {
                 let count_entry = counts.entry(type_name).or_insert(0);
                 *count_entry += 1;
@@ -154,15 +154,15 @@ pub(crate) fn infer_schema(docs: &[bson::Document]) -> SchemaReport {
                 .then_with(|| a.bson_type.cmp(&b.bson_type))
         });
         fields.push(FieldSchema {
-            path: path,
+            path,
             present: present_count,
-            types: types,
+            types,
         });
     }
 
     SchemaReport {
         sampled: docs.len() as u64,
-        fields: fields,
+        fields,
     }
 }
 

@@ -34,10 +34,7 @@ pub(crate) fn test_config() -> Option<ConnectionConfig> {
     };
     let (host, port) = match target.split_once(':') {
         Some((h, p)) => {
-            let parsed = match p.parse::<u16>() {
-                Ok(val) => val,
-                Err(_) => 5432,
-            };
+            let parsed = p.parse::<u16>().unwrap_or(5432);
             (h.to_string(), parsed)
         }
         None => (target, 5432),
@@ -45,7 +42,7 @@ pub(crate) fn test_config() -> Option<ConnectionConfig> {
     Some(ConnectionConfig {
         id: String::from("pg-it-test"),
         name: String::from("integration-test"),
-        hosts: vec![HostEntry { host: host, port: port }],
+        hosts: vec![HostEntry { host, port }],
         // `build_options` rejects an empty username, so this always resolves to
         // something — "postgres" (the common default superuser) unless overridden.
         username: Some(

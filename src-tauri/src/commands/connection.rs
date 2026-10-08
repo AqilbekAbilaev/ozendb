@@ -169,9 +169,7 @@ pub async fn save_connection(
         EngineConfig::Postgres(_) => ctx.pool.connect_postgres(&config, None).await.map(|_| ()),
         EngineConfig::Mongo(_) => ctx.pool.connect(&config).await.map(|_| ()),
     };
-    if let Err(e) = warm {
-        return Err(e);
-    }
+    warm?;
 
     Ok(id)
 }
@@ -215,10 +213,7 @@ fn secret_keys(id: &str) -> [String; 3] {
 fn copy_secrets(from: &str, to: &str) -> Result<(), AppError> {
     for (source, target) in secret_keys(from).iter().zip(secret_keys(to).iter()) {
         if let Some(secret) = crate::keychain::get(source) {
-            match crate::keychain::set(target, &secret) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
+            crate::keychain::set(target, &secret)?;
         }
     }
     Ok(())
@@ -244,14 +239,8 @@ pub fn duplicate_connection(
     copy.open = false;
 
     // Carry over keychain secrets (main password + SSH secrets) to the new id's keys.
-    match copy_secrets(&id, &new_id) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    match ctx.storage.add(copy.clone()) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    copy_secrets(&id, &new_id)?;
+    ctx.storage.add(copy.clone())?;
     Ok(copy)
 }
 
@@ -267,7 +256,7 @@ pub fn export_connections(ctx: State<'_, AppContext>, path: String) -> Result<us
     };
     match std::fs::write(&path, contents) {
         Ok(_) => Ok(connections.len()),
-        Err(e) => return Err(AppError::Io(e)),
+        Err(e) => Err(AppError::Io(e)),
     }
 }
 

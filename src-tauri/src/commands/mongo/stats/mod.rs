@@ -41,7 +41,7 @@ pub(crate) fn extract_stats(doc: &bson::Document) -> CollectionStats {
     if let Some(bson::Bson::Document(sizes)) = doc.get("indexSizes") {
         for (name, value) in sizes {
             if let Some(size) = crate::commands::bson_as_i64(Some(value)) {
-                indexes.push(IndexSize { name: name.clone(), size: size });
+                indexes.push(IndexSize { name: name.clone(), size });
             }
         }
     }
@@ -58,15 +58,15 @@ pub(crate) fn extract_stats(doc: &bson::Document) -> CollectionStats {
     };
 
     CollectionStats {
-        ns: ns,
+        ns,
         count: crate::commands::bson_as_i64(doc.get("count")),
         size: crate::commands::bson_as_i64(doc.get("size")),
         avg_obj_size: crate::commands::bson_as_i64(doc.get("avgObjSize")),
         storage_size: crate::commands::bson_as_i64(doc.get("storageSize")),
         total_index_size: crate::commands::bson_as_i64(doc.get("totalIndexSize")),
         nindexes: crate::commands::bson_as_i64(doc.get("nindexes")),
-        capped: capped,
-        indexes: indexes,
+        capped,
+        indexes,
         raw: serde_json::Value::from(bson::Bson::Document(doc.clone())),
     }
 }

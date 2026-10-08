@@ -84,7 +84,7 @@ pub async fn copy_collection_to_connection(
 
     // Replace semantics: drop the target so a re-copy doesn't collide on `_id`. Dropping a
     // non-existent collection is a no-op in MongoDB.
-    let _ = dst.drop().await?;
+    dst.drop().await?;
 
     // Stream the source and insert in bounded batches so peak memory stays O(batch).
     let mut cursor = match src.find(bson::doc! {}).await {

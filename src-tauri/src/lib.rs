@@ -2,9 +2,13 @@
 // (or `RwLock`) guard across an `.await` can stall or deadlock the runtime. The
 // stores here are deliberately written to lock-clone-drop *before* awaiting; this
 // lint keeps that invariant from silently regressing as new async code is added.
-// `deny` (not `warn`) so a regression fails `cargo clippy` outright instead of
-// being lost among the crate's other (intentional, house-style) lint warnings.
+// `deny` (not `warn`) so a regression fails a local `cargo clippy` too, not only CI's.
 #![deny(clippy::await_holding_lock)]
+// A #[tauri::command]'s parameters are the frontend's payload keys, so bundling them
+// into a struct would change the wire shape to satisfy a style lint.
+#![allow(clippy::too_many_arguments)]
+// sqlx reads rows into tuples written out at the query; an alias would only move them.
+#![allow(clippy::type_complexity)]
 
 mod commands;
 mod collection_history;
@@ -107,7 +111,7 @@ pub fn run() {
                 app.handle().clone(),
             );
             let storage = Storage::new(data_dir.join("connections.json"));
-            app.manage(AppContext { pool: pool, storage: storage });
+            app.manage(AppContext { pool, storage });
             app.manage(ShellEngine::new());
             app.manage(ShellHistoryStorage::new(
                 data_dir.join("shell_history.json"),

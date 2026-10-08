@@ -74,10 +74,7 @@ fn scalar_text(value: &bson::Bson) -> Option<String> {
         bson::Bson::Boolean(val) => Some(val.to_string()),
         bson::Bson::ObjectId(val) => Some(val.to_hex()),
         bson::Bson::Decimal128(val) => Some(val.to_string()),
-        bson::Bson::DateTime(val) => match val.try_to_rfc3339_string() {
-            Ok(text) => Some(text),
-            Err(_) => None,
-        },
+        bson::Bson::DateTime(val) => val.try_to_rfc3339_string().ok(),
         _ => None,
     }
 }
@@ -182,7 +179,7 @@ pub async fn search_collections(
         } else {
             trimmed.to_lowercase()
         };
-        Matcher::Substr { needle: needle, case_sensitive: case_sensitive }
+        Matcher::Substr { needle, case_sensitive }
     };
 
     let scope = match scope.as_deref() {
@@ -243,14 +240,14 @@ pub async fn search_collections(
                     database: database.clone(),
                     collection: name.clone(),
                     id: id_str.clone(),
-                    path: path,
-                    value: value,
+                    path,
+                    value,
                 });
             }
         }
     }
 
-    Ok(SearchResult { hits: hits, scanned: scanned, truncated: truncated })
+    Ok(SearchResult { hits, scanned, truncated })
 }
 
 #[cfg(test)]

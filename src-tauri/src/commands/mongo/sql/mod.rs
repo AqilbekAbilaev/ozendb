@@ -204,18 +204,12 @@ fn convert_projection(items: &[SelectItem]) -> Result<Vec<(String, J)>, String> 
             // SELECT * → all fields, i.e. an empty projection.
             SelectItem::Wildcard(_) => return Ok(Vec::new()),
             SelectItem::UnnamedExpr(expr) => {
-                let field = match projection_field(expr) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
+                let field = projection_field(expr)?;
                 out.push((field, J::Int(1)));
             }
             // `AS alias` is accepted and ignored (projection uses the source field).
             SelectItem::ExprWithAlias { expr, alias: _ } => {
-                let field = match projection_field(expr) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
+                let field = projection_field(expr)?;
                 out.push((field, J::Int(1)));
             }
             other => return Err(format!("Unsupported SELECT item: `{other}`")),
@@ -267,10 +261,7 @@ fn convert_order_by(order_by: &Option<OrderBy>) -> Result<Vec<(String, J)>, Stri
     match &order_by.kind {
         OrderByKind::Expressions(exprs) => {
             for order_expr in exprs {
-                let field = match ident_field(&order_expr.expr) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
+                let field = ident_field(&order_expr.expr)?;
                 // asc == Some(false) means DESC; ASC or unspecified is ascending.
                 let dir = if order_expr.options.asc == Some(false) { -1 } else { 1 };
                 out.push((field, J::Int(dir)));
@@ -297,16 +288,16 @@ fn convert_limit(limit_clause: &Option<LimitClause>) -> Result<(Option<i64>, Opt
                 return Err("LIMIT BY is not supported".to_string());
             }
             let limit_val = match limit {
-                Some(expr) => match expect_int(expr) {
-                    Ok(val) => Some(val),
-                    Err(e) => return Err(e),
+                Some(expr) => {
+                    let val = expect_int(expr)?;
+                    Some(val)
                 },
                 None => None,
             };
             let skip_val = match offset {
-                Some(off) => match expect_int(&off.value) {
-                    Ok(val) => Some(val),
-                    Err(e) => return Err(e),
+                Some(off) => {
+                    let val = expect_int(&off.value)?;
+                    Some(val)
                 },
                 None => None,
             };
@@ -360,37 +351,25 @@ pub(crate) fn sql_to_mql(sql: &str) -> Result<MqlQuery, String> {
         _ => return Err("GROUP BY is not supported yet".to_string()),
     }
 
-    let projection = match convert_projection(&select.projection) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let collection = match convert_from(&select.from) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let projection = convert_projection(&select.projection)?;
+    let collection = convert_from(&select.from)?;
     let filter = match &select.selection {
-        Some(expr) => match filter::convert_where(expr) {
-            Ok(val) => filter::expr_to_j(val),
-            Err(e) => return Err(e),
+        Some(expr) => {
+            let val = filter::convert_where(expr)?;
+            filter::expr_to_j(val)
         },
         None => J::Obj(Vec::new()),
     };
-    let sort = match convert_order_by(&order_by) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let (limit, skip) = match convert_limit(&limit_clause) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let sort = convert_order_by(&order_by)?;
+    let (limit, skip) = convert_limit(&limit_clause)?;
 
     Ok(MqlQuery {
-        collection: collection,
+        collection,
         filter: filter.to_pretty(0),
         projection: J::Obj(projection).to_pretty(0),
         sort: J::Obj(sort).to_pretty(0),
-        limit: limit,
-        skip: skip,
+        limit,
+        skip,
     })
 }
 

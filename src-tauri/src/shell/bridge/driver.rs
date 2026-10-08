@@ -241,11 +241,8 @@ fn update_result_to_json(result: mongodb::results::UpdateResult) -> serde_json::
         String::from("modifiedCount"),
         serde_json::Value::from(result.modified_count),
     );
-    match result.upserted_id {
-        Some(id) => {
-            out.insert(String::from("upsertedId"), serde_json::Value::from(id));
-        }
-        None => {}
+    if let Some(id) = result.upserted_id {
+        out.insert(String::from("upsertedId"), serde_json::Value::from(id));
     }
     serde_json::Value::Object(out)
 }

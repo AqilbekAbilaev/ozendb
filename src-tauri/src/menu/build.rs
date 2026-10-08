@@ -55,56 +55,29 @@ fn build_submenu(
     gated: &mut Vec<(MenuItem<Wry>, Gate, bool)>,
     accelerated: &mut Vec<MenuItem<Wry>>,
 ) -> tauri::Result<Submenu<Wry>> {
-    let submenu = match Submenu::new(app, name, true) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let submenu = Submenu::new(app, name, true)?;
 
     // The Edit menu also carries the standard clipboard/undo items so the webview
     // gets working OS shortcuts — but only where they don't trip the WebKitGTK
     // swallow trap (see `accelerators_enabled`).
     if name == "Edit" && accelerators_enabled() {
-        let clipboard = match edit_clipboard_items(app) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let clipboard = edit_clipboard_items(app)?;
         for predefined in clipboard.iter() {
-            match submenu.append(predefined) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
+            submenu.append(predefined)?;
         }
-        let separator = match PredefinedMenuItem::separator(app) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-        match submenu.append(&separator) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let separator = PredefinedMenuItem::separator(app)?;
+        submenu.append(&separator)?;
     }
 
     for spec in specs.iter() {
         match spec {
             Spec::Separator => {
-                let separator = match PredefinedMenuItem::separator(app) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
-                match submenu.append(&separator) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
+                let separator = PredefinedMenuItem::separator(app)?;
+                submenu.append(&separator)?;
             }
             Spec::Placeholder { id, label } => {
-                let item = match MenuItem::with_id(app, *id, *label, false, None::<&str>) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
-                match submenu.append(&item) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
+                let item = MenuItem::with_id(app, *id, *label, false, None::<&str>)?;
+                submenu.append(&item)?;
             }
             Spec::Action { id, label, accel, gate } => {
                 // On macOS the app menu's predefined Quit already owns ⌘Q, so the
@@ -130,14 +103,8 @@ fn build_submenu(
                 // Gated items start disabled; the frontend pushes the real context
                 // right after load. Always-on items (gate: None) start enabled.
                 let enabled = gate.is_none();
-                let item = match MenuItem::with_id(app, *id, *label, enabled, accelerator) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
-                match submenu.append(&item) {
-                    Ok(val) => val,
-                    Err(e) => return Err(e),
-                };
+                let item = MenuItem::with_id(app, *id, *label, enabled, accelerator)?;
+                submenu.append(&item)?;
                 if let Some(gate_value) = gate {
                     gated.push((item.clone(), *gate_value, is_write_action(id)));
                 }
@@ -153,34 +120,13 @@ fn build_submenu(
 
 // The predefined undo/redo/cut/copy/paste/select-all items for the Edit menu.
 fn edit_clipboard_items(app: &AppHandle) -> tauri::Result<Vec<PredefinedMenuItem<Wry>>> {
-    let undo = match PredefinedMenuItem::undo(app, None) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let redo = match PredefinedMenuItem::redo(app, None) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let separator = match PredefinedMenuItem::separator(app) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let cut = match PredefinedMenuItem::cut(app, None) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let copy = match PredefinedMenuItem::copy(app, None) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let paste = match PredefinedMenuItem::paste(app, None) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
-    let select_all = match PredefinedMenuItem::select_all(app, None) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let undo = PredefinedMenuItem::undo(app, None)?;
+    let redo = PredefinedMenuItem::redo(app, None)?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let cut = PredefinedMenuItem::cut(app, None)?;
+    let copy = PredefinedMenuItem::copy(app, None)?;
+    let paste = PredefinedMenuItem::paste(app, None)?;
+    let select_all = PredefinedMenuItem::select_all(app, None)?;
     Ok(vec![undo, redo, separator, cut, copy, paste, select_all])
 }
 
@@ -261,10 +207,7 @@ pub fn build(
     overrides: &HashMap<String, String>,
     scope: MenuScope,
 ) -> tauri::Result<BuiltMenu> {
-    let menu = match Menu::new(app) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    let menu = Menu::new(app)?;
     let mut gated: Vec<(MenuItem<Wry>, Gate, bool)> = Vec::new();
     let mut accelerated: Vec<MenuItem<Wry>> = Vec::new();
 
@@ -281,14 +224,8 @@ pub fn build(
     }
 
     for (name, specs) in menus_for(scope).iter() {
-        let submenu = match build_submenu(app, name, specs, overrides, &mut gated, &mut accelerated) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-        match menu.append(&submenu) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        let submenu = build_submenu(app, name, specs, overrides, &mut gated, &mut accelerated)?;
+        menu.append(&submenu)?;
     }
 
     Ok(BuiltMenu { menu, gated, accelerated })

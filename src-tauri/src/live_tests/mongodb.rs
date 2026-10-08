@@ -23,10 +23,7 @@ fn test_config() -> Option<ConnectionConfig> {
     };
     let (host, port) = match target.split_once(':') {
         Some((h, p)) => {
-            let parsed = match p.parse::<u16>() {
-                Ok(val) => val,
-                Err(_) => 27017,
-            };
+            let parsed = p.parse::<u16>().unwrap_or(27017);
             (h.to_string(), parsed)
         }
         None => (target, 27017),
@@ -34,7 +31,7 @@ fn test_config() -> Option<ConnectionConfig> {
     Some(ConnectionConfig {
         id: String::from("it-test"),
         name: String::from("integration-test"),
-        hosts: vec![HostEntry { host: host, port: port }],
+        hosts: vec![HostEntry { host, port }],
         ..Default::default()
     })
 }
