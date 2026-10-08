@@ -138,7 +138,35 @@ jobs:
           releaseDraft: true
           prerelease: ${{ github.ref_type != 'tag' }}
           args: ${{ matrix.args }}
-          # The .sig files are noise on the release page: the updater never fetches
-          # them, because latest.json embeds each bundle's signature inline. Turning
-          # this off does not affect the latest.json generator.
-          uploadUpdaterSignatures: false
+
+  # tauri-action attaches a .sig next to every bundle and has no input to stop it
+  # (`uploadUpdaterSignatures: false` sat here for several releases doing nothing —
+  # it isn't a real input, so Actions ignored it with a warning). They're redundant
+  # on the release page: the updater reads latest.json, which embeds each bundle's
+  # signature inline, and never fetches a .sig. So they're deleted afterwards
+  # instead. This waits on the whole matrix because a platform finishing later
+  # would otherwise upload its .sig after the cleanup had already run.
+  cleanup-signatures:
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete the updater signature assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('nightly-{0}', github.run_number) }}
+        run: |
+          # Match *.sig only. OzenDB_universal.app.tar.gz looks as redundant as the
+          # .sig files beside the .dmg, but it is the macOS update payload that
+          # latest.json points darwin-aarch64/darwin-x86_64 at — deleting it would
+          # silently break auto-update for every existing Mac install.
+          sigs=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[].name | select(endswith(".sig"))')
+          if [ -z "$sigs" ]; then
+            echo "No .sig assets on $TAG."
+            exit 0
+          fi
+          while read -r asset; do
+            echo "Deleting $asset"
+            gh release delete-asset "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes
+          done <<< "$sigs"
