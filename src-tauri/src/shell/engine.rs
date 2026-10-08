@@ -260,3 +260,7 @@ fn read_logs(context: &mut Context) -> Vec<String> {
     }
     logs
 }
+
+#[cfg(test)]
+#[path = "engine.test.rs"]
+mod tests;
