@@ -7,7 +7,7 @@
 //! green everywhere because each test returns early when the variable is absent.
 //!
 //! Run them with, e.g.:
-//!   OZENDB_TEST_MONGODB=127.0.0.1:27017 cargo test integration
+//!   OZENDB_TEST_MONGODB=127.0.0.1:27017 cargo test live_tests::mongodb
 
 use crate::storage::{ConnectionConfig, HostEntry};
 use crate::uri;

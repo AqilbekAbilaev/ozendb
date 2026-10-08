@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::known_hosts::KnownHostsStore;
-use crate::pg_uri;
+use crate::postgres::uri as pg_uri;
 use crate::ssh::{self, HostKeyPrompts, SshAuth, SshParams, SshTunnel};
 use crate::storage::{ConnectionConfig, Engine, MongoConfig, PostgresConfig, SshAuthMethod};
 use crate::uri;

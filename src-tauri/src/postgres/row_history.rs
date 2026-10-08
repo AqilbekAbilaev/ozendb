@@ -81,5 +81,5 @@ impl PgRowHistoryStore {
 }
 
 #[cfg(test)]
-#[path = "pg_row_history.test.rs"]
+#[path = "row_history.test.rs"]
 mod tests;

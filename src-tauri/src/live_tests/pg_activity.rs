@@ -1,9 +1,9 @@
 //! Live-PostgreSQL coverage of the activity monitor (`list_sessions_impl`,
-//! `cancel_backend_impl`, `terminate_backend_impl`). Shares `pg_integration_tests.rs`'s
+//! `cancel_backend_impl`, `terminate_backend_impl`). Shares `pg.rs`'s
 //! helpers and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{cancel_backend_impl, list_sessions_impl, terminate_backend_impl};
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 #[tokio::test]
 async fn lists_every_session_including_this_one() {

@@ -1,12 +1,12 @@
 //! Live-PostgreSQL coverage of `list_columns_impl`'s identity/generated
 //! classification (#135) — split into its own file rather than grown
-//! into `pg_command_integration_tests.rs`, mirroring how that file itself was
-//! split out of `pg_integration_tests.rs`. Shares that file's `test_config`/
+//! into `pg_command.rs`, mirroring how that file itself was
+//! split out of `pg.rs`. Shares that file's `test_config`/
 //! `pool` helpers and skip behavior; see its module doc comment for how to run
 //! these.
 
 use crate::commands::list_columns_impl;
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 #[tokio::test]
 async fn classifies_identity_and_generated_columns() {

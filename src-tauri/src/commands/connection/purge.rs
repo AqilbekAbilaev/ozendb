@@ -3,8 +3,8 @@ use crate::default_queries::DefaultQueryStorage;
 use crate::export_watermarks::ExportWatermarkStorage;
 use crate::history::HistoryStorage;
 use crate::node_tags::NodeTagStorage;
-use crate::pg_query_library::PgQueryLibraryStore;
-use crate::pg_row_history::PgRowHistoryStore;
+use crate::postgres::query_library::PgQueryLibraryStore;
+use crate::postgres::row_history::PgRowHistoryStore;
 use crate::shell_history::ShellHistoryStorage;
 use tauri::{AppHandle, Manager};
 

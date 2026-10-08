@@ -1,23 +1,23 @@
 //! Integration tests against a live PostgreSQL for the connect path itself
-//! (`pg_uri`/`ConnectionPool::connect_postgres`) — the `commands::postgres::*`
+//! (`postgres::uri`/`ConnectionPool::connect_postgres`) — the `commands::postgres::*`
 //! command layer (schema browsing, query, row edit) has its own tests in
-//! `pg_command_integration_tests.rs`, which shares this file's `test_config`/
+//! `pg_command.rs`, which shares this file's `test_config`/
 //! `pool` helpers.
 //!
 //! These are skipped unless `OZENDB_TEST_POSTGRES` is set (to a `host` or
 //! `host:port`). When set, they exercise the real connect-options + driver path
-//! `pg_uri` (and, through it, `ConnectionPool::connect_postgres`) build — a plain
+//! `postgres::uri` (and, through it, `ConnectionPool::connect_postgres`) build — a plain
 //! query round-trip — against a throwaway table that is dropped at the end. Default
 //! `cargo test` stays green everywhere because each test returns early when the
 //! variable is absent.
 //!
 //! Run them with, e.g.:
-//!   OZENDB_TEST_POSTGRES=127.0.0.1:5432 cargo test pg_integration
+//!   OZENDB_TEST_POSTGRES=127.0.0.1:5432 cargo test live_tests::pg
 //! `OZENDB_TEST_POSTGRES_USER`/`OZENDB_TEST_POSTGRES_PASSWORD` override the
 //! username (default "postgres") and password (default none) if the test server
 //! needs different credentials.
 
-use crate::pg_uri;
+use crate::postgres::uri as pg_uri;
 use crate::storage::{ConnectionConfig, EngineConfig, HostEntry, PostgresConfig};
 use sqlx::{Connection, Row};
 
@@ -25,7 +25,7 @@ use sqlx::{Connection, Row};
 /// is unset (so the caller skips). Username/password come from their own env vars
 /// (mirroring how libpq/psql read `PGUSER`/`PGPASSWORD`) since a throwaway test
 /// server still needs to authenticate as someone. `pub(crate)`: shared with
-/// `pg_command_integration_tests.rs`, split out once this file grew past the
+/// `pg_command.rs`, split out once this file grew past the
 /// size limit — both cover the same live server, just different command layers.
 pub(crate) fn test_config() -> Option<ConnectionConfig> {
     let target = match std::env::var("OZENDB_TEST_POSTGRES") {
@@ -70,7 +70,7 @@ fn options(config: &ConnectionConfig) -> sqlx::postgres::PgConnectOptions {
 
 /// Connect the way `ConnectionPool::connect_postgres` builds its options, then hand
 /// them straight to the driver — bypassing `ConnectionPool` itself the same way
-/// `integration_tests.rs`'s Mongo `connect()` does (a real `ConnectionPool` needs a
+/// `mongodb.rs`'s Mongo `connect()` does (a real `ConnectionPool` needs a
 /// live Tauri `AppHandle`, which a plain test can't build).
 async fn connect(config: &ConnectionConfig) -> sqlx::PgConnection {
     match sqlx::PgConnection::connect_with(&options(config)).await {
@@ -160,7 +160,7 @@ async fn query_paging_and_count_round_trip() {
 
 /// `ConnectionPool::connect_postgres`'s `database` override (#124): the same
 /// connection's options, targeting a database other than the config's own, reusing
-/// everything else (host, credentials, TLS). Proven here at the `pg_uri` layer that
+/// everything else (host, credentials, TLS). Proven here at the `postgres::uri` layer that
 /// actually builds those options, since a live `ConnectionPool` needs an `AppHandle`
 /// a plain test can't build (see this file's own doc comment).
 #[tokio::test]

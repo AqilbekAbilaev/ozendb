@@ -1,9 +1,9 @@
 //! Live-PostgreSQL coverage of the SQL tab running statements, not only queries.
-//! Shares `pg_integration_tests.rs`'s helpers and skip behaviour; see its module doc
+//! Shares `pg.rs`'s helpers and skip behaviour; see its module doc
 //! comment for how to run these.
 
 use crate::commands::run_query_as;
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 #[tokio::test]
 async fn statements_run_and_report_the_rows_they_changed() {

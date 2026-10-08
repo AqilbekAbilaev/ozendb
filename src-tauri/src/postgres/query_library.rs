@@ -87,5 +87,5 @@ impl PgQueryLibraryStore {
 }
 
 #[cfg(test)]
-#[path = "pg_query_library.test.rs"]
+#[path = "query_library.test.rs"]
 mod tests;

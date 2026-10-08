@@ -1,8 +1,8 @@
 //! Row-edit history for the table workspace (#129) — the Postgres sibling of
 //! MongoDB's `commands/history.rs`, scoped to `update_pg_row` edits only (see
-//! `pg_row_history.rs`'s own doc comment for why).
+//! `postgres/row_history.rs`'s own doc comment for why).
 use crate::error::AppError;
-use crate::pg_row_history::{PgHistoryEntry, PgRowHistoryStore};
+use crate::postgres::row_history::{PgHistoryEntry, PgRowHistoryStore};
 use tauri::State;
 
 use super::row_write::{update_row_impl, ColumnValue};

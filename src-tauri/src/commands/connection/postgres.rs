@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::pg_uri;
+use crate::postgres::uri as pg_uri;
 use crate::storage::{ConnectionConfig, PostgresConfig};
 use sqlx::Connection as _;
 

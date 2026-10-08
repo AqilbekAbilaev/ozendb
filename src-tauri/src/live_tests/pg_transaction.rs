@@ -1,12 +1,12 @@
 //! Live-PostgreSQL coverage of the SQL tab's Manual mode: a transaction held open
-//! across runs, then committed or rolled back. Shares `pg_integration_tests.rs`'s
+//! across runs, then committed or rolled back. Shares `pg.rs`'s
 //! helpers and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{run_query_as, PgTransactions};
 use crate::commands::postgres::ColumnValue;
 use crate::error::AppError;
-use crate::pg_integration_tests::{pool, test_config};
-use crate::pg_row_history::{PgColumnChange, PgHistoryEntry};
+use super::pg::{pool, test_config};
+use crate::postgres::row_history::{PgColumnChange, PgHistoryEntry};
 
 fn shown(err: &AppError) -> String {
     serde_json::to_value(err).unwrap()["message"].as_str().unwrap().to_string()

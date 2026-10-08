@@ -1,12 +1,12 @@
 //! Live-PostgreSQL coverage of `insert_row_impl` (#137) — split into its
-//! own file rather than grown into `pg_command_integration_tests.rs`, mirroring how
-//! that file itself was split out of `pg_integration_tests.rs`. Shares that file's
+//! own file rather than grown into `pg_command.rs`, mirroring how
+//! that file itself was split out of `pg.rs`. Shares that file's
 //! `test_config`/`pool` helpers and skip behavior; see its module doc comment for
 //! how to run these.
 
 use crate::commands::{insert_row_impl, ColumnValue};
 use crate::error::AppError;
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 use serde_json::json;
 
 fn col(column: &str, value: serde_json::Value) -> ColumnValue {

@@ -1,9 +1,9 @@
 //! Live-PostgreSQL coverage of the read-only diagnostics reads (`server_info_impl`,
-//! `server_settings_impl`). Shares `pg_integration_tests.rs`'s helpers and skip
+//! `server_settings_impl`). Shares `pg.rs`'s helpers and skip
 //! behaviour; see its module doc comment for how to run these.
 
 use crate::commands::{server_info_impl, server_settings_impl};
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 #[tokio::test]
 async fn server_info_reports_version_uptime_and_size() {

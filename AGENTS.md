@@ -172,10 +172,10 @@ ResourceRefs.
   - `api/` is its half of the Tauri boundary.
 - **Backend: `src-tauri/src/commands/postgres/`**, one file per area, over `sqlx`.
   - Commands resolve a pool through `ctx.pg_pool*`.
-  - Three modules sit at the crate root: `pg_uri.rs` (connect options), and the
-    `pg_query_library.rs` (saved SQL and run history) and `pg_row_history.rs` (per-row undo)
+  - Three modules sit in `src-tauri/src/postgres/`: `uri.rs` (connect options), and the
+    `query_library.rs` (saved SQL and run history) and `row_history.rs` (per-row undo)
     stores.
-- **Tests:** the `pg_*_integration_tests.rs` files run against a live server when
+- **Tests:** the `live_tests/pg*.rs` files run against a live server when
   `OZENDB_TEST_POSTGRES` is set, and are skipped otherwise.
 
 ### Rust backend (`src-tauri/src/`)
@@ -192,6 +192,9 @@ ResourceRefs.
 | `uri/mod.rs` | `build_uri()` assembles the connection string from a config; `with_timeout()` appends MongoDB timeout params; `tcp_probe()` does a fast TCP check before the MongoDB handshake. |
 | `error.rs` | `AppError` enum serialized as `{ code, message }` so the frontend gets a stable category plus a human-readable message. |
 | `menu.rs` | Native OS menu (source of truth). Also opens the document editor/viewer as a **second Tauri webview window** at `src/pages/document.html` (registered as a Vite entry in `vite.config.js`). See "Native menu" below. |
+| `commands/mongo/`, `commands/postgres/` | Each engine's commands. The rest of `commands/` is engine-neutral: connections, persistence, folders, operations, the error log, the updater, and the CSV import/export helpers both engines' transfers use. `commands/access.rs` is the one lookup and read-only gate behind every `AppContext` resolver. |
+| `postgres/` | PostgreSQL outside the command layer: `uri.rs` (connect options) and the `query_library` / `row_history` stores. |
+| `live_tests/` | Tests against a live server, skipped unless `OZENDB_TEST_MONGODB` / `OZENDB_TEST_POSTGRES` is set. `cargo test live_tests::pg` runs just the PostgreSQL ones. |
 
 ### Native menu
 

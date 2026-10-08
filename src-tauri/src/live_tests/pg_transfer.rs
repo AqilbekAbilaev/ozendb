@@ -1,8 +1,8 @@
 //! Live-PostgreSQL coverage of bulk export (`export_impl`, #128). Shares
-//! `pg_integration_tests.rs`'s helpers and skip behaviour; see its module doc comment.
+//! `pg.rs`'s helpers and skip behaviour; see its module doc comment.
 
 use crate::commands::{export_impl, import_csv_impl, import_preview_impl, PgExportSource};
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 const SCHEMA: &str = "ozendb_it_export";
 

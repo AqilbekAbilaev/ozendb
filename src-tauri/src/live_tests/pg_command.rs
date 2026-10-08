@@ -1,6 +1,6 @@
 //! Integration tests against a live PostgreSQL for the `commands::postgres::*`
 //! command layer (schema browsing, query, row edit) — split out of
-//! `pg_integration_tests.rs` once that file grew past the size limit, since
+//! `pg.rs` once that file grew past the size limit, since
 //! most of what got added here is one regression test per review finding.
 //! Shares that file's `test_config`/`pool` helpers and skip behavior; see its
 //! module doc comment for how to run these.
@@ -9,7 +9,7 @@ use crate::commands::{
     browse_table_impl, count_table_impl, list_columns_impl, list_databases_impl, list_schemas_impl,
     list_tables_impl, run_query_as, search_tables_impl, update_row_impl, ColumnRef, ColumnValue,
 };
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 #[tokio::test]
 async fn postgres_commands_round_trip() {
@@ -346,7 +346,7 @@ async fn a_read_only_connection_is_enforced_per_transaction_not_just_by_session_
     //    to be the *only* enforcement, and there wasn't one — `run_pg_query`
     //    always called it that way regardless of the connection's own flag.
     // 2. Even with the session-level `default_transaction_read_only=on` default
-    //    (`pg_uri::options_for`) and `read_only: true` passed through, a query
+    //    (`postgres::uri::options_for`) and `read_only: true` passed through, a query
     //    can flip that *default* off for the rest of the session with
     //    `set_config('default_transaction_read_only', 'off', false)` — confirmed
     //    live, and the change persisted to later queries on the same pooled

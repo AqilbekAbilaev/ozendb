@@ -3,7 +3,7 @@ use crate::collection_history::HistoryEntry;
 use crate::commands::postgres::ColumnValue;
 use crate::default_queries::DefaultQuery;
 use crate::history::QueryHistoryEntry;
-use crate::pg_row_history::PgHistoryEntry;
+use crate::postgres::row_history::PgHistoryEntry;
 use tempfile::tempdir;
 
 const GONE: &str = "gone-conn";

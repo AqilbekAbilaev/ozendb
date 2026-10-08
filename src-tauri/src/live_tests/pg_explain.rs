@@ -1,8 +1,8 @@
-//! Live-PostgreSQL coverage of `explain_impl`. Shares `pg_integration_tests.rs`'s
+//! Live-PostgreSQL coverage of `explain_impl`. Shares `pg.rs`'s
 //! helpers and skip behaviour; see its module doc comment for how to run these.
 
 use crate::commands::explain_impl;
-use crate::pg_integration_tests::{pool, test_config};
+use super::pg::{pool, test_config};
 
 #[tokio::test]
 async fn explains_a_query_with_real_timings_and_undoes_anything_it_ran() {
