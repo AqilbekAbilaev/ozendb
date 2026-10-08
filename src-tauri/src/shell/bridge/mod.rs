@@ -287,9 +287,6 @@ pub(crate) fn pipeline_writes(pipeline: &serde_json::Value) -> bool {
     }
 }
 
-/// Dispatch one decoded `{ collection, method, args }` operation to the driver,
-/// blocking on the async call via the provided runtime handle.
-
 #[cfg(test)]
 use driver::{arg_doc, to_document};
 

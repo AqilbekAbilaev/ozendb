@@ -40,10 +40,7 @@ where
     // aside (not silently emptied) so the next save can't overwrite it. See
     // persist::read_json.
     pub fn load(&self) -> T {
-        match crate::persist::read_json(&self.path) {
-            Some(value) => value,
-            None => T::default(),
-        }
+        crate::persist::read_json(&self.path).unwrap_or_default()
     }
 
     // Replace the whole value under the lock.
@@ -57,10 +54,7 @@ where
     // caller can, e.g., report whether anything changed.
     pub fn update<R>(&self, mutate: impl FnOnce(&mut T) -> R) -> Result<R, AppError> {
         let _guard = self.guard();
-        let mut value: T = match crate::persist::read_json(&self.path) {
-            Some(value) => value,
-            None => T::default(),
-        };
+        let mut value: T = crate::persist::read_json(&self.path).unwrap_or_default();
         let result = mutate(&mut value);
         match self.write(&value) {
             Ok(()) => Ok(result),

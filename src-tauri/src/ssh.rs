@@ -280,10 +280,11 @@ pub async fn establish<R: Runtime>(
     prompts: Arc<HostKeyPrompts>,
     app: AppHandle<R>,
 ) -> Result<SshTunnel, AppError> {
-    let mut config = client::Config::default();
-    // Send keepalives so a dropped session is detected instead of hanging.
-    config.keepalive_interval = Some(std::time::Duration::from_secs(30));
-    let config = Arc::new(config);
+    let config = Arc::new(client::Config {
+        // Send keepalives so a dropped session is detected instead of hanging.
+        keepalive_interval: Some(std::time::Duration::from_secs(30)),
+        ..Default::default()
+    });
     let reject_reason = Arc::new(Mutex::new(None));
     let handler = ClientHandler {
         known_hosts,

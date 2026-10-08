@@ -170,7 +170,7 @@ pub(crate) fn stream_documents<R, F>(
     flush: F,
 ) -> Result<usize, AppError>
 where
-    R: std::io::Read,
+    R: std::io::BufRead,
     F: FnMut(Vec<bson::Document>) -> Result<(), AppError>,
 {
     if format == "csv" {
