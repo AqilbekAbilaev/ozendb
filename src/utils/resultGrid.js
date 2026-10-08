@@ -68,3 +68,53 @@ export function getAtPath(doc, path) {
   }
   return cur
 }
+
+// The rows the grid renders: the results, or once drilled each document's value at the
+// path — one row per document, so a missing path renders blank rather than vanishing.
+// An array spreads into index-keyed columns.
+export function drillRows(results, drillPath) {
+  if (!results) return []
+  if (!drillPath.length) return results
+  return results.map((doc) => {
+    const val = getAtPath(doc, drillPath) ?? {}
+    if (Array.isArray(val)) {
+      const obj = {}
+      val.forEach((el, idx) => { obj[String(idx)] = el })
+      return obj
+    }
+    return val
+  })
+}
+
+// Each cell's shown text, colour classes and drillability, worked out once per result
+// set rather than per render. `rows[r][c]` is the cell for row r and `cols[c]`.
+export function cellRows(rows, cols) {
+  return rows.map((row) =>
+    cols.map((col) => {
+      const val = row[col]
+      const type = guessType(col, val)
+      return {
+        col: col,
+        display: formatCell(col, val),
+        typeClass: 't-' + type,
+        valClass: TYPE_CLASS[type],
+        drillable: type === 'obj',
+      }
+    })
+  )
+}
+
+// Every `{ row, col }` whose shown text contains the query, ignoring case.
+export function findMatches(cells, cols, query) {
+  const q = query.toLowerCase()
+  if (!q) return []
+  const out = []
+  for (let r = 0; r < cells.length; r++) {
+    const row = cells[r]
+    if (!row) continue
+    for (let c = 0; c < cols.length; c++) {
+      if (row[c].display.toLowerCase().includes(q)) out.push({ row: r, col: cols[c] })
+    }
+  }
+  return out
+}
