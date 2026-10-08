@@ -94,13 +94,16 @@ if one is invoked elsewhere, or if any production file outside the roots imports
 `@tauri-apps/api/core` at all.
 
 The boundary is about `invoke` specifically, because command names and payload keys are
-strings the backend adjudicates — a typo there fails silently at runtime. Tauri's *plugin*
+strings the backend adjudicates — a typo there fails silently at runtime. Event names are
+the same kind of string, so `listen` / `emit` live in `src/appApi/events.js` alone (one
+named function per event; the test also rejects `@tauri-apps/api/event` anywhere else,
+and `src-tauri/src/events.rs` pins the backend's half). Tauri's *plugin*
 APIs (`plugin-dialog`, `plugin-opener`, `plugin-updater`, `plugin-process`) are ordinary
 typed calls with no wire shape, so they are imported directly wherever they are needed.
 
 - **`src/appApi/`** — engine-neutral commands: `settings`, `session`, `menu`, `folders`,
-  `tags`, `operations`, `errorLog`, `files`, `sshTrust`, `updater`, `connectionState`.
-  Nothing here knows what a collection is.
+  `tags`, `operations`, `errorLog`, `files`, `sshTrust`, `updater`, `connectionState`,
+  and `events`. Nothing here knows what a collection is.
 - **`src/engines/mongodb/api/`** — everything MongoDB-shaped: `queries`, `documents`,
   `admin`, `indexes`, `schema`, `resources`, `gridfs`, `shell`, `transfer`,
   `connections`, `queryLibrary`. Each takes a target `{ connectionId, database,

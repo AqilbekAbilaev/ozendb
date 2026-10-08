@@ -15,6 +15,7 @@ mod collection_history;
 mod default_queries;
 mod error;
 mod error_log;
+mod events;
 mod export_watermarks;
 mod folders;
 mod history;

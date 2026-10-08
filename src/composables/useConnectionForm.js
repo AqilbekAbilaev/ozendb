@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { testConnection as testConnectionApi, saveConnection, updateConnection } from '../appApi/connections'
-import { emit as tauriEmit } from '@tauri-apps/api/event'
+import { emitConnectionSaved, emitConnectionUpdated } from '../appApi/events'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
 import { connectionTargetChanged } from '../utils/connectionTarget.js'
@@ -198,7 +198,7 @@ export function useConnectionForm(editConn) {
           return null
         }
         const conn = await updateConnection(editConn.id, fields)
-        await tauriEmit('connection-updated', conn)
+        await emitConnectionUpdated(conn)
         return { event: 'updated', conn: conn }
       }
 
@@ -248,7 +248,7 @@ export function useConnectionForm(editConn) {
       read_only:       fields.readOnly,
       last_accessed:   null,
     }
-    await tauriEmit('connection-saved', conn)
+    await emitConnectionSaved(conn)
     return { event: 'saved', conn: conn }
   }
 

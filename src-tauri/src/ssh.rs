@@ -196,7 +196,7 @@ impl client::Handler for ClientHandler {
                     port: self.port,
                     fingerprint,
                 };
-                match (self.emit)("ssh-host-key-prompt", serde_json::to_value(event).unwrap_or_default()) {
+                match (self.emit)(crate::events::SSH_HOST_KEY_PROMPT, serde_json::to_value(event).unwrap_or_default()) {
                     Ok(()) => {}
                     Err(e) => {
                         self.prompts.cancel(request_id);
@@ -259,7 +259,7 @@ impl client::Handler for ClientHandler {
                     presented_fingerprint: fingerprint,
                 };
                 // Best-effort notify; we refuse regardless of whether it lands.
-                let _ = (self.emit)("ssh-host-key-changed", serde_json::to_value(event).unwrap_or_default());
+                let _ = (self.emit)(crate::events::SSH_HOST_KEY_CHANGED, serde_json::to_value(event).unwrap_or_default());
                 self.set_reason(format!(
                     "host key verification failed for {}:{} — the server's key does not match the \
                      previously trusted key. This may indicate a man-in-the-middle attack, or the \

@@ -3,7 +3,7 @@ import { showToast } from '../stores/toast'
 import { openCollectionTab, openQuickstart, openPostgresQuery, openPostgresSearch } from '../stores/tabCreators'
 import { useZoom } from './useZoom'
 import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh, requestIndexAction } from '../stores/menuRequests'
-import { listen } from '@tauri-apps/api/event'
+import { onMenuAction } from '../appApi/events'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
@@ -320,7 +320,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
 
   let unlisten
   onMounted(() => {
-    unlisten = listen('menu-action', (e) => handleMenuAction(e.payload))
+    unlisten = onMenuAction(handleMenuAction)
     if (!nativeMenuOwnsShortcuts) window.addEventListener('keydown', onGlobalKeydown)
     else if (isMac) window.addEventListener('keydown', onTabNavKeydown)
   })

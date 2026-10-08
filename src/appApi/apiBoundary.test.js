@@ -87,6 +87,16 @@ describe('Application API boundary', () => {
     expect(offenders).toEqual([])
   })
 
+  // Event names are the same kind of string contract as command names, so listen/emit
+  // stay in appApi/events.js alone.
+  it('never imports the Tauri event API in production code outside src/appApi/', () => {
+    const offenders = PRODUCTION
+      .filter((file) => !file.includes('/src/appApi/'))
+      .filter((file) => /from\s+['"]@tauri-apps\/api\/event['"]/.test(readFileSync(file, 'utf8')))
+      .map((file) => file.replace(process.cwd() + '/', ''))
+    expect(offenders).toEqual([])
+  })
+
   it('never calls invoke in production code outside the API roots', () => {
     const offenders = []
     for (const file of PRODUCTION) {

@@ -138,7 +138,7 @@ impl OperationsRegistry {
 
     fn emit(&self) {
         if let Some(app) = &self.app {
-            let _ = app.emit("operations-changed", ());
+            let _ = app.emit(crate::events::OPERATIONS_CHANGED, ());
         }
     }
 

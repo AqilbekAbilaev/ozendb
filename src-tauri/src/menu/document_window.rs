@@ -52,7 +52,7 @@ pub fn open_document_window(app: &AppHandle, target: DocumentTarget) {
     if !is_view {
         let reuse_label = if is_insert { "doc-insert" } else { "doc-editor" };
         if let Some(w) = app.get_webview_window(reuse_label) {
-            app.emit_to(reuse_label, "document-target", target.clone()).ok();
+            app.emit_to(reuse_label, crate::events::DOCUMENT_TARGET, target.clone()).ok();
             w.set_focus().ok();
             return;
         }
