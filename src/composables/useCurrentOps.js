@@ -55,6 +55,16 @@ export const opsDefaults = () => ({
   selectedRows: [],
   drillPath: [],
   colOrder: {},
+  // The server's databases and their collections, for the namespace pickers.
+  databases: [],
+  // The poll's own status: the request in flight, whether another was asked for while
+  // it ran, and how the last one went.
+  inFlight: null,
+  reloadRequested: false,
+  loading: false,
+  error: null,
+  errorCode: null,
+  updatedAt: null,
 })
 
 // The live state behind the Current Operations tab: what the server is doing, refreshed
@@ -69,10 +79,10 @@ export function useCurrentOps(tab) {
     set: (value) => { tab()[key] = value },
   })
   const rows = setting('ops')
-  const error = setting('_opsError')
-  const errorCode = setting('_opsErrorCode')
-  const loading = setting('_opsLoading')
-  const updatedAt = setting('_opsUpdatedAt')
+  const error = setting('error')
+  const errorCode = setting('errorCode')
+  const loading = setting('loading')
+  const updatedAt = setting('updatedAt')
 
   const frequency = setting('frequency')
   const retention = setting('retention')
@@ -90,16 +100,16 @@ export function useCurrentOps(tab) {
   // Each workspace owns its request lock and response target. One pane instance is reused
   // across tabs, so resolving through the active getter after an await can cross servers.
   function load(targetTab = tab(), queue = false) {
-    if (targetTab._opsInFlight) {
-      if (queue) targetTab._opsReloadRequested = true
-      return targetTab._opsInFlight
+    if (targetTab.inFlight) {
+      if (queue) targetTab.reloadRequested = true
+      return targetTab.inFlight
     }
-    targetTab._opsLoading = targetTab.ops.length === 0
+    targetTab.loading = targetTab.ops.length === 0
     const ownOnlyAtRequest = targetTab.ownOnly
     const showSysAtRequest = targetTab.showSys
     const request = (async () => {
       try {
-        const reply = await currentOps(targetTab.connId, {
+        const reply = await currentOps(targetTab.connectionId, {
           ownOnly: ownOnlyAtRequest,
           all: showSysAtRequest,
         })
@@ -110,23 +120,23 @@ export function useCurrentOps(tab) {
           targetTab.retention,
           Date.now(),
         )
-        targetTab._opsUpdatedAt = Date.now()
-        targetTab._opsError = null
-        targetTab._opsErrorCode = null
+        targetTab.updatedAt = Date.now()
+        targetTab.error = null
+        targetTab.errorCode = null
       } catch (e) {
         // Keep showing the last good list — a blink of blank table on one failed poll
         // hides more than the error message tells.
-        targetTab._opsError = errText(e)
-        targetTab._opsErrorCode = errCode(e)
+        targetTab.error = errText(e)
+        targetTab.errorCode = errCode(e)
       } finally {
-        const reload = targetTab._opsReloadRequested
-        targetTab._opsReloadRequested = false
-        targetTab._opsLoading = false
-        targetTab._opsInFlight = null
+        const reload = targetTab.reloadRequested
+        targetTab.reloadRequested = false
+        targetTab.loading = false
+        targetTab.inFlight = null
         if (reload) load(targetTab)
       }
     })()
-    targetTab._opsInFlight = request
+    targetTab.inFlight = request
     return request
   }
 
@@ -135,13 +145,13 @@ export function useCurrentOps(tab) {
   async function kill(opid) {
     const targetTab = tab()
     try {
-      await killOp(targetTab.connId, opid)
-      if (targetTab._opsInFlight) await targetTab._opsInFlight
+      await killOp(targetTab.connectionId, opid)
+      if (targetTab.inFlight) await targetTab.inFlight
       await load(targetTab)
       return true
     } catch (e) {
-      targetTab._opsError = errText(e)
-      targetTab._opsErrorCode = errCode(e)
+      targetTab.error = errText(e)
+      targetTab.errorCode = errCode(e)
       return false
     }
   }

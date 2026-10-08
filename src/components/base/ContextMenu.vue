@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BaseIcon from './BaseIcon.vue'
-import { MENUS } from '../../constants/contextMenus'
+import { MENUS, COLOR_ACTION } from '../../constants/contextMenus'
 import { TAG_PRESETS } from '../../utils/tabColor.js'
 
 const props = defineProps({
@@ -82,11 +82,11 @@ function rememberColor(hex) {
 }
 
 // A custom colour is picked from the native OS picker; its hex is remembered and
-// applied via the same 'Choose Color:<value>' pick the preset swatches use (a hex
+// applied via the same COLOR_ACTION pick the preset swatches use (a hex
 // has no colon, so it flows through the handler's split untouched).
 function onCustomColor(e) {
   rememberColor(e.target.value)
-  emit('pick', 'Choose Color:' + e.target.value)
+  emit('pick', COLOR_ACTION + e.target.value)
 }
 </script>
 
@@ -107,7 +107,7 @@ function onCustomColor(e) {
         class="ctx-item"
         :class="{ danger: item.danger }"
         @mouseenter="openSub(item, $event)"
-        @click="item.sub ? undefined : emit('pick', item.value ?? item.label)"
+        @click="item.sub ? undefined : emit('pick', item.value)"
       >
         <span class="ctx-ic">
           <BaseIcon v-if="item.icon" :name="item.icon" :size="15" />
@@ -126,12 +126,12 @@ function onCustomColor(e) {
         >
           <div
             v-for="sub in item.subItems"
-            :key="sub"
+            :key="sub.value"
             class="ctx-item"
-            @click.stop="emit('pick', sub)"
+            @click.stop="emit('pick', sub.value)"
           >
             <span class="ctx-ic"></span>
-            <span class="ctx-label">{{ sub }}</span>
+            <span class="ctx-label">{{ sub.label }}</span>
           </div>
         </div>
 
@@ -145,7 +145,7 @@ function onCustomColor(e) {
             v-for="tag in TAG_PRESETS"
             :key="tag.name"
             class="ctx-color-item"
-            @click.stop="emit('pick', 'Choose Color:' + tag.name)"
+            @click.stop="emit('pick', COLOR_ACTION + tag.name)"
           >
             <span
               class="ctx-color-sw"
@@ -161,7 +161,7 @@ function onCustomColor(e) {
             v-for="hex in recentColors"
             :key="hex"
             class="ctx-color-item"
-            @click.stop="emit('pick', 'Choose Color:' + hex)"
+            @click.stop="emit('pick', COLOR_ACTION + hex)"
           >
             <span class="ctx-color-sw" :style="{ background: hex }"></span>
             <span>{{ hex }}</span>

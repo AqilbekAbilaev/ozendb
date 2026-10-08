@@ -160,7 +160,7 @@ describe('accelToTokens', () => {
 })
 
 describe('accelFromEvent', () => {
-  // ozendb-wpy: a physical Ctrl press must capture as 'Ctrl', not 'CmdOrCtrl' — the
+  // A physical Ctrl press must capture as 'Ctrl', not 'CmdOrCtrl' — the
   // old behavior silently saved a Cmd binding on macOS for a Ctrl combo the user
   // actually pressed, with no sign the two differed.
   it('captures a physical Ctrl press as Ctrl, not CmdOrCtrl', () => {

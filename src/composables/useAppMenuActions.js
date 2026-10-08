@@ -2,7 +2,7 @@ import { nextTick, onMounted, onUnmounted } from 'vue'
 import { showToast } from '../stores/toast'
 import { openCollectionTab, openQuickstart, openPostgresQuery, openPostgresSearch } from '../stores/tabCreators'
 import { useZoom } from './useZoom'
-import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh } from '../stores/menuRequests'
+import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh, requestIndexAction } from '../stores/menuRequests'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -16,17 +16,21 @@ import { keyBindings } from '../stores/settings'
 import { matchBinding } from '../utils/keybindings'
 import { isEditingTarget } from '../utils/editingTarget'
 
+// Native menu items that run a feature registered under another id: two items, one
+// action. Every other id that names a feature runs it directly.
+export const MENU_ALIASES = {
+  'file:add_database': 'db:add_database',
+  'db:collection_stats': 'coll:stats',
+  'db:copy_all': 'db:copy_database',
+  'db:paste_database': 'db:paste',
+}
+
 // `menuTarget`/`pgMenuTarget` come from useMenu and the three dispatchers from
 // useFeatures — App.vue constructs both once and hands over what this needs of
 // them. `toolbarHidden` is App.vue's own layout state; the View menu just toggles it.
-export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, refreshAll, toolbarHidden }) {
+export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, knownActions, refreshAll, toolbarHidden }) {
   const { zoomIn, zoomOut, resetZoom } = useZoom()
   const appWindow = getCurrentWindow()
-
-  function indexMenuAction(method, ...args) {
-    const tab = tabs.value.find(t => t.id === activeTabId.value)
-    if (tab && tab._idxApi && tab._idxApi[method]) tab._idxApi[method](...args)
-  }
 
   // Routes menu-bar actions (emitted by id) to the same handlers the toolbar and
   // right-click menus already use. The menu bar never emits a disabled item.
@@ -80,37 +84,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       case 'coll:export':       handleTool('export', menuTarget('collection')); return
       case 'coll:import':       handleTool('import', menuTarget('collection')); return
 
-      // --- server / connection scoped ---
-      case 'file:server_status': menuNode('Server Status', 'connection'); return
-      case 'file:server_charts': menuNode('Server Status Charts', 'connection'); return
-      case 'file:server_build':  menuNode('Build Info', 'connection'); return
-      case 'db:database_stats':  menuNode('Database Statistics', 'database'); return
-      case 'db:current_ops':     menuNode('Current Operations', 'connection'); return
-      case 'db:profiler':        menuNode('Query Profiler', 'database'); return
-
-      // --- database scoped ---
-      case 'db:add_collection':  menuNode('Add Collection…', 'database'); return
-      case 'file:add_database':
-      case 'db:add_database':    menuNode('Add Database…', 'connection'); return
-      case 'db:add_view':        menuNode('Add View…', 'database'); return
-      case 'coll:add_view':      menuNode('Add View Here…', 'collection'); return
-      case 'coll:validator':     menuNode('Add / Edit Validator…', 'collection'); return
-      case 'db:export':          menuNode('Export Collections…', 'database'); return
-      case 'db:import':          menuNode('Import Collections…', 'database'); return
-      case 'db:add_bucket':      menuNode('Add GridFS Bucket…', 'database'); return
-      case 'db:manage_users':    menuNode('Manage Users', 'database'); return
-      case 'db:manage_roles':    menuNode('Manage Roles', 'database'); return
-      case 'db:functions':       menuNode('Stored Functions', 'database'); return
-      case 'coll:mapreduce':     menuNode('Open Map-Reduce', 'collection'); return
-      // Copy/Paste: copy a collection or database to the app clipboard, then paste it
-      // into a target database (same connection). Copy All == Copy Database here.
-      case 'coll:copy':          menuNode('Copy Collection', 'collection'); return
-      case 'db:copy_database':   menuNode('Copy Database', 'database'); return
-      case 'db:copy_all':        menuNode('Copy Database', 'database'); return
-      case 'db:paste':
-      case 'db:paste_database':  menuNode('Paste Into Database', 'database'); return
-      case 'db:drop_database':   menuNode('Drop Database…', 'database'); return
-      case 'gridfs:open':        menuNode('GridFS…', 'database'); return
+      // --- GridFS (acts on the open GridFS dialog) ---
       case 'gridfs:add':
       case 'gridfs:save':
       case 'gridfs:remove':
@@ -121,24 +95,14 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       case 'gridfs:drop_bucket':
         requestGridfsAction(id); return
 
-      // --- collection scoped ---
-      case 'coll:aggregation':   menuNode('Open Aggregation Editor', 'collection'); return
-      case 'coll:add_index':     menuNode('Indexes…', 'collection'); return
 
       // --- index scoped (act on the active tab's selected index) ---
-      case 'idx:edit':   indexMenuAction('startEditIndex'); return
-      case 'idx:view':   indexMenuAction('openIndexDetails'); return
-      case 'idx:copy':   indexMenuAction('copyIndex'); return
-      case 'idx:drop':   indexMenuAction('openDropIndexConfirm'); return
-      case 'idx:hide':   indexMenuAction('setIndexHidden', true); return
-      case 'idx:unhide': indexMenuAction('setIndexHidden', false); return
-      case 'coll:stats':
-      case 'db:collection_stats': menuNode('Collection Stats', 'collection'); return
-      case 'coll:schema':        menuNode('View Schema', 'collection'); return
-      case 'coll:history':       menuNode('Collection History', 'collection'); return
-      case 'coll:rename':        menuNode('Rename Collection…', 'collection'); return
-      case 'coll:duplicate':     menuNode('Duplicate Collection…', 'collection'); return
-      case 'coll:drop':          menuNode('Drop Collection…', 'collection'); return
+      case 'idx:edit':   requestIndexAction('startEditIndex'); return
+      case 'idx:view':   requestIndexAction('openIndexDetails'); return
+      case 'idx:copy':   requestIndexAction('copyIndex'); return
+      case 'idx:drop':   requestIndexAction('openDropIndexConfirm'); return
+      case 'idx:hide':   requestIndexAction('setIndexHidden', true); return
+      case 'idx:unhide': requestIndexAction('setIndexHidden', false); return
 
       // --- collection: document editing (open/activate a collection tab, then run) ---
       case 'coll:insert_document':
@@ -221,7 +185,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
         return
       }
 
-      // PostgreSQL (ozendb-sxd) — the same handlers the table workspace's own
+      // PostgreSQL (#145) — the same handlers the table workspace's own
       // toolbar/context menu already call (PG_ACTIONS). Each asks pgMenuTarget for
       // the depth its gate required, so a sidebar selection deep enough for the
       // action wins over the active tab and a shallower one falls back to it. The
@@ -254,6 +218,10 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
         return
       }
     }
+    // Everything else that names a feature (directly, or through MENU_ALIASES) runs it
+    // on the menu's target, at the level the feature itself declares.
+    const action = MENU_ALIASES[id] ?? id
+    if (knownActions.has(action)) menuNode(action)
   }
 
   // Route a Document-menu action to the active collection tab's ResultsPanel, which
@@ -324,7 +292,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
   // Linux — where WebKitGTK swallows native accelerators, so menu.rs attaches none —
   // the webview matches the keyboard against the user's bindings itself.
   const nativeMenuOwnsShortcuts = !/Linux/i.test(navigator.userAgent)
-  // ozendb-4b8: macOS reserves Ctrl+Tab/Ctrl+Shift+Tab for Cocoa's key-view-loop
+  // #146: macOS reserves Ctrl+Tab/Ctrl+Shift+Tab for Cocoa's key-view-loop
   // navigation, claimed earlier in the dispatch pipeline than any menu accelerator —
   // so the native menu item for these two never fires from the keyboard (clicking it
   // still works). The keystroke still reaches the webview as an ordinary keydown, so

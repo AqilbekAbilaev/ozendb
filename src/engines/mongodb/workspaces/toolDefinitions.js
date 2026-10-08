@@ -1,8 +1,8 @@
-// MongoDB tool workspace definitions (Work 5D): indexes, schema, search, import,
-// export, and current operations. Same contract as the query definitions — fresh
-// flat legacy fields, canonical envelope owned by the generic factory. Work 6 adds
-// the duplicate/restore hooks: tool tabs clone their durable configuration (import
-// sources, export mapping, ops settings) and reset their runtime previews/rows.
+// MongoDB tool workspace definitions: indexes, schema, search, import, export, and
+// current operations. Same contract as the query definitions — fresh flat legacy
+// fields, canonical envelope owned by the generic factory. Their duplicate/restore
+// hooks clone the durable configuration (import sources, export mapping, ops settings)
+// and reset the runtime previews/rows.
 import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
@@ -12,7 +12,7 @@ import { opsDefaults } from '../../../composables/useCurrentOps'
 // which kind of tab it is looking at.
 //
 // Reads either spelling because its callers differ: `create` is handed a feature node
-// (still short — see audit §8), while `duplicate` and `restore` are handed a workspace
+// (still short — see #193), while `duplicate` and `restore` are handed a workspace
 // or saved record, which are long.
 function toolTarget(source) {
   return {
@@ -45,8 +45,8 @@ function opsTarget(node) {
 }
 
 // Indexes/Schema/Search tabs are identity-only: the pane reloads its data on mount,
-// so a duplicate is just the same target with a fresh id. Work 7 makes Schema and
-// Search persist (identity only, like Indexes) — the restore hook is shared too.
+// so a duplicate is just the same target with a fresh id. Schema and Search persist
+// too (identity only, like Indexes) — the restore hook is shared.
 function identityTool(kind, titlePrefix, anchor = (source) => source.collectionName || source.dbName) {
   const rebuild = (source) => ({
     title: source.title || titlePrefix + ' ' + anchor(source),
@@ -55,6 +55,17 @@ function identityTool(kind, titlePrefix, anchor = (source) => source.collectionN
   })
   return { duplicate: rebuild, restore: rebuild }
 }
+
+// A CSV import's options with each default filled in — the one copy create, serialize,
+// duplicate and restore share.
+const csvOptions = (csv) => ({
+  delimiter: csv?.delimiter ?? ',', other: csv?.other ?? '', qualifier: csv?.qualifier ?? '"',
+  skipLines: csv?.skipLines ?? 0, hasHeader: csv?.hasHeader ?? true,
+})
+
+// A JSON import's run status. The pane is shared by every import tab, so this lives on
+// the tab — but fresh on each create, duplicate and restore, and never saved.
+const importRuntime = () => ({ running: false, error: null, errorCode: null, done: null })
 
 export const toolDefinitions = [
   {
@@ -111,6 +122,7 @@ export const toolDefinitions = [
     type: 'mongodb.import',
     engine: 'mongodb',
     component: WORKSPACE_COMPONENTS.import,
+    componentFor: (workspace) => (workspace.format === 'csv' ? WORKSPACE_COMPONENTS['import:csv'] : WORKSPACE_COMPONENTS.import),
     create(ctx) {
       const target = toolTarget(ctx.target)
       const format = ctx.options.format || 'json'
@@ -123,7 +135,7 @@ export const toolDefinitions = [
             subTab: 'source',           // 'source' | 'target'
             sourceType: 'file',         // 'clipboard' | 'file'
             filePath: '',
-            csv: { delimiter: ',', other: '', qualifier: '"', skipLines: 0, hasHeader: true },
+            csv: csvOptions(),
             targetDb: ctx.target.dbName, targetColl: ctx.target.collName, mode: 'insert',
             fields: [],                 // column → field mapping (Target options)
           }
@@ -133,6 +145,7 @@ export const toolDefinitions = [
             sources: [],                // { path, name, targetDb, targetColl, mode }
             selectedSource: -1,
             previewOpen: false,
+            runtime: importRuntime(),
           }
       return { title: 'Import: ' + ctx.target.collName, target: resourceFromFeatureNode(target), fields }
     },
@@ -144,12 +157,7 @@ export const toolDefinitions = [
         return {
           format: 'csv',
           sourceType: workspace.sourceType ?? 'file', filePath: workspace.filePath ?? '',
-          csv: {
-            delimiter: workspace.csv?.delimiter ?? ',', other: workspace.csv?.other ?? '',
-            qualifier: workspace.csv?.qualifier ?? '"',
-            skipLines: workspace.csv?.skipLines ?? 0,
-            hasHeader: workspace.csv?.hasHeader ?? true,
-          },
+          csv: csvOptions(workspace.csv),
           targetDb: workspace.targetDb ?? '', targetColl: workspace.targetColl ?? '',
           mode: workspace.mode ?? 'insert',
         }
@@ -174,13 +182,7 @@ export const toolDefinitions = [
             kind: 'import', ...toolTarget(workspace), format: 'csv',
             subTab: 'source', sourceType: workspace.sourceType || 'file',
             filePath: workspace.filePath || '',
-            csv: {
-              delimiter: workspace.csv?.delimiter ?? ',',
-              other: workspace.csv?.other ?? '',
-              qualifier: workspace.csv?.qualifier ?? '"',
-              skipLines: workspace.csv?.skipLines ?? 0,
-              hasHeader: workspace.csv?.hasHeader ?? true,
-            },
+            csv: csvOptions(workspace.csv),
             targetDb: workspace.targetDb, targetColl: workspace.targetColl,
             mode: workspace.mode || 'insert',
             fields: [],
@@ -199,6 +201,7 @@ export const toolDefinitions = [
           })),
           selectedSource: -1,
           previewOpen: false,
+          runtime: importRuntime(),
         },
       }
     },
@@ -213,12 +216,7 @@ export const toolDefinitions = [
             kind: 'import', ...toolTarget(saved), format: 'csv',
             subTab: 'source',
             sourceType: saved.sourceType || 'file', filePath: saved.filePath || '',
-            csv: {
-              delimiter: saved.csv?.delimiter ?? ',', other: saved.csv?.other ?? '',
-              qualifier: saved.csv?.qualifier ?? '"',
-              skipLines: saved.csv?.skipLines ?? 0,
-              hasHeader: saved.csv?.hasHeader ?? true,
-            },
+            csv: csvOptions(saved.csv),
             targetDb: saved.targetDb, targetColl: saved.targetColl,
             mode: saved.mode || 'insert',
             fields: [],
@@ -238,6 +236,7 @@ export const toolDefinitions = [
           sources,
           selectedSource: sources.length ? 0 : -1,
           previewOpen: false,
+          runtime: importRuntime(),
         },
       }
     },

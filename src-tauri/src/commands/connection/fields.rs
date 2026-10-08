@@ -93,9 +93,9 @@ impl ConnectionFields {
             }
         };
         Ok(ConnectionConfig {
-            id: id,
+            id,
             name: self.name,
-            engine: engine,
+            engine,
             hosts: self.hosts,
             username: self.username,
             tls: self.tls,
@@ -109,9 +109,9 @@ impl ConnectionFields {
             ssh_key_file: self.ssh_key_file,
             tag: self.tag,
             read_only: self.read_only,
-            folder_id: folder_id,
-            last_accessed: last_accessed,
-            open: open,
+            folder_id,
+            last_accessed,
+            open,
         })
     }
 

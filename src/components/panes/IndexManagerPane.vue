@@ -14,7 +14,7 @@ import { errText, errMessage } from '../../utils/errors'
 import { fmtBytes } from '../../utils/format'
 import { useIndexPaneLifecycle } from '../../composables/useIndexPaneLifecycle'
 import { showToast } from '../../stores/toast'
-import { refreshRequest } from '../../stores/menuRequests'
+import { refreshRequest, indexMenuRequest } from '../../stores/menuRequests'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
@@ -204,21 +204,22 @@ function handleCopyIndex() {
   idx.copyIndex()
 }
 
-// Expose a menu API so App.vue's native Index menu can reach this tab
-const menuApi = {
-  selectedIndex: localSelectedIndex,
+// What the native Index menu can ask of the open pane (stores/menuRequests). Only the
+// active tab's pane is mounted, so a request always lands on the tab it was made for.
+const menuActions = {
   startEditIndex: handleStartEdit,
   openIndexDetails: handleViewDetails,
   copyIndex: handleCopyIndex,
   openDropIndexConfirm: handleDropIndex,
   setIndexHidden: toggleHidden,
 }
+watch(indexMenuRequest, (request) => { if (request) menuActions[request.method]?.(...request.args) })
 
-// Vue reuses this pane while switching directly between Index Manager tabs. Move the
-// native-menu API with the active workspace, reset local UI state, and invalidate any
-// async response started by the previous workspace before loading the new target.
+// Vue reuses this pane while switching directly between Index Manager tabs. Reset local
+// UI state and invalidate any async response started by the previous workspace before
+// loading the new target.
 watch(() => props.activeTab, (tab) => {
-  lifecycle.attachMenuApi(tab, menuApi)
+  lifecycle.reset()
   localIndexesList.value = []
   localIndexesError.value = null
   localSelectedIndex.value = null
@@ -238,7 +239,7 @@ watch(() => props.activeTab, (tab) => {
 }, { immediate: true })
 
 onUnmounted(() => {
-  lifecycle.detachMenuApi(menuApi)
+  lifecycle.reset()
   localIndexesList.value = []
   localSelectedIndex.value = null
   idx.selectedIndex.value = null

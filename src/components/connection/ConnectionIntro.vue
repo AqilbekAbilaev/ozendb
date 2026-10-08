@@ -6,7 +6,7 @@ import BaseTextarea from '../base/BaseTextarea.vue'
 import FieldError from '../base/FieldError.vue'
 import BaseSelect from '../base/BaseSelect.vue'
 import { ENGINE_OPTIONS } from '../../data/connectionOptions.js'
-import { CONNECTION_EDITORS } from '../../engines/connectionEditor.js'
+import { CONNECTION_EDITORS } from '../../engines/ui.js'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
 const props = defineProps({

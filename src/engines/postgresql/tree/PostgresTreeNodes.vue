@@ -46,7 +46,7 @@ function openQuery() {
   openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: database.value })
 }
 
-// Every other non-template database on this server (ozendb-bj2) — same data
+// Every other non-template database on this server (#124) — same data
 // `databaseSize` reads, fetched once the primary database row opens. A SQL tab
 // against one targets it via `runQuery`'s `database` override, reusing this
 // connection's pool/tunnel/credentials rather than opening a second connection.
@@ -64,7 +64,7 @@ const color = computed(() => nodeTagName(tagOverrides.value, props.conn.id, prop
 const tagStyle = computed(() => (color.value ? { '--tag-color': colorHex(color.value) } : null))
 
 // Clicking a row selects it, which is what the native menu's PostgreSQL gates read
-// (ozendb-sxd) — without this the menu could only ever target an open tab. Both
+// (#145) — without this the menu could only ever target an open tab. Both
 // spellings of the database name ride along: `dbName` is what the shared selection
 // store's ref builder reads, `database` is what every PostgreSQL consumer uses.
 function select(kind, schemaName = null, tableName = null) {
@@ -213,7 +213,7 @@ function openTable(schema, table) {
       </template>
     </template>
 
-    <!-- Every other database on this server (ozendb-bj2) — a connection still binds
+    <!-- Every other database on this server (#124) — a connection still binds
          to one database to browse, but a SQL tab against another reuses the same
          pool/tunnel/credentials instead of a dead click. -->
     <div
