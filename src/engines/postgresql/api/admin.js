@@ -53,7 +53,7 @@ export function dropRole(connectionId, name) {
 }
 
 // Every schema/table/view/sequence this role holds a direct privilege on — not what it
-// inherits through group membership (ozendb-ahy).
+// inherits through group membership (#141).
 export function grants(connectionId, role) {
   return invoke('list_pg_grants', { id: connectionId, role })
 }

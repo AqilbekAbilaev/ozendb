@@ -1,7 +1,7 @@
 use super::{AppError, CsvOptions};
 use mongodb::bson;
 
-pub(crate) struct CsvRecords<R: std::io::Read> {
+pub(crate) struct CsvRecords<R: std::io::BufRead> {
     bytes: std::io::Bytes<R>,
     // One-byte look-ahead buffer, used to detect a doubled quote (`""`) and to peek
     // the byte after a closing quote.
@@ -13,7 +13,7 @@ pub(crate) struct CsvRecords<R: std::io::Read> {
     quote: u8,
 }
 
-impl<R: std::io::Read> CsvRecords<R> {
+impl<R: std::io::BufRead> CsvRecords<R> {
     pub(crate) fn new(reader: R, delimiter: u8, quote: u8) -> Self {
         CsvRecords {
             bytes: reader.bytes(),
@@ -136,7 +136,7 @@ pub(super) fn stream_csv_documents<R, F>(
     mut flush: F,
 ) -> Result<usize, AppError>
 where
-    R: std::io::Read,
+    R: std::io::BufRead,
     F: FnMut(Vec<bson::Document>) -> Result<(), AppError>,
 {
     let mut records = CsvRecords::new(reader, options.delimiter, options.quote);

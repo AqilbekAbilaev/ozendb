@@ -1,6 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { respondSshHostKey, forgetSshHost } from '../appApi/sshTrust'
-import { listen } from '@tauri-apps/api/event'
+import { onSshHostKeyPrompt, onSshHostKeyChanged } from '../appApi/events'
 
 // SSH host-key prompts raised by the backend during a tunnel handshake and the
 // handlers that respond to them.
@@ -13,10 +13,10 @@ export function useSshHostKey() {
   let unlisten = []
 
   onMounted(() => {
-    // Backend-raised SSH host-key prompts (global emits, so use the app-wide listen).
+    // Backend-raised SSH host-key prompts (global emits, so the app-wide subscription).
     unlisten = [
-      listen('ssh-host-key-prompt', (e) => { sshHostKeyPrompt.value = e.payload }),
-      listen('ssh-host-key-changed', (e) => { sshHostKeyChanged.value = e.payload }),
+      onSshHostKeyPrompt((prompt) => { sshHostKeyPrompt.value = prompt }),
+      onSshHostKeyChanged((change) => { sshHostKeyChanged.value = change }),
     ]
   })
 

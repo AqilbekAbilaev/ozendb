@@ -1,14 +1,12 @@
 import { ref } from 'vue'
 import { testConnection as testConnectionApi, saveConnection, updateConnection } from '../appApi/connections'
-import { emit as tauriEmit } from '@tauri-apps/api/event'
+import { emitConnectionSaved, emitConnectionUpdated } from '../appApi/events'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
 import { connectionTargetChanged } from '../utils/connectionTarget.js'
 import { hasLoadedData } from '../stores/connectionData.js'
-import { BUILD_FIELDS } from '../engines/connectionFields.js'
+import { ENGINES } from '../engines/index.js'
 import { useMongoFields } from '../engines/mongodb/connection/useMongoFields.js'
-
-const DEFAULT_PORTS = { mongodb: 27017, postgresql: 5432 }
 
 /**
  * One connection editor's fields and the two things you can do with them: test the
@@ -31,14 +29,14 @@ export function useConnectionForm(editConn) {
   const hosts = ref(
     isEditMode && Array.isArray(editConn.hosts) && editConn.hosts.length
       ? editConn.hosts.map(h => ({ host: h.host, port: h.port }))
-      : [{ host: 'localhost', port: DEFAULT_PORTS[engine.value] }]
+      : [{ host: 'localhost', port: ENGINES[engine.value].defaultPort }]
   )
-  function addHost() { hosts.value.push({ host: '', port: DEFAULT_PORTS[engine.value] }) }
+  function addHost() { hosts.value.push({ host: '', port: ENGINES[engine.value].defaultPort }) }
 
   // A port still at the old engine's default follows the switch; a typed one stays.
   function setEngine(next) {
     for (const h of hosts.value) {
-      if (Number(h.port) === DEFAULT_PORTS[engine.value]) h.port = DEFAULT_PORTS[next]
+      if (Number(h.port) === ENGINES[engine.value].defaultPort) h.port = ENGINES[next].defaultPort
     }
     engine.value = next
   }
@@ -109,7 +107,7 @@ export function useConnectionForm(editConn) {
     return {
       name:            connName.value.trim(),
       engine:          engine.value,
-      hosts:           hosts.value.map(h => ({ host: h.host, port: Number(h.port) || DEFAULT_PORTS[engine.value] })),
+      hosts:           hosts.value.map(h => ({ host: h.host, port: Number(h.port) || ENGINES[engine.value].defaultPort })),
       tls:                          useTls.value,
       tlsCaFile:                    useTls.value ? (tlsCaFile.value || null) : null,
       tlsAllowInvalidCertificates:  useTls.value ? tlsAllowInvalidCerts.value : false,
@@ -123,7 +121,7 @@ export function useConnectionForm(editConn) {
       sshPassphrase: (useSsh.value && sshAuth.value === 'key') ? (sshKeyPassphrase.value || null) : null,
       tag:             selectedTag.value !== 'none' ? selectedTag.value : null,
       readOnly:        readOnly.value,
-      ...BUILD_FIELDS[engine.value]({
+      ...ENGINES[engine.value].buildFields({
         database:       database.value,
         connType:       mongo.connType.value,
         replicaSetName: mongo.replicaSetName.value,
@@ -151,7 +149,7 @@ export function useConnectionForm(editConn) {
     set(useTls, parsed.tls)
     set(tlsAllowInvalidCerts, parsed.tlsAllowInvalidCerts)
     set(tlsCaFile, parsed.tlsCaFile)
-    if (engine.value === 'postgresql') set(database, parsed.database)
+    if (ENGINES[engine.value].namesDatabase) set(database, parsed.database)
     else mongo.applyParsed(parsed)
   }
 
@@ -200,7 +198,7 @@ export function useConnectionForm(editConn) {
           return null
         }
         const conn = await updateConnection(editConn.id, fields)
-        await tauriEmit('connection-updated', conn)
+        await emitConnectionUpdated(conn)
         return { event: 'updated', conn: conn }
       }
 
@@ -250,7 +248,7 @@ export function useConnectionForm(editConn) {
       read_only:       fields.readOnly,
       last_accessed:   null,
     }
-    await tauriEmit('connection-saved', conn)
+    await emitConnectionSaved(conn)
     return { event: 'saved', conn: conn }
   }
 

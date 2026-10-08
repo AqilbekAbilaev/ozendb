@@ -5,8 +5,8 @@ import { MODALS } from './modalRegistry'
 // modal means adding a row here. This guards the row shape every consumer relies on —
 // a component to render and a node level to gate/seed it.
 // null = app-level singleton (no node target); the others are node depths. `table`
-// is PostgreSQL-only (ozendb-h4y) — Postgres has no sidebar node deep enough yet
-// (ozendb-sxd) to open one from, so it's opened directly from the table workspace.
+// is PostgreSQL-only (#129) — Postgres has no sidebar node deep enough yet
+// (#145) to open one from, so it's opened directly from the table workspace.
 const LEVELS = ['connection', 'database', 'collection', 'table', null]
 
 describe('modal registry', () => {

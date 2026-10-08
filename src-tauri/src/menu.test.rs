@@ -7,10 +7,10 @@ fn context(
     any_connection: bool,
 ) -> MenuContext {
     MenuContext {
-        has_connection: has_connection,
-        has_database: has_database,
-        has_collection: has_collection,
-        any_connection: any_connection,
+        has_connection,
+        has_database,
+        has_collection,
+        any_connection,
         has_document: false,
         has_field: false,
         has_index: false,
@@ -28,8 +28,8 @@ fn doc_context(has_document: bool, has_field: bool) -> MenuContext {
         has_database: true,
         has_collection: true,
         any_connection: true,
-        has_document: has_document,
-        has_field: has_field,
+        has_document,
+        has_field,
         has_index: false,
         read_only: false,
         can_refresh_tab: false,
@@ -47,7 +47,7 @@ fn index_context(has_index: bool) -> MenuContext {
         any_connection: true,
         has_document: false,
         has_field: false,
-        has_index: has_index,
+        has_index,
         read_only: false,
         can_refresh_tab: false,
         has_pg_schema: false,
@@ -298,7 +298,7 @@ fn placeholders_are_carried_over_but_ungated() {
 #[test]
 fn pg_menu_items_gate_on_the_active_tabs_schema_or_table_not_the_mongo_gates() {
     // Schema-scoped PostgreSQL items enable from PgSchema alone, independent of
-    // every Mongo-shaped gate (ozendb-sxd: PostgreSQL has no sidebar selection
+    // every Mongo-shaped gate (#145: PostgreSQL has no sidebar selection
     // feeding the menu context yet, so this never reaches via the tree).
     for id in ["pg:new_sql", "pg:create_table", "pg:search_schema"] {
         assert_eq!(gate_of(id), Gate::PgSchema, "{id} should gate on PgSchema");
@@ -362,7 +362,7 @@ fn gate_of(id: &str) -> Gate {
     }
 }
 
-// ozendb-izk: each engine sees only its own items, derived from the gates.
+// #152: each engine sees only its own items, derived from the gates.
 
 fn ids_and_names(scope: MenuScope) -> (Vec<&'static str>, Vec<&'static str>) {
     let mut names = Vec::new();

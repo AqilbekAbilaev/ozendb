@@ -7,7 +7,7 @@ import { createSelection } from '../../../composables/useRowSelection'
 // Explain found, and the Manual-mode transaction. Runtime only — the SQL itself is the
 // tab's lasting state, passed in to each call. `database`, when it names a database
 // other than the connection's own, opens a second database on the same server
-// (ozendb-bj2) — `null` behaves exactly as the connection's own.
+// (#124) — `null` behaves exactly as the connection's own.
 export function createSqlRun(connectionId, database = null) {
   return {
     connectionId, database,

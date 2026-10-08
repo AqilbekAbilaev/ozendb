@@ -4,7 +4,7 @@ import * as connApi from '../../appApi/connections'
 import { connectionUri } from '../../engines/mongodb/api/connections'
 import { updateLastAccessed } from '../../appApi/connectionState'
 import { requestConnectionOpen } from '../../stores/connectionNavigation'
-import { listen, emit as tauriEmit } from '@tauri-apps/api/event'
+import { onConnectionSaved as whenConnectionSaved, emitConnectionDeleted } from '../../appApi/events'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
 import { colorHex } from '../../utils/tabColor.js'
@@ -30,13 +30,13 @@ const showNewConnection = ref(false)
 const showEditConnection = ref(false)
 
 // The dialog is destroyed on close, so the listener must go with it. Kept as the promise:
-// unlistening through .then() is correct whether or not listen() has resolved yet.
+// unlistening through .then() is correct whether or not the subscription has resolved yet.
 let unlisten
 
 onMounted(async () => {
-  unlisten = listen('connection-saved', (e) => {
-    if (!connections.value.find(c => c.id === e.payload.id))
-      connections.value.push(e.payload)
+  unlisten = whenConnectionSaved((conn) => {
+    if (!connections.value.find(c => c.id === conn.id))
+      connections.value.push(conn)
   })
   connections.value = await connApi.listConnections()
   await loadFolders()
@@ -105,7 +105,7 @@ async function deleteSelected() {
   connections.value = connections.value.filter(c => c.id !== deletedId)
   selectedId.value = null
   // Tell the sidebar to drop it too if it was open (mirrors connection-saved).
-  await tauriEmit('connection-deleted', { id: deletedId })
+  await emitConnectionDeleted({ id: deletedId })
 }
 
 async function connectSelected() {

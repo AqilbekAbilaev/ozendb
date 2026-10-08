@@ -54,7 +54,7 @@ pub enum Gate {
     // (Refresh; see canRefreshWorkspace in the frontend's workspaces/lifecycle.js).
     RefreshableTab,
     // The active tab is a PostgreSQL workspace naming a schema (a query or table
-    // tab) — ozendb-sxd. Unlike Connection/Database/Collection, this is PostgreSQL-
+    // tab) — #145. Unlike Connection/Database/Collection, this is PostgreSQL-
     // only and resolved from the active tab alone; the sidebar tree doesn't yet
     // feed a PostgreSQL selection into the menu context (see menuContext.js).
     PgSchema,
@@ -130,7 +130,7 @@ pub enum MenuEngine {
     Postgres,
 }
 
-// Which engine-specific items the menu shows (ozendb-izk): one engine's, or neither.
+// Which engine-specific items the menu shows (#152): one engine's, or neither.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum MenuScope {
     Neutral,
@@ -218,7 +218,7 @@ pub enum Spec {
 // itself; emitting their ids too is harmless (the frontend has no case for them).
 pub fn handle_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     let id = event.id().as_ref().to_string();
-    let _ = app.emit("menu-action", id);
+    let _ = app.emit(crate::events::MENU_ACTION, id);
 }
 
 // Updates the enabled state of every gated item to match the current selection
@@ -244,17 +244,17 @@ pub fn set_menu_context(
     has_pg_table: bool,
 ) -> Result<(), String> {
     let context = MenuContext {
-        has_connection: has_connection,
-        has_database: has_database,
-        has_collection: has_collection,
-        any_connection: any_connection,
-        has_document: has_document,
-        has_field: has_field,
-        has_index: has_index,
-        read_only: read_only,
-        can_refresh_tab: can_refresh_tab,
-        has_pg_schema: has_pg_schema,
-        has_pg_table: has_pg_table,
+        has_connection,
+        has_database,
+        has_collection,
+        any_connection,
+        has_document,
+        has_field,
+        has_index,
+        read_only,
+        can_refresh_tab,
+        has_pg_schema,
+        has_pg_table,
     };
     let mut state = match items.0.lock() {
         Ok(val) => val,
@@ -268,10 +268,7 @@ pub fn set_menu_context(
             Err(e) => return Err(e.to_string()),
         };
         clear_accelerators(&state.accelerated);
-        match install(&app, built.menu) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
+        install(&app, built.menu)?;
         state.scope = scope;
         state.gated = built.gated;
         state.accelerated = built.accelerated;

@@ -1,4 +1,4 @@
-// Generic workspace lifecycle dispatch (Work 6): duplicate, restore, and dispose
+// Generic workspace lifecycle dispatch: duplicate, restore, and dispose
 // route through the registered definitions. The helpers own what every definition
 // must share — fresh IDs, deep detachment of durable state, common metadata, and
 // contained failure — so definitions never touch the workspace array directly.

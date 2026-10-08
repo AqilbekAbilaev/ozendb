@@ -15,7 +15,7 @@ import StateMessage from '../../../components/base/StateMessage.vue'
 import HintText from '../../../components/base/HintText.vue'
 
 // What this role can touch, and GRANT/REVOKE on schemas, tables and sequences
-// (ozendb-ahy). Opened from the Roles modal's detail panel.
+// (#141). Opened from the Roles modal's detail panel.
 const props = defineProps({
   target: { type: Object, required: true },  // { connId, connName, role }
 })

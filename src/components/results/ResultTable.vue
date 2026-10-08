@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { vqbOpen } from '../../stores/visualQueryBuilder'
-import { guessType, TYPE_CLASS, formatCell, columns, getAtPath } from '../../utils/resultGrid'
+import { columns, drillRows, cellRows, findMatches } from '../../utils/resultGrid'
 import { useResultSearch } from '../../composables/useResultSearch'
 import { useColumnReorder, useDrillColumnOrder } from '../../composables/useColumnReorder'
 import { useColumnResize } from '../../composables/useColumnResize'
@@ -131,23 +131,9 @@ watch(() => props.activeTab?.id, () => {
   anchorRow.value = -1
 })
 
-// The rows the grid renders: the results, or once drilled each document's value at the
-// path (one row per document, so a missing path renders blank rather than vanishing).
-// Memoized: the template reads it per row, and recomputing made 200 rows O(rows²).
-const gridDocs = computed(() => {
-  const results = held()?.results
-  if (!results) return []
-  if (!props.drillPath.length) return results
-  return results.map((doc) => {
-    const val = getAtPath(doc, props.drillPath) ?? {}
-    if (Array.isArray(val)) {
-      const obj = {}
-      val.forEach((el, idx) => { obj[String(idx)] = el })
-      return obj
-    }
-    return val
-  })
-})
+// The rows the grid renders (see drillRows). Memoized: the template reads it per row,
+// and recomputing made 200 rows O(rows²).
+const gridDocs = computed(() => drillRows(held()?.results, props.drillPath))
 
 // Column headers can be dragged to reorder; the chosen order is stored per drill path on the
 // tab and applied over the derived column list. The gesture, drop indicator and edge
@@ -174,26 +160,9 @@ const {
 })
 
 // ── per-cell display data (memoized) ────────────────────
-// Derive each cell's formatted text, colour classes and drillability once per result
-// set rather than inside the render function (which called guessType()/formatCell()
-// several times per cell on every re-render). The template just reads these. Aligned
-// to gridColumns: cellData[rowIndex] is the array of cells for that row.
-const cellData = computed(() => {
-  const cols = gridColumns.value
-  return gridDocs.value.map((row) =>
-    cols.map((col) => {
-      const val = row[col]
-      const type = guessType(col, val)
-      return {
-        col: col,
-        display: formatCell(col, val),
-        typeClass: 't-' + type,
-        valClass: TYPE_CLASS[type],
-        drillable: type === 'obj',
-      }
-    })
-  )
-})
+// Worked out once per result set (see cellRows) rather than inside the render function,
+// which called guessType()/formatCell() several times per cell on every re-render.
+const cellData = computed(() => cellRows(gridDocs.value, gridColumns.value))
 
 // ── in-grid search (Ctrl/Cmd+F) ─────────────────────────
 // Match-finding and the reactive highlight classes are grid-specific; the bar's
@@ -219,24 +188,7 @@ const {
   resetOn:    () => held()?.results,
 })
 
-// Flat list of all matches: { row, col } for every cell whose display text contains
-// the query (case-insensitive).
-const searchMatches = computed(() => {
-  const q = searchQuery.value.toLowerCase()
-  if (!q) return []
-  const docs  = gridDocs.value
-  const cols  = gridColumns.value
-  const cells = cellData.value
-  const out   = []
-  for (let r = 0; r < docs.length; r++) {
-    const row = cells[r]
-    if (!row) continue
-    for (let c = 0; c < cols.length; c++) {
-      if (row[c].display.toLowerCase().includes(q)) out.push({ row: r, col: cols[c] })
-    }
-  }
-  return out
-})
+const searchMatches = computed(() => findMatches(cellData.value, gridColumns.value, searchQuery.value))
 
 // Set of "row,col" strings for O(1) highlight lookups in the template.
 const matchSet = computed(() => {

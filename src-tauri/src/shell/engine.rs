@@ -83,12 +83,12 @@ impl ShellEngine {
     ) -> oneshot::Receiver<ShellResult> {
         let (reply, reply_rx) = oneshot::channel::<ShellResult>();
         let message = EvalMsg {
-            code: code,
-            client: client,
-            read_only: read_only,
-            default_db: default_db,
-            handle: handle,
-            reply: reply,
+            code,
+            client,
+            read_only,
+            default_db,
+            handle,
+            reply,
         };
 
         let mut sessions = match self.sessions.lock() {
@@ -179,7 +179,7 @@ fn new_session() -> Session {
     install_db(&mut context, Rc::clone(&slot));
 
     Session {
-        context: context,
+        context,
         db_slot: slot,
     }
 }
@@ -196,18 +196,15 @@ fn eval_in(context: &mut Context, code: &str) -> ShellResult {
             // A bare cursor (e.g. `db.c.find()`) is materialized to its array so
             // it displays results, mirroring mongosh.
             let value = materialize_cursor(value, context);
-            let json = match value.to_json(context) {
-                Ok(option) => option,
-                Err(_) => None,
-            };
+            let json = value.to_json(context).unwrap_or_default();
             ShellResult {
-                logs: logs,
+                logs,
                 value: json,
                 error: None,
             }
         }
         Err(err) => ShellResult {
-            logs: logs,
+            logs,
             value: None,
             error: Some(err.to_string()),
         },

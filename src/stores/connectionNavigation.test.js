@@ -60,7 +60,7 @@ describe('treeSelection', () => {
   })
 })
 
-// ozendb-9gf: a dropped node must not stay selected for the menu to act on.
+// #154: a dropped node must not stay selected for the menu to act on.
 describe('clearTreeSelectionUnder', () => {
   const db = { connectionId: 'a', segments: [{ kind: 'database', name: 'shop' }] }
   beforeEach(() => { treeSelection.value = null })
