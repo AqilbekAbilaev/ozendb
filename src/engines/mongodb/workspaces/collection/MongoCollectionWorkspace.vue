@@ -155,37 +155,37 @@ async function runExplain(tab = activeTab.value) {
   const request = beginWorkspaceRequest(tab, 'explain')
   const canApply = () => request.isCurrent() && props.tabs.includes(tab)
   // The chosen verbosity is stored on the tab so re-runs (pagination, refresh) reuse it.
-  const verbosity = tab.explainVerbosity || 'executionStats'
-  tab.explainVerbosity = verbosity
+  const verbosity = tab.runtime.explainVerbosity || 'executionStats'
+  tab.runtime.explainVerbosity = verbosity
   // Storage sizes (Collection/Index target nodes) are find-only and fetched separately.
-  tab.explainStorage = null
+  tab.runtime.explainStorage = null
 
   // Aggregate tabs explain their pipeline; find tabs explain the find query. Explaining
   // a find({}) on an aggregate tab (the old behavior) was silently misleading.
   if (tab.mode === 'aggregate') {
     const parsed = parsePipeline(tab.state.query.pipeline)
     if (!parsed || !parsed.ok) {
-      tab.explainError = 'Fix the pipeline before running Explain.'
-      tab.explainResult = null
-      tab.explainRunning = false
+      tab.runtime.explainError = 'Fix the pipeline before running Explain.'
+      tab.runtime.explainResult = null
+      tab.runtime.explainRunning = false
       return
     }
-    tab.explainRunning = true
-    tab.explainError = null
+    tab.runtime.explainRunning = true
+    tab.runtime.explainError = null
     try {
       const result = await explainAggregate(
         { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
         parsed.ejson,
         verbosity,
       )
-      if (canApply()) tab.explainResult = result
+      if (canApply()) tab.runtime.explainResult = result
     } catch (e) {
       if (canApply()) {
-        tab.explainError = errText(e)
-        tab.explainResult = null
+        tab.runtime.explainError = errText(e)
+        tab.runtime.explainResult = null
       }
     } finally {
-      if (canApply()) tab.explainRunning = false
+      if (canApply()) tab.runtime.explainRunning = false
     }
     return
   }
@@ -196,13 +196,13 @@ async function runExplain(tab = activeTab.value) {
     sort: parseField(tab.state.query.sort),
   }
   if (!parsed || !parsed.filter.ok || !parsed.projection.ok || !parsed.sort.ok) {
-    tab.explainError = 'Fix the query before running Explain.'
-    tab.explainResult = null
-    tab.explainRunning = false
+    tab.runtime.explainError = 'Fix the query before running Explain.'
+    tab.runtime.explainResult = null
+    tab.runtime.explainRunning = false
     return
   }
-  tab.explainRunning = true
-  tab.explainError = null
+  tab.runtime.explainRunning = true
+  tab.runtime.explainError = null
   try {
     const result = await explainFind(
       { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
@@ -216,7 +216,7 @@ async function runExplain(tab = activeTab.value) {
       verbosity,
     )
     if (!canApply()) return
-    tab.explainResult = result
+    tab.runtime.explainResult = result
     // Best-effort: fetch on-disk sizes for the Collection/Index target nodes. A failure
     // here must never clear the explain or surface an error — just skip the size nodes.
     try {
@@ -225,17 +225,17 @@ async function runExplain(tab = activeTab.value) {
         database:     tab.dbName,
         collection:   tab.collectionName,
       })
-      if (canApply()) tab.explainStorage = storage
+      if (canApply()) tab.runtime.explainStorage = storage
     } catch (e) {
-      if (canApply()) tab.explainStorage = null
+      if (canApply()) tab.runtime.explainStorage = null
     }
   } catch (e) {
     if (canApply()) {
-      tab.explainError = errText(e)
-      tab.explainResult = null
+      tab.runtime.explainError = errText(e)
+      tab.runtime.explainResult = null
     }
   } finally {
-    if (canApply()) tab.explainRunning = false
+    if (canApply()) tab.runtime.explainRunning = false
   }
 }
 
@@ -243,7 +243,7 @@ async function runExplain(tab = activeTab.value) {
 function onExplainVerbosity(v) {
   const tab = activeTab.value
   if (!tab) return
-  tab.explainVerbosity = v
+  tab.runtime.explainVerbosity = v
   runExplain(tab)
 }
 

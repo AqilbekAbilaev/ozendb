@@ -84,6 +84,7 @@ describe('mongodb.import', () => {
     expect(created.fields.selectedSource).toBe(-1)
     expect(created.fields.previewOpen).toBe(false)
     expect(created.fields.csv).toBeUndefined()
+    expect(created.fields.runtime).toEqual({ running: false, error: null, errorCode: null, done: null })
   })
 
   it('defaults to the JSON variant when no format is given', () => {
@@ -214,6 +215,7 @@ describe('lifecycle — tools', () => {
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders',
       format: 'json', validate: true,
       sources: [source], selectedSource: 0, previewOpen: true,
+      runtime: { running: true, error: 'boom', errorCode: 'io', done: { count: 3 } },
     })
     expect(dup.validate).toBe(true)
     expect(dup.sources).toEqual([source])
@@ -221,6 +223,8 @@ describe('lifecycle — tools', () => {
     expect(dup.sources[0]).not.toBe(source)
     expect(dup.selectedSource).toBe(-1)
     expect(dup.previewOpen).toBe(false)
+    // A run's status belongs to the tab that ran it.
+    expect(dup.runtime).toEqual({ running: false, error: null, errorCode: null, done: null })
   })
 
   it('export duplicate persists mapping and filter but clears the result banner', () => {
@@ -288,6 +292,7 @@ describe('lifecycle — tool restore', () => {
     expect(tab.sources).toHaveLength(1)
     expect(tab.selectedSource).toBe(0)
     expect(tab.previewOpen).toBe(false)
+    expect(tab.runtime).toEqual({ running: false, error: null, errorCode: null, done: null })
   })
 
   it('export restore keeps the mapping but clears the run result', () => {

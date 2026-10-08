@@ -4,7 +4,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { ref, reactive, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { useCurrentOps } from './useCurrentOps'
+import { useCurrentOps, opsDefaults } from './useCurrentOps'
 import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
 
 // Switching workspace tabs unmounts the pane, so anything held in a plain ref inside it
@@ -155,18 +155,18 @@ describe('two tabs at once', () => {
     const ops = useCurrentOps(() => active.value)
 
     const loadA = ops.load()
-    expect(a._opsLoading).toBe(true)
+    expect(a.loading).toBe(true)
     active.value = b
     const loadB = ops.load()
     await loadB
-    expect(b._opsLoading).toBe(false)
-    expect(a._opsLoading).toBe(true)
+    expect(b.loading).toBe(false)
+    expect(a.loading).toBe(true)
     resolveA({ inprog: [{ opid: 1, connectionId: 1, ns: 'a.items' }] })
     await loadA
 
     expect(a.ops.map(op => op.opid)).toEqual([1])
     expect(b.ops.map(op => op.opid)).toEqual([2])
-    expect(a._opsLoading).toBe(false)
+    expect(a.loading).toBe(false)
     expect(invoke).toHaveBeenCalledWith('current_ops', { id: 'c1', ownOnly: false, all: false })
     expect(invoke).toHaveBeenCalledWith('current_ops', { id: 'c2', ownOnly: false, all: false })
   })
@@ -231,5 +231,28 @@ describe('two tabs at once', () => {
 
     expect(invoke.mock.calls.filter(([command]) => command === 'current_ops')).toHaveLength(2)
     expect(tab.ops).toEqual([])
+  })
+})
+
+describe('opsDefaults', () => {
+  // Everything a poll records is declared up front, so nothing ad hoc lands on the tab.
+  it('declares every field a load or a kill writes', async () => {
+    const tab = newTab()
+    const keys = Object.keys(tab).sort()
+    invoke.mockRejectedValueOnce(new Error('boom'))
+    const ops = useCurrentOps(() => tab)
+    await ops.load()
+    await ops.load()
+    await ops.kill(7)
+    expect(Object.keys(tab).sort()).toEqual(keys)
+  })
+
+  // The namespace pickers' database list is fetched per server, so two tabs never share it.
+  it('gives each tab its own, empty database list', () => {
+    const a = opsDefaults()
+    const b = opsDefaults()
+    expect(a.databases).toEqual([])
+    a.databases.push({ name: 'shop' })
+    expect(b.databases).toEqual([])
   })
 })

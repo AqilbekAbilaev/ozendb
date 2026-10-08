@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import {
-  historyRequest, saveQueryRequest, savedQueryBrowserRequest, docMenuRequest,
-  requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction,
+  historyRequest, saveQueryRequest, savedQueryBrowserRequest, docMenuRequest, indexMenuRequest,
+  requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestIndexAction,
 } from './menuRequests'
 
 it('each request lands on its own ref', () => {
@@ -28,4 +28,13 @@ it('a doc action replaces the previous one', () => {
   requestDocAction('doc:edit')
   requestDocAction('doc:delete')
   expect(docMenuRequest.value.action).toBe('doc:delete')
+})
+
+// The Index menu acts on whichever Index Manager is open, so the request names the pane
+// method and its arguments rather than reaching into the tab.
+it('an index action carries its method and arguments', () => {
+  requestIndexAction('setIndexHidden', true)
+  expect(indexMenuRequest.value).toMatchObject({ method: 'setIndexHidden', args: [true] })
+  requestIndexAction('copyIndex')
+  expect(indexMenuRequest.value).toMatchObject({ method: 'copyIndex', args: [] })
 })

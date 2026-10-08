@@ -34,7 +34,17 @@ export function createCollectionUi({ resultView } = {}) {
 // replaying state onto a shared runtime is how two tabs end up showing one set of
 // results.
 export function createCollectionRuntime() {
-  return { results: [], hasRun: false, isRunning: false, runError: null, elapsedMs: null, ...createSelection() }
+  return {
+    results: [], hasRun: false, isRunning: false, runError: null, runErrorCode: null, elapsedMs: null,
+    // The run in flight: its server-side tag, the wall clock it started at (for the live
+    // counter), and whether the user cancelled it.
+    runId: null, startedAt: null, cancelled: false,
+    // The footer's optional count, and the filter it was counted for.
+    total: null, totalFilter: null, isCounting: false, countShown: false,
+    // The Explain tab: its last plan, and the verbosity a re-run reuses.
+    explainResult: null, explainStorage: null, explainError: null, explainRunning: false, explainVerbosity: null,
+    ...createSelection(),
+  }
 }
 
 // The flat shape sessions have been written in until now: the query fields sat at the
