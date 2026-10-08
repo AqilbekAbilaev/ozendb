@@ -1,8 +1,9 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlparser::ast::{
-    Expr as SqlExpr, GroupByExpr, Ident, LimitClause, ObjectName, OrderBy, OrderByKind, Query,
-    SelectItem, SetExpr, Statement, TableFactor, UnaryOperator, Value as SqlValue,
+    Expr as SqlExpr, GroupByExpr, Ident, LimitClause, ObjectName, OrderBy, OrderByKind,
+    OrderBySort, Query, SelectItem, SetExpr, Statement, TableFactor, UnaryOperator,
+    Value as SqlValue,
 };
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser as SqlParser;
@@ -262,8 +263,11 @@ fn convert_order_by(order_by: &Option<OrderBy>) -> Result<Vec<(String, J)>, Stri
         OrderByKind::Expressions(exprs) => {
             for order_expr in exprs {
                 let field = ident_field(&order_expr.expr)?;
-                // asc == Some(false) means DESC; ASC or unspecified is ascending.
-                let dir = if order_expr.options.asc == Some(false) { -1 } else { 1 };
+                // Only DESC sorts descending; ASC, unspecified and `USING <op>` ascend.
+                let dir = match order_expr.options.sort {
+                    Some(OrderBySort::Desc) => -1,
+                    _ => 1,
+                };
                 out.push((field, J::Int(dir)));
             }
         }

@@ -2,8 +2,8 @@ use crate::error::AppError;
 use serde::Serialize;
 use sqlparser::ast::{
     BinaryOperator, DataType, Expr, GroupByExpr, Ident, JoinConstraint, JoinOperator, LimitClause, ObjectName,
-    OrderByKind, SelectItem, SelectItemQualifiedWildcardKind, SetExpr, Statement, TableAlias, TableFactor,
-    TableWithJoins, UnaryOperator, Value,
+    OrderByKind, OrderBySort, SelectItem, SelectItemQualifiedWildcardKind, SetExpr, Statement,
+    TableAlias, TableFactor, TableWithJoins, UnaryOperator, Value,
 };
 use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
@@ -299,7 +299,10 @@ pub(crate) fn read_table_select(sql: &str, schema: &str, table: &str) -> Result<
         };
         for e in exprs {
             order_by.push(scope.column(&e.expr)?);
-            directions.push(e.options.asc == Some(false));
+            if let Some(OrderBySort::Using(op)) = &e.options.sort {
+                return Err(format!("ORDER BY … USING {op} can't be shown as a sort"));
+            }
+            directions.push(matches!(e.options.sort, Some(OrderBySort::Desc)));
         }
     }
     if directions.windows(2).any(|pair| pair[0] != pair[1]) {
