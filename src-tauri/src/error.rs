@@ -65,47 +65,56 @@ impl AppError {
     }
 }
 
-// Tauri commands return Result<T, E> where E must implement serde::Serialize.
-// We serialize as { code, message } so the frontend gets both a stable category
-// to branch on and a human-readable message. This is also the single funnel
-// through which every error returned to the frontend passes, so we log it here
-// (with its category) for diagnosis.
+// What the frontend receives for a failed command (src/utils/errors.js reads it): a
+// stable category to branch on and a human-readable message.
 #[derive(serde::Serialize)]
 struct WireError<'a> {
     code: &'a str,
     message: String,
 }
 
-impl serde::Serialize for AppError {
-    // This is the deliberate single funnel: every error returned to the frontend
-    // passes through here, so it's the one place we log. Gate the log by category —
-    // expected user-input errors (`validation`, `bson`) surface to the user as calm
-    // toasts, so logging them here is just noise. Everything else is genuinely
-    // unexpected / server-side, so we log it for diagnosis.
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+impl AppError {
+    // The message the user sees. For MongoDB errors the driver's Display can be a `{:?}`
+    // debug dump (notably write/insert errors), so route them through the humanizer;
+    // every other variant already Displays as a readable sentence.
+    pub(crate) fn user_message(&self) -> String {
+        match self {
+            AppError::Mongo(e) => mongo_message(e),
+            AppError::Postgres(e) => postgres_message(e),
+            _ => self.to_string(),
+        }
+    }
+
+    // The wire shape, and nothing else — no logging, so building it is safe anywhere.
+    fn wire(&self) -> WireError<'_> {
+        WireError {
+            code: self.code(),
+            message: self.user_message(),
+        }
+    }
+
+    // Expected user-input errors (`validation`, `bson`) surface as calm toasts, so they
+    // aren't worth a stderr line; everything else is printed with the full driver
+    // Display, which is verbose and good for diagnosis. The ones that are ours to fix
+    // (see error_log::is_defect) are also kept so they can be reported later — a failed
+    // login or an unreachable host is not one of them.
+    fn report(&self) {
         let code = self.code();
-        // Log with the full driver Display (verbose, good for diagnosis); the user-facing
-        // `message` is humanized below.
         match code {
             "validation" | "bson" => {}
             _ => eprintln!("[ozendb] error [{}]: {}", code, self),
         }
-        // Persist the ones that are ours to fix (see error_log::is_defect) so they can
-        // be reported later. A failed login or an unreachable host is not one of them.
         crate::error_log::record(code, &self.to_string());
-        // For MongoDB errors the driver's Display can be a `{:?}` debug dump (notably
-        // write/insert errors), so route them through the humanizer; every other variant
-        // already Displays as a readable sentence.
-        let message = match self {
-            AppError::Mongo(e) => mongo_message(e),
-            AppError::Postgres(e) => postgres_message(e),
-            _ => self.to_string(),
-        };
-        let wire = WireError {
-            code,
-            message,
-        };
-        wire.serialize(s)
+    }
+}
+
+// Every command's `Err` is converted here on its way to the frontend, exactly once, so this
+// is where it's logged. `AppError` deliberately doesn't implement `Serialize`: Tauri's blanket
+// conversion would then take over and skip the report.
+impl From<AppError> for tauri::ipc::InvokeError {
+    fn from(error: AppError) -> Self {
+        error.report();
+        tauri::ipc::InvokeError::from(error.wire())
     }
 }
 
@@ -310,8 +319,9 @@ mod tests {
         );
     }
 
-    // The wiring between error reporting's two halves: `impl Serialize for AppError` is
-    // what decides whether an error is ever recorded, by calling error_log::record.
+    // The wiring between error reporting's two halves: the conversion into Tauri's
+    // `InvokeError` — the boundary every command error crosses on its way to the frontend
+    // — is what decides whether an error is ever recorded, by calling error_log::record.
     // Classification itself is covered in error_log.test.rs — what this pins is that the
     // funnel is actually connected, in both directions.
     //
@@ -327,8 +337,10 @@ mod tests {
 
         let defect = AppError::Io(std::io::Error::other("marker-defect"));
         let domain = AppError::Validation("marker-domain".to_string());
-        serde_json::to_string(&defect).expect("serialize defect");
-        serde_json::to_string(&domain).expect("serialize domain error");
+        let _ = tauri::ipc::InvokeError::from(defect);
+        let _ = tauri::ipc::InvokeError::from(domain);
+        // Building the wire shape is pure: only crossing the boundary records anything.
+        let _ = AppError::Io(std::io::Error::other("marker-unsent")).wire();
 
         let records = match crate::error_log::store() {
             Some(store) => store.list(),
@@ -336,8 +348,16 @@ mod tests {
             None => return,
         };
         let recorded: Vec<_> = records.iter().filter(|r| r.message.contains("marker-")).collect();
-        assert_eq!(recorded.len(), 1, "exactly one of the two should be recorded");
+        assert_eq!(recorded.len(), 1, "only the defect that crossed the boundary is recorded");
         assert_eq!(recorded[0].code, "io");
         assert!(recorded[0].message.contains("marker-defect"));
+    }
+
+    // The frontend reads exactly this shape (src/utils/errors.js): a stable code to branch
+    // on and a readable message.
+    #[test]
+    fn a_command_error_reaches_the_frontend_as_code_and_message() {
+        let error = tauri::ipc::InvokeError::from(super::AppError::Validation("Name is required".into()));
+        assert_eq!(error.0, serde_json::json!({ "code": "validation", "message": "Name is required" }));
     }
 }

@@ -9,7 +9,7 @@ use super::pg::{pool, test_config};
 use crate::postgres::row_history::{PgColumnChange, PgHistoryEntry};
 
 fn shown(err: &AppError) -> String {
-    serde_json::to_value(err).unwrap()["message"].as_str().unwrap().to_string()
+    err.user_message()
 }
 
 async fn count(pool: &sqlx::PgPool) -> i64 {
