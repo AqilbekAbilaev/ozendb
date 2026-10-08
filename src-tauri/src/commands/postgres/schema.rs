@@ -320,5 +320,5 @@ pub async fn list_pg_foreign_keys(
 mod tests;
 
 // Live-Postgres coverage of `list_databases_impl`/`list_schemas_impl`/
-// `list_tables_impl`/`list_columns_impl` lives in pg_integration_tests.rs
+// `list_tables_impl`/`list_columns_impl` lives in live_tests/pg.rs
 // alongside this crate's other real-server tests, not here.

@@ -23,7 +23,7 @@ mod purge;
 use purge::ConnectionData;
 
 /// Test the connection the editor currently describes, without saving it. Dials
-/// through `uri::build_uri` (MongoDB) or `pg_uri::build_options` (PostgreSQL) — the
+/// through `uri::build_uri` (MongoDB) or `postgres::uri::build_options` (PostgreSQL) — the
 /// same functions the real connect paths use — so a green test means the connection
 /// will be dialled exactly the way it was tested.
 ///
@@ -189,7 +189,7 @@ pub fn connection_uri(ctx: State<'_, AppContext>, id: String) -> Result<String, 
         None => return Err(AppError::UnknownConnection(id)),
     };
     if let Some(postgres) = config.engine.as_postgres() {
-        return Ok(crate::pg_uri::connection_string(&config, postgres));
+        return Ok(crate::postgres::uri::connection_string(&config, postgres));
     }
     match config.engine.as_mongo() {
         Some(mongo) => Ok(crate::uri::build_uri(&config, mongo, None)),

@@ -10,7 +10,7 @@ use tauri::State;
 
 use super::{cancel, primary_key_columns, quote_ident, AppContext};
 
-// A convenience cap, not a hard server-side one: `statement_timeout` (pg_uri.rs)
+// A convenience cap, not a hard server-side one: `statement_timeout` (postgres/uri.rs)
 // already bounds how long the underlying query can run.
 const DEFAULT_LIMIT: i64 = 200;
 const MAX_LIMIT: i64 = 1000;
@@ -139,7 +139,7 @@ async fn build_search_sql(
 }
 
 /// Everything `search_pg_tables` does once it has a pool — split out so the live
-/// integration tests (`pg_command_integration_tests.rs`) can exercise the real
+/// integration tests (`live_tests/pg_command.rs`) can exercise the real
 /// query-building and execution without a Tauri `AppContext`, the same `*_impl`
 /// split every other Postgres command in this codebase already uses.
 pub(crate) async fn search_tables_impl(

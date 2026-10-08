@@ -172,7 +172,7 @@ pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[S
 /// runs `inner_sql` inside its own transaction that starts with `SET TRANSACTION
 /// READ ONLY`, then always rolls back (this path never writes, so there is
 /// nothing to commit). This is the real enforcement for arbitrary caller SQL —
-/// `pg_uri::options_for`'s `default_transaction_read_only` session default is
+/// `postgres::uri::options_for`'s `default_transaction_read_only` session default is
 /// only a *default*: a query can flip it off for the rest of the session with
 /// `set_config('default_transaction_read_only', 'off', false)` (confirmed live),
 /// but can't do the same to a transaction that already explicitly set itself

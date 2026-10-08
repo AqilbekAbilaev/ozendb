@@ -123,6 +123,22 @@ an empty pane — closing the last tab seeds a Quickstart — lives in `tabs.js`
 it guards. Note: module-scope refs do not survive
 Vite HMR cleanly — restart the dev server before blaming the code for stale tab state.
 
+### Engines
+
+What differs between engines is asked of `src/engines/`, never decided by comparing engine
+names — **enforced by `no-restricted-syntax` in `eslint.config.js`**, which also rejects
+ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
+
+- **`src/engines/index.js`** — the component-free engine table (`ENGINES`, `engineOf`):
+  default port, connection-field builder, the sidebar's top-level loader, the stats card,
+  whether a connection names its database. Stores and composables read it.
+- **`src/engines/ui.js`** — the component half: connection editor sections, sidebar rows.
+- **`src/engines/contextActions.js`** — right-click menus and actions an engine handles itself.
+
+A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
+screens still sit in the shared `components/` folders and its sidebar rows in
+`ConnectionTree.vue`, and `utils/menuContext.js` mirrors `menu.rs`'s per-engine menus.
+
 ### Resource identity
 
 A connection/database/collection is named by a **ResourceRef** — `{ connectionId,
@@ -156,10 +172,10 @@ ResourceRefs.
   - `api/` is its half of the Tauri boundary.
 - **Backend: `src-tauri/src/commands/postgres/`**, one file per area, over `sqlx`.
   - Commands resolve a pool through `ctx.pg_pool*`.
-  - Three modules sit at the crate root: `pg_uri.rs` (connect options), and the
-    `pg_query_library.rs` (saved SQL and run history) and `pg_row_history.rs` (per-row undo)
+  - Three modules sit in `src-tauri/src/postgres/`: `uri.rs` (connect options), and the
+    `query_library.rs` (saved SQL and run history) and `row_history.rs` (per-row undo)
     stores.
-- **Tests:** the `pg_*_integration_tests.rs` files run against a live server when
+- **Tests:** the `live_tests/pg*.rs` files run against a live server when
   `OZENDB_TEST_POSTGRES` is set, and are skipped otherwise.
 
 ### Rust backend (`src-tauri/src/`)
@@ -176,6 +192,9 @@ ResourceRefs.
 | `uri/mod.rs` | `build_uri()` assembles the connection string from a config; `with_timeout()` appends MongoDB timeout params; `tcp_probe()` does a fast TCP check before the MongoDB handshake. |
 | `error.rs` | `AppError` enum serialized as `{ code, message }` so the frontend gets a stable category plus a human-readable message. |
 | `menu.rs` | Native OS menu (source of truth). Also opens the document editor/viewer as a **second Tauri webview window** at `src/pages/document.html` (registered as a Vite entry in `vite.config.js`). See "Native menu" below. |
+| `commands/mongo/`, `commands/postgres/` | Each engine's commands. The rest of `commands/` is engine-neutral: connections, persistence, folders, operations, the error log, the updater, and the CSV import/export helpers both engines' transfers use. `commands/access.rs` is the one lookup and read-only gate behind every `AppContext` resolver. |
+| `postgres/` | PostgreSQL outside the command layer: `uri.rs` (connect options) and the `query_library` / `row_history` stores. |
+| `live_tests/` | Tests against a live server, skipped unless `OZENDB_TEST_MONGODB` / `OZENDB_TEST_POSTGRES` is set. `cargo test live_tests::pg` runs just the PostgreSQL ones. |
 
 ### Native menu
 

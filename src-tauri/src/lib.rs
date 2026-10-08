@@ -20,7 +20,7 @@ mod folders;
 mod history;
 mod keybindings;
 #[cfg(test)]
-mod integration_tests;
+mod live_tests;
 mod json_store;
 mod keychain;
 mod known_hosts;
@@ -28,49 +28,9 @@ mod menu;
 mod node_tags;
 mod operations;
 mod persist;
-#[cfg(test)]
-mod pg_command_integration_tests;
-#[cfg(test)]
-mod pg_delete_integration_tests;
-#[cfg(test)]
-mod pg_insert_integration_tests;
-#[cfg(test)]
-mod pg_browse_integration_tests;
-#[cfg(test)]
-mod pg_cancel_integration_tests;
-#[cfg(test)]
-mod pg_explain_integration_tests;
-#[cfg(test)]
-mod pg_statement_integration_tests;
-#[cfg(test)]
-mod pg_transaction_integration_tests;
-#[cfg(test)]
-mod pg_error_integration_tests;
-#[cfg(test)]
-mod pg_ssh_integration_tests;
-#[cfg(test)]
-mod pg_roles_integration_tests;
-#[cfg(test)]
-mod pg_transfer_integration_tests;
-#[cfg(test)]
-mod pg_ddl_integration_tests;
-#[cfg(test)]
-mod pg_activity_integration_tests;
-#[cfg(test)]
-mod pg_routines_integration_tests;
-#[cfg(test)]
-mod pg_serverinfo_integration_tests;
-#[cfg(test)]
-mod pg_schema_integration_tests;
-#[cfg(test)]
-mod pg_stats_integration_tests;
-#[cfg(test)]
-mod pg_integration_tests;
-mod pg_uri;
+mod postgres;
 mod pool;
 mod saved_queries;
-mod pg_query_library;
-mod pg_row_history;
 mod settings;
 mod shell;
 mod ssh;
@@ -83,7 +43,7 @@ mod uri;
 
 use commands::*;
 use collection_history::CollectionHistoryStore;
-use pg_row_history::PgRowHistoryStore;
+use postgres::row_history::PgRowHistoryStore;
 use default_queries::DefaultQueryStorage;
 use export_watermarks::ExportWatermarkStorage;
 use folders::FolderStorage;
@@ -95,7 +55,7 @@ use operations::OperationsRegistry;
 use pool::ConnectionPool;
 use std::sync::Arc;
 use saved_queries::SavedQueryStorage;
-use pg_query_library::PgQueryLibraryStore;
+use postgres::query_library::PgQueryLibraryStore;
 use settings::SettingsStorage;
 use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;

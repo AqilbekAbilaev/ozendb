@@ -1,74 +1,39 @@
 use crate::error::AppError;
 use crate::pool::ConnectionPool;
 use crate::storage::Storage;
+use access::{config_for, Access};
 use mongodb::bson;
 use mongodb::Client;
 use mongodb::Collection;
 use serde::Serialize;
 use std::time::Duration;
 
+mod access;
 pub mod connection;
+pub mod mongo;
 pub mod postgres;
-pub mod query;
-pub mod admin;
 pub mod persistence;
-pub mod shell;
-pub mod schema;
-pub mod sql;
-pub mod stats;
-pub mod duplicate;
-pub mod serverinfo;
-pub mod profiler;
-pub mod search;
-pub mod gridfs;
-pub mod users;
-pub mod functions;
-pub mod mapreduce;
-pub mod copyops;
 pub mod folders;
-pub mod portmap;
-pub mod history;
 pub mod operations;
-pub mod ops;
 pub mod error_log;
 pub mod updater;
 
 pub use connection::*;
+pub use mongo::*;
 pub use postgres::*;
-pub use query::*;
-pub use admin::*;
 pub use persistence::*;
-pub use shell::*;
-pub use schema::*;
-pub use sql::*;
-pub use stats::*;
-pub use duplicate::*;
-pub use serverinfo::*;
-pub use profiler::*;
-pub use search::*;
-pub use gridfs::*;
-pub use users::*;
-pub use functions::*;
-pub use mapreduce::*;
-pub use copyops::*;
 pub use folders::*;
-pub use portmap::*;
-pub use history::*;
 pub use operations::*;
-pub use ops::*;
 pub use error_log::*;
 pub use updater::*;
 
 // Helper modules carved out of this file when it outgrew the size limit. Unlike the
-// command modules above these expose no Tauri commands — they're the shared parsing,
-// export and import machinery the commands call. Re-exported flat so every existing
-// `super::stream_import` / `crate::commands::parse_ejson_document` call site keeps
-// working without touching the caller.
-mod ejson;
+// command modules above these expose no Tauri commands — they're the export and import
+// machinery both engines' transfer commands call. Re-exported flat so every existing
+// `super::stream_import` call site keeps working without touching the caller.
 mod export;
 mod import;
 
-pub(crate) use ejson::*;
 pub(crate) use export::*;
 pub(crate) use import::*;
 
@@ -118,11 +83,7 @@ impl AppContext {
     /// operates on a connection goes through here, so the config-lookup + connect
     /// dance lives in exactly one place (and the keychain read stays off the hot path).
     pub async fn client(&self, id: &str) -> Result<Client, AppError> {
-        let config = match self.storage.find(id) {
-            Some(val) => val,
-            None => return Err(AppError::UnknownConnection(id.to_string())),
-        };
-        self.pool.connect(&config).await
+        self.pool.connect(&config_for(&self.storage, id, Access::Read)?).await
     }
 
     /// The write-gated sibling of `client`: every mutating command resolves through
@@ -135,14 +96,7 @@ impl AppContext {
     /// which runs only operations it knows are reads. A new mutating command belongs
     /// here; a new shell operation is refused there until it's listed as a read.
     pub async fn client_for_write(&self, id: &str) -> Result<Client, AppError> {
-        let config = match self.storage.find(id) {
-            Some(val) => val,
-            None => return Err(AppError::UnknownConnection(id.to_string())),
-        };
-        if config.read_only {
-            return Err(AppError::ReadOnly { name: config.name.clone() });
-        }
-        self.pool.connect(&config).await
+        self.pool.connect(&config_for(&self.storage, id, Access::Write)?).await
     }
 
     /// Resolve straight to a collection handle for the common
@@ -183,11 +137,7 @@ impl AppContext {
     /// `pg_pool`, but for a database other than the connection's own — opening a
     /// second database on the same server (#124). `None` is exactly `pg_pool`.
     pub async fn pg_pool_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
-        let config = match self.storage.find(id) {
-            Some(val) => val,
-            None => return Err(AppError::UnknownConnection(id.to_string())),
-        };
-        self.pool.connect_postgres(&config, database).await
+        self.pool.connect_postgres(&config_for(&self.storage, id, Access::Read)?, database).await
     }
 
     /// The write-gated sibling of `pg_pool`, mirroring `client_for_write`: a
@@ -199,14 +149,7 @@ impl AppContext {
     /// `pg_pool_for_write`'s sibling for a non-primary database, mirroring
     /// `pg_pool_for_database`.
     pub async fn pg_pool_for_write_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
-        let config = match self.storage.find(id) {
-            Some(val) => val,
-            None => return Err(AppError::UnknownConnection(id.to_string())),
-        };
-        if config.read_only {
-            return Err(AppError::ReadOnly { name: config.name.clone() });
-        }
-        self.pool.connect_postgres(&config, database).await
+        self.pool.connect_postgres(&config_for(&self.storage, id, Access::Write)?, database).await
     }
 
     /// Whether the connection is marked `read_only` — for a command that must

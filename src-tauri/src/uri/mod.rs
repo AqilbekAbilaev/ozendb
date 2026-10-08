@@ -233,7 +233,7 @@ pub async fn tcp_probe(uri: &str) -> Result<(), AppError> {
 
 /// The engine-agnostic core of `tcp_probe`: resolve `host_port` and try connecting
 /// to every address it resolves to (e.g. both `::1` and `127.0.0.1` for
-/// "localhost"), succeeding as soon as one connects. Shared with `pg_uri::tcp_probe`
+/// "localhost"), succeeding as soon as one connects. Shared with `postgres::uri::tcp_probe`
 /// rather than duplicated, since neither the DNS/timeout/retry logic nor its error
 /// reporting is specific to MongoDB.
 pub(crate) async fn probe_host_port(host_port: &str) -> Result<(), AppError> {
