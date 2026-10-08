@@ -5,7 +5,7 @@
 // onto ordinary panes' root DOM nodes.
 import { ref, computed, watch } from 'vue'
 import { savedQueryBrowserRequest } from '../../stores/menuRequests'
-import TabBar from '../base/TabBar.vue'
+import TabBar from './TabBar.vue'
 import QueryBrowserModal from '../query/QueryBrowserModal.vue'
 import { WORKSPACE_COMPONENTS, workspaceComponentFor } from '../../workspaces/registry'
 import { useSavedQueryBrowser } from '../../composables/useSavedQueryBrowser'

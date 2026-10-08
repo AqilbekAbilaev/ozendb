@@ -3,9 +3,9 @@
 // bridge and restore can never drift from each other.
 import { describe, it, expect } from 'vitest'
 import { migrateSession, toLegacyRecord, sessionRestoreNotice } from './sessionMigration'
-import { restoreWorkspace } from '../workspaces/lifecycle'
-import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
-import { getWorkspaceDefinition } from '../workspaces/registry'
+import { restoreWorkspace } from './lifecycle'
+import { registerWorkspaceDefinitions } from './registerDefinitions'
+import { getWorkspaceDefinition } from './registry'
 import { legacy, expected, sessions } from './sessionMigration.fixtures'
 import { migrateTableState } from '../engines/postgresql/workspaces/tableState'
 

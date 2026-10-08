@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { summarize, buildIssueBody, buildIssueUrl, describeError, scrub } from './errorReport'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { summarize, buildIssueBody, buildIssueUrl, describeError, scrub, installErrorReporting } from './errorReport'
 
 // The one rule this file has to keep: a recorded message can name the user's hosts,
 // databases and documents, so it must not reach the issue body unless asked for.
@@ -119,5 +119,28 @@ describe('buildIssueBody — account name', () => {
     const body = buildIssueBody(records, CONTEXT, true)
     expect(body).toContain('~/.local/share/tabs.json')
     expect(body).not.toContain('/home/devalyus')
+  })
+})
+
+describe('installErrorReporting', () => {
+  // The suite runs in Node, so a bare EventTarget stands in for the window.
+  beforeEach(() => { globalThis.window = new EventTarget() })
+  afterEach(() => { delete globalThis.window })
+
+  const fire = (type, fields) => window.dispatchEvent(Object.assign(new Event(type), fields))
+
+  it('records thrown errors and marks unhandled rejections', () => {
+    const recorded = []
+    installErrorReporting(async (m) => { recorded.push(m) })
+    fire('error', { error: { name: 'TypeError', message: 'x is undefined' } })
+    fire('unhandledrejection', { reason: 'nope' })
+    expect(recorded).toEqual(['TypeError: x is undefined', 'Unhandled rejection: nope'])
+  })
+
+  it('stops after the per-session cap and survives a recorder that rejects', () => {
+    let calls = 0
+    const report = installErrorReporting(() => { calls++; return Promise.reject(new Error('disk full')) })
+    for (let i = 0; i < 30; i++) report(`boom ${i}`)
+    expect(calls).toBe(20)
   })
 })

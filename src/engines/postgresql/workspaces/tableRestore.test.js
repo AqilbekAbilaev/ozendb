@@ -15,7 +15,7 @@ vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }
 const { registerWorkspaceDefinitions } = await import('../../../workspaces/registerDefinitions.js')
 const { restoreWorkspace } = await import('../../../workspaces/lifecycle.js')
 const { getWorkspaceDefinition } = await import('../../../workspaces/registry.js')
-const { toLegacyRecord } = await import('../../../utils/sessionMigration.js')
+const { toLegacyRecord } = await import('../../../workspaces/sessionMigration.js')
 const { usePostgresTable } = await import('./usePostgresTable.js')
 registerWorkspaceDefinitions()
 

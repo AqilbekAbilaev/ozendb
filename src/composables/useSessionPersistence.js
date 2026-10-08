@@ -4,7 +4,7 @@ import { getOpenTabs, setOpenTabs } from '../appApi/session'
 import { tabs, activeTabId } from '../stores/tabs'
 import { restoreWorkspace } from '../workspaces/lifecycle'
 import { getWorkspaceDefinition } from '../workspaces/registry'
-import { migrateSession, toLegacyRecord, sessionRestoreNotice } from '../utils/sessionMigration'
+import { migrateSession, toLegacyRecord, sessionRestoreNotice } from '../workspaces/sessionMigration'
 import { showToast } from '../stores/toast'
 import { recordFrontendError } from '../appApi/errorLog'
 

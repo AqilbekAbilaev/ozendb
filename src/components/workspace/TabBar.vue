@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { contextMenu } from '../../stores/contextMenu'
-import BaseIcon from './BaseIcon.vue'
+import BaseIcon from '../base/BaseIcon.vue'
 import { colorHex, tabColorName } from '../../utils/tabColor.js'
 import { tagOverrides } from '../../stores/nodeTags'
 import { findDropIndex } from '../../composables/useColumnReorder'
