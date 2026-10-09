@@ -14,6 +14,7 @@ fn context(
         has_document: false,
         has_field: false,
         has_index: false,
+        has_gridfs_file: false,
         read_only: false,
         can_refresh_tab: false,
         has_pg_schema: false,
@@ -31,6 +32,7 @@ fn doc_context(has_document: bool, has_field: bool) -> MenuContext {
         has_document,
         has_field,
         has_index: false,
+        has_gridfs_file: false,
         read_only: false,
         can_refresh_tab: false,
         has_pg_schema: false,
@@ -48,6 +50,27 @@ fn index_context(has_index: bool) -> MenuContext {
         has_document: false,
         has_field: false,
         has_index,
+        has_gridfs_file: false,
+        read_only: false,
+        can_refresh_tab: false,
+        has_pg_schema: false,
+        has_pg_table: false,
+    }
+}
+
+// Context with only the GridFS file-selection flag set, for the GridFS file gate.
+// Every tab/tree flag is off on purpose: #258's whole point is that the dialog's own
+// selection must enable these items with no database resolvable anywhere.
+fn gridfs_context(has_gridfs_file: bool) -> MenuContext {
+    MenuContext {
+        has_connection: false,
+        has_database: false,
+        has_collection: false,
+        any_connection: false,
+        has_document: false,
+        has_field: false,
+        has_index: false,
+        has_gridfs_file,
         read_only: false,
         can_refresh_tab: false,
         has_pg_schema: false,
@@ -65,6 +88,7 @@ fn locked_context() -> MenuContext {
         has_document: true,
         has_field: true,
         has_index: false,
+        has_gridfs_file: false,
         read_only: true,
         can_refresh_tab: false,
         has_pg_schema: false,
@@ -82,6 +106,7 @@ fn gate_enabled_reads_the_matching_context_flag() {
     assert!(!gate_enabled(Gate::Document, &all_off));
     assert!(!gate_enabled(Gate::DocumentField, &all_off));
     assert!(!gate_enabled(Gate::Index, &all_off));
+    assert!(!gate_enabled(Gate::GridfsFile, &all_off));
 
     assert!(gate_enabled(Gate::Connection, &context(true, false, false, false)));
     assert!(gate_enabled(Gate::Database, &context(false, true, false, false)));
@@ -114,6 +139,39 @@ fn index_gate_tracks_index_selection() {
     assert!(!gate_enabled(Gate::Index, &index_context(false)));
     // An index row is selected in the open Indexes dialog: they enable.
     assert!(gate_enabled(Gate::Index, &index_context(true)));
+}
+
+#[test]
+fn gridfs_file_gate_tracks_the_dialogs_own_selection() {
+    // #258: no file picked, nothing to act on.
+    assert!(!gate_enabled(Gate::GridfsFile, &gridfs_context(false)));
+    // A file is picked in the open dialog. The context has no connection, database or
+    // collection — which is exactly the state clicking a file row leaves behind, since
+    // the dialog is outside the sidebar and the click clears the tree selection. The
+    // items must still enable, which a Database gate could not do here.
+    assert!(gate_enabled(Gate::GridfsFile, &gridfs_context(true)));
+    // It is the dialog's selection and nothing else: a full tab/tree selection with no
+    // file picked must not enable them.
+    assert!(!gate_enabled(Gate::GridfsFile, &index_context(true)));
+}
+
+#[test]
+fn gridfs_file_items_gate_on_the_file_selection_and_the_bucket_ones_do_not() {
+    for id in ["gridfs:view_file", "gridfs:rename", "gridfs:meta", "gridfs:save", "gridfs:remove"] {
+        assert_eq!(gate_of(id), Gate::GridfsFile, "{id} acts on the selected file");
+    }
+    // These act on the bucket or open the view, so a resolvable database is the right
+    // bar — they must stay usable with no file picked.
+    for id in ["gridfs:open", "gridfs:add", "gridfs:copy_bucket", "gridfs:drop_bucket"] {
+        assert_eq!(gate_of(id), Gate::Database, "{id} acts on the bucket, not a file");
+    }
+}
+
+#[test]
+fn the_gridfs_file_gate_is_mongodb_shaped() {
+    // Hiding is read off the gate (menus_for), so a gate with no engine would leave
+    // these items showing on a PostgreSQL selection where they can never enable.
+    assert_eq!(gate_engine(Gate::GridfsFile), Some(MenuEngine::MongoDb));
 }
 
 #[test]

@@ -50,6 +50,11 @@ pub enum Gate {
     // An index row is selected in the open Indexes dialog (the Index-menu actions,
     // which all operate on the selected index).
     Index,
+    // A file row is selected in the open GridFS dialog. Like Index, this is the
+    // dialog's own selection rather than the tab/tree one: #258, where gating these
+    // on Database meant clicking a file cleared the sidebar selection and either
+    // disabled the menu or resolved it to a different database's dialog.
+    GridfsFile,
     // The active tab is a view that only reads, so reloading it can't change data
     // (Refresh; see canRefreshWorkspace in the frontend's workspaces/lifecycle.js).
     RefreshableTab,
@@ -71,6 +76,7 @@ pub struct MenuContext {
     pub has_document: bool,
     pub has_field: bool,
     pub has_index: bool,
+    pub has_gridfs_file: bool,
     pub read_only: bool,
     pub can_refresh_tab: bool,
     pub has_pg_schema: bool,
@@ -89,6 +95,7 @@ pub fn gate_enabled(gate: Gate, context: &MenuContext) -> bool {
         Gate::Document => context.has_document,
         Gate::DocumentField => context.has_field,
         Gate::Index => context.has_index,
+        Gate::GridfsFile => context.has_gridfs_file,
         Gate::RefreshableTab => context.can_refresh_tab,
         Gate::PgSchema => context.has_pg_schema,
         Gate::PgTable => context.has_pg_table,
@@ -142,9 +149,13 @@ pub enum MenuScope {
 // that would be dead here" and can't drift from the gating.
 pub fn gate_engine(gate: Gate) -> Option<MenuEngine> {
     match gate {
-        Gate::Connection | Gate::Database | Gate::Collection | Gate::Document | Gate::DocumentField | Gate::Index => {
-            Some(MenuEngine::MongoDb)
-        }
+        Gate::Connection
+        | Gate::Database
+        | Gate::Collection
+        | Gate::Document
+        | Gate::DocumentField
+        | Gate::Index
+        | Gate::GridfsFile => Some(MenuEngine::MongoDb),
         Gate::PgSchema | Gate::PgTable => Some(MenuEngine::Postgres),
         Gate::AnyConnection | Gate::RefreshableTab => None,
     }
@@ -238,6 +249,7 @@ pub fn set_menu_context(
     has_document: bool,
     has_field: bool,
     has_index: bool,
+    has_gridfs_file: bool,
     read_only: bool,
     can_refresh_tab: bool,
     has_pg_schema: bool,
@@ -251,6 +263,7 @@ pub fn set_menu_context(
         has_document,
         has_field,
         has_index,
+        has_gridfs_file,
         read_only,
         can_refresh_tab,
         has_pg_schema,

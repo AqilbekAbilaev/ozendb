@@ -132,13 +132,17 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
             vec![
                 Spec::Action { id: "gridfs:open", label: "Open GridFS View", accel: None, gate: Some(Gate::Database) },
                 Spec::Separator,
-                // GridFS file/bucket ops act inside the GridFS view on its selected
-                // file/bucket; enabled whenever a database is resolvable.
-                Spec::Action { id: "gridfs:view_file", label: "View File", accel: None, gate: Some(Gate::Database) },
-                Spec::Action { id: "gridfs:rename", label: "Rename File…", accel: None, gate: Some(Gate::Database) },
-                Spec::Action { id: "gridfs:meta", label: "Edit Meta Data…", accel: None, gate: Some(Gate::Database) },
-                Spec::Action { id: "gridfs:save", label: "Save To Disk…", accel: None, gate: Some(Gate::Database) },
-                Spec::Action { id: "gridfs:remove", label: "Remove File(s)", accel: None, gate: Some(Gate::Database) },
+                // These act on the file selected in the open GridFS dialog, so they gate
+                // on that selection rather than on a resolvable database (#258): the
+                // dialog isn't in the sidebar, so clicking a file row clears the tree
+                // selection and a Database gate would disable them or aim them at
+                // whatever database the active tab happens to name.
+                Spec::Action { id: "gridfs:view_file", label: "View File", accel: None, gate: Some(Gate::GridfsFile) },
+                Spec::Action { id: "gridfs:rename", label: "Rename File…", accel: None, gate: Some(Gate::GridfsFile) },
+                Spec::Action { id: "gridfs:meta", label: "Edit Meta Data…", accel: None, gate: Some(Gate::GridfsFile) },
+                Spec::Action { id: "gridfs:save", label: "Save To Disk…", accel: None, gate: Some(Gate::GridfsFile) },
+                Spec::Action { id: "gridfs:remove", label: "Remove File(s)", accel: None, gate: Some(Gate::GridfsFile) },
+                // Adds to the bucket rather than acting on a file, so a database is enough.
                 Spec::Action { id: "gridfs:add", label: "Add File(s)…", accel: None, gate: Some(Gate::Database) },
                 Spec::Separator,
                 Spec::Action { id: "gridfs:copy_bucket", label: "Copy Bucket", accel: None, gate: Some(Gate::Database) },

@@ -265,10 +265,22 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
     requestDocAction(action)
   }
 
+  // The file actions act on the dialog's own selected file, so they're dispatched
+  // straight to the open dialog (#258). Resolving a database for them would aim them
+  // at whatever the active tab names — reopening the dialog elsewhere and losing the
+  // picked file — and their Gate::GridfsFile already guarantees a dialog with a
+  // selection is open.
+  const GRIDFS_FILE_ACTIONS = ['gridfs:view_file', 'gridfs:rename', 'gridfs:meta', 'gridfs:save', 'gridfs:remove']
+
   // GridFS menu actions operate inside the GridFS modal on its selected file/bucket.
   // Ensure the modal is open for the resolved database (preserving any existing
   // selection when it's already showing that db), then signal the requested action.
   async function requestGridfsAction(action) {
+    if (GRIDFS_FILE_ACTIONS.includes(action)) {
+      if (!openModals.gridfs) return
+      openModals.gridfs.menuRequest = { action: action, nonce: Date.now() }
+      return
+    }
     const target = menuTarget('database')
     if (!target || !target.connectionId || !target.dbName) {
       showToast('Open a database first')
