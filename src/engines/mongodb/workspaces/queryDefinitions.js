@@ -2,13 +2,13 @@
 // owns the full shape of its fresh tab and the lifecycle hooks (duplicate, restore,
 // dispose) the generic helpers dispatch through; the canonical envelope comes from
 // the factory.
-import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { closeShellSession } from '../api/shell'
 import {
   createCollectionState, createCollectionUi, createCollectionRuntime,
   migrateCollectionState,
 } from './collectionState'
+import { MongoCollectionWorkspace, ShellConsole } from './panes'
 
 // The editor+result spine shared by every collection-scoped query mode. Scalar
 // defaults arrive from the creator; the fallbacks mirror the app's settings defaults
@@ -163,7 +163,8 @@ export const queryDefinitions = [
     engine: 'mongodb',
     // The lifecycle's deep clone keeps the nested state and drops the flat accessors
     // over it; this puts them back (see collectionState.js).
-    component: WORKSPACE_COMPONENTS.collection,
+    component: MongoCollectionWorkspace,
+    paneKind: 'collection',
     // A find only reads, so Refresh may run it again; the other query modes can write.
     canRefresh: () => true,
     create(ctx) {
@@ -189,7 +190,8 @@ export const queryDefinitions = [
   {
     type: 'mongodb.aggregate',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.collection,
+    component: MongoCollectionWorkspace,
+    paneKind: 'collection',
     create(ctx) {
       return createCollection(ctx, 'aggregate')
     },
@@ -205,7 +207,8 @@ export const queryDefinitions = [
   {
     type: 'mongodb.sql_to_mql',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.collection,
+    component: MongoCollectionWorkspace,
+    paneKind: 'collection',
     create(ctx) {
       const base = createCollection(ctx, 'sql', {
         sql: 'SELECT *\nFROM ' + ctx.target.collectionName,
@@ -246,7 +249,7 @@ export const queryDefinitions = [
   {
     type: 'mongodb.shell',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.shell,
+    component: ShellConsole,
     create(ctx) {
       return shellWorkspace(ctx.target, ctx)
     },
