@@ -15,6 +15,7 @@ import * as api from '../engines/mongodb/api/gridfs'
 import { showToast } from '../stores/toast'
 import { invalidateConnectionResources } from '../stores/connectionData'
 import { useGridfsBrowser } from './useGridfsBrowser'
+import { selectedGridfsFile, clearGridfsSelection } from '../stores/gridfs'
 
 const DB = { connectionId: 'c1', database: 'shop' }
 const FILE = { id: 'f1', filename: 'report.pdf', length: 10 }
@@ -26,6 +27,7 @@ function browser(over = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  clearGridfsSelection()
   api.listGridfsBuckets.mockResolvedValue(['fs'])
   api.listGridfsFiles.mockResolvedValue([FILE])
   globalThis.window = { confirm: vi.fn(() => true) }
@@ -156,5 +158,31 @@ describe('bucket and file writes', () => {
     expect(gridfs.pendingDelete.value).toBe('f1')
     await gridfs.confirmDelete(FILE)
     expect(api.gridfsDelete).toHaveBeenCalledWith(DB, 'fs', 'f1')
+  })
+})
+
+// #258: the GridFS file actions are gated on this store value, because useMenu has to
+// see the dialog's selection and a composable's state doesn't outlive the modal.
+describe('the selection published for the GridFS menu', () => {
+  it('publishes the selected file and follows a change of selection', async () => {
+    const SECOND = { id: 'f2', filename: 'notes.txt', length: 4 }
+    api.listGridfsFiles.mockResolvedValue([FILE, SECOND])
+    const { gridfs } = browser()
+    await gridfs.load()
+    expect(selectedGridfsFile.value).toBe(null)
+
+    gridfs.selectFile(FILE)
+    await nextTick()
+    expect(selectedGridfsFile.value).toMatchObject({ id: 'f1' })
+
+    gridfs.selectFile(SECOND)
+    await nextTick()
+    expect(selectedGridfsFile.value).toMatchObject({ id: 'f2' })
+  })
+
+  it('clears on close, so the file actions cannot stay enabled with no dialog open', () => {
+    selectedGridfsFile.value = FILE
+    clearGridfsSelection()
+    expect(selectedGridfsFile.value).toBe(null)
   })
 })

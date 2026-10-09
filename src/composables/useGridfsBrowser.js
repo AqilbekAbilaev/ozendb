@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import {
   listGridfsBuckets,
@@ -16,6 +16,7 @@ import { bucketChoices, metadataEjson } from '../utils/gridfs'
 import { useConfirmDelete } from './useConfirmDelete'
 import { showToast } from '../stores/toast'
 import { invalidateConnectionResources } from '../stores/connectionData'
+import { selectedGridfsFile, clearGridfsSelection } from '../stores/gridfs'
 
 // The GridFS browser behind GridFsModal: a database's buckets and files, and upload /
 // download / delete / rename / edit-metadata, plus bucket copy and drop. `target` is a
@@ -35,6 +36,13 @@ export function useGridfsBrowser(target) {
   const selectedId = ref(null)
   const selectedFile = computed(() => files.value.find(f => f.id === selectedId.value) || null)
   function selectFile(f) { selectedId.value = f.id }
+
+  // Published to the store so useMenu can gate the file actions on it (#258). Mirrored
+  // rather than owned there because the selection is derived from this dialog's own
+  // file list, which it reloads; the store is cleared on unmount so the actions can't
+  // stay enabled with no dialog open.
+  watch(selectedFile, (file) => { selectedGridfsFile.value = file }, { immediate: true })
+  onUnmounted(clearGridfsSelection)
 
   // Inline sub-forms driven by the menu actions.
   const renameTarget = ref(null)   // file being renamed
