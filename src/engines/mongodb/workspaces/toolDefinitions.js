@@ -3,9 +3,12 @@
 // fields, canonical envelope owned by the generic factory. Their duplicate/restore
 // hooks clone the durable configuration (import sources, export mapping, ops settings)
 // and reset the runtime previews/rows.
-import { WORKSPACE_COMPONENTS } from '../../../workspaces/registry'
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
+import {
+  IndexManagerPane, SchemaPane, SearchPane, CurrentOpsPane,
+  ImportPane, CsvImportPane, ExportPane,
+} from './panes'
 
 // A tool workspace's identity fields, in the same long spelling collection and shell
 // workspaces use — so a pane reading `activeTab.collectionName` does not have to know
@@ -71,7 +74,7 @@ export const toolDefinitions = [
   {
     type: 'mongodb.indexes',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.indexes,
+    component: IndexManagerPane,
     canRefresh: () => true,
     create(ctx) {
       return {
@@ -86,7 +89,7 @@ export const toolDefinitions = [
   {
     type: 'mongodb.schema',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.schema,
+    component: SchemaPane,
     canRefresh: () => true,
     create(ctx) {
       return {
@@ -101,7 +104,7 @@ export const toolDefinitions = [
   {
     type: 'mongodb.search',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.search,
+    component: SearchPane,
     create(ctx) {
       return {
         title: 'Search: ' + ctx.target.dbName,
@@ -121,8 +124,8 @@ export const toolDefinitions = [
   {
     type: 'mongodb.import',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.import,
-    componentFor: (workspace) => (workspace.format === 'csv' ? WORKSPACE_COMPONENTS['import:csv'] : WORKSPACE_COMPONENTS.import),
+    component: ImportPane,
+    componentFor: (workspace) => (workspace.format === 'csv' ? CsvImportPane : ImportPane),
     create(ctx) {
       const target = toolTarget(ctx.target)
       const format = ctx.options.format || 'json'
@@ -244,7 +247,7 @@ export const toolDefinitions = [
   {
     type: 'mongodb.export',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.export,
+    component: ExportPane,
     create(ctx) {
       const target = toolTarget(ctx.target)
       const source = ctx.options.source || 'collection'
@@ -331,7 +334,7 @@ export const toolDefinitions = [
   {
     type: 'mongodb.current_operations',
     engine: 'mongodb',
-    component: WORKSPACE_COMPONENTS.currentOps,
+    component: CurrentOpsPane,
     canRefresh: () => true,
     create(ctx) {
       return {

@@ -7,7 +7,7 @@ import { ref, computed, watch } from 'vue'
 import { savedQueryBrowserRequest } from '../../stores/menuRequests'
 import TabBar from './TabBar.vue'
 import QueryBrowserModal from '../query/QueryBrowserModal.vue'
-import { WORKSPACE_COMPONENTS, workspaceComponentFor } from '../../workspaces/registry'
+import { workspaceComponentFor, workspacePaneKind } from '../../workspaces/registry'
 import { useSavedQueryBrowser } from '../../composables/useSavedQueryBrowser'
 
 const props = defineProps({
@@ -18,6 +18,7 @@ const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'run-query
 
 const activeTab = computed(() => props.tabs.find(t => t.id === props.activeTabId))
 const component = computed(() => workspaceComponentFor(activeTab.value))
+const paneKind = computed(() => workspacePaneKind(activeTab.value))
 const savedQueryBrowser = useSavedQueryBrowser({
   activate: (id) => emit('activate-tab', id),
 })
@@ -34,11 +35,13 @@ watch(() => props.tabs.map(tab => tab.id), (ids) => {
 // sub-tab must survive collection → non-collection → collection switches.
 const rtab = ref('Result')
 
-// Prop bindings per resolved kind: ordinary panes get the active tab, Quickstart
-// gets none, and the collection workspace gets its full compatibility contract.
+// Prop bindings per the definition's paneKind: ordinary panes get the active tab,
+// Quickstart gets none, and the collection workspace gets its full compatibility
+// contract. Read from the definition rather than compared against a known component,
+// so this never needs to import an engine's own components.
 const bindings = computed(() => {
-  if (component.value === WORKSPACE_COMPONENTS.quickstart) return {}
-  if (component.value === WORKSPACE_COMPONENTS.collection) {
+  if (paneKind.value === 'quickstart') return {}
+  if (paneKind.value === 'collection') {
     return {
       activeTab:        activeTab.value,
       tabs:             props.tabs,
@@ -77,7 +80,7 @@ const collectionListeners = {
       :is="component"
       v-if="component"
       v-bind="bindings"
-      v-on="component === WORKSPACE_COMPONENTS.collection ? collectionListeners : {}"
+      v-on="paneKind === 'collection' ? collectionListeners : {}"
     />
     <QueryBrowserModal
       v-if="savedQueryBrowser.isOpen.value"

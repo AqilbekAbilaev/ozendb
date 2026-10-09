@@ -1,41 +1,36 @@
 import { describe, it, expect } from 'vitest'
-import { WORKSPACE_COMPONENTS, workspaceComponentFor, registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
+import { workspaceComponentFor, workspacePaneKind, registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
 import { registerWorkspaceDefinitions } from './registerDefinitions'
 
 describe('workspaceComponentFor', () => {
   it('renders each type\'s own component', () => {
-    const cases = [
-      [{ type: 'app.quickstart' }, WORKSPACE_COMPONENTS.quickstart],
-      [{ type: 'mongodb.find' }, WORKSPACE_COMPONENTS.collection],
-      [{ type: 'mongodb.shell' }, WORKSPACE_COMPONENTS.shell],
-      [{ type: 'mongodb.indexes' }, WORKSPACE_COMPONENTS.indexes],
-      [{ type: 'mongodb.schema' }, WORKSPACE_COMPONENTS.schema],
-      [{ type: 'mongodb.search' }, WORKSPACE_COMPONENTS.search],
-      [{ type: 'mongodb.current_operations' }, WORKSPACE_COMPONENTS.currentOps],
-      [{ type: 'mongodb.export' }, WORKSPACE_COMPONENTS.export],
-      [{ type: 'mongodb.import', format: 'json' }, WORKSPACE_COMPONENTS.import],
-      [{ type: 'mongodb.import', format: 'csv' }, WORKSPACE_COMPONENTS['import:csv']],
+    const types = [
+      'app.quickstart', 'mongodb.find', 'mongodb.shell', 'mongodb.indexes',
+      'mongodb.schema', 'mongodb.search', 'mongodb.current_operations', 'mongodb.export',
     ]
-    for (const [tab, expected] of cases) {
-      expect(workspaceComponentFor(tab), tab.type).toBe(expected)
+    for (const type of types) {
+      expect(workspaceComponentFor({ type }), type).toBe(getWorkspaceDefinition(type).component)
     }
   })
 
   it('renders every collection mode with the same component', () => {
+    const expected = getWorkspaceDefinition('mongodb.find').component
     for (const type of ['mongodb.find', 'mongodb.aggregate', 'mongodb.sql_to_mql']) {
-      expect(workspaceComponentFor({ type })).toBe(WORKSPACE_COMPONENTS.collection)
+      expect(workspaceComponentFor({ type })).toBe(expected)
     }
   })
 
   it('lets a definition pick between components, as import does by format', () => {
-    expect(workspaceComponentFor({ type: 'mongodb.import', format: 'csv' }))
-      .not.toBe(workspaceComponentFor({ type: 'mongodb.import', format: 'json' }))
-    expect(workspaceComponentFor({ type: 'mongodb.import' })).toBe(WORKSPACE_COMPONENTS.import)
+    const csv = workspaceComponentFor({ type: 'mongodb.import', format: 'csv' })
+    const json = workspaceComponentFor({ type: 'mongodb.import', format: 'json' })
+    expect(csv).not.toBe(json)
+    expect(workspaceComponentFor({ type: 'mongodb.import' })).toBe(json)
   })
 
   it('falls back to Quickstart when there is no active tab', () => {
-    expect(workspaceComponentFor(null)).toBe(WORKSPACE_COMPONENTS.quickstart)
-    expect(workspaceComponentFor(undefined)).toBe(WORKSPACE_COMPONENTS.quickstart)
+    const quickstart = getWorkspaceDefinition('app.quickstart').component
+    expect(workspaceComponentFor(null)).toBe(quickstart)
+    expect(workspaceComponentFor(undefined)).toBe(quickstart)
   })
 
   it('renders an engine\'s workspace from its definition alone', () => {
@@ -60,7 +55,27 @@ describe('workspaceComponentFor', () => {
     const shell = workspaceComponentFor({ type: 'mongodb.shell' })
     // The async wrapper is a component definition, not the pane module itself.
     expect(typeof shell).toBe('object')
-    expect(shell).toBe(WORKSPACE_COMPONENTS.shell)
+    expect(shell).toBe(getWorkspaceDefinition('mongodb.shell').component)
+  })
+})
+
+describe('workspacePaneKind', () => {
+  it('marks quickstart for no active tab and for the quickstart type', () => {
+    expect(workspacePaneKind(null)).toBe('quickstart')
+    expect(workspacePaneKind(undefined)).toBe('quickstart')
+    expect(workspacePaneKind({ type: 'app.quickstart' })).toBe('quickstart')
+  })
+
+  it('marks every collection mode for the shared binding', () => {
+    for (const type of ['mongodb.find', 'mongodb.aggregate', 'mongodb.sql_to_mql']) {
+      expect(workspacePaneKind({ type })).toBe('collection')
+    }
+  })
+
+  it('leaves ordinary panes and unknown types unmarked', () => {
+    expect(workspacePaneKind({ type: 'mongodb.shell' })).toBe(null)
+    expect(workspacePaneKind({ type: 'mongodb.indexes' })).toBe(null)
+    expect(workspacePaneKind({ type: 'bogus.type' })).toBe(null)
   })
 })
 
@@ -88,12 +103,6 @@ describe('workspace definition registry', () => {
     for (const type of expected) {
       expect(getWorkspaceDefinition(type).type).toBe(type)
     }
-  })
-
-  it('keeps components statically resolvable through the definitions', () => {
-    expect(getWorkspaceDefinition('mongodb.find').component).toBe(WORKSPACE_COMPONENTS.collection)
-    expect(getWorkspaceDefinition('mongodb.shell').component).toBe(WORKSPACE_COMPONENTS.shell)
-    expect(getWorkspaceDefinition('app.quickstart').component).toBe(WORKSPACE_COMPONENTS.quickstart)
   })
 
   it('fails on duplicate registration in development and tests', () => {
