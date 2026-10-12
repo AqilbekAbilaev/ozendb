@@ -307,7 +307,7 @@ const sourceLabel = computed(() => {
 </template>
 
 <style scoped>
-.export-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-window); }
+.export-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-window); }
 
 .iew-header {
   display: flex;
@@ -384,7 +384,7 @@ const sourceLabel = computed(() => {
   text-transform: uppercase;
   letter-spacing: .04em;
 }
-.iew-rows { overflow-y: auto; display: flex; flex-direction: column; }
+.iew-rows { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .iew-row {
   padding: 5px 4px;
   border-bottom: 1px solid var(--grid-line);
