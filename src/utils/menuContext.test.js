@@ -41,10 +41,7 @@ describe('deriveMenuContext', () => {
     })
   })
 
-  // #258: the GridFS file actions act on the open dialog's selection, so this is the
-  // one flag that must be true with nothing selected in the tab or the tree — which is
-  // exactly the state a click on a file row leaves behind, since the dialog sits
-  // outside the sidebar and the click clears the tree selection.
+  // A click on a file row clears the tree selection, so this must hold on its own (#258).
   it('a file selected in the GridFS dialog sets hasGridfsFile on its own', () => {
     const ctx = deriveMenuContext(null, null, 0, false, false, [], true)
     expect(ctx.hasGridfsFile).toBe(true)

@@ -50,10 +50,9 @@ pub enum Gate {
     // An index row is selected in the open Indexes dialog (the Index-menu actions,
     // which all operate on the selected index).
     Index,
-    // A file row is selected in the open GridFS dialog. Like Index, this is the
-    // dialog's own selection rather than the tab/tree one: #258, where gating these
-    // on Database meant clicking a file cleared the sidebar selection and either
-    // disabled the menu or resolved it to a different database's dialog.
+    // A file row is selected in the open GridFS dialog. Like Index, the dialog's own
+    // selection: clicking a file clears the tree selection, so Database would disable
+    // the file actions or aim them at another database's dialog (#258).
     GridfsFile,
     // The active tab is a view that only reads, so reloading it can't change data
     // (Refresh; see canRefreshWorkspace in the frontend's workspaces/lifecycle.js).

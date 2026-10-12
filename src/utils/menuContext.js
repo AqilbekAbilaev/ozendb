@@ -105,9 +105,7 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     // Index-menu actions operate on the index selected in the Indexes dialog, which
     // is independent of the tab/tree selection — so it's passed in directly.
     hasIndex: !!indexSelected,
-    // Same for the GridFS file actions (#258): the dialog isn't in the sidebar, so
-    // clicking a file row clears the tree selection — gating these on a resolvable
-    // database would disable them at exactly the moment they became usable.
+    // Same for the GridFS dialog's selected file (see Gate::GridfsFile).
     hasGridfsFile: !!gridfsFileSelected,
     // A read-only lock (see writable.js) disables the write actions: the active tab's,
     // or that of an open tab showing the sidebar selection, which a write may target.

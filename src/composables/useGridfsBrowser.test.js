@@ -161,8 +161,6 @@ describe('bucket and file writes', () => {
   })
 })
 
-// #258: the GridFS file actions are gated on this store value, because useMenu has to
-// see the dialog's selection and a composable's state doesn't outlive the modal.
 describe('the selection published for the GridFS menu', () => {
   it('publishes the selected file and follows a change of selection', async () => {
     const SECOND = { id: 'f2', filename: 'notes.txt', length: 4 }

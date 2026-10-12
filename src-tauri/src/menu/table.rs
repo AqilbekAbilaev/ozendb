@@ -132,11 +132,7 @@ pub fn menus() -> Vec<(&'static str, Vec<Spec>)> {
             vec![
                 Spec::Action { id: "gridfs:open", label: "Open GridFS View", accel: None, gate: Some(Gate::Database) },
                 Spec::Separator,
-                // These act on the file selected in the open GridFS dialog, so they gate
-                // on that selection rather than on a resolvable database (#258): the
-                // dialog isn't in the sidebar, so clicking a file row clears the tree
-                // selection and a Database gate would disable them or aim them at
-                // whatever database the active tab happens to name.
+                // Act on the dialog's selected file; see Gate::GridfsFile.
                 Spec::Action { id: "gridfs:view_file", label: "View File", accel: None, gate: Some(Gate::GridfsFile) },
                 Spec::Action { id: "gridfs:rename", label: "Rename File…", accel: None, gate: Some(Gate::GridfsFile) },
                 Spec::Action { id: "gridfs:meta", label: "Edit Meta Data…", accel: None, gate: Some(Gate::GridfsFile) },

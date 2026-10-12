@@ -37,10 +37,7 @@ export function useGridfsBrowser(target) {
   const selectedFile = computed(() => files.value.find(f => f.id === selectedId.value) || null)
   function selectFile(f) { selectedId.value = f.id }
 
-  // Published to the store so useMenu can gate the file actions on it (#258). Mirrored
-  // rather than owned there because the selection is derived from this dialog's own
-  // file list, which it reloads; the store is cleared on unmount so the actions can't
-  // stay enabled with no dialog open.
+  // Mirrored to the store for the menu gate; cleared on unmount so it can't outlive the dialog.
   watch(selectedFile, (file) => { selectedGridfsFile.value = file }, { immediate: true })
   onUnmounted(clearGridfsSelection)
 
