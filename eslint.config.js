@@ -30,7 +30,7 @@ export default [
       globals: { ...globals.browser, ...globals.node },
     },
   },
-  // The layering rule from CLAUDE.md: a ring may import inwards, never outwards.
+  // The layering rule from docs/CODING.md: a ring may import inwards, never outwards.
   {
     files: ['src/utils/**/*.js'],
     ignores: ['**/*.test.js'],
