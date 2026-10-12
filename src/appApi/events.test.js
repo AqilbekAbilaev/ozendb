@@ -17,6 +17,7 @@ const SUBSCRIBERS = [
   ['onDocumentTarget', 'document-target'],
   ['onSshHostKeyPrompt', 'ssh-host-key-prompt'],
   ['onSshHostKeyChanged', 'ssh-host-key-changed'],
+  ['onThemeChanged', 'theme-changed'],
   ['onDocumentSaved', 'document-saved'],
   ['onConnectionSaved', 'connection-saved'],
   ['onConnectionUpdated', 'connection-updated'],

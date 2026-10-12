@@ -8,7 +8,9 @@ use crate::saved_queries::{SavedQueryEntry, SavedQueryStorage};
 use crate::tabs::TabStorage;
 use crate::settings::{Settings, SettingsStorage};
 use std::collections::HashMap;
-use tauri::{AppHandle, State};
+use crate::events::THEME_CHANGED;
+use crate::window_theme::window_theme;
+use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
 #[tauri::command(async)]
@@ -31,6 +33,7 @@ pub fn update_settings(
     ui_zoom: Option<f64>,
 ) -> Result<Settings, AppError> {
     let current = settings.load();
+    let previous_theme = current.theme.clone();
 
     // Only known theme names are accepted; anything else falls back to dark so a
     // bad value from the frontend can't leave the UI in an undefined state.
@@ -84,7 +87,12 @@ pub fn update_settings(
     };
     match settings.save(&new_settings) {
         Ok(_) => {
-            app.set_theme(Some(new_settings.window_theme()));
+            // The open document windows repaint from the event; the app call re-themes
+            // every window's title bar.
+            if new_settings.theme != previous_theme {
+                app.set_theme(Some(window_theme(&new_settings.theme)));
+                app.emit(THEME_CHANGED, &new_settings.theme).ok();
+            }
             Ok(new_settings)
         }
         Err(e) => Err(e),

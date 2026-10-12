@@ -1,5 +1,6 @@
 use crate::settings::SettingsStorage;
 use crate::uri::percent_encode;
+use crate::window_theme::{window_background, window_theme};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -88,15 +89,15 @@ pub fn open_document_window(app: &AppHandle, target: DocumentTarget) {
 
     // Themed from the start, so neither the title bar nor the background flashes in the
     // OS appearance while the webview loads its bundle and paints the document.
-    let settings = app.state::<SettingsStorage>().load();
+    let theme = app.state::<SettingsStorage>().load().theme;
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
         .title(title)
         .inner_size(720.0, 640.0)
         .resizable(true)
         .center()
         .focused(true)
-        .theme(Some(settings.window_theme()))
-        .background_color(settings.window_background());
+        .theme(Some(window_theme(&theme)))
+        .background_color(window_background(&theme));
 
     // The editor floats above the main window so it can't be buried; view windows stay
     // normal (non-modal, hideable, can sit behind other windows).

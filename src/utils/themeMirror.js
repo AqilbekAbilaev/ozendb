@@ -26,7 +26,13 @@ function readMirror() {
 // Read-only on purpose: pre-painting must not write the mirror back, or a fresh install
 // would persist a theme the user never chose.
 export function prePaintTheme() {
-  return paint(normalizedTheme(readMirror()))
+  return paintTheme(readMirror())
+}
+
+// The document window repaints from the backend's payload rather than the mirror, which
+// the main window may not have written yet when the event arrives.
+export function paintTheme(value) {
+  return paint(normalizedTheme(value))
 }
 
 export function writeThemeMirror(value) {

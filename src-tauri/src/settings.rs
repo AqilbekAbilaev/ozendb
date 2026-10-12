@@ -1,8 +1,6 @@
 use crate::json_store_wrapper;
 use crate::error::AppError;
 use serde::{Deserialize, Serialize};
-use tauri::window::Color;
-use tauri::Theme;
 
 /// Application-wide preferences. A single JSON object (not keyed), persisted to
 /// `settings.json`. New fields should carry `#[serde(default)]` so older files
@@ -61,25 +59,6 @@ impl Default for Settings {
     }
 }
 
-impl Settings {
-    /// Forced on every window so native title bars follow the app theme rather than the
-    /// OS appearance (#274).
-    pub fn window_theme(&self) -> Theme {
-        match self.theme.as_str() {
-            "light" => Theme::Light,
-            _ => Theme::Dark,
-        }
-    }
-
-    /// What a new window shows before its page paints: theme.css's `--bg-window`.
-    pub fn window_background(&self) -> Color {
-        match self.window_theme() {
-            Theme::Light => Color(244, 245, 247, 255),
-            _ => Color(31, 32, 35, 255),
-        }
-    }
-}
-
 json_store_wrapper!(SettingsStorage, Settings);
 
 impl SettingsStorage {
@@ -87,7 +66,3 @@ impl SettingsStorage {
         self.inner.save(settings)
     }
 }
-
-#[cfg(test)]
-#[path = "settings.test.rs"]
-mod tests;

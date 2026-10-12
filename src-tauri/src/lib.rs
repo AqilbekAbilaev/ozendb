@@ -41,6 +41,7 @@ mod tabs;
 
 mod time;
 mod uri;
+mod window_theme;
 
 use commands::*;
 use collection_history::CollectionHistoryStore;
@@ -138,12 +139,14 @@ pub fn run() {
                     Ok(val) => val,
                     Err(e) => return Err(e.into()),
                 };
-            match main_builder.enable_clipboard_access().build() {
+            // Themed from the first frame; the app-wide call also covers native dialogs
+            // and, on Windows, the menu (#274).
+            let theme = window_theme::window_theme(&app.state::<SettingsStorage>().load().theme);
+            match main_builder.enable_clipboard_access().theme(Some(theme)).build() {
                 Ok(_val) => {}
                 Err(e) => return Err(e.into()),
             };
-            // After the build, so the main window exists to take it (#274).
-            app.set_theme(Some(app.state::<SettingsStorage>().load().window_theme()));
+            app.set_theme(Some(theme));
 
             // Install the native OS menu (macOS system menu bar; native in-window
             // menu on Windows/Linux). Item clicks are emitted to the frontend,
