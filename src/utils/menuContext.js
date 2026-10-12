@@ -69,7 +69,8 @@ function depth(ref) {
 //   indexSelected  whether an index row is selected in the open Indexes dialog
 //   canRefresh     whether the active tab can reload (workspaces/lifecycle's canRefreshWorkspace)
 //   openTabs       every open workspace, for the lock of one showing the selected resource
-export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false, openTabs = []) {
+//   gridfsFileSelected  whether a file row is selected in the open GridFS dialog
+export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false, openTabs = [], gridfsFileSelected = false) {
   const tab = activeTab || null
   const tabDepth = depth(mongoResource(tab, tab?.target ?? null))
   const selDepth = depth(mongoResource(treeSelection, treeSelection?.resource))
@@ -104,6 +105,8 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
     // Index-menu actions operate on the index selected in the Indexes dialog, which
     // is independent of the tab/tree selection — so it's passed in directly.
     hasIndex: !!indexSelected,
+    // Same for the GridFS dialog's selected file (see Gate::GridfsFile).
+    hasGridfsFile: !!gridfsFileSelected,
     // A read-only lock (see writable.js) disables the write actions: the active tab's,
     // or that of an open tab showing the sidebar selection, which a write may target.
     readOnly: isLocked(tab) || openTabs.some(t => isLocked(t) && sameResource(t.target, treeSelection?.resource)),

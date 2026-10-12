@@ -5,6 +5,7 @@ import { activeTab, tabs } from '../stores/tabs'
 import { treeSelection } from '../stores/connectionNavigation'
 import { openConnections } from '../stores/openConnections'
 import { selectedIndex } from '../stores/indexes'
+import { selectedGridfsFile } from '../stores/gridfs'
 import { canRefreshWorkspace } from '../workspaces/lifecycle'
 
 // Derives what the native menu treats as "selected" and keeps the backend menu in
@@ -25,6 +26,7 @@ export function useMenu() {
     !!selectedIndex.value,
     canRefreshWorkspace(activeTab.value),
     tabs.value,
+    !!selectedGridfsFile.value,
   ))
 
   // Push the context down to the native menu so gated items enable/disable in step
@@ -38,6 +40,7 @@ export function useMenu() {
       hasDocument: ctx.hasDocument,
       hasField: ctx.hasField,
       hasIndex: ctx.hasIndex,
+      hasGridfsFile: ctx.hasGridfsFile,
       readOnly: ctx.readOnly,
       canRefreshTab: ctx.canRefreshTab,
       hasPgSchema: ctx.hasPgSchema,

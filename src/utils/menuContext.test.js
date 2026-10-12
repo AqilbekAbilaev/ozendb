@@ -35,9 +35,22 @@ describe('deriveMenuContext', () => {
   it('is all-false with no tab, no selection, no connections', () => {
     expect(deriveMenuContext(null, null, 0)).toEqual({
       hasConnection: false, hasDatabase: false, hasCollection: false, anyConnection: false,
-      hasDocument: false, hasField: false, hasIndex: false, readOnly: false, canRefreshTab: false,
+      hasDocument: false, hasField: false, hasIndex: false, hasGridfsFile: false,
+      readOnly: false, canRefreshTab: false,
       hasPgSchema: false, hasPgTable: false, engine: 'none',
     })
+  })
+
+  // A click on a file row clears the tree selection, so this must hold on its own (#258).
+  it('a file selected in the GridFS dialog sets hasGridfsFile on its own', () => {
+    const ctx = deriveMenuContext(null, null, 0, false, false, [], true)
+    expect(ctx.hasGridfsFile).toBe(true)
+    expect(ctx.hasDatabase).toBe(false)
+  })
+
+  it('no GridFS file selected leaves hasGridfsFile false even with a collection selected', () => {
+    const sel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+    expect(deriveMenuContext(quickstart, sel, 1).hasGridfsFile).toBe(false)
   })
 
   it('Quickstart active with no selection gates everything off', () => {
