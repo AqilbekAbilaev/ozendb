@@ -6,6 +6,8 @@ use std::time::Duration;
 
 mod cursor;
 pub(crate) use cursor::*;
+mod plain_value;
+pub(crate) use plain_value::*;
 
 // Quote a CSV field only when it contains a delimiter, quote, or newline, doubling
 // any embedded quotes — standard RFC-4180 escaping.
@@ -14,21 +16,6 @@ pub(crate) fn csv_escape(value: &str) -> String {
         format!("\"{}\"", value.replace('"', "\"\""))
     } else {
         value.to_string()
-    }
-}
-
-// Render a single BSON value as a flat CSV cell. Scalars become their plain text;
-// anything nested (documents, arrays, dates) falls back to its JSON form.
-fn bson_to_csv_cell(value: &bson::Bson) -> String {
-    match value {
-        bson::Bson::String(val) => val.clone(),
-        bson::Bson::Boolean(val) => val.to_string(),
-        bson::Bson::Int32(val) => val.to_string(),
-        bson::Bson::Int64(val) => val.to_string(),
-        bson::Bson::Double(val) => val.to_string(),
-        bson::Bson::Null => String::new(),
-        bson::Bson::ObjectId(val) => val.to_hex(),
-        other => serde_json::Value::from(other.clone()).to_string(),
     }
 }
 
@@ -48,7 +35,7 @@ fn csv_format_row(headers: &[String], doc: &bson::Document) -> String {
     let row: Vec<String> = headers
         .iter()
         .map(|header| match doc.get(header) {
-            Some(value) => csv_escape(&bson_to_csv_cell(value)),
+            Some(value) => csv_escape(&bson_to_plain_cell(value)),
             None => String::new(),
         })
         .collect();
@@ -330,6 +317,7 @@ where
 
     let mut workbook = rust_xlsxwriter::Workbook::new();
     let header_format = rust_xlsxwriter::Format::new().set_bold();
+    let date_format = xlsx_date_format();
     let worksheet = workbook.add_worksheet();
 
     // First-seen key → column index, so each key maps to a stable column.
@@ -363,7 +351,15 @@ where
             Err(e) => return Err(e),
         }
         let data_row: u32 = (count + 1) as u32; // row 0 is the header
-        match xlsx_write_document(worksheet, &mut columns, &mut next_col, &header_format, data_row, &doc) {
+        match xlsx_write_document(
+            worksheet,
+            &mut columns,
+            &mut next_col,
+            &header_format,
+            &date_format,
+            data_row,
+            &doc,
+        ) {
             Ok(_) => {}
             Err(e) => return Err(e),
         }
@@ -383,6 +379,7 @@ fn xlsx_write_document(
     columns: &mut std::collections::HashMap<String, u16>,
     next_col: &mut u16,
     header_format: &rust_xlsxwriter::Format,
+    date_format: &rust_xlsxwriter::Format,
     data_row: u32,
     doc: &bson::Document,
 ) -> Result<(), AppError> {
@@ -406,7 +403,7 @@ fn xlsx_write_document(
                 assigned
             }
         };
-        match xlsx_write_cell(worksheet, data_row, col_index, value) {
+        match xlsx_write_cell(worksheet, data_row, col_index, value, date_format) {
             Ok(_) => {}
             Err(e) => return Err(e),
         }
@@ -421,46 +418,27 @@ fn xlsx_write_document(
 pub(crate) fn docs_to_xlsx(docs: &[bson::Document], path: &str) -> Result<usize, AppError> {
     let mut workbook = rust_xlsxwriter::Workbook::new();
     let header_format = rust_xlsxwriter::Format::new().set_bold();
+    let date_format = xlsx_date_format();
     let worksheet = workbook.add_worksheet();
     let mut columns: std::collections::HashMap<String, u16> = std::collections::HashMap::new();
     let mut next_col: u16 = 0;
     for (index, doc) in docs.iter().enumerate() {
         let data_row: u32 = (index + 1) as u32;
-        match xlsx_write_document(worksheet, &mut columns, &mut next_col, &header_format, data_row, doc) {
+        match xlsx_write_document(
+            worksheet,
+            &mut columns,
+            &mut next_col,
+            &header_format,
+            &date_format,
+            data_row,
+            doc,
+        ) {
             Ok(_) => {}
             Err(e) => return Err(e),
         }
     }
     match workbook.save(path) {
         Ok(_) => Ok(docs.len()),
-        Err(e) => Err(xlsx_error(e)),
-    }
-}
-
-// A file-writing failure from rust_xlsxwriter isn't user input, so report it as I/O.
-fn xlsx_error(e: rust_xlsxwriter::XlsxError) -> AppError {
-    AppError::Io(std::io::Error::other(e.to_string()))
-}
-
-// Write one BSON value into a worksheet cell, using a native Excel type where it maps
-// cleanly (numbers, booleans) and the CSV text form for everything else. `Null` is left
-// as a blank cell.
-fn xlsx_write_cell(
-    worksheet: &mut rust_xlsxwriter::Worksheet,
-    row: u32,
-    col: u16,
-    value: &bson::Bson,
-) -> Result<(), AppError> {
-    let result = match value {
-        bson::Bson::Null => return Ok(()),
-        bson::Bson::Boolean(val) => worksheet.write_boolean(row, col, *val),
-        bson::Bson::Int32(val) => worksheet.write_number(row, col, *val as f64),
-        bson::Bson::Int64(val) => worksheet.write_number(row, col, *val as f64),
-        bson::Bson::Double(val) => worksheet.write_number(row, col, *val),
-        other => worksheet.write_string(row, col, bson_to_csv_cell(other)),
-    };
-    match result {
-        Ok(_) => Ok(()),
         Err(e) => Err(xlsx_error(e)),
     }
 }

@@ -260,12 +260,32 @@ fn export_xlsx_handles_mixed_bson_types_without_error() {
         "bool": false,
         "null": bson::Bson::Null,
         "oid": object_id,
+        "date": bson::DateTime::from_millis(1709802930000),
+        "decimal": "19.99".parse::<bson::Decimal128>().unwrap(),
         "nested": bson::doc! { "k": 1 },
         "arr": bson::bson!([1, 2, 3]),
     }];
     let path = temp_xlsx_path("mixed");
     let path_str = path.to_str().unwrap();
     assert!(docs_to_xlsx(&docs, path_str).is_ok());
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn export_xlsx_date_outside_excels_range_falls_back_instead_of_failing_the_export() {
+    // Year 10000 is outside Excel's representable 1900-9999 range. The export as a
+    // whole must still succeed — losing this one cell's native date type is fine,
+    // aborting the export over it is not.
+    let docs = vec![
+        bson::doc! { "name": "normal", "when": bson::DateTime::from_millis(1709802930000) },
+        bson::doc! { "name": "far future", "when": bson::DateTime::from_millis(253_402_300_800_000) },
+    ];
+    let path = temp_xlsx_path("date-overflow");
+    let path_str = path.to_str().unwrap();
+    let count = docs_to_xlsx(&docs, path_str).unwrap();
+    assert_eq!(count, 2);
+    let bytes = std::fs::read(&path).unwrap();
+    assert!(bytes.starts_with(b"PK\x03\x04"));
     std::fs::remove_file(&path).ok();
 }
 

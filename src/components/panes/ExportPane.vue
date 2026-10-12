@@ -13,7 +13,7 @@ import BaseCheckbox from '../base/BaseCheckbox.vue'
 import ReorderButtons from '../base/ReorderButtons.vue'
 import HintText from '../base/HintText.vue'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
-import { cellText } from '../../utils/format'
+import { previewCellText } from '../../utils/exportPreview'
 import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT } from '../../constants/dataTools'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
@@ -272,7 +272,7 @@ const sourceLabel = computed(() => {
             </thead>
             <tbody>
               <tr v-for="(row, ri) in previewRows" :key="ri">
-                <td v-for="c in previewColumns" :key="c" :title="cellText(row[c])">{{ cellText(row[c]) }}</td>
+                <td v-for="c in previewColumns" :key="c" :title="previewCellText(row[c], activeTab.format)">{{ previewCellText(row[c], activeTab.format) }}</td>
               </tr>
             </tbody>
           </table>
