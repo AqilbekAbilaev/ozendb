@@ -57,7 +57,7 @@ unless `OZENDB_TEST_MONGODB` / `OZENDB_TEST_POSTGRES` point at a server.
    bundle unrelated fixes and refactors together.
 3. **Match the surrounding code.** Follow the naming, structure, and comment style already in the
    file you're editing. Project-wide architecture notes live in
-   [`CLAUDE.md`](CLAUDE.md) and [`ROADMAP.md`](ROADMAP.md).
+   [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`ROADMAP.md`](ROADMAP.md).
 4. **Keep the build green** — everything under *Verify your changes* should pass before you open
    the PR.
 5. **Describe what changed and why** in the PR, in plain language, and include the CLA agreement

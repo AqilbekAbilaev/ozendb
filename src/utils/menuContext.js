@@ -152,7 +152,7 @@ export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null
 //
 // Carries both the short alias PG_MENUS/PG_ACTIONS use (connId/connName) and the
 // long alias collection/table-tab targets use (connectionId/connectionName) —
-// the modals this feeds are a mix of both conventions (see CLAUDE.md's resource-
+// the modals this feeds are a mix of both conventions (see ARCHITECTURE.md's resource-
 // identity note on the two flat shapes still being live), and duplicating two
 // fields here is simpler than a per-call-site remap.
 export function resolvePgMenuTarget(activeTab, treeSelection = null, requiredLevel = null) {
