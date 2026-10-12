@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Hard ceiling on source file length (see AGENTS.md → Code quality → File size).
+// Hard ceiling on source file length (see docs/CODING.md → Code quality → File size).
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'

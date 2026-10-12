@@ -1,6 +1,6 @@
 # Architecture
 
-How OzenDB is put together. The rules an agent must follow live in [`AGENTS.md`](AGENTS.md);
+How OzenDB is put together. The rules code must follow live in [`docs/CODING.md`](docs/CODING.md);
 this is the map behind them.
 
 **Stack:** Tauri 2 (Rust backend) + Vue 3 (frontend, Vite). No router, no Pinia — plain `ref`/`computed`.
