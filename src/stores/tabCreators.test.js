@@ -285,6 +285,40 @@ describe('export source resolution', () => {
     }, expect.objectContaining({ on: expect.any(Object) }))
   })
 
+  // #275: two tabs on one collection, the first with an empty query.
+  const SPACED_NODE = { connId: 'c 1', connName: 'Sales ü', dbName: 'shop.eu', collName: 'orders/2026' }
+  const collectionTab = (id, filter, results, selectedRows) => ({
+    id, kind: 'collection', connectionId: 'c 1', dbName: 'shop.eu', collectionName: 'orders/2026',
+    state: { query: { filter } }, runtime: { results, selectedRows },
+  })
+
+  it('reads the query and selection from the active tab when it shows the collection', () => {
+    const c = harness()
+    tabs.value = [
+      collectionTab('t1', '', [{ _id: 'x' }], []),
+      collectionTab('t2', '{ "company": "Umbrella Corp." }', [{ _id: 'a' }, { _id: 'b' }], [1]),
+    ]
+    activeTabId.value = 't2'
+    c.openExportSource(SPACED_NODE)
+    const [, target] = openModal.mock.calls[0]
+    expect(target.query).toBe('{"company":"Umbrella Corp."}')
+    expect(target.selectedIds).toEqual(['b'])
+  })
+
+  it('falls back to the first tab of the collection when the active tab shows another', () => {
+    const c = harness()
+    tabs.value = [
+      collectionTab('t1', '{ "company": "Umbrella Corp." }', [{ _id: 'a' }], [0]),
+      collectionTab('t2', '', [], []),
+      { id: 't3', kind: 'quickstart', title: 'Quickstart' },
+    ]
+    activeTabId.value = 't3'
+    c.openExportSource(SPACED_NODE)
+    const [, target] = openModal.mock.calls[0]
+    expect(target.query).toBe('{"company":"Umbrella Corp."}')
+    expect(target.selectedIds).toEqual(['a'])
+  })
+
   it('opens an export tab from the target captured when the picker opened', () => {
     const c = harness()
     c.openExportSource(NODE)

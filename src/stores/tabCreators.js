@@ -1,6 +1,6 @@
 import { getDefaultQuery } from '../engines/mongodb/api/queryLibrary'
 import { parseField } from '../utils/queryParser'
-import { tabs, activateTab, newTabId } from './tabs'
+import { tabs, activeTab, activateTab, newTabId } from './tabs'
 import { createWorkspace } from '../workspaces/createWorkspace'
 import { openModal, closeModal } from './modals'
 import { defaultQueryLimit, defaultResultView } from './settings'
@@ -129,11 +129,12 @@ export function openSchemaTab({ connId, connName, dbName, collName }) {
 // Export starts with the source picker (Entire Collection / Current Query Result /
 // Selected Documents). The two narrower sources are only offered when an open
 // collection tab for the same collection can supply them, so the query and the
-// selected _ids are resolved here and handed to the modal.
+// selected _ids are resolved here and handed to the modal. The active tab wins when it
+// shows the collection, since the same collection may be open in several tabs (#275).
 export function openExportSource(node) {
-  const tab = tabs.value.find(t =>
-    t.kind === 'collection' && t.connectionId === node.connId
-    && t.dbName === node.dbName && t.collectionName === node.collName)
+  const showsNode = t => t.kind === 'collection' && t.connectionId === node.connId
+    && t.dbName === node.dbName && t.collectionName === node.collName
+  const tab = activeTab.value && showsNode(activeTab.value) ? activeTab.value : tabs.value.find(showsNode)
   const pf = tab ? parseField(tab.state.query.filter) : null
   const rows = (tab && tab.runtime.selectedRows) || []
   const selectedIds = rows
