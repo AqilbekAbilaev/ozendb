@@ -126,7 +126,7 @@ export default [
       // Single-word component names are the convention throughout src/components.
       'vue/multi-word-component-names': 'off',
       // Tabs are plain objects and children mutate their properties directly — see the
-      // "Tab state" note in CLAUDE.md. Every hit of this rule is that pattern.
+      // "Tab state" note in ARCHITECTURE.md. Every hit of this rule is that pattern.
       'vue/no-mutating-props': 'off',
       // Ignored catch bindings and placeholder args are intentional; `_` opts out.
       'no-unused-vars': ['error', {
