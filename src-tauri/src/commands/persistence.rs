@@ -8,7 +8,7 @@ use crate::saved_queries::{SavedQueryEntry, SavedQueryStorage};
 use crate::tabs::TabStorage;
 use crate::settings::{Settings, SettingsStorage};
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 #[tauri::command(async)]
@@ -21,6 +21,7 @@ pub fn get_settings(settings: State<'_, SettingsStorage>) -> Settings {
 /// others. Values are clamped/validated so a bad value can't break the UI.
 #[tauri::command(async)]
 pub fn update_settings(
+    app: AppHandle,
     settings: State<'_, SettingsStorage>,
     default_query_limit: Option<i64>,
     theme: Option<String>,
@@ -82,7 +83,10 @@ pub fn update_settings(
         ui_zoom: merged_zoom.clamp(0.5, 2.0),
     };
     match settings.save(&new_settings) {
-        Ok(_) => Ok(new_settings),
+        Ok(_) => {
+            app.set_theme(Some(new_settings.window_theme()));
+            Ok(new_settings)
+        }
         Err(e) => Err(e),
     }
 }

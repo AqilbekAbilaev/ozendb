@@ -142,6 +142,8 @@ pub fn run() {
                 Ok(_val) => {}
                 Err(e) => return Err(e.into()),
             };
+            // After the build, so the main window exists to take it (#274).
+            app.set_theme(Some(app.state::<SettingsStorage>().load().window_theme()));
 
             // Install the native OS menu (macOS system menu bar; native in-window
             // menu on Windows/Linux). Item clicks are emitted to the frontend,

@@ -4,10 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Edit Document</title>
-    <!-- Paint the theme background immediately so the window never flashes white before
-         theme.css loads. -->
+    <!-- Paint the theme background immediately so the window never flashes before
+         theme.css loads. The window is created with the app's theme, which is what
+         prefers-color-scheme reports here; the CSP rules out an inline script. -->
     <style>
       html, body { margin: 0; height: 100%; background: #1f2023; }
+      @media (prefers-color-scheme: light) { html, body { background: #f4f5f7; } }
     </style>
   </head>
   <body>
