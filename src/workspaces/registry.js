@@ -1,44 +1,20 @@
-// The workspace registry: every definition by type, and the panes the app-level and
-// MongoDB definitions render. A tab renders its type's component and nothing else.
-import { defineAsyncComponent } from 'vue'
-import QuickstartPane from '../components/panes/QuickstartPane.vue'
+// The workspace registry: definitions by type, and the generic dispatch every host
+// (WorkspaceArea.vue) reads through instead of knowing which engine owns which pane.
 
-// Everything but Quickstart is fetched the first time a tab of its kind opens: the
-// collection, shell and Current Operations panes carry CodeMirror, which would
-// otherwise be parsed on every launch (src/startupImports.test.js holds that line).
-// Declared once at module scope so repeated resolution returns the same identity.
-const MongoCollectionWorkspace = defineAsyncComponent(() => import('../engines/mongodb/workspaces/collection/MongoCollectionWorkspace.vue'))
-const ShellConsole = defineAsyncComponent(() => import('../components/app/ShellConsole.vue'))
-const IndexManagerPane = defineAsyncComponent(() => import('../components/panes/IndexManagerPane.vue'))
-const SchemaPane = defineAsyncComponent(() => import('../components/panes/SchemaPane.vue'))
-const SearchPane = defineAsyncComponent(() => import('../components/panes/SearchPane.vue'))
-const CurrentOpsPane = defineAsyncComponent(() => import('../components/panes/CurrentOpsPane.vue'))
-const ImportPane = defineAsyncComponent(() => import('../components/panes/ImportPane.vue'))
-const CsvImportPane = defineAsyncComponent(() => import('../components/panes/CsvImportPane.vue'))
-const ExportPane = defineAsyncComponent(() => import('../components/panes/ExportPane.vue'))
-
-export const WORKSPACE_COMPONENTS = Object.freeze({
-  quickstart: QuickstartPane,
-  collection: MongoCollectionWorkspace,
-  shell: ShellConsole,
-  indexes: IndexManagerPane,
-  schema: SchemaPane,
-  search: SearchPane,
-  currentOps: CurrentOpsPane,
-  export: ExportPane,
-  import: ImportPane,
-  'import:csv': CsvImportPane,
-})
-
-// A tab's component comes from its type's definition: `componentFor(tab)` when the
-// definition picks between components (import's JSON and CSV panes), `component`
-// otherwise. No active tab shows Quickstart; an unknown type resolves to null, the
-// blank pane.
+// No active tab (a test, or a session mid-restore) falls back to Quickstart; an unknown
+// type resolves to null, the blank pane.
 export function workspaceComponentFor(tab) {
-  if (!tab) return WORKSPACE_COMPONENTS.quickstart
+  if (!tab) return definitions.get('app.quickstart')?.component ?? null
   const def = definitions.get(tab.type)
   if (!def) return null
   return def.componentFor ? def.componentFor(tab) : def.component
+}
+
+// The pane's binding contract, so the host needn't import engine components to compare:
+// null for plain `{ activeTab }`, 'quickstart' (no props) or 'collection' (props + listeners).
+export function workspacePaneKind(tab) {
+  if (!tab) return 'quickstart'
+  return definitions.get(tab.type)?.paneKind ?? null
 }
 
 // Definition registry. Populated once at startup by registerDefinitions();

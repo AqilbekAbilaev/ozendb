@@ -76,8 +76,9 @@ The rest of `src/` sits around those rings, with its own lint rule where a direc
   they reach nothing that could call them back. `appApi/` imports no app code at all; an engine's
   `api/` imports no components and no app state.
 - **`workspaces/`** is the machinery `stores/tabs.js` builds on, so it reads no stores or
-  composables. Its registry maps types to components and so imports them — the one outward edge,
-  which `importCycles.test.js` keeps from closing into a loop.
+  composables. Its registry imports no components; each engine declares its own panes. The one
+  outward edge is `appDefinitions.js` importing `QuickstartPane.vue`, which `importCycles.test.js`
+  keeps from closing into a loop.
 - **`components/base/`** is the UI kit: other base components, `utils/`, `constants/`, `data/` and
   `composables/`, never a store or a feature area. The one setting it honours (the editor's tab
   width) is provided by each window's root under a key in `constants/injectionKeys.js`.
