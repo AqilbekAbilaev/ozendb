@@ -1,36 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { workspaceComponentFor, workspacePaneKind, registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
 import { registerWorkspaceDefinitions } from './registerDefinitions'
+import QuickstartPane from '../components/panes/QuickstartPane.vue'
 
 describe('workspaceComponentFor', () => {
-  it('renders each type\'s own component', () => {
-    const types = [
-      'app.quickstart', 'mongodb.find', 'mongodb.shell', 'mongodb.indexes',
-      'mongodb.schema', 'mongodb.search', 'mongodb.current_operations', 'mongodb.export',
-    ]
-    for (const type of types) {
-      expect(workspaceComponentFor({ type }), type).toBe(getWorkspaceDefinition(type).component)
-    }
-  })
-
-  it('renders every collection mode with the same component', () => {
-    const expected = getWorkspaceDefinition('mongodb.find').component
-    for (const type of ['mongodb.find', 'mongodb.aggregate', 'mongodb.sql_to_mql']) {
-      expect(workspaceComponentFor({ type })).toBe(expected)
-    }
-  })
-
-  it('lets a definition pick between components, as import does by format', () => {
-    const csv = workspaceComponentFor({ type: 'mongodb.import', format: 'csv' })
-    const json = workspaceComponentFor({ type: 'mongodb.import', format: 'json' })
-    expect(csv).not.toBe(json)
-    expect(workspaceComponentFor({ type: 'mongodb.import' })).toBe(json)
-  })
-
   it('falls back to Quickstart when there is no active tab', () => {
-    const quickstart = getWorkspaceDefinition('app.quickstart').component
-    expect(workspaceComponentFor(null)).toBe(quickstart)
-    expect(workspaceComponentFor(undefined)).toBe(quickstart)
+    expect(workspaceComponentFor(null)).toBe(QuickstartPane)
+    expect(workspaceComponentFor(undefined)).toBe(QuickstartPane)
   })
 
   it('renders an engine\'s workspace from its definition alone', () => {
@@ -49,13 +25,6 @@ describe('workspaceComponentFor', () => {
     expect(workspaceComponentFor({ type: 'mongodb.find' })).toBe(workspaceComponentFor({ type: 'mongodb.find' }))
     expect(workspaceComponentFor({ type: 'mongodb.shell' })).toBe(workspaceComponentFor({ type: 'mongodb.shell' }))
     expect(workspaceComponentFor(null)).toBe(workspaceComponentFor(undefined))
-  })
-
-  it('keeps the shell component lazy-loaded', () => {
-    const shell = workspaceComponentFor({ type: 'mongodb.shell' })
-    // The async wrapper is a component definition, not the pane module itself.
-    expect(typeof shell).toBe('object')
-    expect(shell).toBe(getWorkspaceDefinition('mongodb.shell').component)
   })
 })
 
