@@ -5,10 +5,7 @@
 // and reset the runtime previews/rows.
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
-import {
-  IndexManagerPane, SchemaPane, SearchPane, CurrentOpsPane,
-  ImportPane, CsvImportPane, ExportPane,
-} from './panes'
+import { IndexManagerPane, SchemaPane, SearchPane, CurrentOpsPane, ImportPane, CsvImportPane, ExportPane } from './panes'
 
 // A tool workspace's identity fields, in the same long spelling collection and shell
 // workspaces use — so a pane reading `activeTab.collectionName` does not have to know

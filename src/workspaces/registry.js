@@ -1,12 +1,8 @@
 // The workspace registry: definitions by type, and the generic dispatch every host
 // (WorkspaceArea.vue) reads through instead of knowing which engine owns which pane.
 
-// A tab's component comes from its type's definition: `componentFor(tab)` when the
-// definition picks between components (import's JSON and CSV panes), `component`
-// otherwise. With no active tab, the app.quickstart definition's own component is the
-// fallback — there is normally always a Quickstart tab, but an empty activeTabId (a
-// test, or a session mid-restore) can still ask for one before a match exists. An
-// unknown type resolves to null, the blank pane.
+// No active tab (a test, or a session mid-restore) falls back to Quickstart; an unknown
+// type resolves to null, the blank pane.
 export function workspaceComponentFor(tab) {
   if (!tab) return definitions.get('app.quickstart')?.component ?? null
   const def = definitions.get(tab.type)
@@ -14,12 +10,8 @@ export function workspaceComponentFor(tab) {
   return def.componentFor ? def.componentFor(tab) : def.component
 }
 
-// Most panes take just `{ activeTab }` and emit nothing WorkspaceArea.vue needs to
-// route — that's the `null` default. A definition can mark a different UI contract on
-// itself (`paneKind`) when its pane needs more: 'quickstart' (no props at all) or
-// 'collection' (the full compatibility surface plus the query/result listeners). This
-// is how the host asks a definition what it needs instead of comparing resolved
-// component identity, which would force it to import the engine's own components.
+// The pane's binding contract, so the host needn't import engine components to compare:
+// null for plain `{ activeTab }`, 'quickstart' (no props) or 'collection' (props + listeners).
 export function workspacePaneKind(tab) {
   if (!tab) return 'quickstart'
   return definitions.get(tab.type)?.paneKind ?? null

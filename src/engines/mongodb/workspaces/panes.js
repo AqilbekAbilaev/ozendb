@@ -1,10 +1,5 @@
-// Every MongoDB pane heavy enough to defer: the collection workspace, the shell
-// console and Current Operations carry CodeMirror, which would otherwise be parsed on
-// every launch (src/startupImports.test.js holds that line); the rest are deferred for
-// the same reason — fetched the first time a tab of its kind opens rather than at
-// startup. Declared once here, at module scope, so repeated resolution from either
-// definition file (queryDefinitions.js, toolDefinitions.js) returns the same component
-// identity.
+// Lazy so CodeMirror and the rest stay out of startup (src/startupImports.test.js holds
+// that line); declared once so every definition shares one component identity.
 import { defineAsyncComponent } from 'vue'
 
 export const MongoCollectionWorkspace = defineAsyncComponent(() => import('./collection/MongoCollectionWorkspace.vue'))
