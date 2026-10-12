@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { THEME_KEY, normalizedTheme, prePaintTheme, writeThemeMirror } from './themeMirror'
+import { THEME_KEY, normalizedTheme, prePaintTheme, paintTheme, writeThemeMirror } from './themeMirror'
 
 function stubEnv(stored) {
   const store = { [THEME_KEY]: stored }
@@ -68,5 +68,20 @@ describe('writeThemeMirror', () => {
     vi.stubGlobal('localStorage', { setItem: () => { throw new Error('blocked') } })
     expect(writeThemeMirror('light')).toBe('light')
     expect(document.documentElement.dataset.theme).toBe('light')
+  })
+})
+
+// #274: the document window repaints from the backend's theme-changed payload.
+describe('paintTheme', () => {
+  it('paints the given theme without writing the mirror', () => {
+    stubEnv('dark')
+    expect(paintTheme('light')).toBe('light')
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(localStorage.setItem).not.toHaveBeenCalled()
+  })
+
+  it('paints dark for an unknown value', () => {
+    stubEnv('light')
+    expect(paintTheme('Solarized ü')).toBe('dark')
   })
 })

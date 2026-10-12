@@ -8,7 +8,9 @@ use crate::saved_queries::{SavedQueryEntry, SavedQueryStorage};
 use crate::tabs::TabStorage;
 use crate::settings::{Settings, SettingsStorage};
 use std::collections::HashMap;
-use tauri::State;
+use crate::events::THEME_CHANGED;
+use crate::window_theme::window_theme;
+use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
 #[tauri::command(async)]
@@ -21,6 +23,7 @@ pub fn get_settings(settings: State<'_, SettingsStorage>) -> Settings {
 /// others. Values are clamped/validated so a bad value can't break the UI.
 #[tauri::command(async)]
 pub fn update_settings(
+    app: AppHandle,
     settings: State<'_, SettingsStorage>,
     default_query_limit: Option<i64>,
     theme: Option<String>,
@@ -30,6 +33,7 @@ pub fn update_settings(
     ui_zoom: Option<f64>,
 ) -> Result<Settings, AppError> {
     let current = settings.load();
+    let previous_theme = current.theme.clone();
 
     // Only known theme names are accepted; anything else falls back to dark so a
     // bad value from the frontend can't leave the UI in an undefined state.
@@ -82,7 +86,15 @@ pub fn update_settings(
         ui_zoom: merged_zoom.clamp(0.5, 2.0),
     };
     match settings.save(&new_settings) {
-        Ok(_) => Ok(new_settings),
+        Ok(_) => {
+            // The open document windows repaint from the event; the app call re-themes
+            // every window's title bar.
+            if new_settings.theme != previous_theme {
+                app.set_theme(Some(window_theme(&new_settings.theme)));
+                app.emit(THEME_CHANGED, &new_settings.theme).ok();
+            }
+            Ok(new_settings)
+        }
         Err(e) => Err(e),
     }
 }

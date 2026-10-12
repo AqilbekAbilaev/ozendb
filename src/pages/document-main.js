@@ -2,13 +2,15 @@ import { createApp } from "vue";
 import "../assets/theme.css";
 import DocumentEditorPage from "../components/results/DocumentEditorPage.vue";
 import { installInputUndo } from "../utils/inputUndo";
-import { prePaintTheme } from "../utils/themeMirror";
+import { prePaintTheme, paintTheme } from "../utils/themeMirror";
+import { onThemeChanged } from "../appApi/events";
 import { editorTabWidth } from "../stores/settings";
 import { EDITOR_TAB_WIDTH } from "../constants/injectionKeys";
 
 // This editor is a separate webview, so it loads its own stylesheet and pre-paints
 // from the shared mirror the main window keeps in sync.
 prePaintTheme();
+onThemeChanged(paintTheme);
 
 createApp(DocumentEditorPage).provide(EDITOR_TAB_WIDTH, editorTabWidth).mount("#doc-editor-app");
 
