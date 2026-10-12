@@ -47,3 +47,30 @@ export function matchSessions(sessions, { database, user, state, activeOnly } = 
     && (!state || s.state === state)
     && (!activeOnly || s.state === 'active'))
 }
+
+// Cancel leaves the session open, so only a successful terminate may hide its row.
+export function shouldSuppressAfterSignal(kind, done) {
+  return kind === 'terminate' && done === true
+}
+
+// pid alone can be reused by a later backend; backendStart tells them apart. It is null for
+// other roles' sessions without pg_read_all_stats — exactly the ones pg_signal_backend can
+// terminate — so a null falls back to pid, leaving the TTL to bound any reuse.
+function sameBackend(pendingBackendStart, sessionBackendStart) {
+  if (pendingBackendStart == null || sessionBackendStart == null) return true
+  return pendingBackendStart === sessionBackendStart
+}
+
+// Terminate only sends the signal, so a reload can still list the session. Hide it until a
+// read no longer has that backend, or the TTL passes in case the terminate never took.
+const PENDING_TERMINATION_TTL_MS = 15000
+
+export function reconcilePendingTerminations(freshSessions, pending, now = new Date(), ttlMs = PENDING_TERMINATION_TTL_MS) {
+  const isMatch = (p, s) => p.pid === s.pid && sameBackend(p.backendStart, s.backendStart)
+  const stillPending = pending.filter(p =>
+    now - p.at < ttlMs && freshSessions.some(s => isMatch(p, s)))
+  return {
+    sessions: freshSessions.filter(s => !stillPending.some(p => isMatch(p, s))),
+    pending: stillPending,
+  }
+}
