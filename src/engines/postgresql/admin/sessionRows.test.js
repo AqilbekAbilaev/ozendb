@@ -4,8 +4,7 @@ import { matchSessions, queryText, fmtAge, sessionOptions, reconcilePendingTermi
 const SESSIONS = [
   { pid: 1, user: 'postgres', database: 'shop', state: 'active', query: 'SELECT 1', redacted: false, queryStart: '2026-09-30 12:00:00+00', backendStart: '2026-09-30 11:00:00+00' },
   { pid: 2, user: 'app', database: 'shop', state: 'idle', query: null, redacted: false, queryStart: null, backendStart: '2026-09-30 11:05:00+00' },
-  { pid: 3, user: 'app', database: 'billing', state: 'idle in transaction', query: null, redacted: true, queryStart: '2026-09-30 11:00:00+00', backendStart: '2026-09-30 10:00:00+00' },
-  // A background worker: no backend_start reported, same as the rest of its fields.
+  { pid: 3, user: 'app', database: 'billing', state: 'idle in transaction', query: null, redacted: true, queryStart: '2026-09-30 11:00:00+00', backendStart: null },
   { pid: 4, user: null, database: null, state: null, query: null, redacted: false, queryStart: null, backendStart: null },
 ]
 
@@ -131,9 +130,9 @@ describe('reconcilePendingTerminations', () => {
   })
 
   it('only hides pids that are actually pending, not everything', () => {
-    const pending = [{ pid: 3, backendStart: '2026-09-30 10:00:00+00', at: T0 }]
+    const pending = [{ pid: 2, backendStart: '2026-09-30 11:05:00+00', at: T0 }]
     const { sessions } = reconcilePendingTerminations(SESSIONS, pending, T0)
-    expect(sessions.map(s => s.pid)).toEqual([1, 2, 4])
+    expect(sessions.map(s => s.pid)).toEqual([1, 3, 4])
   })
 
   it('does not hide a row once its pid has been reused by a different backend', () => {
@@ -145,10 +144,10 @@ describe('reconcilePendingTerminations', () => {
     expect(next).toEqual([])
   })
 
-  it('falls back to matching by pid alone when backendStart is null, since identity cannot be verified either way', () => {
-    const pending = [{ pid: 4, backendStart: null, at: T0 }]
+  it("falls back to pid alone for another role's session, whose backendStart Postgres withholds", () => {
+    const pending = [{ pid: 3, backendStart: null, at: T0 }]
     const { sessions } = reconcilePendingTerminations(SESSIONS, pending, T0)
-    expect(sessions.map(s => s.pid)).not.toContain(4)
+    expect(sessions.map(s => s.pid)).not.toContain(3)
   })
 })
 

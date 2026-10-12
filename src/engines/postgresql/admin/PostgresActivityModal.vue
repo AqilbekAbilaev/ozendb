@@ -31,8 +31,7 @@ const auto = ref(true)
 const confirming = ref(null)   // the session a terminate is being confirmed for
 const now = ref(new Date())
 let timer = null
-// Terminates this modal has sent that `load()` hasn't yet seen take effect — see
-// reconcilePendingTerminations for why the row must stay hidden across this very reload.
+// Terminates sent but not yet seen to take effect; see reconcilePendingTerminations.
 let pendingTerminations = []
 
 async function load() {
