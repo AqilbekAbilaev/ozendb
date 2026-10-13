@@ -16,12 +16,16 @@ import { showToast } from '../stores/toast'
 import { invalidateConnectionResources } from '../stores/connectionData'
 import { useGridfsBrowser } from './useGridfsBrowser'
 import { selectedGridfsFile, clearGridfsSelection } from '../stores/gridfs'
+import { createResourceRef } from '../utils/resourceRef'
 
 const DB = { connectionId: 'c1', database: 'shop' }
 const FILE = { id: 'f1', filename: 'report.pdf', length: 10 }
 
 function browser(over = {}) {
-  const target = reactive({ connectionId: 'c1', connectionName: 'Local', dbName: 'shop', menuRequest: null, ...over })
+  const target = reactive({
+    resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]),
+    connectionName: 'Local', menuRequest: null, ...over,
+  })
   return { target, gridfs: useGridfsBrowser(() => target) }
 }
 

@@ -13,11 +13,12 @@ import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
 import { fmtBytes } from '../../utils/format'
+import { resourceName } from '../../utils/resourceRef'
 
 // Top-bar / tree GridFS browser for a database; everything it does lives in
 // useGridfsBrowser.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, menuRequest? }
+  target: { type: Object, required: true },  // { resource, connectionName, menuRequest? }
 })
 defineEmits(['close'])
 
@@ -32,7 +33,7 @@ onMounted(load)
 </script>
 
 <template>
-  <BaseModal :title="`GridFS — ${target.dbName}`" width="680px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`GridFS — ${resourceName(target.resource)}`" width="680px" max-width="92vw" @close="$emit('close')">
       <BaseModalBody>
         <div class="gf-controls">
           <label class="gf-f">

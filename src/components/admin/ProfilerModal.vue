@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { getProfilingStatus, setProfilingLevel, listProfile } from '../../engines/mongodb/api/admin'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { errText, errCode } from '../../utils/errors'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -8,12 +9,13 @@ import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
+import { resourceName } from '../../utils/resourceRef'
 
 // Opened from App.vue for a database node. Reads the database's profiling status,
 // lists the slow ops captured in `system.profile`, and lets the user change the
 // profiling level / slow-op threshold. Profiling is per-database in MongoDB.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 
@@ -47,7 +49,7 @@ const currentLevelLabel = computed(() =>
 
 async function fetchStatus() {
   status.value = await getProfilingStatus(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
     )
   // Seed the control bar from the live status the first time we learn it.
   if (status.value && typeof status.value.was === 'number') {
@@ -60,7 +62,7 @@ async function fetchStatus() {
 
 async function fetchList() {
   entries.value = await listProfile(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
       50,
       slowerThan.value != null && slowerThan.value !== '' ? Number(slowerThan.value) : null,
     )
@@ -84,7 +86,7 @@ async function applyLevel() {
   errorCode.value = null
   try {
     await setProfilingLevel(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
       Number(level.value),
       Number(slowms.value),
     )
@@ -150,7 +152,7 @@ function rawFor(op) {
 </script>
 
 <template>
-  <BaseModal :title="`Query Profiler — ${target.dbName}`" width="860px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Query Profiler — ${resourceName(target.resource)}`" width="860px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <StateMessage v-if="loading" mode="loading" label="Reading profiling status…" />

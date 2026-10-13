@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { databaseStats } from '../../engines/mongodb/api/admin'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import RawToggle from '../base/RawToggle.vue'
@@ -8,11 +9,12 @@ import StateMessage from '../base/StateMessage.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
 import BaseModal from '../base/BaseModal.vue'
 import { fmtBytes, fmtNum } from '../../utils/format'
+import { resourceName } from '../../utils/resourceRef'
 
 // Opened from App.vue for a database node. Fetches `dbStats` once and surfaces the
 // headline fields; the full document is available raw below.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 
@@ -25,7 +27,7 @@ const showRaw = ref(false)
 onMounted(async () => {
   try {
     stats.value = await databaseStats(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
     )
   } catch (e) {
     error.value = errText(e)
@@ -42,7 +44,7 @@ const cards = computed(() => {
   const s = stats.value
   if (!s) return []
   return [
-    { label: 'Database',     value: s.db || props.target.dbName || '—', icon: 'dbSmall' },
+    { label: 'Database',     value: s.db || resourceName(props.target.resource) || '—', icon: 'dbSmall' },
     { label: 'Collections',  value: fmtNum(s.collections),              icon: 'count' },
     { label: 'Objects',      value: fmtNum(s.objects),                  icon: 'count' },
     { label: 'Data Size',    value: fmtBytes(s.dataSize),               icon: 'count' },
@@ -59,7 +61,7 @@ const rawJson = computed(() =>
 </script>
 
 <template>
-  <BaseModal :title="`Database Statistics — ${target.dbName}`" width="640px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Database Statistics — ${resourceName(target.resource)}`" width="640px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <StateMessage v-if="loading" mode="loading" label="Fetching database statistics…" />

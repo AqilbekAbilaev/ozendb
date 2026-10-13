@@ -10,6 +10,8 @@ import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
 import { tabs, activeTabId, activeTab, closeTab, cycleTab } from '../stores/tabs'
 import { canRefreshWorkspace } from '../workspaces/lifecycle'
 import { openModal, openModals } from '../stores/modals'
+import { createResourceRef, sameResource } from '../utils/resourceRef'
+import { resourceFromTreeSelection } from '../utils/legacyResourceRef'
 import { checkNow as checkForUpdates } from '../stores/updater'
 import { vqbOpen } from '../stores/visualQueryBuilder'
 import { keyBindings } from '../stores/settings'
@@ -278,20 +280,15 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       return
     }
     const target = menuTarget('database')
-    if (!target || !target.connectionId || !target.dbName) {
+    const resolved = resourceFromTreeSelection(target)
+    if (!resolved || resolved.segments.length < 1) {
       showToast('Open a database first')
       return
     }
-    const open = openModals.gridfs
-    const sameOpen = open
-      && open.connectionId === target.connectionId
-      && open.dbName === target.dbName
-    if (!sameOpen) {
-      openModal('gridfs', {
-        connectionId: target.connectionId,
-        connectionName: target.connectionName,
-        dbName: target.dbName,
-      })
+    // A collection resolves too; GridFS acts on its database.
+    const database = createResourceRef(resolved.connectionId, resolved.segments.slice(0, 1))
+    if (!sameResource(openModals.gridfs?.resource, database)) {
+      openModal('gridfs', { resource: database, connectionName: target.connectionName })
     }
     await nextTick()
     openModals.gridfs.menuRequest = { action: action, nonce: Date.now() }

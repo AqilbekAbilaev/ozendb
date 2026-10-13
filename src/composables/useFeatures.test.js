@@ -288,6 +288,23 @@ describe('feature nodes arrive as a ResourceRef', () => {
     })
   })
 
+  it('opens a database-level modal with the database\'s ref', () => {
+    contextMenu.value = ordersRow
+    makeFeatures().handleContextAction('db:database_stats')
+    expect(openModal).toHaveBeenCalledWith('dbStats', {
+      resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]), connectionName: 'Sales',
+    })
+  })
+
+  it('seeds Add View Here with the clicked collection beside its database\'s ref', () => {
+    contextMenu.value = ordersRow
+    makeFeatures().handleContextAction('coll:add_view')
+    expect(openModal).toHaveBeenCalledWith('addView', {
+      resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]),
+      connectionName: 'Sales', source: 'orders',
+    })
+  })
+
   it('guides the user when the node is too shallow for the action', () => {
     makeFeatures().runFeature('coll:stats', createResourceRef('c1', [{ kind: 'database', name: 'shop' }]))
     expect(openModal).not.toHaveBeenCalled()

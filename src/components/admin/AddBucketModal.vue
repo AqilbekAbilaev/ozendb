@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { createCollection } from '../../engines/mongodb/api/resources'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -13,7 +14,7 @@ import FlexSpacer from '../base/FlexSpacer.vue'
 // Database → Add GridFS Bucket…: a bucket is the pair of `<name>.files` and
 // `<name>.chunks` collections; create both so it appears in the GridFS view.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connectionId, connectionName, dbName }
+  target: { type: Object, required: true },   // { resource, connectionName }
 })
 const emit = defineEmits(['close'])
 
@@ -30,11 +31,11 @@ async function confirm() {
   try {
     for (const suffix of ['files', 'chunks']) {
       await createCollection(
-        { connectionId: props.target.connectionId, database: props.target.dbName },
+        apiTarget(props.target.resource),
         `${bucket}.${suffix}`,
       )
       // The first collection may succeed even if creating the second fails.
-      invalidateConnectionResources(props.target.connectionId)
+      invalidateConnectionResources(props.target.resource.connectionId)
     }
     showToast(`GridFS bucket "${bucket}" created`)
     emit('close')

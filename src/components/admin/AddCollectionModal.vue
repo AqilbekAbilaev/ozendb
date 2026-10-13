@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { createCollection } from '../../engines/mongodb/api/resources'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -17,7 +18,7 @@ import FlexSpacer from '../base/FlexSpacer.vue'
 // (mirrors 3T's dialog). The per-type field rules live in utils/collectionOptions.js so
 // they stay unit tested; this component only binds inputs and surfaces the error.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connectionId, connectionName, dbName }
+  target: { type: Object, required: true },   // { resource, connectionName }
 })
 const emit = defineEmits(['close'])
 
@@ -46,12 +47,12 @@ async function confirm() {
   error.value = null
   try {
     await createCollection(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
       collection,
       built.options,
     )
     showToast(`Collection "${collection}" created`)
-    invalidateConnectionResources(props.target.connectionId)
+    invalidateConnectionResources(props.target.resource.connectionId)
     emit('close')
   } catch (e) {
     error.value = errText(e)
