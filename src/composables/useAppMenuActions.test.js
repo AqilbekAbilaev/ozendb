@@ -55,6 +55,17 @@ describe('GridFS file actions', () => {
     expect(openModal).toHaveBeenCalledWith('gridfs', { resource: db('c1', 'other'), connectionName: 'Local' })
   })
 
+  // With a collection selected in the sidebar, the menu resolves to that collection;
+  // GridFS belongs to its database.
+  it('opens on the database of a resolved collection', () => {
+    const { handleMenuAction, menuTarget } = actions()
+    menuTarget.mockReturnValue({
+      connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
+    })
+    handleMenuAction('gridfs:add')
+    expect(openModal).toHaveBeenCalledWith('gridfs', { resource: db('c1', 'shop'), connectionName: 'Local' })
+  })
+
   it('keeps the open dialog when it already shows the resolved database', () => {
     openModals.gridfs = { resource: db('c1', 'other') }
     const { handleMenuAction } = actions()
