@@ -273,6 +273,21 @@ describe('feature nodes arrive as a ResourceRef', () => {
     })
   })
 
+  it('opens a connection-level modal with the connection\'s ref and its name', () => {
+    contextMenu.value = ordersRow
+    makeFeatures().handleContextAction('file:server_status')
+    expect(openModal).toHaveBeenCalledWith('serverStatus', {
+      resource: createResourceRef('c1'), connectionName: 'Sales',
+    })
+  })
+
+  it('opens the shared server info modal with its kind and title beside the ref', () => {
+    makeFeatures().runFeature('conn:host_info', createResourceRef('c1'), { connectionName: 'Sales' })
+    expect(openModal).toHaveBeenCalledWith('serverInfo', {
+      resource: createResourceRef('c1'), connectionName: 'Sales', kind: 'host', title: 'Host Info',
+    })
+  })
+
   it('guides the user when the node is too shallow for the action', () => {
     makeFeatures().runFeature('coll:stats', createResourceRef('c1', [{ kind: 'database', name: 'shop' }]))
     expect(openModal).not.toHaveBeenCalled()

@@ -10,7 +10,7 @@ import BaseModal from '../base/BaseModal.vue'
 // Reused for the extra Server Info menu entries (Build Info / Host Info / Replica
 // Set Status). Shows the flat scalar fields as cards and the full document raw.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, kind, title }
+  target: { type: Object, required: true },  // { resource, connectionName, kind, title }
 })
 defineEmits(['close'])
 
@@ -22,7 +22,7 @@ const showRaw = ref(false)
 
 onMounted(async () => {
   try {
-    data.value = await serverInfo(props.target.connectionId, props.target.kind)
+    data.value = await serverInfo(props.target.resource.connectionId, props.target.kind)
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)

@@ -10,7 +10,7 @@ import BaseModalBody from '../base/BaseModalBody.vue'
 // Live server metrics: polls serverStatus on an interval and draws simple SVG
 // sparklines. Reuses the existing server_status command (no new backend).
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 
@@ -36,7 +36,7 @@ function push(key, value) {
 
 async function sample() {
   try {
-    const s = await serverStatus(props.target.connectionId)
+    const s = await serverStatus(props.target.resource.connectionId)
     error.value = null
     const conn = s.connections || {}
     const net = s.network || {}
