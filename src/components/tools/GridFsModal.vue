@@ -18,7 +18,7 @@ import { resourceName } from '../../utils/resourceRef'
 // Top-bar / tree GridFS browser for a database; everything it does lives in
 // useGridfsBrowser.
 const props = defineProps({
-  target: { type: Object, required: true },  // { resource, connectionName, menuRequest? }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 

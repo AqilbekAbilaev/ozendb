@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { createResourceRef } from '../utils/resourceRef'
 
 // The tab store builds its module-scope Quickstart through a definition, so the
@@ -16,6 +17,7 @@ vi.mock('../stores/modals', async (importOriginal) => {
 })
 
 const { openModals, openModal, closeModal } = await import('../stores/modals')
+const { gridfsMenuRequest } = await import('../stores/menuRequests')
 const { useAppMenuActions } = await import('./useAppMenuActions')
 
 function actions() {
@@ -31,6 +33,7 @@ const db = (connectionId, name) => createResourceRef(connectionId, [{ kind: 'dat
 
 beforeEach(() => {
   closeModal('gridfs')
+  gridfsMenuRequest.value = null
   vi.clearAllMocks()
 })
 
@@ -44,8 +47,20 @@ describe('GridFS file actions', () => {
       handleMenuAction(id)
       expect(menuTarget).not.toHaveBeenCalled()
       expect(openModal).not.toHaveBeenCalled()
-      expect(openModals.gridfs).toMatchObject({ resource: db('c1', 'shop'), menuRequest: { action: id } })
+      expect(gridfsMenuRequest.value).toMatchObject({ action: id })
     })
+
+  // #288: AppModals keys each dialog on its payload, so the request must travel through
+  // the menu-request store. A payload that grew a request would remount the dialog and
+  // lose the file the action was aimed at.
+  it.each(['gridfs:view_file', 'gridfs:add'])('%s leaves the dialog payload untouched', async (id) => {
+    openModals.gridfs = { resource: db('c1', 'other') }
+    const { handleMenuAction } = actions()
+    handleMenuAction(id)
+    await nextTick()
+    expect(gridfsMenuRequest.value).toMatchObject({ action: id })
+    expect(openModals.gridfs).toEqual({ resource: db('c1', 'other') })
+  })
 
   it('bucket actions still resolve their database', () => {
     openModals.gridfs = { resource: db('c1', 'shop') }

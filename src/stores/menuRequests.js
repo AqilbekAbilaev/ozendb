@@ -14,6 +14,7 @@ export const savedQueryBrowserRequest = ref(null)   // File → Load
 export const docMenuRequest           = ref(null)   // Document/Collection menu: { action }
 export const refreshRequest           = ref(null)   // View → Refresh: the active tab reloads
 export const indexMenuRequest         = ref(null)   // Index menu: { method, args } for the open Index Manager
+export const gridfsMenuRequest        = ref(null)   // GridFS menu: { action } for the open GridFS dialog
 
 export const requestHistory           = () => signal(historyRequest)
 export const requestSaveQuery         = () => signal(saveQueryRequest)
@@ -21,3 +22,6 @@ export const requestSavedQueryBrowser = () => signal(savedQueryBrowserRequest)
 export const requestDocAction         = (action) => signal(docMenuRequest, { action })
 export const requestRefresh           = () => signal(refreshRequest)
 export const requestIndexAction       = (method, ...args) => signal(indexMenuRequest, { method, args })
+// The GridFS dialog loads lazily, so its request can be made before the dialog exists: it
+// stays here until that dialog takes it (useGridfsBrowser clears it once handled).
+export const requestGridfsAction      = (action) => signal(gridfsMenuRequest, { action })
