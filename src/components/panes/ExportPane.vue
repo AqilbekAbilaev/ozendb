@@ -17,13 +17,9 @@ import { previewCellText } from '../../utils/exportPreview'
 import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT, JSON_VALUE_STYLES } from '../../constants/dataTools'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
-// Stepped Export wizard for a single collection: sample the collection, choose /
-// reorder / rename the fields (optionally coercing a type), pick a format, preview,
-// then run (`export_collection_fields`).
-//
-// This is a workspace tab, not a modal, so the wizard's working state (step, format,
-// field mapping) lives on the tab object — the pane is unmounted whenever the user
-// switches tabs, and local refs would reset the wizard every time.
+// Stepped Export wizard: sample the collection, choose/reorder/rename fields (optionally
+// coercing a type), pick a format, preview, then run (`export_collection_fields`).
+// State lives on the tab object, not local refs, since this pane unmounts on tab switch.
 const props = defineProps({
   activeTab: { type: Object, required: true },
 })
@@ -163,13 +159,9 @@ async function run() {
 
 const isLastStep = computed(() => t.value.step === steps.length - 1)
 
-// What the picker chose, for the banner under the breadcrumb. Shown always — an
-// export that silently covers less than the whole collection is worth stating.
-// CSV and Excel flatten to columns; JSON keeps the document shape. Worth saying out
-// loud next to the field mapping, since that's what changes between them.
+// CSV/XLSX flatten to columns; JSON keeps nesting — worth stating next to the mapping.
 const isTabular = computed(() => t.value.format === 'csv' || t.value.format === 'xlsx')
-// The value-style choice only means anything for JSON — CSV/XLSX already always write
-// plain values, so the control stays hidden rather than offering a no-op setting.
+// The value-style control only means anything for JSON; CSV/XLSX always write plain.
 const isJson = computed(() => t.value.format === 'json')
 
 const sourceLabel = computed(() => {

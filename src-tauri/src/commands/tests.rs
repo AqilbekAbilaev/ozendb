@@ -184,22 +184,13 @@ fn export_json_multi_doc_is_a_valid_json_array() {
 
 #[test]
 fn json_value_style_omitted_writes_byte_identical_output_to_the_old_default() {
-    // Proves the default is unchanged, byte for byte. Before #279, `json_array_element`
-    // had no style argument and always did exactly this:
-    // `serde_json::to_string_pretty(&serde_json::Value::from(bson::Bson::Document(doc)))`,
-    // wrapped as `"[\n" + pretty + "\n]"`. That line is untouched by this change — it is
-    // now one match arm instead of the whole body — so reconstructing it independently
-    // here and comparing against `JsonValueStyle::default()`'s actual output is a direct
-    // check that the default still takes that exact path.
+    // Pinned literal, not a reconstruction of the Extended arm's own expression — this
+    // fails if that output's shape ever changes, not just if the match arm is wrong.
     let oid = bson::oid::ObjectId::parse_str("5f8d0d55b54764421b7156c3").unwrap();
     let dt = bson::DateTime::from_millis(1709802930000);
     let docs = vec![bson::doc! { "_id": oid, "when": dt, "näme": "Łukasz" }];
     let out = docs_to_json_array(&docs, JsonValueStyle::default()).unwrap();
-    let expected_doc = serde_json::to_string_pretty(&serde_json::Value::from(bson::Bson::Document(
-        docs[0].clone(),
-    )))
-    .unwrap();
-    let expected = format!("[\n{}\n]", expected_doc);
+    let expected = "[\n{\n  \"_id\": {\n    \"$oid\": \"5f8d0d55b54764421b7156c3\"\n  },\n  \"when\": {\n    \"$date\": \"2024-03-07T09:15:30Z\"\n  },\n  \"näme\": \"Łukasz\"\n}\n]";
     assert_eq!(out, expected);
 }
 

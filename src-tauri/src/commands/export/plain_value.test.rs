@@ -139,6 +139,16 @@ fn plain_json_recurses_through_an_array_of_sub_documents() {
 }
 
 #[test]
+fn plain_json_keeps_an_out_of_range_date_as_a_date_object_not_a_string() {
+    // Year 10000 can't be RFC 3339 text; Plain JSON must still give a `$date` object,
+    // not that fallback text re-wrapped as a JSON string (escaped JSON-in-a-string).
+    let dt = bson::DateTime::from_millis(253_402_300_800_000);
+    let value = bson_to_plain_json(&bson::Bson::DateTime(dt));
+    assert!(value.is_object(), "expected a $date object, got {value}");
+    assert!(value.get("$date").is_some(), "expected a $date object, got {value}");
+}
+
+#[test]
 fn plain_json_falls_back_to_extended_json_for_a_type_with_no_plain_form() {
     // Regex has no flat/plain decision — same bucket as `bson_to_plain_cell`'s fallback.
     let regex = bson::Regex { pattern: "^jo".to_string(), options: "i".to_string() };

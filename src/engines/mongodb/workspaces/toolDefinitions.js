@@ -1,19 +1,13 @@
 // MongoDB tool workspace definitions: indexes, schema, search, import, export, and
-// current operations. Same contract as the query definitions — fresh flat legacy
-// fields, canonical envelope owned by the generic factory. Their duplicate/restore
-// hooks clone the durable configuration (import sources, export mapping, ops settings)
-// and reset the runtime previews/rows.
+// current operations. Same contract as the query definitions. duplicate/restore clone
+// the durable configuration (sources, mapping, ops settings) and reset runtime state.
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
 import { IndexManagerPane, SchemaPane, SearchPane, CurrentOpsPane, ImportPane, CsvImportPane, ExportPane } from './panes'
 
-// A tool workspace's identity fields, in the same long spelling collection and shell
-// workspaces use — so a pane reading `activeTab.collectionName` does not have to know
-// which kind of tab it is looking at.
-//
-// Reads either spelling because its callers differ: `create` is handed a feature node
-// (still short — see #193), while `duplicate` and `restore` are handed a workspace
-// or saved record, which are long.
+// A tool workspace's identity fields, in the long spelling collection/shell workspaces
+// use. Reads either spelling: `create` gets a feature node (still short, #193), while
+// `duplicate`/`restore` get a workspace or saved record, which are long.
 function toolTarget(source) {
   return {
     connectionId: source.connectionId ?? source.connId ?? null,

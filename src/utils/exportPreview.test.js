@@ -79,6 +79,11 @@ describe('plainJsonValue', () => {
     expect(value).toEqual({ café: { who: '5f8d0d55b54764421b7156c3' } })
   })
 
+  it('keeps an unparseable date as a $date object, not a string of escaped JSON', () => {
+    const value = plainJsonValue({ $date: { $numberLong: 'not a number' } })
+    expect(value).toEqual({ $date: { $numberLong: 'not a number' } })
+  })
+
   it('recurses through an array of sub-documents, unwrapping an id and a date in each', () => {
     const value = plainJsonValue([
       { id: { $oid: '5f8d0d55b54764421b7156c3' }, at: { $date: '2024-03-07T09:15:30.000Z' } },
