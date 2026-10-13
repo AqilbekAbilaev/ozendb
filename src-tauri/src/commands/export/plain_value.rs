@@ -1,5 +1,19 @@
 use crate::error::AppError;
 use mongodb::bson;
+use serde::Deserialize;
+
+// How a JSON export renders ObjectId/DateTime/Decimal128: `Extended` keeps them wrapped
+// (`{"$oid": …}`, …) — what `mongoexport` writes, and what lets a file round-trip back
+// in with its types intact — while `Plain` unwraps them to the text a user would have
+// typed. `Extended` is the default so an older frontend call (or a request that omits
+// the field entirely) can't silently change output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum JsonValueStyle {
+    #[default]
+    Extended,
+    Plain,
+}
 
 // Render a single BSON value as a flat plain-text cell — the form a CSV cell takes,
 // and what an XLSX cell falls back to for anything that isn't a native Excel type (see
@@ -20,20 +34,40 @@ pub(crate) fn bson_to_plain_cell(value: &bson::Bson) -> String {
         bson::Bson::Null => String::new(),
         bson::Bson::ObjectId(val) => val.to_hex(),
         bson::Bson::Decimal128(val) => val.to_string(),
-        bson::Bson::DateTime(val) => plain_datetime_text(*val),
+        bson::Bson::DateTime(val) => plain_datetime_text(*val)
+            .unwrap_or_else(|| serde_json::Value::from(bson::Bson::DateTime(*val)).to_string()),
         other => serde_json::Value::from(other.clone()).to_string(),
     }
 }
 
-// DateTime -> ISO-8601 text. `try_to_rfc3339_string` fails for a date outside the
-// four-digit-year range RFC 3339 can express (BSON's DateTime covers a much wider i64
-// millisecond range than that) — fall back to Extended JSON for that one cell rather
-// than losing the whole export over a single out-of-range date.
-fn plain_datetime_text(value: bson::DateTime) -> String {
-    match value.try_to_rfc3339_string() {
-        Ok(text) => text,
-        Err(_) => serde_json::Value::from(bson::Bson::DateTime(value)).to_string(),
+// Recursive sibling of `bson_to_plain_cell`: Document/Array stay real structure
+// (recursed into, not stringified), and an out-of-range date keeps its `$date` object
+// rather than the flat renderer's text fallback — a JSON file must not hold a string of
+// escaped JSON.
+pub(crate) fn bson_to_plain_json(value: &bson::Bson) -> serde_json::Value {
+    match value {
+        bson::Bson::ObjectId(val) => serde_json::Value::String(val.to_hex()),
+        // Stays a string, not a number: JSON numbers are IEEE-754 doubles, which would
+        // lose exactly the precision Decimal128 exists to preserve.
+        bson::Bson::Decimal128(val) => serde_json::Value::String(val.to_string()),
+        bson::Bson::DateTime(val) => match plain_datetime_text(*val) {
+            Some(text) => serde_json::Value::String(text),
+            None => serde_json::Value::from(bson::Bson::DateTime(*val)),
+        },
+        bson::Bson::Document(doc) => serde_json::Value::Object(
+            doc.iter().map(|(key, val)| (key.clone(), bson_to_plain_json(val))).collect(),
+        ),
+        bson::Bson::Array(items) => {
+            serde_json::Value::Array(items.iter().map(bson_to_plain_json).collect())
+        }
+        other => serde_json::Value::from(other.clone()),
     }
+}
+
+// DateTime -> ISO-8601 text, or `None` for a date outside the four-digit-year range
+// RFC 3339 can express — each caller picks its own fallback for that one value.
+fn plain_datetime_text(value: bson::DateTime) -> Option<String> {
+    value.try_to_rfc3339_string().ok()
 }
 
 // bson::DateTime stores milliseconds; rust_xlsxwriter's ExcelDateTime::from_timestamp

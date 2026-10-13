@@ -23,6 +23,15 @@ export const EXPORT_FORMATS = [
   { value: 'xlsx', label: 'Excel (.xlsx)' },
 ]
 
+// How a JSON export renders ObjectId/Date/Decimal128 values. CSV and XLSX always write
+// plain values already, so this choice only applies to the JSON format. Extended is the
+// default: it's what mongoexport writes, and what keeps the file re-importable with its
+// types intact — see issue #279.
+export const JSON_VALUE_STYLES = [
+  { value: 'extended', label: 'Extended JSON (keeps types, re-importable)' },
+  { value: 'plain', label: 'Plain JSON' },
+]
+
 // How an import writes its documents. One option today; the dropdown exists so
 // upsert/replace can be added without reworking the UI.
 export const INSERT_MODES = [

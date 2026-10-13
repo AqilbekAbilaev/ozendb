@@ -32,6 +32,19 @@ describe('exportCollection', () => {
       format:     'json',
     })
   })
+
+  it('passes the json value style when given', async () => {
+    invoke.mockResolvedValue(null)
+    await exportCollection(target, '/tmp/users.json', 'json', { jsonStyle: 'plain' })
+    expect(invoke).toHaveBeenCalledWith('export_collection', {
+      id:         'connection-1',
+      database:   'app',
+      collection: 'users',
+      path:       '/tmp/users.json',
+      format:     'json',
+      jsonStyle:  'plain',
+    })
+  })
 })
 
 describe('exportCollectionFields', () => {
@@ -61,6 +74,20 @@ describe('exportCollectionFields', () => {
       path:       '/tmp/users.csv',
       format:     'csv',
       fields:     [],
+    })
+  })
+
+  it('passes the json value style when given', async () => {
+    invoke.mockResolvedValue(3)
+    await exportCollectionFields(target, '/tmp/users.json', 'json', [], { jsonStyle: 'plain' })
+    expect(invoke).toHaveBeenCalledWith('export_collection_fields', {
+      id:         'connection-1',
+      database:   'app',
+      collection: 'users',
+      path:       '/tmp/users.json',
+      format:     'json',
+      fields:     [],
+      jsonStyle:  'plain',
     })
   })
 })

@@ -46,8 +46,15 @@ fn csv_format_row(headers: &[String], doc: &bson::Document) -> String {
 // separator for its position (the first element has none). Shared by the
 // streaming exporter and the test-only `docs_to_json_array`, so the streamed and
 // the tested output are byte-identical.
-fn json_array_element(doc: &bson::Document, first: bool) -> Result<String, AppError> {
-    let value = serde_json::Value::from(bson::Bson::Document(doc.clone()));
+fn json_array_element(
+    doc: &bson::Document,
+    first: bool,
+    style: JsonValueStyle,
+) -> Result<String, AppError> {
+    let value = match style {
+        JsonValueStyle::Extended => serde_json::Value::from(bson::Bson::Document(doc.clone())),
+        JsonValueStyle::Plain => bson_to_plain_json(&bson::Bson::Document(doc.clone())),
+    };
     let pretty = match serde_json::to_string_pretty(&value) {
         Ok(val) => val,
         Err(e) => return Err(AppError::Serde(e)),
@@ -78,10 +85,13 @@ pub(crate) fn docs_to_csv(docs: &[bson::Document]) -> String {
 }
 
 #[cfg(test)]
-pub(crate) fn docs_to_json_array(docs: &[bson::Document]) -> Result<String, AppError> {
+pub(crate) fn docs_to_json_array(
+    docs: &[bson::Document],
+    style: JsonValueStyle,
+) -> Result<String, AppError> {
     let mut out = String::from("[");
     for (index, doc) in docs.iter().enumerate() {
-        let element = json_array_element(doc, index == 0)?;
+        let element = json_array_element(doc, index == 0, style)?;
         out.push_str(&element);
     }
     if !docs.is_empty() {
@@ -135,6 +145,9 @@ async fn export_cursor(
 /// rows) — this assumes the collection isn't mutated between the passes.
 /// `transform` runs in both CSV passes because a rule can drop a key, which must
 /// be reflected in the header union.
+///
+/// `json_style` only matters for the JSON branch — CSV and XLSX already always write
+/// plain values via `bson_to_plain_cell` / `xlsx_write_cell`, independent of this choice.
 pub(crate) async fn stream_export<F>(
     col: &Collection<bson::Document>,
     filter: bson::Document,
@@ -142,6 +155,7 @@ pub(crate) async fn stream_export<F>(
     max_time: Option<Duration>,
     path: &str,
     format: &str,
+    json_style: JsonValueStyle,
     mut transform: F,
 ) -> Result<usize, AppError>
 where
@@ -183,7 +197,7 @@ where
             Ok(_) => {}
             Err(e) => return Err(e),
         }
-        let element = match json_array_element(&doc, count == 0) {
+        let element = match json_array_element(&doc, count == 0, json_style) {
             Ok(val) => val,
             Err(e) => return Err(e),
         };

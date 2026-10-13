@@ -111,6 +111,7 @@ describe('mongodb.export', () => {
     expect(created.fields.step).toBe(0)
     expect(created.fields.format).toBe('json')
     expect(created.fields.incremental).toBe(false)
+    expect(created.fields.jsonStyle).toBe('extended')
     expect(created.fields.fields).toEqual([])
     expect(created.fields.result).toBe(null)
     expectCollectionDepth(created)
@@ -227,11 +228,11 @@ describe('lifecycle — tools', () => {
     expect(dup.runtime).toEqual({ running: false, error: null, errorCode: null, done: null })
   })
 
-  it('export duplicate persists mapping and filter but clears the result banner', () => {
+  it('export duplicate persists mapping, filter and json value style but clears the result banner', () => {
     const dup = duplicateWorkspace({
       id: 'e', type: 'mongodb.export', kind: 'export', title: 'Export: orders',
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders',
-      step: 2, format: 'csv', incremental: true, source: 'query',
+      step: 2, format: 'csv', incremental: true, jsonStyle: 'plain', source: 'query',
       sourceCount: 5, filter: '{ "a": 1 }',
       fields: [{ source: 'a', target: 'b', kind: 'string', include: true }],
       result: { count: 3, path: '/tmp/x.csv' },
@@ -239,8 +240,18 @@ describe('lifecycle — tools', () => {
     expect(dup.filter).toBe('{ "a": 1 }')
     expect(dup.source).toBe('query')
     expect(dup.sourceCount).toBe(5)
+    expect(dup.jsonStyle).toBe('plain')
     expect(dup.fields).toEqual([{ source: 'a', target: 'b', kind: 'string', include: true }])
     expect(dup.result).toBe(null)
+  })
+
+  it('export duplicate defaults the json value style to extended when the source tab has none', () => {
+    const dup = duplicateWorkspace({
+      id: 'e', type: 'mongodb.export', kind: 'export', title: 'Export: orders',
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders',
+      format: 'json', source: 'collection', filter: '{}', fields: [],
+    })
+    expect(dup.jsonStyle).toBe('extended')
   })
 
   it('current operations duplicate clones settings over fresh defaults', () => {
@@ -295,17 +306,27 @@ describe('lifecycle — tool restore', () => {
     expect(tab.runtime).toEqual({ running: false, error: null, errorCode: null, done: null })
   })
 
-  it('export restore keeps the mapping but clears the run result', () => {
+  it('export restore keeps the mapping and json value style but clears the run result', () => {
     const tab = restoreWorkspace({
       id: 'e', kind: 'export', title: 'Export: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
-      step: 1, format: 'csv', incremental: true, source: 'collection',
+      step: 1, format: 'csv', incremental: true, jsonStyle: 'plain', source: 'collection',
       sourceCount: null, filter: '{ "a": 1 }',
       fields: [{ source: 'a', target: 'b', kind: 'string', include: true }],
     })
     expect(tab.filter).toBe('{ "a": 1 }')
     expect(tab.fields).toHaveLength(1)
+    expect(tab.jsonStyle).toBe('plain')
     expect(tab.result).toBe(null)
+  })
+
+  it('export restore defaults the json value style to extended for a session saved before #279', () => {
+    const tab = restoreWorkspace({
+      id: 'e', kind: 'export', title: 'Export: orders', color: null,
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+      format: 'json', source: 'collection', filter: '{}', fields: [],
+    })
+    expect(tab.jsonStyle).toBe('extended')
   })
 
   it('current operations restore settings over fresh defaults', () => {

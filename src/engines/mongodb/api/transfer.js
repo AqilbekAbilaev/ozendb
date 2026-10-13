@@ -6,14 +6,17 @@
 import { invoke } from '@tauri-apps/api/core'
 import { collectionPayload } from './payload'
 
-export function exportCollection(target, path, format) {
-  return invoke('export_collection', collectionPayload(target, { path, format }))
+export function exportCollection(target, path, format, options = {}) {
+  const extra = { path, format }
+  if (options.jsonStyle !== undefined) extra.jsonStyle = options.jsonStyle
+  return invoke('export_collection', collectionPayload(target, extra))
 }
 
 export function exportCollectionFields(target, path, format, fields, options = {}) {
   const extra = { path, format, fields }
   if (options.incremental !== undefined) extra.incremental = options.incremental
   if (options.filter !== undefined) extra.filter = options.filter
+  if (options.jsonStyle !== undefined) extra.jsonStyle = options.jsonStyle
   return invoke('export_collection_fields', collectionPayload(target, extra))
 }
 

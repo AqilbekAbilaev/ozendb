@@ -246,7 +246,7 @@ describe('toLegacyRecord bridge', () => {
     'mongodb.schema': [],
     'mongodb.search': [],
     'mongodb.import': [],
-    'mongodb.export': ['step', 'format', 'incremental', 'source', 'sourceCount', 'filter', 'fields'],
+    'mongodb.export': ['step', 'format', 'incremental', 'jsonStyle', 'source', 'sourceCount', 'filter', 'fields'],
     'mongodb.current_operations': ['frequency', 'retention', 'ownOnly', 'showSys', 'slowOnly', 'slowSecs', 'dbName', 'collName', 'view'],
   }
 
