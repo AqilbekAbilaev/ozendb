@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { duplicateCollection } from '../../engines/mongodb/api/transfer'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -8,24 +9,26 @@ import FieldError from '../base/FieldError.vue'
 import { errText } from '../../utils/errors'
 import { showToast } from '../../stores/toast'
 import { invalidateConnectionResources } from '../../stores/connectionData'
+import { resourceName } from '../../utils/resourceRef'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Collection → Duplicate Collection…: copies every document into a new collection in the
 // same database, prefilled with a "_copy" suffix. The backend returns the copied count.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connectionId, connectionName, dbName, collectionName }
+  target: { type: Object, required: true },   // { resource, connectionName }
 })
 const emit = defineEmits(['close'])
 
 
-const name = ref(props.target.collectionName + '_copy')
+const current = props.target.resource
+const name = ref(resourceName(current) + '_copy')
 const error = ref(null)
 const saving = ref(false)
 
 // Duplicating onto itself would fail server-side, so the button waits for a new name.
 const valid = computed(() => {
   const next = name.value.trim()
-  return !!next && next !== props.target.collectionName
+  return !!next && next !== resourceName(current)
 })
 
 async function confirm() {
@@ -34,12 +37,9 @@ async function confirm() {
   saving.value = true
   error.value = null
   try {
-    const count = await duplicateCollection(
-      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
-      targetName,
-    )
+    const count = await duplicateCollection(apiTarget(current), targetName)
     showToast(`Copied ${count} document${count === 1 ? '' : 's'} to "${targetName}"`)
-    invalidateConnectionResources(props.target.connectionId)
+    invalidateConnectionResources(current.connectionId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

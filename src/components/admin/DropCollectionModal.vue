@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { dropCollection } from '../../engines/mongodb/api/resources'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
@@ -10,13 +11,13 @@ import { invalidateConnectionResources } from '../../stores/connectionData'
 import { closeWhere } from '../../stores/tabs'
 import { clearTreeSelectionUnder } from '../../stores/connectionNavigation'
 import { affectedByResource } from '../../workspaces/lifecycle'
-import { createResourceRef } from '../../utils/resourceRef'
+import { resourceName } from '../../utils/resourceRef'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Collection → Drop Collection…: destructive, so it confirms first. Dropping also closes
 // any open tab on that collection, which would otherwise query something gone.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connectionId, connectionName, dbName, collectionName }
+  target: { type: Object, required: true },   // { resource, connectionName }
 })
 const emit = defineEmits(['close'])
 
@@ -28,22 +29,15 @@ async function confirm() {
   if (deleting.value) return
   deleting.value = true
   error.value = null
+  const dropped = props.target.resource
   try {
-    await dropCollection({
-      connectionId: props.target.connectionId,
-      database:     props.target.dbName,
-      collection:   props.target.collectionName,
-    })
-    invalidateConnectionResources(props.target.connectionId)
+    await dropCollection(apiTarget(dropped))
+    invalidateConnectionResources(dropped.connectionId)
     // Containment closes every tab scoped into the dropped collection (find/aggregate/
     // SQL/import/export/indexes/schema), and only those. closeTab runs disposal.
-    const dropped = createResourceRef(props.target.connectionId, [
-      { kind: 'database', name: props.target.dbName },
-      { kind: 'collection', name: props.target.collectionName },
-    ])
     closeWhere(affectedByResource(dropped))
     clearTreeSelectionUnder(dropped)
-    showToast(`Collection "${props.target.collectionName}" dropped`)
+    showToast(`Collection "${resourceName(dropped)}" dropped`)
     emit('close')
   } catch (e) {
     error.value = errText(e)
@@ -56,7 +50,7 @@ async function confirm() {
 <template>
   <BaseModal title="Drop Collection" @close="emit('close')">
     <div class="del-body">
-      <p>Are you sure you want to drop "<strong>{{ target.collectionName }}</strong>"? This deletes all of its documents and cannot be undone.</p>
+      <p>Are you sure you want to drop "<strong>{{ resourceName(target.resource) }}</strong>"? This deletes all of its documents and cannot be undone.</p>
       <FieldError :text="error" spaced />
     </div>
     <div class="del-footer">

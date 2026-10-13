@@ -1,7 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 import { mapReduce } from '../../engines/mongodb/api/queries'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { errText } from '../../utils/errors'
+import { resourceName } from '../../utils/resourceRef'
 import { invalidateConnectionResources } from '../../stores/connectionData'
 import BaseModal from '../base/BaseModal.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
@@ -15,7 +17,7 @@ import FormField from '../base/FormField.vue'
 // Open Map-Reduce for a collection: enter map / reduce / (optional) finalize JS and
 // an output collection (blank = inline), run mapReduce, and show the raw result.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, collectionName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 
@@ -28,14 +30,14 @@ const error = ref(null)
 const result = ref(null)
 
 async function run() {
-  const connectionId = props.target.connectionId
+  const connectionId = props.target.resource.connectionId
   const output = outCollection.value
   running.value = true
   error.value = null
   result.value = null
   try {
     result.value = await mapReduce(
-      { connectionId, database: props.target.dbName, collection: props.target.collectionName },
+      apiTarget(props.target.resource),
       {
         map:          map.value,
         reduce:       reduce.value,
@@ -55,7 +57,7 @@ const resultJson = () => (result.value ? JSON.stringify(result.value, null, 2) :
 </script>
 
 <template>
-  <BaseModal :title="`Map-Reduce — ${target.collectionName}`" width="640px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Map-Reduce — ${resourceName(target.resource)}`" width="640px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <div class="mr-body">
