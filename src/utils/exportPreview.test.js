@@ -63,8 +63,10 @@ describe('plainJsonValue', () => {
   })
 
   it('unwraps both date shapes to ISO text', () => {
+    // The plain-string shape (1970-9999, bson's own ISO text) passes through unchanged;
+    // the canonical $numberLong shape gets its all-zero fraction trimmed to match the file.
     expect(plainJsonValue({ $date: '2024-03-07T09:15:30.000Z' })).toBe('2024-03-07T09:15:30.000Z')
-    expect(plainJsonValue({ $date: { $numberLong: '1709802930000' } })).toBe('2024-03-07T09:15:30.000Z')
+    expect(plainJsonValue({ $date: { $numberLong: '1709802930000' } })).toBe('2024-03-07T09:15:30Z')
   })
 
   it('keeps scalars, null and arrays of scalars unchanged', () => {
@@ -105,10 +107,31 @@ describe('plainCellText', () => {
     expect(plainCellText({ $date: '2024-03-07T09:15:30.000Z' })).toBe('2024-03-07T09:15:30.000Z')
   })
 
-  it('renders a canonical nested $numberLong date as ISO text', () => {
+  it('renders a canonical nested $numberLong date as ISO text, trimming the all-zero fraction', () => {
     // 1709802930000 ms = 2024-03-07T09:15:30.000Z — the canonical shape used for
-    // dates outside the range a plain ISO string round-trips safely.
-    expect(plainCellText({ $date: { $numberLong: '1709802930000' } })).toBe('2024-03-07T09:15:30.000Z')
+    // dates outside the range a plain ISO string round-trips safely. The file's
+    // try_to_rfc3339_string drops an all-zero fraction entirely, so the preview must too.
+    expect(plainCellText({ $date: { $numberLong: '1709802930000' } })).toBe('2024-03-07T09:15:30Z')
+  })
+
+  it('trims a $numberLong date\'s fractional milliseconds to match the file, not toISOString\'s fixed 3 digits', () => {
+    // A pre-1970 date (1965) with 550ms: the file writes "…06.55Z" (trailing zero
+    // trimmed); toISOString() alone would give "…06.550Z", which disagrees.
+    expect(plainCellText({ $date: { $numberLong: '-157766393450' } })).toBe('1965-01-01T00:00:06.55Z')
+  })
+
+  it('falls back to Extended JSON outside the four-digit RFC 3339 year range (year 10000)', () => {
+    // bson's try_to_rfc3339_string fails for year 10000, so the file falls back to a
+    // $date object; the preview must take the same fallback instead of showing the
+    // non-RFC-3339 string JS's toISOString() happily produces for it.
+    const wrapped = { $date: { $numberLong: '253402300800000' } }
+    expect(plainCellText(wrapped)).toBe(JSON.stringify(wrapped))
+  })
+
+  it('falls back to Extended JSON for a negative year', () => {
+    // -62198755200000 ms is 0000-12-31, i.e. year -1 — outside RFC 3339's 0-9999.
+    const wrapped = { $date: { $numberLong: '-62198755200000' } }
+    expect(plainCellText(wrapped)).toBe(JSON.stringify(wrapped))
   })
 
   it('falls back to extended JSON for an unparseable date', () => {

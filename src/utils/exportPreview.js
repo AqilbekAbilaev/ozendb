@@ -31,10 +31,8 @@ function isDateWrapper(value) {
   return keys.length === 1 && keys[0] === '$date'
 }
 
-// Renders a previewed value the way CSV/XLSX now write it (ObjectId as hex, dates as
-// ISO text, …) instead of `cellText`'s Extended JSON. Values here are already relaxed
-// EJSON (plain JS objects from across the Tauri boundary, not BSON). Not recursive —
-// a CSV/XLSX cell has no nested structure to preserve, matching `bson_to_plain_cell`.
+// Mirrors `bson_to_plain_cell`. Values here are already relaxed EJSON (plain JS
+// objects, not BSON); not recursive, since a flat cell has no nested structure.
 export function plainCellText(value) {
   if (value === null || value === undefined) return ''
   if (typeof value !== 'object') return String(value)
@@ -42,10 +40,9 @@ export function plainCellText(value) {
   return wrapped !== undefined ? wrapped : JSON.stringify(value)
 }
 
-// Recursive sibling of `plainCellText`, mirroring `bson_to_plain_json` on the Rust
-// side: a plain object or array stays real structure instead of being stringified. An
-// unparseable `$date` keeps its original object rather than recursing into it, so the
-// output still reads as Extended JSON for that one value — not a flattened mismatch.
+// Mirrors `bson_to_plain_json`: a plain object or array stays real structure. An
+// unparseable `$date` keeps its original object, so that one value still reads as
+// Extended JSON rather than a flattened mismatch.
 export function plainJsonValue(value) {
   if (value === null || value === undefined) return null
   if (Array.isArray(value)) return value.map(plainJsonValue)
@@ -58,14 +55,29 @@ export function plainJsonValue(value) {
   return out
 }
 
-// `$date`'s value is either a relaxed ISO string or the canonical
-// `{ $numberLong: "<epoch ms>" }` form used outside that range. Returns `undefined`
-// when unparseable so each caller (flat vs. recursive) picks its own fallback.
+// `$date`'s value is either a relaxed ISO string (1970-9999, passed through unchanged —
+// it already matches the file) or the canonical `{ $numberLong: "<epoch ms>" }` form used
+// outside that range. Returns `undefined` when unparseable, or when the year falls
+// outside what `try_to_rfc3339_string` on the Rust side can render (0-9999), so each
+// caller (flat vs. recursive) takes its own existing Extended JSON fallback.
 function plainDateText(date) {
   if (typeof date === 'string') return date
   if (date && typeof date === 'object' && '$numberLong' in date) {
     const parsed = new Date(Number(date.$numberLong))
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString()
+    if (Number.isNaN(parsed.getTime())) return undefined
+    const year = parsed.getUTCFullYear()
+    if (year < 0 || year > 9999) return undefined
+    return trimFractionalZeros(parsed.toISOString())
   }
   return undefined
+}
+
+// `toISOString()` always emits exactly three fractional digits; the file's
+// `try_to_rfc3339_string` trims trailing zeros, dropping the fraction entirely when it's
+// all zero. Matches that so a 1965 date with 550ms (or 0ms) agrees with the file.
+function trimFractionalZeros(iso) {
+  return iso.replace(/\.(\d+)Z$/, (_, fraction) => {
+    const trimmed = fraction.replace(/0+$/, '')
+    return trimmed ? `.${trimmed}Z` : 'Z'
+  })
 }

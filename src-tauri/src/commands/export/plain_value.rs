@@ -16,15 +16,10 @@ pub(crate) enum JsonValueStyle {
     Plain,
 }
 
-// Render a single BSON value as a flat plain-text cell — the form a CSV cell takes,
-// and what an XLSX cell falls back to for anything that isn't a native Excel type (see
-// `excel_datetime` for the one BSON type, DateTime, that gets a real typed cell instead).
-// ObjectId becomes hex and Decimal128 its number text, matching what a user typing the
-// same value would have written — not Extended JSON's `{"$oid": …}` / `{"$numberDecimal":
-// …}` wrappers. Null is blank. Documents, arrays, Binary, Timestamp and the rest have no
-// flat text form at all — a document or array nested in one cell is still nested data, so
-// JSON is a defensible rendering, while a wrapper around a single scalar (ObjectId,
-// Decimal128, DateTime) is not, which is why those three get their own arms here.
+// Render a single BSON value as a flat plain-text cell (CSV, and XLSX's fallback for
+// anything that isn't a native Excel type). ObjectId/Decimal128/DateTime become the text
+// a user would have typed, not Extended JSON's wrapper; Null is blank; anything with no
+// flat form (Document, Array, …) falls back to Extended JSON.
 pub(crate) fn bson_to_plain_cell(value: &bson::Bson) -> String {
     match value {
         bson::Bson::String(val) => val.clone(),
@@ -72,14 +67,14 @@ fn plain_datetime_text(value: bson::DateTime) -> Option<String> {
 }
 
 // bson::DateTime stores milliseconds; rust_xlsxwriter's ExcelDateTime::from_timestamp
-// takes Unix seconds, so this drops sub-second precision — acceptable for a spreadsheet
-// cell, where no format shows milliseconds anyway. Returns the library's own
-// `DateTimeRangeError` when the date falls outside Excel's representable 1900-9999
-// range; the caller falls back to `bson_to_plain_cell`'s ISO text for that cell.
+// takes Unix seconds. `div_euclid` floors toward negative infinity (unlike `/`, which
+// truncates toward zero and so rounds a pre-1970 timestamp's seconds up). Returns the
+// library's own `DateTimeRangeError` when the date falls outside Excel's representable
+// 1900-9999 range; the caller falls back to `bson_to_plain_cell`'s ISO text for that cell.
 pub(crate) fn excel_datetime(
     value: bson::DateTime,
 ) -> Result<rust_xlsxwriter::ExcelDateTime, rust_xlsxwriter::XlsxError> {
-    rust_xlsxwriter::ExcelDateTime::from_timestamp(value.timestamp_millis() / 1000)
+    rust_xlsxwriter::ExcelDateTime::from_timestamp(value.timestamp_millis().div_euclid(1000))
 }
 
 // A file-writing failure from rust_xlsxwriter isn't user input, so report it as I/O.
@@ -94,9 +89,34 @@ pub(crate) fn xlsx_date_format() -> rust_xlsxwriter::Format {
     rust_xlsxwriter::Format::new().set_num_format("yyyy-mm-dd hh:mm:ss")
 }
 
-// Write one BSON value into a worksheet cell, using a native Excel type where it maps
-// cleanly (numbers, booleans, dates) and the plain text form for everything else.
-// `Null` is left as a blank cell.
+// The native Excel cell shape a BSON value decides on, independent of actually writing
+// it — a date in Excel's 1900-9999 range gets a typed cell, one outside it falls back to
+// the same ISO text the CSV/JSON exports use, so a bad export never aborts.
+pub(crate) enum XlsxCell {
+    Number(f64),
+    Bool(bool),
+    Date(rust_xlsxwriter::ExcelDateTime),
+    Text(String),
+    Blank,
+}
+
+pub(crate) fn xlsx_cell(value: &bson::Bson) -> XlsxCell {
+    match value {
+        bson::Bson::Null => XlsxCell::Blank,
+        bson::Bson::Boolean(val) => XlsxCell::Bool(*val),
+        bson::Bson::Int32(val) => XlsxCell::Number(*val as f64),
+        bson::Bson::Int64(val) => XlsxCell::Number(*val as f64),
+        bson::Bson::Double(val) => XlsxCell::Number(*val),
+        bson::Bson::DateTime(val) => match excel_datetime(*val) {
+            Ok(excel_date) => XlsxCell::Date(excel_date),
+            Err(_) => XlsxCell::Text(bson_to_plain_cell(value)),
+        },
+        other => XlsxCell::Text(bson_to_plain_cell(other)),
+    }
+}
+
+// Write one BSON value into a worksheet cell: a thin match over `xlsx_cell`'s decision,
+// with no logic of its own.
 pub(crate) fn xlsx_write_cell(
     worksheet: &mut rust_xlsxwriter::Worksheet,
     row: u32,
@@ -104,36 +124,12 @@ pub(crate) fn xlsx_write_cell(
     value: &bson::Bson,
     date_format: &rust_xlsxwriter::Format,
 ) -> Result<(), AppError> {
-    if let bson::Bson::DateTime(val) = value {
-        return xlsx_write_datetime(worksheet, row, col, *val, date_format);
-    }
-    let result = match value {
-        bson::Bson::Null => return Ok(()),
-        bson::Bson::Boolean(val) => worksheet.write_boolean(row, col, *val),
-        bson::Bson::Int32(val) => worksheet.write_number(row, col, *val as f64),
-        bson::Bson::Int64(val) => worksheet.write_number(row, col, *val as f64),
-        bson::Bson::Double(val) => worksheet.write_number(row, col, *val),
-        other => worksheet.write_string(row, col, bson_to_plain_cell(other)),
-    };
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(xlsx_error(e)),
-    }
-}
-
-// A date Excel cannot represent (outside its 1900-9999 year range) must not abort the
-// whole export — write that one cell as the same ISO text the CSV/JSON exports use
-// instead of propagating the error.
-fn xlsx_write_datetime(
-    worksheet: &mut rust_xlsxwriter::Worksheet,
-    row: u32,
-    col: u16,
-    value: bson::DateTime,
-    date_format: &rust_xlsxwriter::Format,
-) -> Result<(), AppError> {
-    let result = match excel_datetime(value) {
-        Ok(excel_date) => worksheet.write_datetime_with_format(row, col, &excel_date, date_format),
-        Err(_) => worksheet.write_string(row, col, bson_to_plain_cell(&bson::Bson::DateTime(value))),
+    let result = match xlsx_cell(value) {
+        XlsxCell::Blank => return Ok(()),
+        XlsxCell::Bool(val) => worksheet.write_boolean(row, col, val),
+        XlsxCell::Number(val) => worksheet.write_number(row, col, val),
+        XlsxCell::Date(val) => worksheet.write_datetime_with_format(row, col, &val, date_format),
+        XlsxCell::Text(val) => worksheet.write_string(row, col, val),
     };
     match result {
         Ok(_) => Ok(()),
