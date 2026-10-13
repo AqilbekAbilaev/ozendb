@@ -15,7 +15,8 @@ import { MODALS } from '../constants/modalRegistry'
 import { COLOR_ACTION } from '../constants/contextMenus'
 import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
-import { createResourceRef } from '../utils/resourceRef'
+import { createResourceRef, resourceKind, resourceName } from '../utils/resourceRef'
+import { resourceFromFeatureNode, resourceFromTreeSelection } from '../utils/legacyResourceRef'
 import { resolveMenuTarget } from '../utils/menuContext'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
@@ -27,8 +28,10 @@ import { runPgTool } from '../engines/postgresql/toolbarActions'
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
 // handleContextAction) and the toolbar (@tool → handleTool). Every action is
-// described once in FEATURES: the node level it needs and what it does. A "node"
-// here is the normalized shape { connId, connName, dbName, collName }.
+// described once in FEATURES: the node level it needs and what it does. A handler
+// receives the node as a ResourceRef plus a `ctx` carrying its presentation — the
+// connection's display name and the clicked row's label — which a ref never holds.
+// Each entry point converts its own shape into a ref once, on the way in.
 //
 // Dependencies are injected so this stays UI-agnostic and testable: `dbActions` is the
 // sibling composable API; the rest are shared refs and the tab creators, which remain in
@@ -48,9 +51,8 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   const { applyColorTag } = useNodeTags()
   const { openImportWizard, exportDatabase, importDatabase } = useDbTransfer()
 
-  const CONN = ['connId', 'connName']
-  const DB   = ['connId', 'connName', 'dbName']
-  const COLL = ['connId', 'connName', 'dbName', 'collName']
+  // How many segments each level's resource has.
+  const DEPTH = { connection: 0, database: 1, collection: 2 }
 
   // Toolbar tool name → registry action. Tools whose behavior is app-level
   // (connect/sql) or bespoke (collection/shell) are handled in handleTool.
@@ -62,67 +64,58 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     search:    'file:search',
   }
 
-  function pick(node, fields) {
-    const out = {}
-    for (const field of fields) out[field] = node[field]
-    return out
+  // The node's resource cut to `level` — a database action run on a collection row acts
+  // on that row's database — in the long alias spelling the tab creators and modals
+  // read. Only the fields the level names are present.
+  function target(ref, ctx, level) {
+    const [database, collection] = ref.segments
+    return {
+      connectionId: ref.connectionId,
+      connectionName: ctx.connectionName,
+      ...(DEPTH[level] >= DEPTH.database ? { dbName: database.name } : {}),
+      ...(DEPTH[level] >= DEPTH.collection ? { collectionName: collection.name } : {}),
+    }
+  }
+
+  // The same, in the short alias spelling the tool tabs, the transfer wizards and the
+  // clipboard still read. It goes when those take a ResourceRef (the rest of #193).
+  function toolTarget(ref, ctx, level) {
+    const long = target(ref, ctx, level)
+    return {
+      connId: long.connectionId,
+      connName: long.connectionName,
+      ...('dbName' in long ? { dbName: long.dbName } : {}),
+      ...('collectionName' in long ? { collName: long.collectionName } : {}),
+    }
   }
 
   // Add View is the one structural dialog whose payload isn't just the node's level fields:
   // it carries the source collection to prefill (empty from a database node, the clicked
   // collection from "Add View Here…"), so it opens directly instead of via modalFeature.
-  function openAddView(node, source) {
-    openModal('addView', { ...modalTarget(node, 'database'), source: source })
+  function openAddView(ref, ctx, source) {
+    openModal('addView', { ...target(ref, ctx, 'database'), source: source })
   }
 
   // A registry-driven modal feature (see constants/modalRegistry.js): its level and
   // component are declared once in MODALS, so the feature is named by id alone and opens
-  // the registry modal with the node fields that level needs.
-  const LEVEL_FIELDS = { connection: CONN, database: DB, collection: COLL }
-
-  // A modal's target. Modals read the long alias spelling — the same one the tab
-  // creators, the Mongo API and the menu target resolution use — so the short
-  // connId/collName pair stops here and never reaches a component. The FEATURES nodes
-  // upstream are still short; converting those is the rest of #193.
-  function modalTarget(node, level) {
-    const short = pick(node, LEVEL_FIELDS[level])
-    return {
-      connectionId: short.connId,
-      connectionName: short.connName,
-      ...(short.dbName !== undefined ? { dbName: short.dbName } : {}),
-      ...(short.collName !== undefined ? { collectionName: short.collName } : {}),
-    }
-  }
-
+  // the registry modal with the target that level needs.
   function modalFeature(id) {
     const level = MODALS[id].level
-    return { requires: level, run: (node) => openModal(id, modalTarget(node, level)) }
+    return { requires: level, run: (ref, ctx) => openModal(id, target(ref, ctx, level)) }
   }
 
-  // Normalize a tab (connectionId/collectionName keys) into a registry node.
-  function tabNode(tab) {
-    if (!tab) return {}
-    return { connId: tab.connectionId, connName: tab.connectionName, dbName: tab.dbName, collName: tab.collectionName }
-  }
-  function tabArgs(node) {
-    return { connectionId: node.connId, connectionName: node.connName, dbName: node.dbName, collectionName: node.collName }
-  }
-  function shellArgs(node) {
-    return { connectionId: node.connId, connectionName: node.connName, dbName: node.dbName }
-  }
-
-  async function disconnectOne(node, ctx) {
-    try { await disconnect(node.connId) } catch (_) {}
-    await closeConnection(node.connId)
+  async function disconnectOne(ref, ctx) {
+    try { await disconnect(ref.connectionId) } catch (_) {}
+    await closeConnection(ref.connectionId)
     // Every tab scoped into this connection is stale once it's gone — including tool
     // tabs, whose short alias keys the old filter could never see. Containment runs
     // disposal (shell teardown) through closeTab for each affected workspace.
-    closeWhere(affectedByResource(createResourceRef(node.connId)))
+    closeWhere(affectedByResource(createResourceRef(ref.connectionId)))
     showToast('Disconnected from ' + ctx.label)
   }
-  async function disconnectOthers(node) {
+  async function disconnectOthers(ref) {
     // Snapshot first: closing mutates the list the loop is reading.
-    const others = openConnections.value.filter(c => c.id !== node.connId)
+    const others = openConnections.value.filter(c => c.id !== ref.connectionId)
     for (const conn of others) {
       try { await disconnect(conn.id) } catch (_) {}
       await closeConnection(conn.id)
@@ -130,7 +123,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     // Keep every tab scoped under the surviving connection; close all other
     // resource-scoped tabs. The old filter closed every non-collection tab — it
     // killed shells that were still valid and kept stale ones on dropped connections.
-    const keep = affectedByResource(createResourceRef(node.connId))
+    const keep = affectedByResource(createResourceRef(ref.connectionId))
     closeWhere(t => !!t.target && !keep(t))
     showToast('Disconnected all other connections')
   }
@@ -144,9 +137,9 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     closeWhere(t => !!t.target)
     showToast('All connections closed')
   }
-  async function refreshSelected(node) {
+  async function refreshSelected(ref) {
     try {
-      await refreshConnectionResources(node.connId)
+      await refreshConnectionResources(ref.connectionId)
       showToast('Refreshed')
     } catch (e) {
       showToast('Refresh failed: ' + errText(e))
@@ -166,37 +159,33 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     showToast(failed ? `Refreshed ${done} connection${done === 1 ? '' : 's'}, ${failed} failed` : 'All connections refreshed')
   }
 
-  function openServerInfo(node, kind, title) {
+  function openServerInfo(ref, ctx, kind, title) {
     openModal('serverInfo', {
-      ...modalTarget(node, 'connection'), kind: kind, title: title,
+      ...target(ref, ctx, 'connection'), kind: kind, title: title,
     })
   }
-  function copyToClipboard(node, kind) {
-    if (kind === 'collection') {
-      dbClipboard.value = { kind: 'collection', connId: node.connId, connName: node.connName, dbName: node.dbName, collName: node.collName }
-      showToast(`Copied collection "${node.collName}"`)
-    } else {
-      dbClipboard.value = { kind: 'database', connId: node.connId, connName: node.connName, dbName: node.dbName }
-      showToast(`Copied database "${node.dbName}"`)
-    }
+  function copyToClipboard(ref, ctx, kind) {
+    const copied = toolTarget(ref, ctx, kind)
+    dbClipboard.value = { kind: kind, ...copied }
+    showToast(`Copied ${kind} "${kind === 'collection' ? copied.collName : copied.dbName}"`)
   }
 
   // Keyed by action id; the labels menus show are theirs, not ours. Ids match the
   // native menu's where it offers the same action.
   const FEATURES = {
     // ── open a tab ──
-    'coll:open_tab':           { requires: 'collection', run: (n) => openCollectionTab(tabArgs(n)) },
-    'coll:aggregation':        { requires: 'collection', run: (n) => openCollectionTab(tabArgs(n), 'aggregate') },
-    'file:intellishell':       { requires: 'database',   run: (n) => openShellTab(shellArgs(n)) },
-    'coll:add_index':          { requires: 'collection', run: (n) => openIndexManagerTab(pick(n, COLL)) },
+    'coll:open_tab':           { requires: 'collection', run: (r, c) => openCollectionTab(target(r, c, 'collection')) },
+    'coll:aggregation':        { requires: 'collection', run: (r, c) => openCollectionTab(target(r, c, 'collection'), 'aggregate') },
+    'file:intellishell':       { requires: 'database',   run: (r, c) => openShellTab(target(r, c, 'database')) },
+    'coll:add_index':          { requires: 'collection', run: (r, c) => openIndexManagerTab(toolTarget(r, c, 'collection')) },
 
     // ── connection-scoped info modals ──
     'file:server_status':      modalFeature('serverStatus'),
     'file:server_charts':      modalFeature('serverCharts'),
-    'db:current_ops':          { requires: 'connection', run: (n) => openCurrentOpsTab(pick(n, CONN)) },
-    'file:server_build':       { requires: 'connection', run: (n) => openServerInfo(n, 'build',   'Build Info') },
-    'conn:host_info':          { requires: 'connection', run: (n) => openServerInfo(n, 'host',    'Host Info') },
-    'conn:replica_status':     { requires: 'connection', run: (n) => openServerInfo(n, 'replica', 'Replica Set Status') },
+    'db:current_ops':          { requires: 'connection', run: (r, c) => openCurrentOpsTab(toolTarget(r, c, 'connection')) },
+    'file:server_build':       { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'build',   'Build Info') },
+    'conn:host_info':          { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'host',    'Host Info') },
+    'conn:replica_status':     { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'replica', 'Replica Set Status') },
 
     // ── database-scoped modals ──
     'db:database_stats':       modalFeature('dbStats'),
@@ -205,11 +194,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'db:manage_roles':         modalFeature('roles'),
     'db:functions':            modalFeature('functions'),
     'gridfs:open':             modalFeature('gridfs'),
-    'file:search':             { requires: 'database', run: (n) => openSearchTab(pick(n, DB)) },
+    'file:search':             { requires: 'database', run: (r, c) => openSearchTab(toolTarget(r, c, 'database')) },
 
     // ── collection-scoped modals ──
     'coll:validator':          modalFeature('validator'),
-    'coll:schema':             { requires: 'collection', run: (n) => openSchemaTab(pick(n, COLL)) },
+    'coll:schema':             { requires: 'collection', run: (r, c) => openSchemaTab(toolTarget(r, c, 'collection')) },
     'coll:history':            modalFeature('history'),
     'coll:stats':              modalFeature('stats'),
     'coll:mapreduce':          modalFeature('mapReduce'),
@@ -217,8 +206,8 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     // ── create/edit dialogs (state + seeders owned by useDbActions) ──
     'db:add_collection':       modalFeature('addCollection'),
     'db:add_database':         modalFeature('addDatabase'),
-    'db:add_view':             { requires: 'database',   run: (n) => openAddView(n, '') },
-    'coll:add_view':           { requires: 'collection', run: (n) => openAddView(n, n.collName || '') },
+    'db:add_view':             { requires: 'database',   run: (r, c) => openAddView(r, c, '') },
+    'coll:add_view':           { requires: 'collection', run: (r, c) => openAddView(r, c, resourceName(r)) },
     'db:add_bucket':           modalFeature('addBucket'),
     'db:drop_database':        modalFeature('dropDatabase'),
     'coll:drop':               modalFeature('dropCollection'),
@@ -226,16 +215,16 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'coll:duplicate':          modalFeature('duplicateCollection'),
 
     // ── import / export (collection-level wizards; db-level exports many) ──
-    'coll:export':             { requires: 'collection', run: (n) => openExportSource(pick(n, COLL)) },
-    'coll:import':             { requires: 'collection', run: (n) => openImportWizard(pick(n, COLL)) },
-    'db:export':               { requires: 'database',   run: (n) => exportDatabase(pick(n, COLL)) },
-    'db:import':               { requires: 'database',   run: (n) => importDatabase(pick(n, COLL)) },
+    'coll:export':             { requires: 'collection', run: (r, c) => openExportSource(toolTarget(r, c, 'collection')) },
+    'coll:import':             { requires: 'collection', run: (r, c) => openImportWizard(toolTarget(r, c, 'collection')) },
+    'db:export':               { requires: 'database',   run: (r, c) => exportDatabase(toolTarget(r, c, resourceKind(r))) },
+    'db:import':               { requires: 'database',   run: (r, c) => importDatabase(toolTarget(r, c, resourceKind(r))) },
 
     // ── clipboard / copy-paste ──
-    'node:copy_name':          { requires: null,         run: (n, ctx) => { navigator.clipboard.writeText(ctx.label); showToast('Copied') } },
-    'coll:copy':               { requires: 'collection', run: (n) => copyToClipboard(n, 'collection') },
-    'db:copy_database':        { requires: 'database',   run: (n) => copyToClipboard(n, 'database') },
-    'db:paste':                { requires: 'database',   run: (n) => pasteClipboard(pick(n, COLL)) },
+    'node:copy_name':          { requires: null,         run: (r, c) => { navigator.clipboard.writeText(c.label); showToast('Copied') } },
+    'coll:copy':               { requires: 'collection', run: (r, c) => copyToClipboard(r, c, 'collection') },
+    'db:copy_database':        { requires: 'database',   run: (r, c) => copyToClipboard(r, c, 'database') },
+    'db:paste':                { requires: 'database',   run: (r, c) => pasteClipboard(toolTarget(r, c, resourceKind(r))) },
 
     // ── connection lifecycle ──
     'conn:disconnect':         { requires: 'connection', run: disconnectOne },
@@ -245,12 +234,10 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'view:refresh_all':        { requires: null,         run: refreshAll },
   }
 
-  // True when a node carries the fields a given level needs.
-  function hasLevel(node, requires) {
-    if (requires === 'connection') return !!node.connId
-    if (requires === 'database')   return !!node.connId && !!node.dbName
-    if (requires === 'collection') return !!node.connId && !!node.dbName && !!node.collName
-    return true
+  // True when the resource is at least as deep as the level an action needs.
+  function hasLevel(ref, requires) {
+    if (!requires) return true
+    return !!ref && ref.segments.length >= DEPTH[requires]
   }
   function levelHint(requires) {
     if (requires === 'collection') return 'Open a collection first'
@@ -258,9 +245,9 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     return 'Open a connection, database, or collection first'
   }
 
-  // Single dispatch point for the feature registry. `ctx` carries extras a handler
-  // may want (e.g. the clicked node's display label).
-  function runFeature(action, node, ctx = {}) {
+  // Single dispatch point for the feature registry. `ref` is the node's ResourceRef, or
+  // null when nothing is selected; `ctx` carries its presentation (connectionName, label).
+  function runFeature(action, ref, ctx = {}) {
     const feat = FEATURES[action]
     if (!feat) {
       if (UNBUILT_ACTIONS.has(action)) { showToast(UNBUILT_ACTIONS.get(action) + ' — coming to OzenDB'); return }
@@ -270,8 +257,8 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
       showToast(`Could not run "${action}"`)
       return
     }
-    if (feat.requires && !hasLevel(node, feat.requires)) { showToast(levelHint(feat.requires)); return }
-    return feat.run(node, ctx)
+    if (!hasLevel(ref, feat.requires)) { showToast(levelHint(feat.requires)); return }
+    return feat.run(ref, ctx)
   }
 
   async function handleContextAction(action) {
@@ -296,7 +283,9 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
     const engineAction = contextAction(saved.nodeData, action)
     if (engineAction) return engineAction(saved.nodeData)
-    return runFeature(action, saved.nodeData, { label: saved.label })
+    // The tree's rows still hand over the short-alias node; this is where it becomes a ref.
+    const ref = resourceFromFeatureNode(saved.nodeData)
+    return runFeature(action, ref, { label: saved.label, connectionName: saved.nodeData.connName })
   }
 
   // Toolbar / native-menu tool dispatch. `connect`/`sql` are app-level (no
@@ -365,7 +354,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
     const action = TOOL_ALIASES[name]
     if (action) {
-      runFeature(action, tabNode(tab))
+      runFeature(action, resourceFromTreeSelection(tab), { connectionName: tab?.connectionName })
       return
     }
     // Every entry in TOOLS is handled above or via TOOL_ALIASES, so reaching here
@@ -381,26 +370,13 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // the user when context is missing.
   function menuNode(action, requiredType = FEATURES[action]?.requires ?? null) {
     const tab = menuTarget(requiredType)
-    if (!tab || !tab.connectionId) {
-      showToast('Open a connection, database, or collection first')
+    const ref = resourceFromTreeSelection(tab)
+    if (!ref || !hasLevel(ref, requiredType)) {
+      showToast(levelHint(requiredType))
       return
     }
-    if (requiredType === 'collection' && (tab.kind !== 'collection' || !tab.collectionName)) {
-      showToast('Open a collection first')
-      return
-    }
-    if (requiredType === 'database' && !tab.dbName) {
-      showToast('Open a database or collection first')
-      return
-    }
-    const node = {
-      connId: tab.connectionId,
-      connName: tab.connectionName,
-      dbName: tab.dbName,
-      collName: tab.collectionName,
-    }
-    const label = tab.collectionName || tab.dbName || tab.connectionName
-    runFeature(action, node, { label: label })
+    const label = resourceName(ref) || tab.connectionName
+    runFeature(action, ref, { label: label, connectionName: tab.connectionName })
   }
 
   return {
