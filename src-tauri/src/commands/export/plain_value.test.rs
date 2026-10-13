@@ -73,6 +73,54 @@ fn excel_datetime_rejects_a_year_beyond_excels_range() {
 }
 
 #[test]
+fn excel_datetime_floors_a_pre_1970_timestamp_instead_of_rounding_toward_zero() {
+    // -1500 ms is 1.5s before the epoch. Flooring (div_euclid) lands on -2s
+    // (1969-12-31T23:59:58Z); truncating division (the old `/ 1000`) lands on -1s
+    // (…:59Z) instead, a full second late.
+    let dt = bson::DateTime::from_millis(-1500);
+    let expected =
+        rust_xlsxwriter::ExcelDateTime::from_ymd(1969, 12, 31).unwrap().and_hms(23, 59, 58.0).unwrap();
+    assert_eq!(excel_datetime(dt).unwrap().to_excel(), expected.to_excel());
+}
+
+#[test]
+fn xlsx_cell_resolves_a_date_in_range_to_a_typed_date_variant() {
+    let dt = bson::DateTime::from_millis(1709802930000);
+    assert!(matches!(xlsx_cell(&bson::Bson::DateTime(dt)), XlsxCell::Date(_)));
+}
+
+#[test]
+fn xlsx_cell_falls_back_to_text_with_iso_form_for_a_date_outside_excels_range() {
+    // 1850-01-01 predates Excel's 1900 floor but is still a valid RFC 3339 year, so
+    // the fallback is the plain ISO string, not an Extended JSON wrapper.
+    let dt = bson::DateTime::from_millis(-3_786_825_600_000);
+    match xlsx_cell(&bson::Bson::DateTime(dt)) {
+        XlsxCell::Text(text) => assert_eq!(text, "1850-01-01T00:00:00Z"),
+        other => panic!("expected Text, got a different XlsxCell variant: {:?}", std::mem::discriminant(&other)),
+    }
+}
+
+#[test]
+fn xlsx_cell_resolves_numbers_and_bools_to_their_own_variants() {
+    assert!(matches!(xlsx_cell(&bson::Bson::Int32(7)), XlsxCell::Number(n) if n == 7.0));
+    assert!(matches!(xlsx_cell(&bson::Bson::Int64(9_000_000_000)), XlsxCell::Number(n) if n == 9_000_000_000.0));
+    assert!(matches!(xlsx_cell(&bson::Bson::Double(3.5)), XlsxCell::Number(n) if n == 3.5));
+    assert!(matches!(xlsx_cell(&bson::Bson::Boolean(true)), XlsxCell::Bool(true)));
+}
+
+#[test]
+fn xlsx_cell_resolves_null_to_blank() {
+    assert!(matches!(xlsx_cell(&bson::Bson::Null), XlsxCell::Blank));
+}
+
+#[test]
+fn xlsx_cell_falls_back_to_text_for_a_document_or_array() {
+    let doc = bson::doc! { "street": "Rue de l'Église" };
+    assert!(matches!(xlsx_cell(&bson::Bson::Document(doc)), XlsxCell::Text(_)));
+    assert!(matches!(xlsx_cell(&bson::bson!(["a", "b"])), XlsxCell::Text(_)));
+}
+
+#[test]
 fn json_value_style_defaults_to_plain() {
     assert_eq!(JsonValueStyle::default(), JsonValueStyle::Plain);
 }
