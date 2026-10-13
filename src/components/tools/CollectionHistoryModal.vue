@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { listCollectionHistory, clearCollectionHistory, restoreHistory } from '../../engines/mongodb/api/documents'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -14,9 +15,12 @@ import FlexSpacer from '../base/FlexSpacer.vue'
 // delete) made to this collection, newest-first, each restorable — Studio-3T's
 // undo-your-edits safety net. Opened from App.vue for a collection node.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, collectionName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
+
+// MongoDB names a collection by its database too, so the heading spells out both.
+const qualifiedName = computed(() => props.target.resource.segments.map(s => s.name).join('.'))
 
 const loading = ref(true)
 const error = ref(null)
@@ -30,9 +34,7 @@ async function load() {
   error.value = null
   errorCode.value = null
   try {
-    entries.value = await listCollectionHistory(
-      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
-    )
+    entries.value = await listCollectionHistory(apiTarget(props.target.resource))
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)
@@ -80,9 +82,7 @@ async function restore(entry) {
 
 async function clearAll() {
   try {
-    await clearCollectionHistory(
-      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
-    )
+    await clearCollectionHistory(apiTarget(props.target.resource))
     entries.value = []
     notice.value = 'History cleared'
   } catch (e) {
@@ -92,7 +92,7 @@ async function clearAll() {
 </script>
 
 <template>
-  <BaseModal :title="`Collection History — ${target.dbName}.${target.collectionName}`" width="min(860px, calc(100vw - 40px))" max-height="calc(100vh - 80px)" @close="$emit('close')">
+  <BaseModal :title="`Collection History — ${qualifiedName}`" width="min(860px, calc(100vw - 40px))" max-height="calc(100vh - 80px)" @close="$emit('close')">
       <!-- Only the list scrolls, under controls that stay put (#176). -->
       <BaseModalBody :scrollable="false" class="ch-body">
         <div class="ch-controls">

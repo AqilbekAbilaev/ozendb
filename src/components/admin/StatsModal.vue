@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { collectionStats } from '../../engines/mongodb/api/admin'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { errText, errCode } from '../../utils/errors'
 import BaseIcon from '../base/BaseIcon.vue'
 import RawToggle from '../base/RawToggle.vue'
@@ -13,7 +14,7 @@ import { fmtBytes, fmtNum } from '../../utils/format'
 // and surfaces the headline numbers plus a per-index size breakdown, the way
 // Studio-3T's Collection Stats view does.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName, collectionName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 
@@ -23,11 +24,12 @@ const errorCode = ref(null)
 const stats = ref(null)
 const showRaw = ref(false)
 
+// MongoDB names a collection by its database too, so the heading spells out both.
+const qualifiedName = computed(() => props.target.resource.segments.map(s => s.name).join('.'))
+
 onMounted(async () => {
   try {
-    stats.value = await collectionStats(
-      { connectionId: props.target.connectionId, database: props.target.dbName, collection: props.target.collectionName },
-    )
+    stats.value = await collectionStats(apiTarget(props.target.resource))
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)
@@ -57,7 +59,7 @@ const rawJson = computed(() => (stats.value ? JSON.stringify(stats.value.raw, nu
 <template>
   <BaseModal width="620px" max-width="92vw" @close="$emit('close')">
       <template #title>
-        Collection Stats — {{ target.dbName }}.{{ target.collectionName }}
+        Collection Stats — {{ qualifiedName }}
         <span v-if="stats && stats.capped" class="ss-tag">capped</span>
       </template>
 

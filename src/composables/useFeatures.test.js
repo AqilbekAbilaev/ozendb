@@ -265,12 +265,30 @@ describe('feature nodes arrive as a ResourceRef', () => {
     expect(openCurrentOpsTab).toHaveBeenCalledWith({ connId: 'c1', connName: 'Sales' })
   })
 
-  it('opens a registry modal with exactly its level\'s target', () => {
+  it('opens a collection-level modal with the collection\'s ref', () => {
     contextMenu.value = ordersRow
     makeFeatures().handleContextAction('coll:stats')
     expect(openModal).toHaveBeenCalledWith('stats', {
-      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+      resource: createResourceRef('c1', [
+        { kind: 'database', name: 'shop' },
+        { kind: 'collection', name: 'orders' },
+      ]),
+      connectionName: 'Sales',
     })
+  })
+
+  // Every level now goes through the same conversion, so a modal's payload is its ref and
+  // the connection's display name — never the flat fields (#193).
+  it('opens a registry modal with exactly its level\'s target, at every level', () => {
+    contextMenu.value = ordersRow
+    const features = makeFeatures()
+    for (const action of ['coll:validator', 'coll:history', 'coll:mapreduce', 'coll:drop', 'coll:rename', 'coll:duplicate']) {
+      features.handleContextAction(action)
+      contextMenu.value = ordersRow
+    }
+    for (const [, payload] of openModal.mock.calls) {
+      expect(Object.keys(payload).sort()).toEqual(['connectionName', 'resource'])
+    }
   })
 
   it('opens a connection-level modal with the connection\'s ref and its name', () => {

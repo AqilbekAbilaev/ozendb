@@ -65,8 +65,8 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   }
 
   // The node's resource cut to `level` — a database action run on a collection row acts
-  // on that row's database — in the long alias spelling the tab creators and modals
-  // read. Only the fields the level names are present.
+  // on that row's database — in the long alias spelling the tab creators still read.
+  // Only the fields the level names are present.
   function target(ref, ctx, level) {
     const [database, collection] = ref.segments
     return {
@@ -107,13 +107,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
   // A registry-driven modal feature (see constants/modalRegistry.js): its level and
   // component are declared once in MODALS, so the feature is named by id alone and opens
-  // the registry modal with the target that level needs. Connection- and database-level
-  // modals take a ResourceRef; collection-level ones move next (#193), and this branch
-  // goes with them.
+  // the registry modal with the target that level needs. Every registry modal now takes a
+  // ResourceRef, whatever its level (#193).
   function modalFeature(id) {
     const level = MODALS[id].level
-    const make = level === 'collection' ? target : modalTarget
-    return { requires: level, run: (ref, ctx) => openModal(id, make(ref, ctx, level)) }
+    return { requires: level, run: (ref, ctx) => openModal(id, modalTarget(ref, ctx, level)) }
   }
 
   async function disconnectOne(ref, ctx) {
