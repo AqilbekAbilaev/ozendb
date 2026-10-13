@@ -2,7 +2,7 @@ import { nextTick, onMounted, onUnmounted } from 'vue'
 import { showToast } from '../stores/toast'
 import { openCollectionTab, openQuickstart, openPostgresQuery, openPostgresSearch } from '../stores/tabCreators'
 import { useZoom } from './useZoom'
-import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh, requestIndexAction } from '../stores/menuRequests'
+import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh, requestIndexAction, requestGridfsAction } from '../stores/menuRequests'
 import { onMenuAction } from '../appApi/events'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -95,7 +95,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       case 'gridfs:meta':
       case 'gridfs:copy_bucket':
       case 'gridfs:drop_bucket':
-        requestGridfsAction(id); return
+        requestGridfsMenuAction(id); return
 
 
       // --- index scoped (act on the active tab's selected index) ---
@@ -273,10 +273,14 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
   // open dialog, since resolving a database would lose the picked file (Gate::GridfsFile).
   // Bucket actions open the modal on the resolved database (keeping its selection when
   // it already shows that db), then signal the requested action.
-  async function requestGridfsAction(action) {
+  //
+  // #288: the request travels through stores/menuRequests, never through the modal's
+  // payload — AppModals keys each dialog on its payload, so writing the action in there
+  // remounted the dialog and threw away the very file selection the action needed.
+  async function requestGridfsMenuAction(action) {
     if (GRIDFS_FILE_ACTIONS.includes(action)) {
       if (!openModals.gridfs) return
-      openModals.gridfs.menuRequest = { action: action, nonce: Date.now() }
+      requestGridfsAction(action)
       return
     }
     const target = menuTarget('database')
@@ -290,8 +294,10 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
     if (!sameResource(openModals.gridfs?.resource, database)) {
       openModal('gridfs', { resource: database, connectionName: target.connectionName })
     }
+    // Let the open/remount settle first: opening the dialog on another database replaces
+    // the one on screen, and the request belongs to the new instance, not the old one.
     await nextTick()
-    openModals.gridfs.menuRequest = { action: action, nonce: Date.now() }
+    requestGridfsAction(action)
   }
   // Two ways an action arrives: the native menu emits the clicked item's id, and on
   // Linux — where WebKitGTK swallows native accelerators, so menu.rs attaches none —

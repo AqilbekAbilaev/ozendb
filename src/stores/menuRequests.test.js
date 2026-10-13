@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest'
 import {
   historyRequest, saveQueryRequest, savedQueryBrowserRequest, docMenuRequest, indexMenuRequest,
-  requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestIndexAction,
+  gridfsMenuRequest, requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction,
+  requestIndexAction, requestGridfsAction,
 } from './menuRequests'
 
 it('each request lands on its own ref', () => {
@@ -28,6 +29,13 @@ it('a doc action replaces the previous one', () => {
   requestDocAction('doc:edit')
   requestDocAction('doc:delete')
   expect(docMenuRequest.value.action).toBe('doc:delete')
+})
+
+// The GridFS dialog takes its request on mount, so a request made while it is still
+// loading has to wait here rather than be handed to the dialog as a prop (#288).
+it('a GridFS action carries its action and waits on the ref', () => {
+  requestGridfsAction('gridfs:view_file')
+  expect(gridfsMenuRequest.value).toMatchObject({ action: 'gridfs:view_file' })
 })
 
 // The Index menu acts on whichever Index Manager is open, so the request names the pane

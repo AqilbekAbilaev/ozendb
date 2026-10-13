@@ -18,11 +18,12 @@ import { useConfirmDelete } from './useConfirmDelete'
 import { showToast } from '../stores/toast'
 import { invalidateConnectionResources } from '../stores/connectionData'
 import { selectedGridfsFile, clearGridfsSelection } from '../stores/gridfs'
+import { gridfsMenuRequest } from '../stores/menuRequests'
 
 // The GridFS browser behind GridFsModal: a database's buckets and files, and upload /
 // download / delete / rename / edit-metadata, plus bucket copy and drop. `target` is a
-// getter for `{ resource, connectionName, menuRequest? }`, where `resource` is the
-// database's ResourceRef. Call `load()` once the modal mounts.
+// getter for `{ resource, connectionName }`, where `resource` is the database's
+// ResourceRef. Call `load()` once the modal mounts.
 export function useGridfsBrowser(target) {
   const buckets = ref([])
   const selectedBucket = ref('fs')
@@ -40,7 +41,10 @@ export function useGridfsBrowser(target) {
 
   // Mirrored to the store for the menu gate; cleared on unmount so it can't outlive the dialog.
   watch(selectedFile, (file) => { selectedGridfsFile.value = file }, { immediate: true })
-  onUnmounted(clearGridfsSelection)
+  onUnmounted(() => {
+    clearGridfsSelection()
+    gridfsMenuRequest.value = null   // a request this dialog closed without taking dies with it
+  })
 
   // Inline sub-forms driven by the menu actions.
   const renameTarget = ref(null)   // file being renamed
@@ -59,12 +63,22 @@ export function useGridfsBrowser(target) {
     errorCode.value = errCode(e)
   }
 
-  // The GridFS menu signals actions by setting { action, nonce } on the modal's own target;
-  // dispatch each to the matching operation. `immediate` covers the case where the action was
-  // set before this (lazily-loaded) modal mounted, so the first request is never dropped.
-  watch(() => target().menuRequest && target().menuRequest.nonce, (nonce) => {
-    if (nonce == null) return
-    handleGridfsMenu(target().menuRequest.action)
+  // The GridFS menu signals actions through stores/menuRequests; dispatch each to the
+  // matching operation. `immediate` covers the case where the action was set before this
+  // (lazily-loaded) modal mounted, so the first request is never dropped. Taking the
+  // request clears it, so it can't fire again the next time the dialog opens.
+  //
+  // A request can arrive before the first listing is back — a bucket action opens the
+  // dialog and signals in the same breath — so hold it until `load()` has the real bucket
+  // list. Acting sooner would run against the 'fs' default on a database that may not have
+  // an `fs` bucket at all (#288).
+  let listed = false
+  let heldAction = null
+  watch(gridfsMenuRequest, (request) => {
+    if (!request) return
+    gridfsMenuRequest.value = null
+    if (listed) handleGridfsMenu(request.action)
+    else heldAction = request.action
   }, { immediate: true })
 
   function needFile() {
@@ -200,6 +214,10 @@ export function useGridfsBrowser(target) {
   async function load() {
     await loadBuckets()
     await loadFiles()
+    listed = true
+    const action = heldAction
+    heldAction = null
+    if (action) handleGridfsMenu(action)
   }
 
   async function upload() {
