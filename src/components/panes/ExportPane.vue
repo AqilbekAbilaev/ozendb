@@ -14,7 +14,7 @@ import ReorderButtons from '../base/ReorderButtons.vue'
 import HintText from '../base/HintText.vue'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 import { previewCellText } from '../../utils/exportPreview'
-import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT } from '../../constants/dataTools'
+import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT, JSON_VALUE_STYLES } from '../../constants/dataTools'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
 // Stepped Export wizard for a single collection: sample the collection, choose /
@@ -148,7 +148,7 @@ async function run() {
       String(path),
       t.value.format,
       mappingPayload(),
-      { incremental: t.value.incremental, filter: t.value.filter || '{}' },
+      { incremental: t.value.incremental, filter: t.value.filter || '{}', jsonStyle: t.value.jsonStyle },
     )
     // The tab stays open on success so the mapping can be tweaked and re-run; the
     // result banner replaces the modal's close-on-success.
@@ -168,6 +168,9 @@ const isLastStep = computed(() => t.value.step === steps.length - 1)
 // CSV and Excel flatten to columns; JSON keeps the document shape. Worth saying out
 // loud next to the field mapping, since that's what changes between them.
 const isTabular = computed(() => t.value.format === 'csv' || t.value.format === 'xlsx')
+// The value-style choice only means anything for JSON — CSV/XLSX already always write
+// plain values, so the control stays hidden rather than offering a no-op setting.
+const isJson = computed(() => t.value.format === 'json')
 
 const sourceLabel = computed(() => {
   if (t.value.source === 'query') return 'Current query result'
@@ -201,6 +204,10 @@ const sourceLabel = computed(() => {
         <span v-if="isTabular" class="iew-hnote">
           Flat output — only the selected fields become columns, and nested values are stringified.
         </span>
+      </div>
+      <div v-if="isJson" class="iew-hrow">
+        <span class="iew-hlabel">Values</span>
+        <BaseSelect v-model="activeTab.jsonStyle" class="iew-format" :options="JSON_VALUE_STYLES" size="sm" />
       </div>
     </div>
 
@@ -272,7 +279,7 @@ const sourceLabel = computed(() => {
             </thead>
             <tbody>
               <tr v-for="(row, ri) in previewRows" :key="ri">
-                <td v-for="c in previewColumns" :key="c" :title="previewCellText(row[c], activeTab.format)">{{ previewCellText(row[c], activeTab.format) }}</td>
+                <td v-for="c in previewColumns" :key="c" :title="previewCellText(row[c], activeTab.format, activeTab.jsonStyle)">{{ previewCellText(row[c], activeTab.format, activeTab.jsonStyle) }}</td>
               </tr>
             </tbody>
           </table>

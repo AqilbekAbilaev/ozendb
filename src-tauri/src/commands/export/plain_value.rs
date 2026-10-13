@@ -1,5 +1,19 @@
 use crate::error::AppError;
 use mongodb::bson;
+use serde::Deserialize;
+
+// How a JSON export renders ObjectId/DateTime/Decimal128: `Extended` keeps them wrapped
+// (`{"$oid": …}`, …) — what `mongoexport` writes, and what lets a file round-trip back
+// in with its types intact — while `Plain` unwraps them to the text a user would have
+// typed. `Extended` is the default so an older frontend call (or a request that omits
+// the field entirely) can't silently change output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum JsonValueStyle {
+    #[default]
+    Extended,
+    Plain,
+}
 
 // Render a single BSON value as a flat plain-text cell — the form a CSV cell takes,
 // and what an XLSX cell falls back to for anything that isn't a native Excel type (see
@@ -22,6 +36,29 @@ pub(crate) fn bson_to_plain_cell(value: &bson::Bson) -> String {
         bson::Bson::Decimal128(val) => val.to_string(),
         bson::Bson::DateTime(val) => plain_datetime_text(*val),
         other => serde_json::Value::from(other.clone()).to_string(),
+    }
+}
+
+// Recursive sibling of `bson_to_plain_cell`, for a "Plain JSON" export: the same
+// per-type plain decisions (ObjectId -> hex, DateTime -> ISO-8601 text, Decimal128 ->
+// its number text) applied at every depth, so a date nested inside an array of
+// sub-documents is unwrapped too — not just at the top level. Unlike the flat cell
+// renderer, a Document or Array is *not* stringified: it stays real JSON structure,
+// with each child converted by this same function. Anything with no plain form
+// (Binary, Timestamp, Regex, …) falls back to its ordinary Extended JSON value,
+// matching `bson_to_plain_cell`'s bucket for those types.
+pub(crate) fn bson_to_plain_json(value: &bson::Bson) -> serde_json::Value {
+    match value {
+        bson::Bson::ObjectId(val) => serde_json::Value::String(val.to_hex()),
+        bson::Bson::Decimal128(val) => serde_json::Value::String(val.to_string()),
+        bson::Bson::DateTime(val) => serde_json::Value::String(plain_datetime_text(*val)),
+        bson::Bson::Document(doc) => serde_json::Value::Object(
+            doc.iter().map(|(key, val)| (key.clone(), bson_to_plain_json(val))).collect(),
+        ),
+        bson::Bson::Array(items) => {
+            serde_json::Value::Array(items.iter().map(bson_to_plain_json).collect())
+        }
+        other => serde_json::Value::from(other.clone()),
     }
 }
 

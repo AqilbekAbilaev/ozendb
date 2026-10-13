@@ -138,7 +138,7 @@ export const expected = {
     id: 'w-export', type: 'mongodb.export', engine: 'mongodb', title: 'Export: orders (query)', color: null,
     target: CONN_REF('shop', 'orders'),
     state: {
-      step: 2, format: 'csv', incremental: true, source: 'query',
+      step: 2, format: 'csv', incremental: true, jsonStyle: 'extended', source: 'query',
       sourceCount: null, filter: '{ status: "open" }',
       fields: [{ source: 'a', target: 'b', kind: 'string', include: true }],
     },

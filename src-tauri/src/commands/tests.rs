@@ -164,18 +164,71 @@ fn sort_document_preserves_key_order() {
 
 #[test]
 fn export_json_empty_is_empty_array() {
-    assert_eq!(docs_to_json_array(&[]).unwrap(), "[]");
+    assert_eq!(docs_to_json_array(&[], JsonValueStyle::Extended).unwrap(), "[]");
 }
 
 #[test]
 fn export_json_multi_doc_is_a_valid_json_array() {
     let docs = vec![bson::doc! { "a": 1 }, bson::doc! { "b": "x" }];
-    let out = docs_to_json_array(&docs).unwrap();
+    let out = docs_to_json_array(&docs, JsonValueStyle::Extended).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
     let array = parsed.as_array().unwrap();
     assert_eq!(array.len(), 2);
     assert_eq!(array[0]["a"], serde_json::json!(1));
     assert_eq!(array[1]["b"], serde_json::json!("x"));
+}
+
+// ── JSON export value style (Extended vs. Plain) ──────────────────
+// #279's second half: an export option, defaulting to Extended so an older call (or
+// one that omits the field) keeps writing exactly what it always wrote.
+
+#[test]
+fn json_value_style_omitted_writes_byte_identical_output_to_the_old_default() {
+    // Proves the default is unchanged, byte for byte. Before #279, `json_array_element`
+    // had no style argument and always did exactly this:
+    // `serde_json::to_string_pretty(&serde_json::Value::from(bson::Bson::Document(doc)))`,
+    // wrapped as `"[\n" + pretty + "\n]"`. That line is untouched by this change — it is
+    // now one match arm instead of the whole body — so reconstructing it independently
+    // here and comparing against `JsonValueStyle::default()`'s actual output is a direct
+    // check that the default still takes that exact path.
+    let oid = bson::oid::ObjectId::parse_str("5f8d0d55b54764421b7156c3").unwrap();
+    let dt = bson::DateTime::from_millis(1709802930000);
+    let docs = vec![bson::doc! { "_id": oid, "when": dt, "näme": "Łukasz" }];
+    let out = docs_to_json_array(&docs, JsonValueStyle::default()).unwrap();
+    let expected_doc = serde_json::to_string_pretty(&serde_json::Value::from(bson::Bson::Document(
+        docs[0].clone(),
+    )))
+    .unwrap();
+    let expected = format!("[\n{}\n]", expected_doc);
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn json_value_style_extended_keeps_oid_and_date_wrapped() {
+    let oid = bson::oid::ObjectId::parse_str("5f8d0d55b54764421b7156c3").unwrap();
+    let dt = bson::DateTime::from_millis(1709802930000);
+    let docs = vec![bson::doc! { "_id": oid, "when": dt }];
+    let out = docs_to_json_array(&docs, JsonValueStyle::Extended).unwrap();
+    assert!(out.contains("\"$oid\""));
+    assert!(out.contains("\"$date\""));
+}
+
+#[test]
+fn json_value_style_plain_unwraps_oid_and_date_recursively() {
+    // The nested case that matters most: an array of sub-documents each holding an
+    // ObjectId and a date must come out fully unwrapped, not just at the top level.
+    let oid = bson::oid::ObjectId::parse_str("5f8d0d55b54764421b7156c3").unwrap();
+    let dt = bson::DateTime::from_millis(1709802930000);
+    let docs = vec![bson::doc! {
+        "ciudad": "Córdoba",
+        "events": [ { "id": oid, "at": dt } ],
+    }];
+    let out = docs_to_json_array(&docs, JsonValueStyle::Plain).unwrap();
+    assert!(!out.contains("$oid"), "expected no $oid wrapper, got {out}");
+    assert!(!out.contains("$date"), "expected no $date wrapper, got {out}");
+    let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(parsed[0]["events"][0]["id"], serde_json::json!("5f8d0d55b54764421b7156c3"));
+    assert_eq!(parsed[0]["events"][0]["at"], serde_json::json!("2024-03-07T09:15:30Z"));
 }
 
 #[test]

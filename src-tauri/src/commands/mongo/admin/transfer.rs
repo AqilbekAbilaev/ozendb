@@ -3,6 +3,7 @@ use crate::operations::OperationsRegistry;
 use mongodb::bson;
 use tauri::State;
 
+use super::super::{JsonValueStyle, stream_export};
 use super::{data_op_meta, AppContext};
 use crate::commands::portmap::{apply_field_map, FieldMap};
 
@@ -15,6 +16,7 @@ pub async fn export_collection(
     collection: String,
     path: String,
     format: String,
+    json_style: Option<JsonValueStyle>,
 ) -> Result<usize, AppError> {
     let meta = data_op_meta(
         &ctx,
@@ -29,13 +31,14 @@ pub async fn export_collection(
         let col = client
             .database(&database)
             .collection::<bson::Document>(&collection);
-        super::super::stream_export(
+        stream_export(
             &col,
             bson::doc! {},
             None,
             None,
             &path,
             &format,
+            json_style.unwrap_or_default(),
             |_doc: &mut bson::Document| -> Result<(), AppError> { Ok(()) },
         )
         .await
@@ -135,6 +138,7 @@ pub async fn export_collection_fields(
     fields: Vec<FieldMap>,
     incremental: Option<bool>,
     filter: Option<String>,
+    json_style: Option<JsonValueStyle>,
 ) -> Result<usize, AppError> {
     let client = ctx.client(&id).await?;
     let col = client
@@ -167,13 +171,14 @@ pub async fn export_collection_fields(
         new_watermark = Some(boundary);
     }
 
-    let count = super::super::stream_export(
+    let count = stream_export(
         &col,
         filter,
         None,
         None,
         &path,
         &format,
+        json_style.unwrap_or_default(),
         move |doc: &mut bson::Document| -> Result<(), AppError> {
             if !fields.is_empty() {
                 *doc = apply_field_map(doc, &fields);
