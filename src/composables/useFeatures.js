@@ -89,6 +89,15 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     }
   }
 
+  // A modal's target: the node's resource cut to `level`, with the connection's display
+  // name beside it, since a ref never carries one. Modals read names off the ref.
+  function modalTarget(ref, ctx, level) {
+    return {
+      resource: createResourceRef(ref.connectionId, ref.segments.slice(0, DEPTH[level])),
+      connectionName: ctx.connectionName,
+    }
+  }
+
   // Add View is the one structural dialog whose payload isn't just the node's level fields:
   // it carries the source collection to prefill (empty from a database node, the clicked
   // collection from "Add View Here…"), so it opens directly instead of via modalFeature.
@@ -98,10 +107,12 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
   // A registry-driven modal feature (see constants/modalRegistry.js): its level and
   // component are declared once in MODALS, so the feature is named by id alone and opens
-  // the registry modal with the target that level needs.
+  // the registry modal with the target that level needs. Connection-level modals take a
+  // ResourceRef; the deeper levels move to one next (#193), and this branch goes with them.
   function modalFeature(id) {
     const level = MODALS[id].level
-    return { requires: level, run: (ref, ctx) => openModal(id, target(ref, ctx, level)) }
+    const make = level === 'connection' ? modalTarget : target
+    return { requires: level, run: (ref, ctx) => openModal(id, make(ref, ctx, level)) }
   }
 
   async function disconnectOne(ref, ctx) {
@@ -161,7 +172,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
   function openServerInfo(ref, ctx, kind, title) {
     openModal('serverInfo', {
-      ...target(ref, ctx, 'connection'), kind: kind, title: title,
+      ...modalTarget(ref, ctx, 'connection'), kind: kind, title: title,
     })
   }
   function copyToClipboard(ref, ctx, kind) {

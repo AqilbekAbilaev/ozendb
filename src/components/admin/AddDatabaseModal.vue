@@ -13,7 +13,7 @@ import FlexSpacer from '../base/FlexSpacer.vue'
 // Connection → Add Database…: MongoDB only materialises a database once it holds a
 // collection, so the first collection name is required rather than optional.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connectionId, connectionName }
+  target: { type: Object, required: true },   // { resource, connectionName }
 })
 const emit = defineEmits(['close'])
 
@@ -32,11 +32,11 @@ async function confirm() {
   error.value = null
   try {
     await createDatabase(
-      { connectionId: props.target.connectionId, database: database },
+      { connectionId: props.target.resource.connectionId, database: database },
       collName.value.trim(),
     )
     showToast(`Database "${database}" created`)
-    invalidateConnectionResources(props.target.connectionId)
+    invalidateConnectionResources(props.target.resource.connectionId)
     emit('close')
   } catch (e) {
     error.value = errText(e)
