@@ -16,6 +16,7 @@ vi.mock('../stores/tabCreators', () => ({
   openCurrentOpsTab: vi.fn(), openExportSource: vi.fn(),
   openPostgresQuery: vi.fn(), openPostgresTable: vi.fn(),
 }))
+vi.mock('../stores/modals', () => ({ openModal: vi.fn() }))
 vi.mock('./useDbActions', () => ({ useDbActions: () => ({ pasteClipboard: vi.fn() }) }))
 vi.mock('./useNodeTags', () => ({ useNodeTags: () => ({ applyColorTag }) }))
 vi.mock('./useDbTransfer', () => ({
@@ -24,7 +25,8 @@ vi.mock('./useDbTransfer', () => ({
 
 const { tabs, activeTabId } = await import('../stores/tabs')
 const { showToast } = await import('../stores/toast')
-const { openCollectionTab, openShellTab, openSqlTab, openPostgresQuery } = await import('../stores/tabCreators')
+const { openCollectionTab, openShellTab, openSqlTab, openPostgresQuery, openSearchTab, openCurrentOpsTab } = await import('../stores/tabCreators')
+const { openModal } = await import('../stores/modals')
 const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
 const { MENU_ALIASES } = await import('./useAppMenuActions')
 const { MENUS } = await import('../constants/contextMenus')
@@ -82,14 +84,14 @@ beforeEach(() => {
 
 describe('resource refresh actions', () => {
   it('refreshes the selected connection without a tree refresh method', async () => {
-    await makeFeatures().runFeature('node:refresh', { connId: 'c1' })
+    await makeFeatures().runFeature('node:refresh', createResourceRef('c1'))
     expect(refreshConnectionResources).toHaveBeenCalledWith('c1')
     expect(showToast).toHaveBeenCalledWith('Refreshed')
   })
 
   it('reports selected refresh failure without rejecting', async () => {
     refreshConnectionResources.mockRejectedValue({ code: 'network', message: 'offline' })
-    await makeFeatures().runFeature('node:refresh', { connId: 'c1' })
+    await makeFeatures().runFeature('node:refresh', createResourceRef('c1'))
     expect(showToast).toHaveBeenCalledWith("Refresh failed: Can't reach the server")
   })
 
@@ -99,7 +101,7 @@ describe('resource refresh actions', () => {
     addOpenConnection({ id: 'c1' })
     addOpenConnection({ id: 'c2' })
     const features = makeFeatures()
-    await features.runFeature('view:refresh_all', {})
+    await features.runFeature('view:refresh_all', null)
     expect(refreshConnectionResources.mock.calls).toEqual([['c1'], ['c2']])
     expect(showToast).toHaveBeenCalledWith('Refreshed 1 connection, 1 failed')
   })
@@ -115,7 +117,7 @@ describe('disconnect paths read the registry from the store', () => {
   it('disconnects one connection without touching the sidebar component', async () => {
     addOpenConnection({ id: 'c1', name: 'One' })
     addOpenConnection({ id: 'c2', name: 'Two' })
-    await makeFeatures().runFeature('conn:disconnect', { connId: 'c1' }, { label: 'One' })
+    await makeFeatures().runFeature('conn:disconnect', createResourceRef('c1'), { label: 'One' })
     expect(disconnect).toHaveBeenCalledWith('c1')
     expect(openConnections.value.map(c => c.id)).toEqual(['c2'])
   })
@@ -124,14 +126,14 @@ describe('disconnect paths read the registry from the store', () => {
     addOpenConnection({ id: 'c1', name: 'One' })
     addOpenConnection({ id: 'c2', name: 'Two' })
     addOpenConnection({ id: 'c3', name: 'Three' })
-    await makeFeatures().runFeature('conn:disconnect_others', { connId: 'c1' })
+    await makeFeatures().runFeature('conn:disconnect_others', createResourceRef('c1'))
     expect(openConnections.value.map(c => c.id)).toEqual(['c1'])
   })
 
   it('disconnects all of them', async () => {
     addOpenConnection({ id: 'c1', name: 'One' })
     addOpenConnection({ id: 'c2', name: 'Two' })
-    await makeFeatures().runFeature('conn:disconnect_all', {})
+    await makeFeatures().runFeature('conn:disconnect_all', null)
     expect(openConnections.value).toEqual([])
   })
 })
@@ -148,7 +150,7 @@ describe('disconnect paths close affected workspaces through the store', () => {
     resetOpenConnections()
     addOpenConnection({ id: 'c1' })
     const features = makeFeatures()
-    await features.runFeature('conn:disconnect', { connId: 'c1', connName: 'Sales' }, { label: 'Sales' })
+    await features.runFeature('conn:disconnect', createResourceRef('c1'), { label: 'Sales', connectionName: 'Sales' })
     expect(disconnect).toHaveBeenCalledWith('c1')
     const ids = tabs.value.map(t => t.id)
     expect(ids).not.toContain('f')
@@ -169,7 +171,7 @@ describe('disconnect paths close affected workspaces through the store', () => {
     addOpenConnection({ id: 'c1' })
     addOpenConnection({ id: 'c2' })
     const features = makeFeatures()
-    await features.runFeature('conn:disconnect_others', { connId: 'c1', connName: 'Sales' })
+    await features.runFeature('conn:disconnect_others', createResourceRef('c1'), { connectionName: 'Sales' })
     expect(disconnect).toHaveBeenCalledWith('c2')
     const ids = tabs.value.map(t => t.id)
     expect(ids).toEqual(['q', 'f', 'sh'])
@@ -187,7 +189,7 @@ describe('disconnect paths close affected workspaces through the store', () => {
     addOpenConnection({ id: 'c1' })
     addOpenConnection({ id: 'c2' })
     const features = makeFeatures()
-    await features.runFeature('conn:disconnect_all', {})
+    await features.runFeature('conn:disconnect_all', null)
     expect(disconnect).toHaveBeenCalledWith('c1')
     expect(disconnect).toHaveBeenCalledWith('c2')
     expect(tabs.value.map(t => t.id)).toEqual(['q'])
@@ -240,6 +242,58 @@ describe('global toolbar routing', () => {
 
     expect(openCollectionTab).not.toHaveBeenCalled()
     expect(showToast).toHaveBeenCalledWith('Select a collection in the sidebar first')
+  })
+})
+
+// Every entry point hands the handlers a ResourceRef; each handler cuts it to the level
+// its action needs before passing it on, so a deeper row acts on its own ancestor.
+describe('feature nodes arrive as a ResourceRef', () => {
+  const ordersRow = {
+    type: 'collection', x: 0, y: 0, label: 'orders',
+    nodeData: { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' },
+  }
+
+  it('opens a database tool for the database of a right-clicked collection', () => {
+    contextMenu.value = ordersRow
+    makeFeatures().handleContextAction('file:intellishell')
+    expect(openShellTab).toHaveBeenCalledWith({ connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
+  })
+
+  it('gives a connection-scoped tool no database or collection to filter on', () => {
+    contextMenu.value = ordersRow
+    makeFeatures().handleContextAction('db:current_ops')
+    expect(openCurrentOpsTab).toHaveBeenCalledWith({ connId: 'c1', connName: 'Sales' })
+  })
+
+  it('opens a registry modal with exactly its level\'s target', () => {
+    contextMenu.value = ordersRow
+    makeFeatures().handleContextAction('coll:stats')
+    expect(openModal).toHaveBeenCalledWith('stats', {
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+    })
+  })
+
+  it('guides the user when the node is too shallow for the action', () => {
+    makeFeatures().runFeature('coll:stats', createResourceRef('c1', [{ kind: 'database', name: 'shop' }]))
+    expect(openModal).not.toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalledWith('Open a collection first')
+  })
+
+  it('runs a native menu action on the target it resolves', () => {
+    const menuTarget = vi.fn(() => ({
+      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: null, kind: 'database',
+    }))
+    useFeatures({ menuTarget }).menuNode('file:search')
+    expect(openSearchTab).toHaveBeenCalledWith({ connId: 'c1', connName: 'Sales', dbName: 'shop' })
+  })
+
+  it('guides the user when the native menu has nothing deep enough', () => {
+    const menuTarget = vi.fn(() => ({
+      connectionId: 'c1', connectionName: 'Sales', dbName: null, collectionName: null, kind: 'connection',
+    }))
+    useFeatures({ menuTarget }).menuNode('coll:stats')
+    expect(openModal).not.toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalledWith('Open a collection first')
   })
 })
 
@@ -377,14 +431,14 @@ describe('context menu coverage', () => {
 
   it('reports an unknown action as a fault instead of an unbuilt feature', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    makeFeatures().runFeature('nope:not_a_feature', { connId: 'c1' })
+    makeFeatures().runFeature('nope:not_a_feature', createResourceRef('c1'))
     expect(showToast).toHaveBeenCalledWith('Could not run "nope:not_a_feature"')
     expect(error).toHaveBeenCalled()
     error.mockRestore()
   })
 
   it('still says "coming soon", by name, for the acknowledged placeholders', () => {
-    makeFeatures().runFeature('conn:export_uri', { connId: 'c1' })
+    makeFeatures().runFeature('conn:export_uri', createResourceRef('c1'))
     expect(showToast).toHaveBeenCalledWith('Export URI… — coming to OzenDB')
   })
 })
