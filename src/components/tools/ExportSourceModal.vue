@@ -13,12 +13,15 @@ import FlexSpacer from '../base/FlexSpacer.vue'
 // Two of the sources depend on there being a matching open collection tab, so they
 // enable only when the caller supplies one (see `target.query` / `target.selected`).
 const props = defineProps({
-  // { connectionId, connectionName, dbName, collectionName, query, selectedIds } — `query` is the tab’s
-  // current filter as EJSON (null when Export was opened from the sidebar), and
-  // `selectedIds` the EJSON _id values of the rows selected in its grid.
+  // { resource, connectionName, query, selectedIds } — `query` is the tab’s current
+  // filter as EJSON (null when Export was opened from the sidebar), and `selectedIds`
+  // the EJSON _id values of the rows selected in its grid.
   target: { type: Object, required: true },
 })
 const emit = defineEmits(['choose', 'close'])
+
+// MongoDB names a collection by its database too, so the heading spells out both.
+const qualifiedName = computed(() => props.target.resource.segments.map(s => s.name).join('.'))
 
 const hasQuery = computed(() => {
   const q = props.target.query
@@ -70,7 +73,7 @@ function next() {
       <div class="ifm-title">Export source</div>
       <div class="ifm-sub">
         Please choose an export source —
-        {{ target.dbName }}.{{ target.collectionName }}
+        {{ qualifiedName }}
       </div>
     </div>
 

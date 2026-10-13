@@ -6,6 +6,7 @@ import { ref, reactive, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useCurrentOps, opsDefaults } from './useCurrentOps'
 import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
+import { createResourceRef } from '../utils/resourceRef'
 
 // Switching workspace tabs unmounts the pane, so anything held in a plain ref inside it
 // is gone when the user comes back. The toolbar settings live on the tab object for that
@@ -19,7 +20,10 @@ import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
 const definition = toolDefinitions.find((d) => d.type === 'mongodb.current_operations')
 const newTab = (over = {}) => reactive({
   id: 't1',
-  ...definition.create({ target: { connId: 'c1', connName: 'Local' }, options: {} }).fields,
+  ...definition.create({
+    target: { resource: createResourceRef('c1'), connectionName: 'Local' },
+    options: {},
+  }).fields,
   ...over,
 })
 

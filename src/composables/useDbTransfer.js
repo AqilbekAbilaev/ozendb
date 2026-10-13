@@ -4,6 +4,8 @@ import { openImportTab } from '../stores/tabCreators'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { exportCollection, importCollection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'
+import { apiTarget } from '../engines/mongodb/api/payload'
+import { resourceName } from '../utils/resourceRef'
 import { invalidateConnectionResources } from '../stores/connectionData'
 import { openModal, closeModal } from '../stores/modals'
 
@@ -12,13 +14,8 @@ import { openModal, closeModal } from '../stores/modals'
 // Collections… run the plain per-collection commands in a loop over a chosen folder/files.
 export function useDbTransfer() {
   // Import starts with the format picker; on Configure it opens the matching import tab.
-  function openImportWizard(nodeData) {
-    const target = {
-      connId: nodeData.connId,
-      connName: nodeData.connName,
-      dbName: nodeData.dbName,
-      collName: nodeData.collName,
-    }
+  // `target` is the collection's `{ resource, connectionName }`, as the modals take (#193).
+  function openImportWizard(target) {
     openModal('import', target, {
       on: {
         configure: (format) => {
@@ -31,10 +28,11 @@ export function useDbTransfer() {
 
   // Database → Export Collections…: export every collection in the database to a chosen
   // folder, one JSON file per collection. Reuses the per-collection command.
-  async function exportDatabase(nodeData) {
+  async function exportDatabase({ resource }) {
+    const dbName = resourceName(resource)
     let dir
     try {
-      dir = await openDialog({ directory: true, title: `Export all collections in ${nodeData.dbName}` })
+      dir = await openDialog({ directory: true, title: `Export all collections in ${dbName}` })
     } catch (e) {
       showToast('Export failed: ' + errText(e))
       return
@@ -42,8 +40,8 @@ export function useDbTransfer() {
     if (!dir) return  // user cancelled
     let collections
     try {
-      const dbs = await listDatabases(nodeData.connId)
-      collections = (dbs.find(d => d.name === nodeData.dbName)?.collections) || []
+      const dbs = await listDatabases(resource.connectionId)
+      collections = (dbs.find(d => d.name === dbName)?.collections) || []
     } catch (e) {
       showToast('Export failed: ' + errText(e))
       return
@@ -54,7 +52,7 @@ export function useDbTransfer() {
     for (const coll of collections) {
       try {
         await exportCollection(
-          { connectionId: nodeData.connId, database: nodeData.dbName, collection: coll },
+          { ...apiTarget(resource), collection: coll },
           `${dir}/${coll}.json`,
           'json',
         )
@@ -68,7 +66,7 @@ export function useDbTransfer() {
 
   // Database → Import Collections…: import one or more JSON/CSV files into the database,
   // each into a collection named after the file. Reuses the per-file command.
-  async function importDatabase(nodeData) {
+  async function importDatabase({ resource }) {
     let paths
     try {
       paths = await openDialog({
@@ -89,7 +87,7 @@ export function useDbTransfer() {
       const format = p.toLowerCase().endsWith('.csv') ? 'csv' : 'json'
       try {
         await importCollection(
-          { connectionId: nodeData.connId, database: nodeData.dbName, collection },
+          { ...apiTarget(resource), collection },
           p,
           format,
         )
@@ -98,7 +96,7 @@ export function useDbTransfer() {
         failed++
       }
     }
-    if (done > 0) invalidateConnectionResources(nodeData.connId)
+    if (done > 0) invalidateConnectionResources(resource.connectionId)
     showToast(`Imported ${done} file${done !== 1 ? 's' : ''}${failed ? `, ${failed} failed` : ''}`)
   }
 

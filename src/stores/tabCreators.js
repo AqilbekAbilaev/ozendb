@@ -1,5 +1,6 @@
 import { getDefaultQuery } from '../engines/mongodb/api/queryLibrary'
 import { parseField } from '../utils/queryParser'
+import { sameResource } from '../utils/resourceRef'
 import { tabs, activeTab, activateTab, newTabId } from './tabs'
 import { createWorkspace } from '../workspaces/createWorkspace'
 import { openModal, closeModal } from './modals'
@@ -105,11 +106,10 @@ export function openShellTab({ connectionId, connectionName, dbName }) {
 
 // Opens (or re-focuses) an Index Manager tab for a collection. The tab is a thin
 // shell around the shared useIndexes state; IndexManagerPane loads it on mount.
-export function openIndexManagerTab({ connId, connName, dbName, collName }) {
-  const existing = tabs.value.find(t =>
-    t.kind === 'indexes' && t.connectionId === connId && t.dbName === dbName && t.collectionName === collName)
+export function openIndexManagerTab({ resource, connectionName }) {
+  const existing = tabs.value.find(t => t.kind === 'indexes' && sameResource(t.target, resource))
   if (existing) { activateTab(existing.id); return }
-  const tab = newWorkspace('mongodb.indexes', { target: { connId, connName, dbName, collName } })
+  const tab = newWorkspace('mongodb.indexes', { target: { resource, connectionName } })
   tabs.value.push(tab)
   activateTab(tab.id)
 }
@@ -117,11 +117,10 @@ export function openIndexManagerTab({ connId, connName, dbName, collName }) {
 // Open (or focus) a collection-scoped tool tab — Studio-3T renders Schema,
 // etc. as workspace tabs rather than modals. Reopening the same tool on the same
 // collection focuses the existing tab.
-export function openSchemaTab({ connId, connName, dbName, collName }) {
-  const existing = tabs.value.find(t =>
-    t.kind === 'schema' && t.connectionId === connId && t.dbName === dbName && t.collectionName === collName)
+export function openSchemaTab({ resource, connectionName }) {
+  const existing = tabs.value.find(t => t.kind === 'schema' && sameResource(t.target, resource))
   if (existing) { activateTab(existing.id); return }
-  const tab = newWorkspace('mongodb.schema', { target: { connId, connName, dbName, collName } })
+  const tab = newWorkspace('mongodb.schema', { target: { resource, connectionName } })
   tabs.value.push(tab)
   activateTab(tab.id)
 }
@@ -131,9 +130,8 @@ export function openSchemaTab({ connId, connName, dbName, collName }) {
 // collection tab for the same collection can supply them, so the query and the
 // selected _ids are resolved here and handed to the modal. The active tab wins when it
 // shows the collection, since the same collection may be open in several tabs (#275).
-export function openExportSource(node) {
-  const showsNode = t => t.kind === 'collection' && t.connectionId === node.connId
-    && t.dbName === node.dbName && t.collectionName === node.collName
+export function openExportSource({ resource, connectionName }) {
+  const showsNode = t => t.kind === 'collection' && sameResource(t.target, resource)
   const tab = activeTab.value && showsNode(activeTab.value) ? activeTab.value : tabs.value.find(showsNode)
   const pf = tab ? parseField(tab.state.query.filter) : null
   const rows = (tab && tab.runtime.selectedRows) || []
@@ -141,14 +139,11 @@ export function openExportSource(node) {
     .map(i => tab.runtime.results[i])
     .filter(doc => doc && doc._id !== undefined)
     .map(doc => doc._id)
+  // The picker and the export tab share one payload: the collection's reference plus
+  // the two narrower sources this collection's open tab can supply.
   const target = {
-    ...node,
-    // The modal reads the long spelling; openExportTab still builds a tool
-    // workspace from the short one, so this object carries both until the node
-    // path is migrated too (#193).
-    connectionId: node.connId,
-    connectionName: node.connName,
-    collectionName: node.collName,
+    resource: resource,
+    connectionName: connectionName,
     query: pf && pf.ok ? pf.ejson : null,
     selectedIds: selectedIds,
   }
@@ -173,7 +168,7 @@ export function openExportSource(node) {
 // query as it was when the export was set up, not whatever the other tab shows now.
 export function openExportTab(target, source) {
   const tab = newWorkspace('mongodb.export', {
-    target: target,            // { connId, connName, dbName, collName, query, selectedIds }
+    target: target,            // { resource, connectionName, query, selectedIds }
     options: { source: source || 'collection', format: 'json' },
   })
   tabs.value.push(tab)
@@ -181,10 +176,10 @@ export function openExportTab(target, source) {
 }
 
 // Search is database-scoped (it scans every collection in one db).
-export function openSearchTab({ connId, connName, dbName }) {
-  const existing = tabs.value.find(t => t.kind === 'search' && t.connectionId === connId && t.dbName === dbName)
+export function openSearchTab({ resource, connectionName }) {
+  const existing = tabs.value.find(t => t.kind === 'search' && sameResource(t.target, resource))
   if (existing) { activateTab(existing.id); return }
-  const tab = newWorkspace('mongodb.search', { target: { connId, connName, dbName } })
+  const tab = newWorkspace('mongodb.search', { target: { resource, connectionName } })
   tabs.value.push(tab)
   activateTab(tab.id)
 }
@@ -193,8 +188,8 @@ export function openSearchTab({ connId, connName, dbName }) {
 // a collection does): two views of the same server can watch it through different
 // filters — one on a namespace, one on slow ops only — and silently focusing an
 // existing tab would take one of those away.
-export function openCurrentOpsTab({ connId, connName }) {
-  const tab = newWorkspace('mongodb.current_operations', { target: { connId, connName } })
+export function openCurrentOpsTab({ resource, connectionName }) {
+  const tab = newWorkspace('mongodb.current_operations', { target: { resource, connectionName } })
   tabs.value.push(tab)
   activateTab(tab.id)
 }
@@ -204,9 +199,9 @@ export function openCurrentOpsTab({ connId, connName }) {
 // on the tab, so it survives tab switches; the persisted subset (format, validate,
 // sources) lets the tab return on restart. Each source targets a db.collection on
 // this connection; Run loops over the sources on the frontend.
-export function openImportTab({ connId, connName, dbName, collName }, format) {
+export function openImportTab({ resource, connectionName }, format) {
   const tab = newWorkspace('mongodb.import', {
-    target: { connId, connName, dbName, collName },
+    target: { resource, connectionName },
     options: { format: format },
   })
   tabs.value.push(tab)

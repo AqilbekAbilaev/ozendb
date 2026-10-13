@@ -15,7 +15,7 @@ import { MODALS } from '../constants/modalRegistry'
 import { COLOR_ACTION } from '../constants/contextMenus'
 import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
-import { createResourceRef, resourceKind, resourceName } from '../utils/resourceRef'
+import { createResourceRef, resourceName } from '../utils/resourceRef'
 import { resourceFromFeatureNode, resourceFromTreeSelection } from '../utils/legacyResourceRef'
 import { resolveMenuTarget } from '../utils/menuContext'
 import { errText } from '../utils/errors'
@@ -77,20 +77,9 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     }
   }
 
-  // The same, in the short alias spelling the tool tabs, the transfer wizards and the
-  // clipboard still read. It goes when those take a ResourceRef (the rest of #193).
-  function toolTarget(ref, ctx, level) {
-    const long = target(ref, ctx, level)
-    return {
-      connId: long.connectionId,
-      connName: long.connectionName,
-      ...('dbName' in long ? { dbName: long.dbName } : {}),
-      ...('collectionName' in long ? { collName: long.collectionName } : {}),
-    }
-  }
-
-  // A modal's target: the node's resource cut to `level`, with the connection's display
-  // name beside it, since a ref never carries one. Modals read names off the ref.
+  // The node's resource cut to `level`, with the connection's display name beside it,
+  // since a ref never carries one. This is what every modal, tool tab and wizard takes;
+  // they read the names they show off the ref.
   function modalTarget(ref, ctx, level) {
     return {
       resource: createResourceRef(ref.connectionId, ref.segments.slice(0, DEPTH[level])),
@@ -175,9 +164,9 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     })
   }
   function copyToClipboard(ref, ctx, kind) {
-    const copied = toolTarget(ref, ctx, kind)
+    const copied = modalTarget(ref, ctx, kind)
     dbClipboard.value = { kind: kind, ...copied }
-    showToast(`Copied ${kind} "${kind === 'collection' ? copied.collName : copied.dbName}"`)
+    showToast(`Copied ${kind} "${resourceName(copied.resource)}"`)
   }
 
   // Keyed by action id; the labels menus show are theirs, not ours. Ids match the
@@ -187,12 +176,12 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'coll:open_tab':           { requires: 'collection', run: (r, c) => openCollectionTab(target(r, c, 'collection')) },
     'coll:aggregation':        { requires: 'collection', run: (r, c) => openCollectionTab(target(r, c, 'collection'), 'aggregate') },
     'file:intellishell':       { requires: 'database',   run: (r, c) => openShellTab(target(r, c, 'database')) },
-    'coll:add_index':          { requires: 'collection', run: (r, c) => openIndexManagerTab(toolTarget(r, c, 'collection')) },
+    'coll:add_index':          { requires: 'collection', run: (r, c) => openIndexManagerTab(modalTarget(r, c, 'collection')) },
 
     // ── connection-scoped info modals ──
     'file:server_status':      modalFeature('serverStatus'),
     'file:server_charts':      modalFeature('serverCharts'),
-    'db:current_ops':          { requires: 'connection', run: (r, c) => openCurrentOpsTab(toolTarget(r, c, 'connection')) },
+    'db:current_ops':          { requires: 'connection', run: (r, c) => openCurrentOpsTab(modalTarget(r, c, 'connection')) },
     'file:server_build':       { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'build',   'Build Info') },
     'conn:host_info':          { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'host',    'Host Info') },
     'conn:replica_status':     { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'replica', 'Replica Set Status') },
@@ -204,11 +193,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'db:manage_roles':         modalFeature('roles'),
     'db:functions':            modalFeature('functions'),
     'gridfs:open':             modalFeature('gridfs'),
-    'file:search':             { requires: 'database', run: (r, c) => openSearchTab(toolTarget(r, c, 'database')) },
+    'file:search':             { requires: 'database', run: (r, c) => openSearchTab(modalTarget(r, c, 'database')) },
 
     // ── collection-scoped modals ──
     'coll:validator':          modalFeature('validator'),
-    'coll:schema':             { requires: 'collection', run: (r, c) => openSchemaTab(toolTarget(r, c, 'collection')) },
+    'coll:schema':             { requires: 'collection', run: (r, c) => openSchemaTab(modalTarget(r, c, 'collection')) },
     'coll:history':            modalFeature('history'),
     'coll:stats':              modalFeature('stats'),
     'coll:mapreduce':          modalFeature('mapReduce'),
@@ -225,16 +214,18 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'coll:duplicate':          modalFeature('duplicateCollection'),
 
     // ── import / export (collection-level wizards; db-level exports many) ──
-    'coll:export':             { requires: 'collection', run: (r, c) => openExportSource(toolTarget(r, c, 'collection')) },
-    'coll:import':             { requires: 'collection', run: (r, c) => openImportWizard(toolTarget(r, c, 'collection')) },
-    'db:export':               { requires: 'database',   run: (r, c) => exportDatabase(toolTarget(r, c, resourceKind(r))) },
-    'db:import':               { requires: 'database',   run: (r, c) => importDatabase(toolTarget(r, c, resourceKind(r))) },
+    'coll:export':             { requires: 'collection', run: (r, c) => openExportSource(modalTarget(r, c, 'collection')) },
+    'coll:import':             { requires: 'collection', run: (r, c) => openImportWizard(modalTarget(r, c, 'collection')) },
+    // Export / Import Collections… act on a database, so a collection row resolves to
+    // its database rather than carrying a collection the handlers would ignore.
+    'db:export':               { requires: 'database',   run: (r, c) => exportDatabase(modalTarget(r, c, 'database')) },
+    'db:import':               { requires: 'database',   run: (r, c) => importDatabase(modalTarget(r, c, 'database')) },
 
     // ── clipboard / copy-paste ──
     'node:copy_name':          { requires: null,         run: (r, c) => { navigator.clipboard.writeText(c.label); showToast('Copied') } },
     'coll:copy':               { requires: 'collection', run: (r, c) => copyToClipboard(r, c, 'collection') },
     'db:copy_database':        { requires: 'database',   run: (r, c) => copyToClipboard(r, c, 'database') },
-    'db:paste':                { requires: 'database',   run: (r, c) => pasteClipboard(toolTarget(r, c, resourceKind(r))) },
+    'db:paste':                { requires: 'database',   run: (r, c) => pasteClipboard(modalTarget(r, c, 'database')) },
 
     // ── connection lifecycle ──
     'conn:disconnect':         { requires: 'connection', run: disconnectOne },

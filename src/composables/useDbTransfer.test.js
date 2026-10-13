@@ -21,13 +21,20 @@ import { showToast } from '../stores/toast'
 import { openImportTab } from '../stores/tabCreators'
 import { useDbTransfer } from './useDbTransfer'
 import { useDbActions } from './useDbActions'
+import { createResourceRef } from '../utils/resourceRef'
 
 beforeEach(() => vi.resetAllMocks())
-const target = { connId: 'destination', dbName: 'db' }
+
+// Tools and wizards are handed `{ resource, connectionName }` (#193).
+const db = (connectionId, name) => createResourceRef(connectionId, [{ kind: 'database', name }])
+const collection = (connectionId, name, coll) => createResourceRef(connectionId, [
+  { kind: 'database', name }, { kind: 'collection', name: coll },
+])
+const target = { resource: db('destination', 'db'), connectionName: 'Dest' }
 
 it('creates an import workspace from the picker target captured at open', () => {
   const transfer = useDbTransfer()
-  const target = { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' }
+  const target = { resource: collection('c1', 'shop', 'orders'), connectionName: 'Sales' }
 
   transfer.openImportWizard(target)
   const [, capturedTarget, options] = openModal.mock.calls[0]
@@ -54,9 +61,10 @@ it('does not invalidate when every import fails', async () => {
 })
 
 it.each(['destination', 'source'])('invalidates the destination after collection paste from %s', async connId => {
-  dbClipboard.value = { kind: 'collection', connId, dbName: 'sourceDb', collName: 'items' }
+  dbClipboard.value = { kind: 'collection', resource: collection(connId, 'sourceDb', 'items'), connectionName: 'Src' }
   await useDbActions().pasteClipboard(target)
-  expect(connId === target.connId ? copyCollection : copyCollectionToConnection).toHaveBeenCalledOnce()
+  const sameConnection = connId === target.resource.connectionId
+  expect(sameConnection ? copyCollection : copyCollectionToConnection).toHaveBeenCalledOnce()
   expect(invalidateConnectionResources).toHaveBeenCalledWith('destination')
   expect(showToast).toHaveBeenCalledTimes(1)
   expect(showToast.mock.calls[0][0]).toContain('Pasted "items"')
@@ -65,7 +73,7 @@ it.each(['destination', 'source'])('invalidates the destination after collection
 it('invalidates successful database copies even when later collections fail', async () => {
   listDatabases.mockResolvedValue([{ name: 'sourceDb', collections: ['a', 'b'] }])
   copyCollectionToConnection.mockResolvedValueOnce(1).mockRejectedValueOnce('Failed')
-  dbClipboard.value = { kind: 'database', connId: 'source', dbName: 'sourceDb' }
+  dbClipboard.value = { kind: 'database', resource: db('source', 'sourceDb'), connectionName: 'Src' }
   await useDbActions().pasteClipboard(target)
   expect(invalidateConnectionResources).toHaveBeenCalledWith('destination')
   expect(showToast).toHaveBeenLastCalledWith('Pasted 1 collection into db (cross-server)')
