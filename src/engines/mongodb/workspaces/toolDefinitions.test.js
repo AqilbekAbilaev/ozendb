@@ -111,7 +111,7 @@ describe('mongodb.export', () => {
     expect(created.fields.step).toBe(0)
     expect(created.fields.format).toBe('json')
     expect(created.fields.incremental).toBe(false)
-    expect(created.fields.jsonStyle).toBe('extended')
+    expect(created.fields.jsonStyle).toBe('plain')
     expect(created.fields.fields).toEqual([])
     expect(created.fields.result).toBe(null)
     expectCollectionDepth(created)
@@ -232,7 +232,7 @@ describe('lifecycle — tools', () => {
     const dup = duplicateWorkspace({
       id: 'e', type: 'mongodb.export', kind: 'export', title: 'Export: orders',
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders',
-      step: 2, format: 'csv', incremental: true, jsonStyle: 'plain', source: 'query',
+      step: 2, format: 'csv', incremental: true, jsonStyle: 'extended', source: 'query',
       sourceCount: 5, filter: '{ "a": 1 }',
       fields: [{ source: 'a', target: 'b', kind: 'string', include: true }],
       result: { count: 3, path: '/tmp/x.csv' },
@@ -240,18 +240,20 @@ describe('lifecycle — tools', () => {
     expect(dup.filter).toBe('{ "a": 1 }')
     expect(dup.source).toBe('query')
     expect(dup.sourceCount).toBe(5)
-    expect(dup.jsonStyle).toBe('plain')
+    // Non-default on purpose: the saved field must come through unchanged, not fall
+    // back to the (now matching) default and hide a bug that ignores it.
+    expect(dup.jsonStyle).toBe('extended')
     expect(dup.fields).toEqual([{ source: 'a', target: 'b', kind: 'string', include: true }])
     expect(dup.result).toBe(null)
   })
 
-  it('export duplicate defaults the json value style to extended when the source tab has none', () => {
+  it('export duplicate defaults the json value style to plain when the source tab has none', () => {
     const dup = duplicateWorkspace({
       id: 'e', type: 'mongodb.export', kind: 'export', title: 'Export: orders',
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders',
       format: 'json', source: 'collection', filter: '{}', fields: [],
     })
-    expect(dup.jsonStyle).toBe('extended')
+    expect(dup.jsonStyle).toBe('plain')
   })
 
   it('current operations duplicate clones settings over fresh defaults', () => {
@@ -310,23 +312,25 @@ describe('lifecycle — tool restore', () => {
     const tab = restoreWorkspace({
       id: 'e', kind: 'export', title: 'Export: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
-      step: 1, format: 'csv', incremental: true, jsonStyle: 'plain', source: 'collection',
+      step: 1, format: 'csv', incremental: true, jsonStyle: 'extended', source: 'collection',
       sourceCount: null, filter: '{ "a": 1 }',
       fields: [{ source: 'a', target: 'b', kind: 'string', include: true }],
     })
     expect(tab.filter).toBe('{ "a": 1 }')
     expect(tab.fields).toHaveLength(1)
-    expect(tab.jsonStyle).toBe('plain')
+    // Non-default on purpose: the saved field must come through unchanged, not fall
+    // back to the (now matching) default and hide a bug that ignores it.
+    expect(tab.jsonStyle).toBe('extended')
     expect(tab.result).toBe(null)
   })
 
-  it('export restore defaults the json value style to extended for a session saved before #279', () => {
+  it('export restore defaults the json value style to plain for a session saved before #282', () => {
     const tab = restoreWorkspace({
       id: 'e', kind: 'export', title: 'Export: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
       format: 'json', source: 'collection', filter: '{}', fields: [],
     })
-    expect(tab.jsonStyle).toBe('extended')
+    expect(tab.jsonStyle).toBe('plain')
   })
 
   it('current operations restore settings over fresh defaults', () => {

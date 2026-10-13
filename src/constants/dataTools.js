@@ -24,12 +24,13 @@ export const EXPORT_FORMATS = [
 ]
 
 // How a JSON export renders ObjectId/Date/Decimal128 values. CSV and XLSX always write
-// plain values already, so this choice only applies to the JSON format. Extended is the
-// default: it's what mongoexport writes, and what keeps the file re-importable with its
-// types intact — see issue #279.
+// plain values already, so this choice only applies to the JSON format. Plain is the
+// default (#289): most exports go to a spreadsheet, a script or another system that
+// just wants the values. Extended is what mongoexport writes, and what keeps the file
+// re-importable with its types intact — see issue #279.
 export const JSON_VALUE_STYLES = [
-  { value: 'extended', label: 'Extended JSON (keeps types, re-importable)' },
   { value: 'plain', label: 'Plain JSON' },
+  { value: 'extended', label: 'Extended JSON (keeps types, re-importable)' },
 ]
 
 // How an import writes its documents. One option today; the dropdown exists so

@@ -73,8 +73,8 @@ fn excel_datetime_rejects_a_year_beyond_excels_range() {
 }
 
 #[test]
-fn json_value_style_defaults_to_extended() {
-    assert_eq!(JsonValueStyle::default(), JsonValueStyle::Extended);
+fn json_value_style_defaults_to_plain() {
+    assert_eq!(JsonValueStyle::default(), JsonValueStyle::Plain);
 }
 
 #[test]

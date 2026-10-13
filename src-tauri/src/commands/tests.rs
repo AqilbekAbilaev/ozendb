@@ -179,18 +179,33 @@ fn export_json_multi_doc_is_a_valid_json_array() {
 }
 
 // ── JSON export value style (Extended vs. Plain) ──────────────────
-// #279's second half: an export option, defaulting to Extended so an older call (or
-// one that omits the field) keeps writing exactly what it always wrote.
+// #279 added the option defaulting to Extended; #289 flipped the default to Plain, so
+// an omitted style no longer writes what it used to. These two tests split what was
+// one "the default never changes" test: the guarantee that explicit Extended still
+// writes the old pinned output survives, and the default's new output is pinned
+// separately as its own fact.
 
 #[test]
-fn json_value_style_omitted_writes_byte_identical_output_to_the_old_default() {
+fn explicit_extended_style_still_writes_the_pinned_pre_289_output() {
     // Pinned literal, not a reconstruction of the Extended arm's own expression — this
     // fails if that output's shape ever changes, not just if the match arm is wrong.
     let oid = bson::oid::ObjectId::parse_str("5f8d0d55b54764421b7156c3").unwrap();
     let dt = bson::DateTime::from_millis(1709802930000);
     let docs = vec![bson::doc! { "_id": oid, "when": dt, "näme": "Łukasz" }];
-    let out = docs_to_json_array(&docs, JsonValueStyle::default()).unwrap();
+    let out = docs_to_json_array(&docs, JsonValueStyle::Extended).unwrap();
     let expected = "[\n{\n  \"_id\": {\n    \"$oid\": \"5f8d0d55b54764421b7156c3\"\n  },\n  \"when\": {\n    \"$date\": \"2024-03-07T09:15:30Z\"\n  },\n  \"näme\": \"Łukasz\"\n}\n]";
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn omitted_style_now_writes_plain_unwrapped_values_not_the_old_extended_default() {
+    // Same input as the Extended-pinned test above, so the two outputs are directly
+    // comparable: this one must have no `$oid`/`$date` wrapper at all.
+    let oid = bson::oid::ObjectId::parse_str("5f8d0d55b54764421b7156c3").unwrap();
+    let dt = bson::DateTime::from_millis(1709802930000);
+    let docs = vec![bson::doc! { "_id": oid, "when": dt, "näme": "Łukasz" }];
+    let out = docs_to_json_array(&docs, JsonValueStyle::default()).unwrap();
+    let expected = "[\n{\n  \"_id\": \"5f8d0d55b54764421b7156c3\",\n  \"when\": \"2024-03-07T09:15:30Z\",\n  \"näme\": \"Łukasz\"\n}\n]";
     assert_eq!(out, expected);
 }
 
