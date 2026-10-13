@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { dropFunction, listFunctions, saveFunction } from '../../engines/mongodb/api/admin'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { errText } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -11,10 +12,11 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseTextarea from '../base/BaseTextarea.vue'
 import FieldError from '../base/FieldError.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
+import { resourceName } from '../../utils/resourceRef'
 
 // Add / Edit Stored Functions for a database (its system.js documents).
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 
@@ -32,7 +34,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    functions.value = await listFunctions({ connectionId: props.target.connectionId, database: props.target.dbName })
+    functions.value = await listFunctions(apiTarget(props.target.resource))
   } catch (e) {
     error.value = errText(e)
   } finally {
@@ -59,7 +61,7 @@ async function onSaveFunction() {
   editError.value = null
   try {
     await saveFunction(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
       name,
       editing.value.body,
     )
@@ -76,7 +78,7 @@ async function onDropFunction(fn) {
   if (!confirmDelete(fn.name)) return
   busy.value = true
   try {
-    await dropFunction({ connectionId: props.target.connectionId, database: props.target.dbName }, fn.name)
+    await dropFunction(apiTarget(props.target.resource), fn.name)
     await load()
   } catch (e) {
     error.value = errText(e)
@@ -87,7 +89,7 @@ async function onDropFunction(fn) {
 </script>
 
 <template>
-  <BaseModal :title="`Stored Functions — ${target.dbName}`" width="620px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Stored Functions — ${resourceName(target.resource)}`" width="620px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <!-- Editor -->

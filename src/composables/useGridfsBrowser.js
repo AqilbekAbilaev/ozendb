@@ -11,6 +11,7 @@ import {
   gridfsDropBucket,
   gridfsCopyBucket,
 } from '../engines/mongodb/api/gridfs'
+import { apiTarget } from '../engines/mongodb/api/payload'
 import { errText, errCode } from '../utils/errors'
 import { bucketChoices, metadataEjson } from '../utils/gridfs'
 import { useConfirmDelete } from './useConfirmDelete'
@@ -20,8 +21,8 @@ import { selectedGridfsFile, clearGridfsSelection } from '../stores/gridfs'
 
 // The GridFS browser behind GridFsModal: a database's buckets and files, and upload /
 // download / delete / rename / edit-metadata, plus bucket copy and drop. `target` is a
-// getter for `{ connectionId, connectionName, dbName, menuRequest? }`. Call `load()` once
-// the modal mounts.
+// getter for `{ resource, connectionName, menuRequest? }`, where `resource` is the
+// database's ResourceRef. Call `load()` once the modal mounts.
 export function useGridfsBrowser(target) {
   const buckets = ref([])
   const selectedBucket = ref('fs')
@@ -51,7 +52,7 @@ export function useGridfsBrowser(target) {
   const copyBucketName = ref('')
   const subError = ref(null)       // error for the active sub-form
 
-  const db = () => ({ connectionId: target().connectionId, database: target().dbName })
+  const db = () => apiTarget(target().resource)
 
   function fail(e) {
     error.value = errText(e)
@@ -131,7 +132,7 @@ export function useGridfsBrowser(target) {
   async function doCopyBucket() {
     const name = copyBucketName.value.trim()
     if (!name) return
-    const connectionId = target().connectionId
+    const connectionId = target().resource.connectionId
     await subFormWrite(async () => {
       await gridfsCopyBucket(db(), selectedBucket.value, name)
       invalidateConnectionResources(connectionId)
@@ -147,7 +148,7 @@ export function useGridfsBrowser(target) {
     const bucket = selectedBucket.value
     const ok = window.confirm(`Drop GridFS bucket "${bucket}" and all its files? This cannot be undone.`)
     if (!ok) return
-    const connectionId = target().connectionId
+    const connectionId = target().resource.connectionId
     busy.value = true
     try {
       await gridfsDropBucket(db(), bucket)
@@ -207,7 +208,7 @@ export function useGridfsBrowser(target) {
       path = await openDialog({ multiple: false })
     } catch (_) { return }
     if (!path) return
-    const connectionId = target().connectionId
+    const connectionId = target().resource.connectionId
     busy.value = true
     try {
       await gridfsUpload(db(), selectedBucket.value, path)

@@ -1,14 +1,16 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { listRoles } from '../../engines/mongodb/api/admin'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { errText } from '../../utils/errors'
 import StateMessage from '../base/StateMessage.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
+import { resourceName } from '../../utils/resourceRef'
 
 // Manage Roles for a database: read-only listing of the custom (non-built-in) roles.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 
@@ -18,7 +20,7 @@ const roles = ref([])
 
 onMounted(async () => {
   try {
-    roles.value = await listRoles({ connectionId: props.target.connectionId, database: props.target.dbName })
+    roles.value = await listRoles(apiTarget(props.target.resource))
   } catch (e) {
     error.value = errText(e)
   } finally {
@@ -28,7 +30,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <BaseModal :title="`Roles — ${target.dbName}`" width="420px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Roles — ${resourceName(target.resource)}`" width="420px" max-width="92vw" @close="$emit('close')">
       <BaseModalBody>
         <StateMessage v-if="loading" mode="loading" label="Loading roles…" />
         <StateMessage v-else-if="error" mode="error" :message="error" />

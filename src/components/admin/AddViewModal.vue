@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { createView } from '../../engines/mongodb/api/resources'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import BaseModal from '../base/BaseModal.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseTextarea from '../base/BaseTextarea.vue'
@@ -15,7 +16,7 @@ import FlexSpacer from '../base/FlexSpacer.vue'
 // Add View… (from a database node) opens with no source; Add View Here… (from a
 // collection node) prefills that collection — the caller seeds `target.source`.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connectionId, connectionName, dbName, source }
+  target: { type: Object, required: true },   // { resource, connectionName, source }
 })
 const emit = defineEmits(['close'])
 
@@ -38,13 +39,13 @@ async function confirm() {
   error.value = null
   try {
     await createView(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
       viewName,
       source.value.trim(),
       pp.ejson,
     )
     showToast(`View "${viewName}" created`)
-    invalidateConnectionResources(props.target.connectionId)
+    invalidateConnectionResources(props.target.resource.connectionId)
     emit('close')
   } catch (e) {
     error.value = errText(e)

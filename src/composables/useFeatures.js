@@ -102,16 +102,17 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // it carries the source collection to prefill (empty from a database node, the clicked
   // collection from "Add View Here…"), so it opens directly instead of via modalFeature.
   function openAddView(ref, ctx, source) {
-    openModal('addView', { ...target(ref, ctx, 'database'), source: source })
+    openModal('addView', { ...modalTarget(ref, ctx, 'database'), source: source })
   }
 
   // A registry-driven modal feature (see constants/modalRegistry.js): its level and
   // component are declared once in MODALS, so the feature is named by id alone and opens
-  // the registry modal with the target that level needs. Connection-level modals take a
-  // ResourceRef; the deeper levels move to one next (#193), and this branch goes with them.
+  // the registry modal with the target that level needs. Connection- and database-level
+  // modals take a ResourceRef; collection-level ones move next (#193), and this branch
+  // goes with them.
   function modalFeature(id) {
     const level = MODALS[id].level
-    const make = level === 'connection' ? modalTarget : target
+    const make = level === 'collection' ? target : modalTarget
     return { requires: level, run: (ref, ctx) => openModal(id, make(ref, ctx, level)) }
   }
 

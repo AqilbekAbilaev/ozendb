@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { createUser, dropUser, listUsers, copyUsersToConnection } from '../../engines/mongodb/api/admin'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { listConnections } from '../../appApi/connections'
 import { errText } from '../../utils/errors'
 import { useConfirmDelete } from '../../composables/useConfirmDelete'
@@ -14,11 +15,12 @@ import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
 import BaseModalBody from '../base/BaseModalBody.vue'
 import FormField from '../base/FormField.vue'
+import { resourceName } from '../../utils/resourceRef'
 
 // Manage Users for a database: list, create, and drop users (via usersInfo /
 // createUser / dropUser).
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, connectionName, dbName }
+  target: { type: Object, required: true },  // { resource, connectionName }
 })
 defineEmits(['close'])
 
@@ -38,7 +40,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    users.value = await listUsers({ connectionId: props.target.connectionId, database: props.target.dbName })
+    users.value = await listUsers(apiTarget(props.target.resource))
   } catch (e) {
     error.value = errText(e)
   } finally {
@@ -56,7 +58,7 @@ async function onCreateUser() {
   createError.value = null
   try {
     await createUser(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
       name,
       newPassword.value,
       roles,
@@ -77,7 +79,7 @@ async function onDropUser(user) {
   if (!confirmDelete(user.user)) return
   busy.value = true
   try {
-    await dropUser({ connectionId: props.target.connectionId, database: props.target.dbName }, user.user)
+    await dropUser(apiTarget(props.target.resource), user.user)
     await load()
   } catch (e) {
     error.value = errText(e)
@@ -103,10 +105,10 @@ async function openCopyPanel() {
   if (!showCopy.value) return
   copyResults.value = null
   copyError.value = null
-  copyTargetDb.value = props.target.dbName
+  copyTargetDb.value = resourceName(props.target.resource)
   try {
     connections.value = await listConnections()
-    copyTargetConn.value = props.target.connectionId
+    copyTargetConn.value = props.target.resource.connectionId
   } catch (e) {
     copyError.value = errText(e)
   }
@@ -120,7 +122,7 @@ async function runCopyUsers() {
   copyResults.value = null
   try {
     copyResults.value = await copyUsersToConnection(
-      { connectionId: props.target.connectionId, database: props.target.dbName },
+      apiTarget(props.target.resource),
       copyTargetConn.value,
       targetDb,
     )
@@ -137,7 +139,7 @@ function copyText(text) {
 </script>
 
 <template>
-  <BaseModal :title="`Users — ${target.dbName}`" width="660px" max-width="92vw" @close="$emit('close')">
+  <BaseModal :title="`Users — ${resourceName(target.resource)}`" width="660px" max-width="92vw" @close="$emit('close')">
 
       <BaseModalBody>
         <div class="um-bar">
