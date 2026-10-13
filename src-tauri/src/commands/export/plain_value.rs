@@ -5,13 +5,14 @@ use serde::Deserialize;
 // How a JSON export renders ObjectId/DateTime/Decimal128: `Extended` keeps them wrapped
 // (`{"$oid": …}`, …) — what `mongoexport` writes, and what lets a file round-trip back
 // in with its types intact — while `Plain` unwraps them to the text a user would have
-// typed. `Extended` is the default so an older frontend call (or a request that omits
-// the field entirely) can't silently change output.
+// typed. `Plain` is the default (#289): most exports go to a spreadsheet, a script or
+// another system that just wants the values, not back into MongoDB, so the common case
+// should be the easy one. A request that omits the field entirely gets Plain too.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum JsonValueStyle {
-    #[default]
     Extended,
+    #[default]
     Plain,
 }
 
