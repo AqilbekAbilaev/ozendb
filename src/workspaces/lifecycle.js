@@ -51,7 +51,7 @@ export function duplicateWorkspace(workspace, context = {}) {
 }
 
 // Restore reconstructs a fresh runtime workspace from a projected saved record (see
-// sessionMigration's toLegacyRecord), which names its workspace `type`. The saved id is
+// sessionMigration's toRestoreRecord), which names its workspace `type`. The saved id is
 // preserved (that is what session persistence re-activates). Returns null for a type
 // that is not restorable, so a stale file can never materialize a workspace the app no
 // longer saves.

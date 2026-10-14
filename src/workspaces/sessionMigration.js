@@ -179,35 +179,23 @@ export function migrateSession(raw, { connections = null } = {}) {
   return okResult(buildSession(validated.tabs, raw.activeTabId), 2, false, warnings, raw)
 }
 
-// The types the restore bridge accepts, with any extras a type's restore hook reads:
-// a collection record names its mode.
-const LEGACY_KEYS = {
-  'mongodb.find':           { extra: { mode: 'find' } },
-  'mongodb.aggregate':      { extra: { mode: 'aggregate' } },
-  'mongodb.sql_to_mql':     { extra: { mode: 'sql' } },
-  'mongodb.shell':          {},
-  'mongodb.indexes':        {},
-  'mongodb.schema':         {},
-  'mongodb.search':         {},
-  'mongodb.import':         {},
-  'mongodb.export':         {},
-  'mongodb.current_operations': {},
-  'postgresql.table_browse': {},
-  'postgresql.query':       {},
+// Whether a saved type can come back: exactly the types whose definition has a
+// restore hook, so the bridge can never leave out a type the definitions can restore
+// (#313: search tabs were saved but never restored, missing from a hand-kept list).
+function restorable(type) {
+  return knownType(type) && !!getWorkspaceDefinition(type).restore
 }
 
 // The v2 → restore bridge. Restore hooks read one flat record: the saved `type` and
 // `target`, which is the workspace's whole identity (#303), the display name
 // re-resolved from the connection list (names are not identity, so they are never
 // stored), and the durable state spread beside them. The state goes first, so no key
-// in it can ever overwrite the record's identity. Returns null for types outside the
-// table.
-export function toLegacyRecord(v2, connectionName = null) {
-  const conf = LEGACY_KEYS[v2 && v2.type]
-  if (!conf || !isValidTarget(v2.target)) return null
+// in it can ever overwrite the record's identity. Returns null for a type that cannot
+// be restored, or a record without a valid target.
+export function toRestoreRecord(v2, connectionName = null) {
+  if (!v2 || !restorable(v2.type) || !isValidTarget(v2.target)) return null
   return {
     ...v2.state,
-    ...(conf.extra || {}),
     id: v2.id,
     type: v2.type,
     target: v2.target,

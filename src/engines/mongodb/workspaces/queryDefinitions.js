@@ -83,8 +83,9 @@ function editorState(workspace) {
 // Restore reconstructs the full spine from a projected saved record: the saved
 // editor fields come back verbatim, runtime state starts fresh, and the canonical
 // target is the one the record was saved with. Only the connection's display name rides
-// along from the saved record, since a ref carries no display names.
-function restoreCollection(saved, defaults = {}) {
+// along from the saved record, since a ref carries no display names. Each mode's
+// definition names its own `mode`; the saved record does not carry one.
+function restoreCollection(saved, defaults = {}, mode = 'find') {
   const target = saved.target
   return {
     title: saved.title || resourceName(target),
@@ -96,7 +97,7 @@ function restoreCollection(saved, defaults = {}) {
         state: migrateCollectionState(saved),
         ui: createCollectionUi({ resultView: saved.resultView ?? defaults.resultView }),
       }),
-      mode: saved.mode || 'find',
+      mode: mode,
       readOnly: !!saved.readOnly,
     },
   }
@@ -159,7 +160,7 @@ export const queryDefinitions = [
     restore(saved, ctx) {
       // Find is the only query that auto-runs on restore; the one-shot marker tells
       // its workspace to run it exactly once on activation.
-      const base = restoreCollection(saved, ctx.defaults)
+      const base = restoreCollection(saved, ctx.defaults, 'find')
       return { ...base, fields: { ...base.fields, needsInitialRun: true } }
     },
   },
@@ -177,7 +178,7 @@ export const queryDefinitions = [
       return duplicateCollection(workspace, 'aggregate', editorState(workspace))
     },
     restore(saved, ctx) {
-      return restoreCollection(saved, ctx.defaults)
+      return restoreCollection(saved, ctx.defaults, 'aggregate')
     },
   },
   {
@@ -211,7 +212,7 @@ export const queryDefinitions = [
     restore(saved, ctx) {
       // The translated find pieces are re-derived on the next Run, so they restore
       // empty (like a freshly opened SQL tab); only the SQL text itself comes back.
-      const base = restoreCollection(saved, ctx.defaults)
+      const base = restoreCollection(saved, ctx.defaults, 'sql')
       return {
         ...base,
         fields: Object.assign(base.fields, {
