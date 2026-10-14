@@ -179,8 +179,8 @@ export function migrateSession(raw, { connections = null } = {}) {
   return okResult(buildSession(validated.tabs, raw.activeTabId), 2, false, warnings, raw)
 }
 
-// Per-type extras for the restore bridge: a collection record names its mode, and a
-// PostgreSQL target is deeper than MongoDB's, so each names its own levels.
+// The types the restore bridge accepts, with any extras a type's restore hook reads:
+// a collection record names its mode.
 const LEGACY_KEYS = {
   'mongodb.find':           { extra: { mode: 'find' } },
   'mongodb.aggregate':      { extra: { mode: 'aggregate' } },
@@ -192,40 +192,25 @@ const LEGACY_KEYS = {
   'mongodb.import':         {},
   'mongodb.export':         {},
   'mongodb.current_operations': {},
-  'postgresql.table_browse': {
-    identity: ([db, schema, table]) => ({ database: db.name, schema: schema.name, table: table.name }),
-  },
-  'postgresql.query': { identity: ([db]) => ({ database: db.name }) },
+  'postgresql.table_browse': {},
+  'postgresql.query':       {},
 }
 
-// The v2 → legacy bridge. Restore hooks consume the flat legacy shape;
-// this un-projects the canonical record back into it, with the display name
+// The v2 → restore bridge. Restore hooks read one flat record: the saved `type` and
+// `target`, which is the workspace's whole identity (#303), the display name
 // re-resolved from the connection list (names are not identity, so they are never
-// stored). The record's `type` and `target` ride along, so a restore hook takes its
-// identity as saved instead of rebuilding it from the flat fields. Returns null for
-// types outside the table.
+// stored), and the durable state spread beside them. Returns null for types outside
+// the table.
 export function toLegacyRecord(v2, connectionName = null) {
   const conf = LEGACY_KEYS[v2 && v2.type]
   if (!conf || !isValidTarget(v2.target)) return null
-  const [db] = v2.target.segments
-  const coll = v2.target.segments[1]
-  // Every workspace kind now takes the long spelling, so there is one projection
-  // rather than a per-type flag choosing between two.
-  const identity = conf.identity
-    ? { connectionId: v2.target.connectionId, connectionName, ...conf.identity(v2.target.segments) }
-    : {
-        connectionId: v2.target.connectionId,
-        connectionName: connectionName,
-        dbName: db ? db.name : null,
-        collectionName: coll ? coll.name : null,
-      }
   return {
     id: v2.id,
     type: v2.type,
     target: v2.target,
     title: v2.title,
     color: v2.color,
-    ...identity,
+    connectionName: connectionName,
     ...(conf.extra || {}),
     ...v2.state,
   }

@@ -9,7 +9,7 @@ const props = defineProps({
   activeTab: { type: Object, required: true },
 })
 
-const conn = computed(() => openConnections.value.find(c => c.id === props.activeTab.connectionId))
+const conn = computed(() => openConnections.value.find(c => c.id === props.activeTab.target.connectionId))
 const items = computed(() => {
   const host = conn.value?.hosts?.[0]
   const server = host ? ` (${host.host}:${host.port})` : ''

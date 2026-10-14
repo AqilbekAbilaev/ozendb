@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { listDatabases, listTables, listColumns, listForeignKeys } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
+import { segmentName } from '../../../utils/resourceRef'
 
 // PostgreSQL's own schemas (pg_catalog, information_schema, …) are in every database
 // and aren't what anyone is usually browsing for — hidden unless asked for.
@@ -108,15 +109,16 @@ export function usePostgresTree(connectionId) {
 
 // Whether `tab` (the active one) is browsing this table — the row the tree highlights.
 export function isOpenTable(tab, connectionId, schema, table) {
-  return tab?.type === 'postgresql.table_browse' && tab.connectionId === connectionId && tab.schema === schema && tab.table === table
+  return tab?.type === 'postgresql.table_browse' && tab.target.connectionId === connectionId
+    && segmentName(tab.target, 'schema') === schema && segmentName(tab.target, 'table') === table
 }
 
 // The schema holding the table the active tab is browsing on this connection, or null
 // when the tab is something else. The tree opens down to it, because a row that isn't
 // rendered can't carry the highlight — a restored tab left the sidebar showing nothing.
 export function activeTableSchema(tab, connectionId) {
-  if (tab?.type !== 'postgresql.table_browse' || tab.connectionId !== connectionId) return null
-  return tab.schema
+  if (tab?.type !== 'postgresql.table_browse' || tab.target.connectionId !== connectionId) return null
+  return segmentName(tab.target, 'schema')
 }
 
 // Whether `selection` (the shared sidebar selection) names this very row — what the

@@ -1,4 +1,5 @@
 import { toRef } from 'vue'
+import { segmentName } from '../../../utils/resourceRef'
 import { explainSql } from './runSql.js'
 import { useTableDerived } from './tableDerived.js'
 import { useTableLoad } from './tableLoad.js'
@@ -8,12 +9,16 @@ import { useTableStage } from './tableStage.js'
 
 /**
  * One table-browse tab: a page of rows, the row count, sorting, and editing a cell by
- * the row's primary key. `tab` is the workspace: `{ connectionId, database, schema,
- * table }`, and the `state` and `ui` it keeps (tableState.js), which this reads and
- * writes in place.
+ * the row's primary key. `tab` is the workspace: its `target` (the table's ref), and the
+ * `state` and `ui` it keeps (tableState.js), which this reads and writes in place.
  */
 export function usePostgresTable(tab, { readOnly = false } = {}) {
-  const target = { connectionId: tab.connectionId, database: tab.database, schema: tab.schema, table: tab.table }
+  const target = {
+    connectionId: tab.target.connectionId,
+    database: segmentName(tab.target, 'database'),
+    schema: segmentName(tab.target, 'schema'),
+    table: segmentName(tab.target, 'table'),
+  }
   const query = tab.state.query
   const runtime = tab.runtime
   const columns = toRef(runtime, 'columns')

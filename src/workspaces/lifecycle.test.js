@@ -210,7 +210,7 @@ describe('retargetResource', () => {
   const archive = createResourceRef(conn, [{ kind: 'database', name: 'archive' }])
 
   function tab(extra) {
-    return { type: 'mongodb.find', target: orders, title: 'orders', collectionName: 'orders', ...extra }
+    return { type: 'mongodb.find', target: orders, title: 'orders', ...extra }
   }
 
   it('rewrites the target of the renamed resource itself', () => {
@@ -250,44 +250,28 @@ describe('retargetResource', () => {
     expect(retargetResource(orders, sales)(home)).toBe(false)
   })
 
-  // Every workspace kind spells identity the same way now, so the flat copy is kept
-  // in step with the target rather than left to drift.
-  it('updates the flat identity copy alongside the target', () => {
-    const t = tab({ collectionName: 'orders' })
+  // The target is a workspace's whole identity (#303), so a rename moves only it.
+  // Current Operations' dbName/collName are the user's *filters*; a rename must never
+  // rewrite them, or it would silently change what the user is watching.
+  it('moves only the target, never a filter that names the same thing', () => {
+    const t = tab({ dbName: 'shop', collName: 'orders' })
     retargetResource(orders, sales)(t)
-    expect(t.collectionName).toBe('sales')
+    expect(t.target).toEqual(sales)
+    expect([t.dbName, t.collName]).toEqual(['shop', 'orders'])
   })
 
-  // `collName` survives only on Current Operations, where it is the user's collection
-  // *filter*. Retargeting must never rewrite it — that would silently change what the
-  // user is watching.
-  it('never touches a collName filter', () => {
-    const t = tab({ collectionName: 'orders', collName: 'a-filter' })
-    retargetResource(orders, sales)(t)
-    expect(t.collectionName).toBe('sales')
-    expect(t.collName).toBe('a-filter')
-  })
-
-  it('renames a database in the flat fields of the collections under it', () => {
-    const t = tab({ dbName: 'shop' })
-    retargetResource(shop, archive)(t)
-    expect(t.dbName).toBe('archive')
-    expect(t.collectionName).toBe('orders')
-  })
-
-  // A PostgreSQL table tab queries by its flat schema/table, so a stale copy would
-  // keep reading the old name after a rename.
+  // A PostgreSQL table tab reads its schema and table off its target each time it
+  // activates, so the target is what a rename has to move.
   it('moves a PostgreSQL table tab to the renamed table and schema', () => {
     const at = (schema, table) => createResourceRef(conn, [
       { kind: 'database', name: 'app' }, { kind: 'schema', name: schema }, { kind: 'table', name: table },
     ])
-    const pg = { type: 'postgresql.table_browse', target: at('public', 'users'), title: 'users', database: 'app', schema: 'public', table: 'users' }
+    const pg = { type: 'postgresql.table_browse', target: at('public', 'users'), title: 'users' }
     retargetResource(at('public', 'users'), at('public', 'people'))(pg)
-    expect([pg.schema, pg.table, pg.title]).toEqual(['public', 'people', 'people'])
+    expect([pg.target, pg.title]).toEqual([at('public', 'people'), 'people'])
 
     const schemaOnly = (name) => createResourceRef(conn, [{ kind: 'database', name: 'app' }, { kind: 'schema', name }])
     retargetResource(schemaOnly('public'), schemaOnly('crm'))(pg)
-    expect([pg.database, pg.schema, pg.table]).toEqual(['app', 'crm', 'people'])
     expect(pg.target).toEqual(at('crm', 'people'))
   })
 

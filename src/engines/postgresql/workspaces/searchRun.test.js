@@ -7,9 +7,10 @@ const cancelQuery = vi.fn(() => Promise.resolve())
 vi.mock('../api/queries', () => ({ cancelQuery }))
 
 const { createSearchState, createSearchRuntime, runSearch, cancelSearch } = await import('./searchRun.js')
+const { createResourceRef } = await import('../../../utils/resourceRef')
 
 const tabOf = (state = {}) => reactive({
-  connectionId: 'c1', database: 'app', schema: 'public',
+  target: createResourceRef('c1', [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }]),
   state: { ...createSearchState(), ...state }, runtime: createSearchRuntime(),
 })
 

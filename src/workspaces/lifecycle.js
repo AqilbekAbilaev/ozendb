@@ -118,25 +118,10 @@ export function retargetResource(from, to) {
     if (!target) return false
     if (!sameResource(target, from) && !isResourceAncestor(from, target)) return false
 
+    // The target is a workspace's whole identity (#303), so it is the only thing a
+    // rename has to move; no flat copy of it is left to fall out of step.
     const segments = [...to.segments, ...target.segments.slice(from.segments.length)]
     workspace.target = createResourceRef(to.connectionId, segments)
-
-    // Every workspace kind spells its identity the same way now, so the flat copies
-    // are pushed forward from the new target rather than left to drift out of step.
-    //
-    // Deliberately does NOT touch `collName`: that key survives only on Current
-    // Operations, where it is the user's collection *filter*, not identity — and a
-    // connection-scoped tab is never matched by this predicate anyway.
-    for (const segment of segments) {
-      if (segment.kind === 'database' && workspace.dbName !== undefined) workspace.dbName = segment.name
-      if (segment.kind === 'collection' && workspace.collectionName !== undefined) {
-        workspace.collectionName = segment.name
-      }
-      // PostgreSQL tabs spell the same identity as database / schema / table.
-      if (segment.kind === 'database' && workspace.database !== undefined) workspace.database = segment.name
-      if (segment.kind === 'schema' && workspace.schema !== undefined) workspace.schema = segment.name
-      if (segment.kind === 'table' && workspace.table !== undefined) workspace.table = segment.name
-    }
 
     // A tab the user renamed by hand keeps its title; only a default one follows.
     const renamed = from.segments[from.segments.length - 1]

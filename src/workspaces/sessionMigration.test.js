@@ -408,7 +408,7 @@ describe('PostgreSQL tabs across a restart', () => {
     const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
     expect(restored).toMatchObject({
       id: 't1', type: 'postgresql.table_browse', title: 'merchants', color: 'green', target: tableTarget,
-      connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
+      connectionName: 'Payments PG',
       state: migrateTableState({ view }),
     })
   })
@@ -417,7 +417,10 @@ describe('PostgreSQL tabs across a restart', () => {
     const target = { connectionId: 'p1', segments: [{ kind: 'database', name: 'payments' }] }
     const v2 = { id: 'q1', type: 'postgresql.query', engine: 'postgresql', title: 'SQL: payments', color: null, target, state: { sql: 'SELECT 1' } }
     const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
-    expect(restored).toMatchObject({ id: 'q1', type: 'postgresql.query', database: 'payments', state: { sql: 'SELECT 1' }, runtime: { run: { result: null } }, target })
+    expect(restored).toMatchObject({
+      id: 'q1', type: 'postgresql.query', connectionName: 'Payments PG',
+      state: { sql: 'SELECT 1' }, runtime: { run: { result: null, connectionId: 'p1', database: 'payments' } }, target,
+    })
   })
 
   it('saves what the tabs need, and keeps them through a load', () => {
