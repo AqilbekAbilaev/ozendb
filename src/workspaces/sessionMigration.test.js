@@ -327,6 +327,15 @@ describe('toLegacyRecord bridge', () => {
     }
   })
 
+  // The target is the record's whole identity (#303), so nothing in the saved state may
+  // overwrite it, or the other envelope fields, however that state was written.
+  it('never lets the saved state overwrite the record\'s identity', () => {
+    const stray = { ...expected.find, state: { ...expected.find.state, target: null, type: 'x', id: 'y', connectionName: 'z' } }
+    expect(toLegacyRecord(stray, 'Sales')).toMatchObject({
+      id: expected.find.id, type: expected.find.type, target: expected.find.target, connectionName: 'Sales',
+    })
+  })
+
   // A restored workspace takes its identity as saved; the flat fields are only names.
   it('hands the saved target to the restore hook unchanged', () => {
     const record = toLegacyRecord(expected.find, 'Sales')

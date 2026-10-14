@@ -199,20 +199,21 @@ const LEGACY_KEYS = {
 // The v2 → restore bridge. Restore hooks read one flat record: the saved `type` and
 // `target`, which is the workspace's whole identity (#303), the display name
 // re-resolved from the connection list (names are not identity, so they are never
-// stored), and the durable state spread beside them. Returns null for types outside
-// the table.
+// stored), and the durable state spread beside them. The state goes first, so no key
+// in it can ever overwrite the record's identity. Returns null for types outside the
+// table.
 export function toLegacyRecord(v2, connectionName = null) {
   const conf = LEGACY_KEYS[v2 && v2.type]
   if (!conf || !isValidTarget(v2.target)) return null
   return {
+    ...v2.state,
+    ...(conf.extra || {}),
     id: v2.id,
     type: v2.type,
     target: v2.target,
     title: v2.title,
     color: v2.color,
     connectionName: connectionName,
-    ...(conf.extra || {}),
-    ...v2.state,
   }
 }
 
