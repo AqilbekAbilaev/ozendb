@@ -8,6 +8,7 @@ import { registerWorkspaceDefinitions } from './registerDefinitions'
 import { getWorkspaceDefinition } from './registry'
 import { legacy, expected, sessions } from './sessionMigration.fixtures'
 import { migrateTableState } from '../engines/postgresql/workspaces/tableState'
+import { isCollectionTab } from '../utils/workspaceTypes'
 
 registerWorkspaceDefinitions()
 
@@ -222,16 +223,16 @@ describe('serialize hooks', () => {
 
 describe('toLegacyRecord bridge', () => {
   const restorable = {
-    'mongodb.find': { key: 'find', kind: 'collection', name: 'Sales' },
-    'mongodb.aggregate': { key: 'aggregate', kind: 'collection', name: 'Sales' },
-    'mongodb.sql_to_mql': { key: 'sql', kind: 'collection', name: 'Sales' },
-    'mongodb.shell': { key: 'shell', kind: 'shell', name: 'Sales' },
-    'mongodb.indexes': { key: 'indexes', kind: 'indexes', name: 'Sales' },
-    'mongodb.schema': { key: 'schema', kind: 'schema', name: 'Sales' },
-    'mongodb.search': { key: 'search', kind: 'search', name: 'Sales' },
-    'mongodb.import': { key: 'importCsv', kind: 'import', name: 'Sales' },
-    'mongodb.export': { key: 'export', kind: 'export', name: 'Sales' },
-    'mongodb.current_operations': { key: 'currentOps', kind: 'currentOps', name: 'Sales' },
+    'mongodb.find': { key: 'find', name: 'Sales' },
+    'mongodb.aggregate': { key: 'aggregate', name: 'Sales' },
+    'mongodb.sql_to_mql': { key: 'sql', name: 'Sales' },
+    'mongodb.shell': { key: 'shell', name: 'Sales' },
+    'mongodb.indexes': { key: 'indexes', name: 'Sales' },
+    'mongodb.schema': { key: 'schema', name: 'Sales' },
+    'mongodb.search': { key: 'search', name: 'Sales' },
+    'mongodb.import': { key: 'importCsv', name: 'Sales' },
+    'mongodb.export': { key: 'export', name: 'Sales' },
+    'mongodb.current_operations': { key: 'currentOps', name: 'Sales' },
   }
 
   // What each restore hook is trusted to bring back. Collection-mode names are
@@ -252,7 +253,7 @@ describe('toLegacyRecord bridge', () => {
 
   // A collection tab keeps its query under state and its view under ui; the pinned
   // fixtures are the flat record those come from, so compare against that layout.
-  const flatView = (tab) => (tab.kind === 'collection'
+  const flatView = (tab) => (isCollectionTab(tab)
     ? { ...tab, ...tab.state.query, resultView: tab.ui.resultView }
     : tab)
 
@@ -261,7 +262,7 @@ describe('toLegacyRecord bridge', () => {
       const v2 = expected[conf.key]
       const legacyRecord = toLegacyRecord(v2, conf.name)
       expect(legacyRecord, type).not.toBe(null)
-      expect(legacyRecord.kind, type).toBe(conf.kind)
+      expect(legacyRecord.type, type).toBe(type)
       const restored = restoreWorkspace(legacyRecord)
       expect(restored, type).not.toBe(null)
       expect(restored.type, type).toBe(type)
@@ -272,7 +273,10 @@ describe('toLegacyRecord bridge', () => {
       // Flat identity comes back from the saved record (names were re-injected by
       // the bridge); durable state must match the pinned projection exactly.
       const view = flatView(restored)
-      expect(view, type).toMatchObject(legacy[conf.key])
+      // The pinned v1 records name their tab by `kind`, the old file format; a live
+      // workspace names itself by `type` alone (#193), so that one field is not compared.
+      const { kind: _kind, ...legacyFields } = legacy[conf.key]
+      expect(view, type).toMatchObject(legacyFields)
       const durable = type === 'mongodb.import'
         ? (v2.state.format === 'csv'
             ? ['format', 'sourceType', 'filePath', 'csv', 'targetDb', 'targetColl', 'mode']
@@ -361,7 +365,7 @@ describe('PostgreSQL tabs across a restart', () => {
     const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
     expect(restored).toMatchObject({
       id: 't1', type: 'postgresql.table_browse', title: 'merchants', color: 'green', target: tableTarget,
-      kind: 'pgTable', connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
+      connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
       state: migrateTableState({ view }),
     })
   })
@@ -370,7 +374,7 @@ describe('PostgreSQL tabs across a restart', () => {
     const target = { connectionId: 'p1', segments: [{ kind: 'database', name: 'payments' }] }
     const v2 = { id: 'q1', type: 'postgresql.query', engine: 'postgresql', title: 'SQL: payments', color: null, target, state: { sql: 'SELECT 1' } }
     const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
-    expect(restored).toMatchObject({ id: 'q1', type: 'postgresql.query', kind: 'pgQuery', database: 'payments', state: { sql: 'SELECT 1' }, runtime: { run: { result: null } }, target })
+    expect(restored).toMatchObject({ id: 'q1', type: 'postgresql.query', database: 'payments', state: { sql: 'SELECT 1' }, runtime: { run: { result: null } }, target })
   })
 
   it('saves what the tabs need, and keeps them through a load', () => {

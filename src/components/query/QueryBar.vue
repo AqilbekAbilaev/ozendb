@@ -15,6 +15,7 @@ import NumberStepper from '../base/NumberStepper.vue'
 import MenuItem from '../base/MenuItem.vue'
 import FieldError from '../base/FieldError.vue'
 import FlexSpacer from '../base/FlexSpacer.vue'
+import { isCollectionTab } from '../../utils/workspaceTypes'
 
 const props = defineProps({
   activeTab:      { type: Object,  required: true },
@@ -58,7 +59,7 @@ function sortById(dir) {
 // ── query history ──────────────────────────────────────
 async function openHistoryMenu() {
   const tab = props.activeTab
-  if (!tab || tab.kind !== 'collection') return
+  if (!isCollectionTab(tab)) return
   if (historyMenu.value) {
     historyMenu.value = false
     return

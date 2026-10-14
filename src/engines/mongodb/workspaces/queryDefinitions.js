@@ -18,7 +18,6 @@ import { MongoCollectionWorkspace, ShellConsole } from './panes'
 // Identity plus the state / ui / runtime split (collectionState.js).
 function collectionFields({ target, defaults = {}, state, ui }) {
   return {
-    kind: 'collection',
     connectionId: target.connectionId,
     connectionName: target.connectionName,
     dbName: target.dbName,
@@ -139,7 +138,6 @@ function shellTarget(source) {
 // session so variables persist across runs within a tab and never leak between them.
 function shellFields(source, sessionId, durable = {}) {
   return {
-    kind: 'shell',
     ...shellTarget(source),
     sessionId: sessionId,
     code: durable.code ?? '',

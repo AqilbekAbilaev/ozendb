@@ -2,12 +2,13 @@ import { computed, ref } from 'vue'
 import { countDocuments } from '../engines/mongodb/api/queries'
 import { errText } from '../utils/errors'
 import { parseField } from '../utils/queryParser'
+import { isCollectionTab } from '../utils/workspaceTypes'
 
 // Owns collection pagination and the optional server-side count shown in the results footer.
 export function useResultsPagination({ activeTab, isAggregate, requery, showToast }) {
   const countMenu = ref(null)
   const isCountDisabled = computed(() =>
-    isAggregate() || !activeTab() || activeTab().kind !== 'collection'
+    isAggregate() || !isCollectionTab(activeTab())
   )
 
   async function fetchCount(tab) {

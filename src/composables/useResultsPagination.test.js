@@ -4,7 +4,7 @@ import { useResultsPagination } from './useResultsPagination'
 
 describe('useResultsPagination', () => {
   it('advances from the current page by the tab limit', () => {
-    const tab = reactive({ kind: 'collection', state: { query: { skip: 50, limit: 25 } }, runtime: { results: [] } })
+    const tab = reactive({ type: 'mongodb.find', state: { query: { skip: 50, limit: 25 } }, runtime: { results: [] } })
     const requery = vi.fn()
     const pagination = useResultsPagination({
       activeTab: () => tab,

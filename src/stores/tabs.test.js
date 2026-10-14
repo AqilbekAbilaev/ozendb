@@ -26,7 +26,7 @@ const {
 
 // The store's refs are module-scope singletons, so each test seeds them explicitly.
 function seed(ids, activeId) {
-  tabs.value = ids.map(id => (typeof id === 'string' ? { id, kind: 'collection' } : id))
+  tabs.value = ids.map(id => (typeof id === 'string' ? { id, type: 'mongodb.find' } : id))
   activeTabId.value = activeId
 }
 const idsOf = () => tabs.value.map(t => t.id)
@@ -40,7 +40,7 @@ describe('initializeTabs', () => {
     expect(tabs.value).toHaveLength(1)
     const t = tabs.value[0]
     expect(t.id).toBe('t0')
-    expect(t.kind).toBe('quickstart')
+    expect(t.type).toBe('app.quickstart')
     expect(t.title).toBe('Quickstart')
     expect(t.type).toBe('app.quickstart')
     expect(t.engine).toBe('app')
@@ -88,7 +88,7 @@ describe('closeTab — which tab becomes active', () => {
   it('never leaves the pane empty: the last close seeds Quickstart', () => {
     seed(['a'], 'a')
     closeTab('a')
-    expect(tabs.value.map(t => t.kind)).toEqual(['quickstart'])
+    expect(tabs.value.map(t => t.type)).toEqual(['app.quickstart'])
     expect(activeTabId.value).toBe(tabs.value[0].id)
   })
 
@@ -100,7 +100,7 @@ describe('closeTab — which tab becomes active', () => {
   })
 
   it('only updates active state when close fallback activates a marked tab', () => {
-    const marked = { id: 'r', kind: 'collection', needsInitialRun: true }
+    const marked = { id: 'r', type: 'mongodb.find', needsInitialRun: true }
     seed([marked, 'active'], 'active')
 
     closeTab('active')
@@ -165,7 +165,7 @@ describe('bulk close — iterating while the array reindexes', () => {
   it('closes all tabs, leaving a fresh Quickstart', () => {
     seed(['a', 'b', 'c'], 'b')
     handleTabAction('tab:close_all', 'b')
-    expect(tabs.value.map(t => t.kind)).toEqual(['quickstart'])
+    expect(tabs.value.map(t => t.type)).toEqual(['app.quickstart'])
   })
 
   it('ignores a side-close against an unknown tab id', () => {
@@ -258,7 +258,7 @@ describe('activeTab', () => {
 
 describe('activateTab', () => {
   it('changes only active state for a marked workspace', () => {
-    const marked = { id: 'r', kind: 'collection', needsInitialRun: true }
+    const marked = { id: 'r', type: 'mongodb.find', needsInitialRun: true }
     seed([marked, 'b'], 'b')
     activateTab('r')
     expect(activeTabId.value).toBe('r')
@@ -279,7 +279,7 @@ describe('activateTab', () => {
 })
 
 const FIND_TAB = {
-  id: 'f1', kind: 'collection', type: 'mongodb.find', engine: 'mongodb',
+  id: 'f1', type: 'mongodb.find', engine: 'mongodb',
   title: 'orders', color: '#f00',
   connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
   mode: 'find', filter: '{ "a": 1 }', projection: '{}', sort: '{}',
@@ -317,7 +317,7 @@ describe('duplicateTab', () => {
   })
 
   it('is a no-op for an unsupported duplicate', () => {
-    seed([{ id: 'q', kind: 'quickstart', type: 'app.quickstart', title: 'Quickstart' }, 'b'], 'q')
+    seed([{ id: 'q', type: 'app.quickstart', title: 'Quickstart' }, 'b'], 'q')
     duplicateTab('q')
     expect(tabs.value).toHaveLength(2)
     expect(activeTabId.value).toBe('q')
@@ -325,7 +325,7 @@ describe('duplicateTab', () => {
 
   it('keeps a duplicated shell a shell with a fresh session', () => {
     seed([{
-      id: 's1', kind: 'shell', type: 'mongodb.shell', engine: 'mongodb', title: 'mongosh: shop',
+      id: 's1', type: 'mongodb.shell', engine: 'mongodb', title: 'mongosh: shop',
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
       sessionId: 'old-session', code: 'db.x.find()', history: [], isRunning: false,
       results: [], resultView: 'table', resultTab: 'Console',
@@ -334,7 +334,7 @@ describe('duplicateTab', () => {
     }, 'b'], 'b')
     duplicateTab('s1')
     const dup = tabs.value[2]
-    expect(dup.kind).toBe('shell')
+    expect(dup.type).toBe('mongodb.shell')
     expect(dup.sessionId).not.toBe('old-session')
     expect(dup.code).toBe('db.x.find()')
     expect(dup.history).toEqual([])
@@ -342,12 +342,12 @@ describe('duplicateTab', () => {
 
   it('a tool workspace can never become a collection workspace', () => {
     seed([{
-      id: 'i', kind: 'indexes', type: 'mongodb.indexes', engine: 'mongodb',
+      id: 'i', type: 'mongodb.indexes', engine: 'mongodb',
       title: 'Index Manager: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     }, 'b'], 'b')
     duplicateTab('i')
     const dup = tabs.value[2]
-    expect(dup.kind).toBe('indexes')
+    expect(dup.type).toBe('mongodb.indexes')
     expect(dup.type).toBe('mongodb.indexes')
     expect(dup.mode).toBeUndefined()
     // Identity is shared by every workspace kind now; what must not leak across is

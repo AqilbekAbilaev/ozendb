@@ -11,6 +11,7 @@ import { canWriteTab, isWriteAction } from '../utils/writable'
 import { inspectField, setFieldValue, addFieldValue, removeField, renameField, getContainer } from '../utils/docEdit'
 import { valueToClipboard, valueToEjson, documentToClipboard, fieldPath } from '../utils/clipboardCopy'
 import { useDocumentPaste } from './useDocumentPaste'
+import { isCollectionTab } from '../utils/workspaceTypes'
 
 // Document CRUD + field-edit + native Document/Collection menu dispatch for the results
 // grid. UI-agnostic: `activeTab` is a getter onto ResultsPanel's props, `docMenuRequest`
@@ -51,7 +52,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // insert modal.
   function openInsert() {
     const tab = activeTab()
-    if (!tab || tab.kind !== 'collection' || !tab.collectionName) {
+    if (!isCollectionTab(tab) || !tab.collectionName) {
       showToast('Open a collection first')
       return
     }
@@ -186,7 +187,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // we re-check defensively and guide the user if the selection changed meanwhile.
   function runDocMenuAction(action) {
     const tab = activeTab()
-    if (!tab || tab.kind !== 'collection') return
+    if (!isCollectionTab(tab)) return
     // The read-only lock applies to every write action, whatever the entry point
     // (the native menu and keybindings bypass the disabled toolbar buttons).
     if (isWriteAction(action) && !ensureWritable()) return

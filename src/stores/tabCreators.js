@@ -7,6 +7,7 @@ import { createWorkspace } from '../workspaces/createWorkspace'
 import { openModal, closeModal } from './modals'
 import { defaultQueryLimit, defaultResultView } from './settings'
 import { runQuery } from './queryRunner'
+import { isCollectionTab } from '../utils/workspaceTypes'
 
 // Every "open a tab" entry point in the app. The tab *shape* is owned by the
 // workspace definitions; this is the orchestration layer — which opens focus an
@@ -85,7 +86,7 @@ export async function openCollectionTab({ resource, connectionName, filter }, st
 // paging, Query Code, Explain) is reused. One SQL tab per collection.
 export function openSqlTab({ resource, connectionName }) {
   const existing = tabs.value.find(t =>
-    t.kind === 'collection' && t.mode === 'sql' && sameResource(t.target, resource))
+    t.type === 'mongodb.sql_to_mql' && sameResource(t.target, resource))
   if (existing) { activateTab(existing.id); return }
   const tab = newWorkspace('mongodb.sql_to_mql', {
     target: { resource, connectionName },
@@ -108,7 +109,7 @@ export function openShellTab({ resource, connectionName }) {
 // Opens (or re-focuses) an Index Manager tab for a collection. The tab is a thin
 // shell around the shared useIndexes state; IndexManagerPane loads it on mount.
 export function openIndexManagerTab({ resource, connectionName }) {
-  const existing = tabs.value.find(t => t.kind === 'indexes' && sameResource(t.target, resource))
+  const existing = tabs.value.find(t => t.type === 'mongodb.indexes' && sameResource(t.target, resource))
   if (existing) { activateTab(existing.id); return }
   const tab = newWorkspace('mongodb.indexes', { target: { resource, connectionName } })
   tabs.value.push(tab)
@@ -119,7 +120,7 @@ export function openIndexManagerTab({ resource, connectionName }) {
 // etc. as workspace tabs rather than modals. Reopening the same tool on the same
 // collection focuses the existing tab.
 export function openSchemaTab({ resource, connectionName }) {
-  const existing = tabs.value.find(t => t.kind === 'schema' && sameResource(t.target, resource))
+  const existing = tabs.value.find(t => t.type === 'mongodb.schema' && sameResource(t.target, resource))
   if (existing) { activateTab(existing.id); return }
   const tab = newWorkspace('mongodb.schema', { target: { resource, connectionName } })
   tabs.value.push(tab)
@@ -132,7 +133,7 @@ export function openSchemaTab({ resource, connectionName }) {
 // selected _ids are resolved here and handed to the modal. The active tab wins when it
 // shows the collection, since the same collection may be open in several tabs (#275).
 export function openExportSource({ resource, connectionName }) {
-  const showsNode = t => t.kind === 'collection' && sameResource(t.target, resource)
+  const showsNode = t => isCollectionTab(t) && sameResource(t.target, resource)
   const tab = activeTab.value && showsNode(activeTab.value) ? activeTab.value : tabs.value.find(showsNode)
   const pf = tab ? parseField(tab.state.query.filter) : null
   const rows = (tab && tab.runtime.selectedRows) || []
@@ -178,7 +179,7 @@ export function openExportTab(target, source) {
 
 // Search is database-scoped (it scans every collection in one db).
 export function openSearchTab({ resource, connectionName }) {
-  const existing = tabs.value.find(t => t.kind === 'search' && sameResource(t.target, resource))
+  const existing = tabs.value.find(t => t.type === 'mongodb.search' && sameResource(t.target, resource))
   if (existing) { activateTab(existing.id); return }
   const tab = newWorkspace('mongodb.search', { target: { resource, connectionName } })
   tabs.value.push(tab)
@@ -211,7 +212,7 @@ export function openImportTab({ resource, connectionName }, format) {
 
 // Help → Quickstart: focus the existing Quickstart tab, or open one if it was closed.
 export function openQuickstart() {
-  const existing = tabs.value.find(t => t.kind === 'quickstart')
+  const existing = tabs.value.find(t => t.type === 'app.quickstart')
   if (existing) {
     activateTab(existing.id)
     return

@@ -9,7 +9,7 @@ registerWorkspaceDefinitions()
 const FIND = {
   id: 'f1', type: 'mongodb.find', engine: 'mongodb', title: 'orders',
   color: '#f00', target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
-  kind: 'collection', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+  connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
   filter: '{ "a": 1 }', projection: '{}', sort: '{}', skip: 2, limit: 25,
   mode: 'find', pipeline: '', vqb: { rows: [1, 2] }, colOrder: { a: 0 },
   results: [{ x: 1 }], hasRun: true, isRunning: false, runError: null,
@@ -59,7 +59,7 @@ describe('duplicateWorkspace', () => {
   })
 
   it('returns null for an unsupported duplicate', () => {
-    const quickstart = { id: 'q', type: 'app.quickstart', kind: 'quickstart', title: 'Quickstart' }
+    const quickstart = { id: 'q', type: 'app.quickstart', title: 'Quickstart' }
     expect(duplicateWorkspace(quickstart)).toBe(null)
   })
 
@@ -70,13 +70,13 @@ describe('duplicateWorkspace', () => {
 
 describe('restoreWorkspace', () => {
   const saved = {
-    id: 'r1', kind: 'collection', title: 'orders', color: '#0f0',
+    id: 'r1', type: 'mongodb.find', title: 'orders', color: '#0f0',
     connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     filter: '{ "a": 1 }', sort: '{}', projection: '{}', skip: 0, limit: 25,
     mode: 'find', pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 },
   }
 
-  it('reconstructs through the saved kind and keeps the saved id', () => {
+  it('reconstructs through the saved type and keeps the saved id', () => {
     const tab = restoreWorkspace(saved)
     expect(tab.id).toBe('r1')
     expect(tab.type).toBe('mongodb.find')
@@ -94,19 +94,22 @@ describe('restoreWorkspace', () => {
     expect(tab.runtime.selectedRow).toBe(-1)
   })
 
-  it('maps SQL and aggregate saved records to their own types', () => {
-    expect(restoreWorkspace({ ...saved, id: 'a', mode: 'aggregate', pipeline: '[{ "$match": {} }]' }).type).toBe('mongodb.aggregate')
-    expect(restoreWorkspace({ ...saved, id: 's', mode: 'sql', sql: 'SELECT 1' }).type).toBe('mongodb.sql_to_mql')
+  it('restores SQL and aggregate records as their own types', () => {
+    const aggregate = { ...saved, id: 'a', type: 'mongodb.aggregate', mode: 'aggregate', pipeline: '[{ "$match": {} }]' }
+    expect(restoreWorkspace(aggregate).type).toBe('mongodb.aggregate')
+    expect(restoreWorkspace({ ...saved, id: 's', type: 'mongodb.sql_to_mql', mode: 'sql', sql: 'SELECT 1' }).type).toBe('mongodb.sql_to_mql')
   })
 
-  it('returns null for records of unreadable kinds and null input', () => {
-    expect(restoreWorkspace({ id: 'x', kind: 'quickstart' })).toBe(null)
+  it('returns null for an unrestorable or unknown type and for null input', () => {
+    expect(restoreWorkspace({ id: 'x', type: 'app.quickstart' })).toBe(null)
+    expect(restoreWorkspace({ id: 'y', type: 'no.such.type' })).toBe(null)
+    expect(restoreWorkspace({ id: 'z', kind: 'collection' })).toBe(null)
     expect(restoreWorkspace(null)).toBe(null)
   })
 
   it('gives restored shells a fresh session from the injected source', () => {
     const tab = restoreWorkspace({
-      id: 'sh', kind: 'shell', title: 'mongosh: shop', color: null,
+      id: 'sh', type: 'mongodb.shell', title: 'mongosh: shop', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
       sessionId: 'old-session', code: 'db.orders.find()', scriptPath: null,
     }, { ids: { session: () => 'fresh-session' } })
@@ -189,7 +192,7 @@ describe('affectedByResource', () => {
 
   it('ignores workspaces without a target', () => {
     expect(by({ target: null })).toBe(false)
-    expect(by({ kind: 'quickstart' })).toBe(false)
+    expect(by({ type: 'app.quickstart' })).toBe(false)
     expect(affectedByResource(conn)({ target: coll })).toBe(true)
   })
 })
@@ -206,7 +209,7 @@ describe('retargetResource', () => {
   const archive = createResourceRef(conn, [{ kind: 'database', name: 'archive' }])
 
   function tab(extra) {
-    return { kind: 'collection', target: orders, title: 'orders', collectionName: 'orders', ...extra }
+    return { type: 'mongodb.find', target: orders, title: 'orders', collectionName: 'orders', ...extra }
   }
 
   it('rewrites the target of the renamed resource itself', () => {
@@ -242,7 +245,7 @@ describe('retargetResource', () => {
   })
 
   it('ignores workspaces with no target', () => {
-    const home = { kind: 'quickstart', target: null }
+    const home = { type: 'app.quickstart', target: null }
     expect(retargetResource(orders, sales)(home)).toBe(false)
   })
 
@@ -277,7 +280,7 @@ describe('retargetResource', () => {
     const at = (schema, table) => createResourceRef(conn, [
       { kind: 'database', name: 'app' }, { kind: 'schema', name: schema }, { kind: 'table', name: table },
     ])
-    const pg = { kind: 'pgTable', target: at('public', 'users'), title: 'users', database: 'app', schema: 'public', table: 'users' }
+    const pg = { type: 'postgresql.table_browse', target: at('public', 'users'), title: 'users', database: 'app', schema: 'public', table: 'users' }
     retargetResource(at('public', 'users'), at('public', 'people'))(pg)
     expect([pg.schema, pg.table, pg.title]).toEqual(['public', 'people', 'people'])
 

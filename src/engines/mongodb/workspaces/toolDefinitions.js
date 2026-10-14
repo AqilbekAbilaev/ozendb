@@ -80,7 +80,7 @@ export const toolDefinitions = [
       return {
         title: 'Index Manager: ' + resourceName(ctx.target.resource),
         target: ctx.target.resource,
-        fields: { kind: 'indexes', ...createdFields(ctx) },
+        fields: createdFields(ctx),
       }
     },
     serialize: () => ({}),
@@ -95,7 +95,7 @@ export const toolDefinitions = [
       return {
         title: 'Schema: ' + resourceName(ctx.target.resource),
         target: ctx.target.resource,
-        fields: { kind: 'schema', ...createdFields(ctx) },
+        fields: createdFields(ctx),
       }
     },
     serialize: () => ({}),
@@ -110,7 +110,7 @@ export const toolDefinitions = [
       return {
         title: 'Search: ' + resourceName(ctx.target.resource),
         target: ctx.target.resource,
-        fields: { kind: 'search', connectionId, connectionName, dbName },
+        fields: { connectionId, connectionName, dbName },
       }
     },
     serialize: () => ({}),
@@ -126,7 +126,7 @@ export const toolDefinitions = [
     create(ctx) {
       const target = createdFields(ctx)
       const format = ctx.options.format || 'json'
-      const base = { kind: 'import', ...target, format }
+      const base = { ...target, format }
       // CSV is single-source with Source/Target sub-tabs and per-file options; JSON
       // is a multi-source table. Two shapes of one tab, not two workspace types.
       const fields = format === 'csv'
@@ -179,7 +179,7 @@ export const toolDefinitions = [
           title: workspace.title,
           target: resourceFromFeatureNode(toolTarget(workspace)),
           fields: {
-            kind: 'import', ...toolTarget(workspace), format: 'csv',
+            ...toolTarget(workspace), format: 'csv',
             subTab: 'source', sourceType: workspace.sourceType || 'file',
             filePath: workspace.filePath || '',
             csv: csvOptions(workspace.csv),
@@ -193,7 +193,7 @@ export const toolDefinitions = [
         title: workspace.title,
         target: resourceFromFeatureNode(toolTarget(workspace)),
         fields: {
-          kind: 'import', ...toolTarget(workspace), format: 'json',
+          ...toolTarget(workspace), format: 'json',
           validate: !!workspace.validate,
           sources: (workspace.sources || []).map(s => ({
             path: s.path, name: s.name,
@@ -213,7 +213,7 @@ export const toolDefinitions = [
           title: saved.title,
           target: resourceFromFeatureNode(toolTarget(saved)),
           fields: {
-            kind: 'import', ...toolTarget(saved), format: 'csv',
+            ...toolTarget(saved), format: 'csv',
             subTab: 'source',
             sourceType: saved.sourceType || 'file', filePath: saved.filePath || '',
             csv: csvOptions(saved.csv),
@@ -231,7 +231,7 @@ export const toolDefinitions = [
         title: saved.title,
         target: resourceFromFeatureNode(toolTarget(saved)),
         fields: {
-          kind: 'import', ...toolTarget(saved), format: 'json',
+          ...toolTarget(saved), format: 'json',
           validate: !!saved.validate,
           sources,
           selectedSource: sources.length ? 0 : -1,
@@ -264,7 +264,6 @@ export const toolDefinitions = [
         title: 'Export: ' + resourceName(ctx.target.resource) + suffix,
         target: ctx.target.resource,
         fields: {
-          kind: 'export',
           ...target,
           step: 0, format: ctx.options.format || 'json', incremental: false,
           jsonStyle: 'plain',
@@ -298,7 +297,7 @@ export const toolDefinitions = [
         title: workspace.title,
         target: resourceFromFeatureNode(toolTarget(workspace)),
         fields: {
-          kind: 'export', ...toolTarget(workspace),
+          ...toolTarget(workspace),
           step: workspace.step || 0, format: workspace.format || 'json',
           incremental: !!workspace.incremental,
           jsonStyle: workspace.jsonStyle || 'plain',
@@ -317,7 +316,7 @@ export const toolDefinitions = [
         title: saved.title,
         target: resourceFromFeatureNode(toolTarget(saved)),
         fields: {
-          kind: 'export', ...toolTarget(saved),
+          ...toolTarget(saved),
           step: saved.step || 0, format: saved.format || 'json',
           incremental: !!saved.incremental,
           jsonStyle: saved.jsonStyle || 'plain',
@@ -342,7 +341,6 @@ export const toolDefinitions = [
         title: 'Current Operations: ' + (ctx.target.connectionName ?? ''),
         target: ctx.target.resource,
         fields: {
-          kind: 'currentOps',
           ...createdConnectionFields(ctx),
           // Toolbar settings and grid state live on the tab so they survive tab
           // switches (the pane unmounts while another tab is active). opsDefaults is
@@ -370,7 +368,7 @@ export const toolDefinitions = [
         title: workspace.title,
         target: opsTarget(workspace),
         fields: {
-          kind: 'currentOps', ...toolConnectionTarget(workspace),
+          ...toolConnectionTarget(workspace),
           ...opsDefaults(),
           frequency: workspace.frequency ?? 2000,
           retention: workspace.retention ?? 10_000,
@@ -389,7 +387,7 @@ export const toolDefinitions = [
         title: saved.title,
         target: opsTarget(saved),
         fields: {
-          kind: 'currentOps', ...toolConnectionTarget(saved),
+          ...toolConnectionTarget(saved),
           ...opsDefaults(),
           frequency: saved.frequency ?? 2000,
           retention: saved.retention ?? 10_000,

@@ -41,7 +41,7 @@ const TARGET = (connId) => ({
 const liveFind = (id, connId = 'c1') => ({
   id, type: 'mongodb.find', engine: 'mongodb', title: 'orders', color: '#0f0',
   target: TARGET(connId),
-  kind: 'collection', connectionId: connId, connectionName: 'Sales',
+  connectionId: connId, connectionName: 'Sales',
   dbName: 'shop', collectionName: 'orders',
   mode: 'find', filter: '{ "a": 1 }', sort: '{}', projection: '{}',
   skip: 0, limit: 25, pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 }, readOnly: false,
@@ -112,7 +112,7 @@ describe('projection (v2 writes)', () => {
   })
 
   it('excludes app-level tabs (quickstart) from the session', async () => {
-    seedStore([liveFind('f1'), { id: 't0', type: 'app.quickstart', engine: 'app', kind: 'quickstart', title: 'Quickstart' }], 'f1')
+    seedStore([liveFind('f1'), { id: 't0', type: 'app.quickstart', engine: 'app', title: 'Quickstart' }], 'f1')
     const session = useSessionPersistence()
     await session.initializeSession({ restore: false })
     await savedAfterChange(session, liveFind('f2'))
@@ -145,7 +145,7 @@ describe('initializeSession', () => {
   })
 
   it('migrates a legacy session and restores tabs with re-injected names', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({
       activeTabId: 'r1',
       tabs: [legacyFind('r1'), {
@@ -173,7 +173,7 @@ describe('initializeSession', () => {
   })
 
   it('writes the migrated v2 session back once', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1')] })
     const { initializeSession } = useSessionPersistence()
     await initializeSession({ restore: false })
@@ -186,7 +186,7 @@ describe('initializeSession', () => {
   })
 
   it('drops tabs for deleted connections via migration pruning', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1', 'c1'), legacyFind('r3', 'c3')] })
     const { initializeSession } = useSessionPersistence()
     await initializeSession({ restore: true })
@@ -196,7 +196,7 @@ describe('initializeSession', () => {
   })
 
   it('activates the repaired survivor when the requested v2 tab was pruned', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({
       schemaVersion: 2,
       activeTabId: 'deleted',
@@ -211,7 +211,7 @@ describe('initializeSession', () => {
   })
 
   it('skips pruning when the connection list fails', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     listConnections.mockRejectedValue(new Error('offline'))
     getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1', 'c3')] })
     const { initializeSession } = useSessionPersistence()
@@ -221,7 +221,7 @@ describe('initializeSession', () => {
   })
 
   it('does not restore ids that are already open', async () => {
-    seedStore([liveFind('r1'), { id: 't0', kind: 'quickstart', title: 'Quickstart' }], 'r1')
+    seedStore([liveFind('r1'), { id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 'r1')
     getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1'), legacyFind('r2')] })
     const { initializeSession } = useSessionPersistence()
     await initializeSession({ restore: true })
@@ -231,7 +231,7 @@ describe('initializeSession', () => {
   })
 
   it('marks the active restored find for workspace-owned initial execution', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1')] })
     const { initializeSession } = useSessionPersistence()
     await initializeSession({ restore: true })
@@ -241,7 +241,7 @@ describe('initializeSession', () => {
   })
 
   it('leaves an inactive restored find marked for first activation', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({ activeTabId: 't0', tabs: [legacyFind('r1')] })
     const { initializeSession } = useSessionPersistence()
     await initializeSession({ restore: true })
@@ -250,7 +250,7 @@ describe('initializeSession', () => {
   })
 
   it('does not auto-run restored aggregate or sql tabs', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     const aggregate = { ...legacyFind('a'), mode: 'aggregate', pipeline: '[{ "$match": {} }]' }
     const sql = { ...legacyFind('s'), mode: 'sql', sql: 'SELECT 1' }
     getOpenTabs.mockResolvedValue({ activeTabId: 'a', tabs: [aggregate, sql] })
@@ -265,7 +265,7 @@ describe('initializeSession', () => {
   })
 
   it('gives a restored shell a fresh session id', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({
       activeTabId: 'sh',
       tabs: [{
@@ -282,7 +282,7 @@ describe('initializeSession', () => {
   })
 
   it('restores schema and search as identity-only tabs', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({
       activeTabId: 's',
       tabs: [
@@ -301,7 +301,7 @@ describe('initializeSession', () => {
   })
 
   it('loads and validates without pushing tabs when restore is off', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({ activeTabId: 'r1', tabs: [legacyFind('r1')] })
     const session = useSessionPersistence()
     const result = await session.initializeSession({ restore: false })
@@ -323,7 +323,7 @@ describe('initializeSession', () => {
   })
 
   it('disables autosave on a future-version file even when restore is off', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({ schemaVersion: 3, activeTabId: 'r1', tabs: [canonicalFind('r1')] })
     const session = useSessionPersistence()
     const result = await session.initializeSession({ restore: false })
@@ -333,7 +333,7 @@ describe('initializeSession', () => {
   })
 
   it('disables autosave on an invalid session file', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockResolvedValue({ schemaVersion: 2, tabs: 'not-an-array' })
     const session = useSessionPersistence()
     const result = await session.initializeSession({ restore: true })
@@ -343,7 +343,7 @@ describe('initializeSession', () => {
   })
 
   it('disables autosave when the read fails', async () => {
-    seedStore([{ id: 't0', kind: 'quickstart', title: 'Quickstart' }], 't0')
+    seedStore([{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }], 't0')
     getOpenTabs.mockRejectedValue(new Error('io error'))
     const session = useSessionPersistence()
     const result = await session.initializeSession({ restore: true })

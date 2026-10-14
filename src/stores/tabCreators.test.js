@@ -26,7 +26,7 @@ vi.mock('../engines/mongodb/api/queryLibrary', () => ({
 // Each test seeds a clean tab strip; the creators append to it. The query runner is
 // mocked so no Tauri call can leak into the assertions; the modal store likewise.
 function harness() {
-  tabs.value = [{ id: 't0', kind: 'quickstart', title: 'Quickstart' }]
+  tabs.value = [{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }]
   activeTabId.value = 't0'
   defaultQueryLimit.value = 50
   defaultResultView.value = 'table'
@@ -155,7 +155,7 @@ describe('focus policies — one tab per target', () => {
     tabs.value = []
     c.openQuickstart()
     expect(tabs.value).toHaveLength(1)
-    expect(lastTab().kind).toBe('quickstart')
+    expect(lastTab().type).toBe('app.quickstart')
     expect(activeTabId.value).toBe(lastTab().id)
   })
 })
@@ -167,7 +167,7 @@ describe('created tab shapes', () => {
     const tab = lastTab()
     expect(tab.type).toBe('mongodb.find')
     expect(tab.engine).toBe('mongodb')
-    expect(tab.kind).toBe('collection')
+    expect(tab.type).toBe('mongodb.find')
     expect(tab.mode).toBe('find')
     expect(tab.state.query.limit).toBe(50)
     expect(tab.ui.resultView).toBe('table')
@@ -204,7 +204,7 @@ describe('created tab shapes', () => {
   it('opens current-operations tabs with the toolbar defaults on the tab', () => {
     const c = harness()
     c.openCurrentOpsTab(CONN_TOOL)
-    expect(lastTab().kind).toBe('currentOps')
+    expect(lastTab().type).toBe('mongodb.current_operations')
     expect(lastTab().frequency).toBe(2000)
     expect(lastTab().title).toBe('Current Operations: Sales')
   })
@@ -223,7 +223,7 @@ describe('created tab shapes', () => {
     const c = harness()
     c.openExportTab({ ...TOOL, query: '{ "a": 1 }', selectedIds: ['x', 'y'] }, 'query')
     const tab = lastTab()
-    expect(tab.kind).toBe('export')
+    expect(tab.type).toBe('mongodb.export')
     expect(tab.source).toBe('query')
     expect(tab.filter).toBe('{ "a": 1 }')
     expect(tab.sourceCount).toBe(null)
@@ -304,7 +304,7 @@ describe('export source resolution', () => {
   it('starts in the export-source modal with the resolved query and selected ids', () => {
     const c = harness()
     tabs.value = [{
-      id: 't1', kind: 'collection', target: collRef('c1', 'shop', 'orders'),
+      id: 't1', type: 'mongodb.find', target: collRef('c1', 'shop', 'orders'),
       state: { query: { filter: '{ "status": "open" }' } },
       runtime: { results: [{ _id: 'a' }, { _id: 'b' }, { noId: true }], selectedRows: [0, 1, 2] },
     }]
@@ -320,7 +320,7 @@ describe('export source resolution', () => {
   // #275: two tabs on one collection, the first with an empty query.
   const SPACED_TOOL = { resource: collRef('c 1', 'shop.eu', 'orders/2026'), connectionName: 'Sales ü' }
   const collectionTab = (id, filter, results, selectedRows) => ({
-    id, kind: 'collection', target: collRef('c 1', 'shop.eu', 'orders/2026'),
+    id, type: 'mongodb.find', target: collRef('c 1', 'shop.eu', 'orders/2026'),
     state: { query: { filter } }, runtime: { results, selectedRows },
   })
 
@@ -342,7 +342,7 @@ describe('export source resolution', () => {
     tabs.value = [
       collectionTab('t1', '{ "company": "Umbrella Corp." }', [{ _id: 'a' }], [0]),
       collectionTab('t2', '', [], []),
-      { id: 't3', kind: 'quickstart', title: 'Quickstart' },
+      { id: 't3', type: 'app.quickstart', title: 'Quickstart' },
     ]
     activeTabId.value = 't3'
     c.openExportSource(SPACED_TOOL)
@@ -393,7 +393,7 @@ describe('PostgreSQL tables', () => {
     c.openPostgresTable(TABLE)
 
     expect(tabs.value.filter(t => t.type === 'postgresql.table_browse')).toHaveLength(2)
-    expect(lastTab()).toMatchObject({ kind: 'pgTable', engine: 'postgresql', schema: 'public', table: 'users' })
+    expect(lastTab()).toMatchObject({ type: 'postgresql.table_browse', engine: 'postgresql', schema: 'public', table: 'users' })
     expect(activeTabId.value).toBe(lastTab().id)
   })
 
@@ -411,7 +411,7 @@ describe('PostgreSQL search', () => {
     c.openPostgresSearch(SCHEMA)
     c.openPostgresSearch(SCHEMA)
     expect(tabs.value.filter(t => t.type === 'postgresql.search')).toHaveLength(2)
-    expect(lastTab()).toMatchObject({ kind: 'pgSearch', engine: 'postgresql', title: 'Search: public', schema: 'public' })
+    expect(lastTab()).toMatchObject({ type: 'postgresql.search', engine: 'postgresql', title: 'Search: public', schema: 'public' })
     expect(activeTabId.value).toBe(lastTab().id)
   })
 })
@@ -420,7 +420,7 @@ describe('PostgreSQL queries', () => {
   it('opens a query tab against the connection\'s database, and activates it', () => {
     const c = harness()
     c.openPostgresQuery({ connectionId: 'c9', connectionName: 'pg', database: 'app' })
-    expect(lastTab()).toMatchObject({ type: 'postgresql.query', kind: 'pgQuery', database: 'app', state: { sql: '' } })
+    expect(lastTab()).toMatchObject({ type: 'postgresql.query', database: 'app', state: { sql: '' } })
     expect(activeTabId.value).toBe(lastTab().id)
   })
 })
