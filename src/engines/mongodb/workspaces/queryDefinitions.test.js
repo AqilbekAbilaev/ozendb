@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { queryDefinitions } from './queryDefinitions'
 import { setCollectionQueryMode } from '../../../utils/queryMode'
-import { isResourceRef } from '../../../utils/resourceRef'
+import { createResourceRef, isResourceRef } from '../../../utils/resourceRef'
 import { duplicateWorkspace, restoreWorkspace, disposeWorkspace } from '../../../workspaces/lifecycle'
 import { registerWorkspaceDefinitions } from '../../../workspaces/registerDefinitions'
 import { closeShellSession } from '../api/shell'
@@ -28,8 +28,12 @@ const ctx = (target, defaults = {}, ids = {}) => ({
   ids: { workspace: () => 'w-1', session: () => crypto.randomUUID(), ...ids },
 })
 
-const COLLECTION = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' }
-const DATABASE = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' }
+// What the openers hand `create`: `{ resource, connectionName }` (#193).
+const DATABASE = { resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]), connectionName: 'Sales' }
+const COLLECTION = {
+  resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
+  connectionName: 'Sales',
+}
 
 describe('mongodb.find', () => {
   const created = defFor('mongodb.find').create(ctx(COLLECTION, { queryLimit: 25, resultView: 'grid' }))

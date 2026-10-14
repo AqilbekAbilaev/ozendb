@@ -199,7 +199,7 @@ describe('PostgreSQL never reaches the MongoDB gates', () => {
   it('a MongoDB tab still counts while a PostgreSQL connection is selected', () => {
     const ctx = deriveMenuContext(collectionTab, pgConnection, 2)
     expect([ctx.hasConnection, ctx.hasDatabase, ctx.hasCollection]).toEqual([true, true, true])
-    expect(resolveMenuTarget(collectionTab, pgConnection, 'connection')).toMatchObject({ connectionId: 'c1' })
+    expect(resolveMenuTarget(collectionTab, pgConnection, 'connection').resource.connectionId).toBe('c1')
   })
 
   it('never hands a PostgreSQL connection to an action — ⌘L finds no database to open a shell on', () => {
@@ -212,7 +212,7 @@ describe('resolveMenuTarget', () => {
   it('prefers the sidebar selection over the active tab', () => {
     const sel = selection('c2', 'Prod', 'analytics', 'events', 'collection')
     expect(resolveMenuTarget(collectionTab, sel)).toEqual({
-      connectionId: 'c2', connectionName: 'Prod', dbName: 'analytics', collectionName: 'events', kind: 'collection',
+      resource: ref('c2', 'analytics', 'events'), connectionName: 'Prod',
     })
   })
 
@@ -220,9 +220,9 @@ describe('resolveMenuTarget', () => {
   // authoritative — the level is never guessed from which fields happen to be set.
   it('takes the level from the selection kind, not from field presence', () => {
     const dbSel = selection('c1', 'Local', 'shop', null, 'database')
-    expect(resolveMenuTarget(null, dbSel).kind).toBe('database')
+    expect(resolveMenuTarget(null, dbSel).resource).toEqual(ref('c1', 'shop'))
     const connSel = selection('c1', 'Local', null, null, 'connection')
-    expect(resolveMenuTarget(null, connSel).kind).toBe('connection')
+    expect(resolveMenuTarget(null, connSel).resource).toEqual(ref('c1'))
   })
 
   it('names no resource for a kindless selection rather than guessing one', () => {
@@ -231,7 +231,7 @@ describe('resolveMenuTarget', () => {
 
   it('falls back to the active tab when nothing is selected', () => {
     expect(resolveMenuTarget(collectionTab, null)).toEqual({
-      connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
+      resource: ref('c1', 'shop', 'orders'), connectionName: 'Local',
     })
   })
 
@@ -245,30 +245,29 @@ describe('resolveMenuTarget', () => {
     // selection — otherwise the enabled item would only toast a guide message.
     const connSel = selection('c2', 'Prod', null, null, 'connection')
     expect(resolveMenuTarget(collectionTab, connSel, 'collection')).toEqual({
-      connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
+      resource: ref('c1', 'shop', 'orders'), connectionName: 'Local',
     })
     // A database-scoped action likewise falls through to the collection tab.
-    expect(resolveMenuTarget(collectionTab, connSel, 'database').collectionName).toBe('orders')
+    expect(resolveMenuTarget(collectionTab, connSel, 'database').resource).toEqual(ref('c1', 'shop', 'orders'))
     // A connection-scoped action is satisfied by the selection, so it wins.
-    expect(resolveMenuTarget(collectionTab, connSel, 'connection').connectionId).toBe('c2')
+    expect(resolveMenuTarget(collectionTab, connSel, 'connection').resource).toEqual(ref('c2'))
   })
 
   it('prefers the sidebar selection when it satisfies the required level', () => {
     const collSel = selection('c2', 'Prod', 'analytics', 'events', 'collection')
-    expect(resolveMenuTarget(collectionTab, collSel, 'collection').connectionId).toBe('c2')
+    expect(resolveMenuTarget(collectionTab, collSel, 'collection').resource).toEqual(ref('c2', 'analytics', 'events'))
   })
 
   it('returns the shallow selection for the guide message when neither satisfies', () => {
     const connSel = selection('c2', 'Prod', null, null, 'connection')
-    expect(resolveMenuTarget(quickstart, connSel, 'collection').connectionId).toBe('c2')
+    expect(resolveMenuTarget(quickstart, connSel, 'collection').resource).toEqual(ref('c2'))
   })
 
-  // A tool tab resolves through its target, like every other tab, to the long spelling
-  // the handlers read.
+  // A tool tab resolves through its target, like every other tab.
   it('resolves a tool tab through its target', () => {
     const schema = { id: 't3', kind: 'schema', target: ref('c1', 'shop', 'orders'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders' }
     expect(resolveMenuTarget(schema, null, 'collection')).toEqual({
-      connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
+      resource: ref('c1', 'shop', 'orders'), connectionName: 'Local',
     })
   })
 })

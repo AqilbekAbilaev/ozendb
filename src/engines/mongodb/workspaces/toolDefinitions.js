@@ -4,6 +4,7 @@
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { resourceName } from '../../../utils/resourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
+import { createdFields } from './createdFields'
 import { IndexManagerPane, SchemaPane, SearchPane, CurrentOpsPane, ImportPane, CsvImportPane, ExportPane } from './panes'
 
 // A tool workspace's identity fields, in the long spelling collection/shell workspaces
@@ -39,19 +40,6 @@ function opsTarget(node) {
   return resourceFromFeatureNode(connectionScope(node))
 }
 
-// What every tool's `create` is handed: `{ resource, connectionName }` (#193), the same
-// payload the registry modals take. The tab's own fields stay in the long spelling until
-// the tab shape itself moves, so this spells them out from the reference once.
-function createdFields(ctx) {
-  const { resource, connectionName } = ctx.target
-  const [database, collection] = resource.segments
-  return {
-    connectionId: resource.connectionId,
-    connectionName: connectionName ?? null,
-    dbName: database?.name ?? null,
-    collectionName: collection?.name ?? null,
-  }
-}
 // The connection-scoped half of the same, for Current Operations, whose dbName/collName
 // are filters rather than identity.
 function createdConnectionFields(ctx) {

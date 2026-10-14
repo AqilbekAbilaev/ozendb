@@ -13,7 +13,6 @@
 // be set. That is what keeps Current Operations, which carries dbName/collName as
 // *filters*, from enabling the Database menu. A tab without a target (Quickstart)
 // names no resource and gates everything off.
-import { legacyTargetFromResource } from './legacyResourceRef'
 import { sameResource } from './resourceRef'
 
 // How many segments each gated level needs.
@@ -118,10 +117,10 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   }
 }
 
-// A resolved target, in the long alias spelling every handler already reads. The name
-// is the one piece of presentation the ref cannot carry, so it is read off the source.
+// A resolved target: the ref, and beside it the connection's display name, the one piece
+// of presentation a ref cannot carry, read off the source.
 function nodeFrom(source, ref) {
-  return legacyTargetFromResource(ref, source?.connectionName ?? source?.connName ?? null)
+  return ref ? { resource: ref, connectionName: source?.connectionName ?? source?.connName ?? null } : null
 }
 
 // The node a native menu action should act on. Because item enablement is the
@@ -130,7 +129,8 @@ function nodeFrom(source, ref) {
 // otherwise a shallow sidebar click could steal an item that only the deeper
 // active tab enabled. The sidebar selection wins when both qualify (that's what
 // the user just clicked); we fall back to the active tab when the selection is too
-// shallow. `requiredLevel` is 'connection' | 'database' | 'collection' | null.
+// shallow. `requiredLevel` is 'connection' | 'database' | 'collection' | null. The result
+// is `{ resource, connectionName }`, or null when neither names a MongoDB resource.
 export function resolveMenuTarget(activeTab, treeSelection, requiredLevel = null) {
   const sel = treeSelection || null
   const tab = activeTab || null

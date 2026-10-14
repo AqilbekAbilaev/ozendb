@@ -33,11 +33,7 @@ function harness() {
   return { ...creators, runQuery, defaultQueryLimit, defaultResultView }
 }
 
-const COLLECTION = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' }
-const DB_NODE = { connId: 'c1', connName: 'Sales', dbName: 'shop' }
-
-// Tool tabs and wizards take `{ resource, connectionName }` (#193); the collection,
-// shell and SQL creators still take the long spelling above.
+// Every creator takes `{ resource, connectionName }` (#193).
 const collRef = (connectionId, database, collection) => createResourceRef(connectionId, [
   { kind: 'database', name: database }, { kind: 'collection', name: collection },
 ])
@@ -57,10 +53,10 @@ const ids = () => tabs.value.map(t => t.id)
 describe('open policies — every open makes its own tab', () => {
   it('opens collections, shells, current-operations, imports, and exports without dedup', () => {
     const c = harness()
-    c.openCollectionTab(COLLECTION)
-    c.openCollectionTab(COLLECTION)
-    c.openShellTab(DB_NODE)
-    c.openShellTab(DB_NODE)
+    c.openCollectionTab(TOOL)
+    c.openCollectionTab(TOOL)
+    c.openShellTab(DB_TOOL)
+    c.openShellTab(DB_TOOL)
     c.openCurrentOpsTab(CONN_TOOL)
     c.openCurrentOpsTab(CONN_TOOL)
     c.openImportTab(TOOL, 'csv')
@@ -72,8 +68,8 @@ describe('open policies — every open makes its own tab', () => {
 
   it('activates every newly opened tab', () => {
     const c = harness()
-    c.openCollectionTab(COLLECTION)
-    c.openShellTab(DB_NODE)
+    c.openCollectionTab(TOOL)
+    c.openShellTab(DB_TOOL)
     c.openCurrentOpsTab(CONN_TOOL)
     c.openImportTab(TOOL, 'json')
     expect(activeTabId.value).toBe(lastTab().id)
@@ -83,9 +79,9 @@ describe('open policies — every open makes its own tab', () => {
 describe('focus policies — one tab per target', () => {
   it('focuses the existing SQL tab for the same collection instead of opening', () => {
     const c = harness()
-    c.openSqlTab(COLLECTION)
+    c.openSqlTab(TOOL)
     const sqlTab = lastTab()
-    c.openSqlTab(COLLECTION)
+    c.openSqlTab(TOOL)
     expect(tabs.value).toHaveLength(2)
     expect(activeTabId.value).toBe(sqlTab.id)
   })
@@ -167,7 +163,7 @@ describe('focus policies — one tab per target', () => {
 describe('created tab shapes', () => {
   it('builds collection tabs through their definition with the app defaults', () => {
     const c = harness()
-    c.openCollectionTab(COLLECTION)
+    c.openCollectionTab(TOOL)
     const tab = lastTab()
     expect(tab.type).toBe('mongodb.find')
     expect(tab.engine).toBe('mongodb')
@@ -181,7 +177,7 @@ describe('created tab shapes', () => {
 
   it('opens aggregate tabs in aggregate mode with an empty pipeline', () => {
     const c = harness()
-    c.openCollectionTab(COLLECTION, 'aggregate')
+    c.openCollectionTab(TOOL, 'aggregate')
     expect(lastTab().type).toBe('mongodb.aggregate')
     expect(lastTab().mode).toBe('aggregate')
     expect(lastTab().state.query.pipeline).toBe('')
@@ -189,7 +185,7 @@ describe('created tab shapes', () => {
 
   it('opens SQL tabs with the seeded editor text', () => {
     const c = harness()
-    c.openSqlTab(COLLECTION)
+    c.openSqlTab(TOOL)
     expect(lastTab().type).toBe('mongodb.sql_to_mql')
     expect(lastTab().sql).toBe('SELECT *\nFROM orders')
     expect(lastTab().mode).toBe('sql')
@@ -197,9 +193,9 @@ describe('created tab shapes', () => {
 
   it('gives every shell tab its own engine session', () => {
     const c = harness()
-    c.openShellTab(DB_NODE)
+    c.openShellTab(DB_TOOL)
     const s1 = lastTab()
-    c.openShellTab(DB_NODE)
+    c.openShellTab(DB_TOOL)
     const s2 = lastTab()
     expect(s1.sessionId).not.toBe(s2.sessionId)
     expect(s1.title).toBe('mongosh: shop')
@@ -238,7 +234,7 @@ describe('created tab shapes', () => {
 describe('initial query execution', () => {
   it('runs a supplied filter immediately, bypassing default-query loading', async () => {
     const c = harness()
-    await c.openCollectionTab({ ...COLLECTION, filter: '{ "status": "open" }' })
+    await c.openCollectionTab({ ...TOOL, filter: '{ "status": "open" }' })
     expect(getDefaultQuery).not.toHaveBeenCalled()
     expect(c.runQuery).toHaveBeenCalledTimes(1)
     expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
@@ -249,13 +245,13 @@ describe('initial query execution', () => {
   it('keeps the supplied filter text on the tab so the editor, history, and session agree', async () => {
     const c = harness()
     const filter = '{ "status": "open" }'
-    await c.openCollectionTab({ ...COLLECTION, filter })
+    await c.openCollectionTab({ ...TOOL, filter })
     expect(lastTab().state.query.filter).toBe(filter) // exact text, not the parsed EJSON sent to the API
   })
 
   it('does not retain filter text that did not parse — an empty query is what ran', async () => {
     const c = harness()
-    await c.openCollectionTab({ ...COLLECTION, filter: 'not json' })
+    await c.openCollectionTab({ ...TOOL, filter: 'not json' })
     // Nothing was persisted for display/history/session to misread as the executed query.
     expect(lastTab().state.query.filter).toBe('')
     expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
@@ -268,7 +264,7 @@ describe('initial query execution', () => {
       filter: '{ "x": 1 }', sort: '{ "y": -1 }', projection: '{ "z": 1 }', skip: 2, limit: 5,
     })
     const c = harness()
-    await c.openCollectionTab(COLLECTION)
+    await c.openCollectionTab(TOOL)
     expect(getDefaultQuery).toHaveBeenCalledWith({ connectionId: 'c1', database: 'shop', collection: 'orders' })
     const tab = lastTab()
     expect(tab.state.query.filter).toBe('{ "x": 1 }')
@@ -282,7 +278,7 @@ describe('initial query execution', () => {
   it('falls back to the empty-query run when default-query loading fails', async () => {
     vi.mocked(getDefaultQuery).mockRejectedValue(new Error('boom'))
     const c = harness()
-    await c.openCollectionTab(COLLECTION)
+    await c.openCollectionTab(TOOL)
     expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
       filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 50,
     })
@@ -290,7 +286,7 @@ describe('initial query execution', () => {
 
   it('runs the empty-query fallback when there is no saved default query', async () => {
     const c = harness()
-    await c.openCollectionTab(COLLECTION)
+    await c.openCollectionTab(TOOL)
     expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
       filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 50,
     })
@@ -298,8 +294,8 @@ describe('initial query execution', () => {
 
   it('does not run anything on open for aggregate or SQL tabs', async () => {
     const c = harness()
-    await c.openCollectionTab(COLLECTION, 'aggregate')
-    c.openSqlTab(COLLECTION)
+    await c.openCollectionTab(TOOL, 'aggregate')
+    c.openSqlTab(TOOL)
     expect(c.runQuery).not.toHaveBeenCalled()
   })
 })
@@ -369,10 +365,10 @@ describe('export source resolution', () => {
 describe('changed settings affect only future workspaces', () => {
   it('applies a new query limit to tabs opened after the setting changes', () => {
     const c = harness()
-    c.openCollectionTab(COLLECTION)
+    c.openCollectionTab(TOOL)
     expect(lastTab().state.query.limit).toBe(50)
     c.defaultQueryLimit.value = 100
-    c.openCollectionTab(COLLECTION)
+    c.openCollectionTab(TOOL)
     expect(lastTab().state.query.limit).toBe(100)
     expect(tabs.value[1].state.query.limit).toBe(50)
   })
@@ -381,8 +377,8 @@ describe('changed settings affect only future workspaces', () => {
 describe('ids', () => {
   it('gives distinct ids to tabs opened in one tick', () => {
     const c = harness()
-    c.openCollectionTab(COLLECTION)
-    c.openShellTab(DB_NODE)
+    c.openCollectionTab(TOOL)
+    c.openShellTab(DB_TOOL)
     c.openCurrentOpsTab(CONN_TOOL)
     expect(new Set(ids()).size).toBe(4)
   })

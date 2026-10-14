@@ -10,8 +10,7 @@ import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
 import { tabs, activeTabId, activeTab, closeTab, cycleTab } from '../stores/tabs'
 import { canRefreshWorkspace } from '../workspaces/lifecycle'
 import { openModal, openModals } from '../stores/modals'
-import { createResourceRef, sameResource } from '../utils/resourceRef'
-import { resourceFromTreeSelection } from '../utils/legacyResourceRef'
+import { resourceAt, sameResource } from '../utils/resourceRef'
 import { checkNow as checkForUpdates } from '../stores/updater'
 import { vqbOpen } from '../stores/visualQueryBuilder'
 import { keyBindings } from '../stores/settings'
@@ -53,17 +52,13 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       case 'help:quickstart':  openQuickstart(); return
       case 'help:updates':     checkForUpdates(); return
       case 'coll:vqb': {
-        const tab = menuTarget('collection')
-        if (!tab || tab.kind !== 'collection' || !tab.collectionName) {
+        const target = menuTarget('collection')
+        const collection = resourceAt(target?.resource, 'collection')
+        if (!collection) {
           showToast('Open a collection first')
           return
         }
-        openCollectionTab({
-          connectionId: tab.connectionId,
-          connectionName: tab.connectionName,
-          dbName: tab.dbName,
-          collectionName: tab.collectionName,
-        })
+        openCollectionTab({ resource: collection, connectionName: target.connectionName })
         vqbOpen.value = true
         return
       }
@@ -244,24 +239,18 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
   // that tab is mounted — signal the panel to open the matching dialog.
   async function requestCollectionDocAction(action) {
     const target = menuTarget('collection')
-    if (!target || target.kind !== 'collection' || !target.collectionName) {
+    const collection = resourceAt(target?.resource, 'collection')
+    if (!collection) {
       showToast('Open a collection first')
       return
     }
     const active = tabs.value.find(t => t.id === activeTabId.value)
     const sameCollectionActive = active && active.kind === 'collection'
-      && active.connectionId === target.connectionId
-      && active.dbName === target.dbName
-      && active.collectionName === target.collectionName
+      && sameResource(active.target, collection)
     // Reuse the active tab when it already shows this collection; otherwise open one so
     // the operation has a results view to refresh afterward.
     if (!sameCollectionActive) {
-      openCollectionTab({
-        connectionId: target.connectionId,
-        connectionName: target.connectionName,
-        dbName: target.dbName,
-        collectionName: target.collectionName,
-      })
+      openCollectionTab({ resource: collection, connectionName: target.connectionName })
     }
     await nextTick()
     requestDocAction(action)
@@ -284,13 +273,12 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       return
     }
     const target = menuTarget('database')
-    const resolved = resourceFromTreeSelection(target)
-    if (!resolved || resolved.segments.length < 1) {
+    // A collection resolves too; GridFS acts on its database.
+    const database = resourceAt(target?.resource, 'database')
+    if (!database) {
       showToast('Open a database first')
       return
     }
-    // A collection resolves too; GridFS acts on its database.
-    const database = createResourceRef(resolved.connectionId, resolved.segments.slice(0, 1))
     if (!sameResource(openModals.gridfs?.resource, database)) {
       openModal('gridfs', { resource: database, connectionName: target.connectionName })
     }

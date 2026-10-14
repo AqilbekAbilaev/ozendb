@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   createResourceRef, appendResource, isResourceRef,
-  resourceKind, resourceName, sameResource, isResourceAncestor,
+  resourceKind, resourceName, resourceAt, sameResource, isResourceAncestor,
 } from './resourceRef'
 
 const db = (name) => ({ kind: 'database', name: name })
@@ -152,5 +152,25 @@ describe('isResourceAncestor', () => {
   it('returns false for malformed input', () => {
     expect(isResourceAncestor(null, createResourceRef('c1'))).toBe(false)
     expect(isResourceAncestor(createResourceRef('c1'), 'x')).toBe(false)
+  })
+})
+describe('resourceAt', () => {
+  const orders = createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }])
+
+  it('cuts a ref back to the named level', () => {
+    expect(resourceAt(orders, 'connection')).toEqual(createResourceRef('c1'))
+    expect(resourceAt(orders, 'database')).toEqual(createResourceRef('c1', [{ kind: 'database', name: 'shop' }]))
+    expect(resourceAt(orders, 'collection')).toEqual(orders)
+  })
+
+  it('names nothing when the ref does not reach that level', () => {
+    expect(resourceAt(createResourceRef('c1'), 'database')).toBe(null)
+    expect(resourceAt(null, 'connection')).toBe(null)
+  })
+
+  // A PostgreSQL schema is as deep as a MongoDB collection; only the kinds tell them apart.
+  it('matches by kind, never by depth', () => {
+    const schema = createResourceRef('p1', [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }])
+    expect(resourceAt(schema, 'collection')).toBe(null)
   })
 })

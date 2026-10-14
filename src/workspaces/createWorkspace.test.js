@@ -21,8 +21,10 @@ function deepFreeze(obj) {
   return obj
 }
 
+// What the openers hand a MongoDB definition: `{ resource, connectionName }` (#193).
 const COLLECTION_TARGET = {
-  connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
+  resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
+  connectionName: 'Sales',
 }
 
 describe('createWorkspace — type resolution', () => {
@@ -113,7 +115,7 @@ describe('createWorkspace — context contract', () => {
 
   it('gives the shell definition its injected session id source', () => {
     const tab = createWorkspace('mongodb.shell', {
-      target: { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' },
+      target: { resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]), connectionName: 'Sales' },
       ids: { workspace: () => 'w-1', session: () => 'sess-9' },
     })
     expect(tab.sessionId).toBe('sess-9')

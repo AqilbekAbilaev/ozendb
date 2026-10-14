@@ -70,6 +70,11 @@ const tab = (id, connId, db, coll, kind = 'collection') => {
   }
 }
 
+const dbRef = (connId, db) => createResourceRef(connId, [{ kind: 'database', name: db }])
+const collRef = (connId, db, coll) => createResourceRef(connId, [
+  { kind: 'database', name: db }, { kind: 'collection', name: coll },
+])
+
 const quickstart = { id: 'q', kind: 'quickstart', type: 'app.quickstart', title: 'Quickstart' }
 
 function seedStore(arr, activeId) {
@@ -204,25 +209,16 @@ describe('global toolbar routing', () => {
 
     features.handleTool('shell')
 
-    expect(openShellTab).toHaveBeenCalledWith({
-      connectionId: 'c1',
-      connectionName: 'Sales',
-      dbName: 'shop',
-    })
+    expect(openShellTab).toHaveBeenCalledWith({ resource: dbRef('c1', 'shop'), connectionName: 'Sales' })
   })
 
   it('opens the collection explicitly resolved by the native menu', () => {
-    const target = tab('target', 'c2', 'warehouse', 'stock')
+    const target = { resource: collRef('c2', 'warehouse', 'stock'), connectionName: 'Sales' }
     const features = makeFeatures()
 
     features.handleTool('collection', target)
 
-    expect(openCollectionTab).toHaveBeenCalledWith({
-      connectionId: 'c2',
-      connectionName: 'Sales',
-      dbName: 'warehouse',
-      collectionName: 'stock',
-    })
+    expect(openCollectionTab).toHaveBeenCalledWith(target)
   })
 
   // With no explicit target, the toolbar's Collection button opens whatever is
@@ -232,7 +228,7 @@ describe('global toolbar routing', () => {
     setTreeSelection({ connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders', kind: 'collection' })
     makeFeatures().handleTool('collection')
 
-    expect(openCollectionTab).toHaveBeenCalledWith(expect.objectContaining({ dbName: 'shop', collectionName: 'orders' }))
+    expect(openCollectionTab).toHaveBeenCalledWith({ resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' })
     expect(treeSelection.value).toBeNull()
   })
 
@@ -256,7 +252,7 @@ describe('feature nodes arrive as a ResourceRef', () => {
   it('opens a database tool for the database of a right-clicked collection', () => {
     contextMenu.value = ordersRow
     makeFeatures().handleContextAction('file:intellishell')
-    expect(openShellTab).toHaveBeenCalledWith({ connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
+    expect(openShellTab).toHaveBeenCalledWith({ resource: dbRef('c1', 'shop'), connectionName: 'Sales' })
   })
 
   it('gives a connection-scoped tool no database or collection to filter on', () => {
@@ -332,9 +328,7 @@ describe('feature nodes arrive as a ResourceRef', () => {
   })
 
   it('runs a native menu action on the target it resolves', () => {
-    const menuTarget = vi.fn(() => ({
-      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: null, kind: 'database',
-    }))
+    const menuTarget = vi.fn(() => ({ resource: dbRef('c1', 'shop'), connectionName: 'Sales' }))
     useFeatures({ menuTarget }).menuNode('file:search')
     expect(openSearchTab).toHaveBeenCalledWith({
       resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]), connectionName: 'Sales',
@@ -342,9 +336,7 @@ describe('feature nodes arrive as a ResourceRef', () => {
   })
 
   it('guides the user when the native menu has nothing deep enough', () => {
-    const menuTarget = vi.fn(() => ({
-      connectionId: 'c1', connectionName: 'Sales', dbName: null, collectionName: null, kind: 'connection',
-    }))
+    const menuTarget = vi.fn(() => ({ resource: createResourceRef('c1'), connectionName: 'Sales' }))
     useFeatures({ menuTarget }).menuNode('coll:stats')
     expect(openModal).not.toHaveBeenCalled()
     expect(showToast).toHaveBeenCalledWith('Open a collection first')
@@ -391,17 +383,13 @@ describe('handleTool falling back to the active workspace', () => {
   // target rather than whichever identity fields it happens to carry.
   it('opens IntelliShell for the database a Schema tab is scoped to', () => {
     makeFeatures().handleTool('shell')
-    expect(openShellTab).toHaveBeenCalledWith({
-      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
-    })
+    expect(openShellTab).toHaveBeenCalledWith({ resource: dbRef('c1', 'shop'), connectionName: 'Sales' })
     expect(showToast).not.toHaveBeenCalled()
   })
 
   it('opens SQL for the collection a Schema tab is scoped to', () => {
     makeFeatures().handleTool('sql')
-    expect(openSqlTab).toHaveBeenCalledWith({
-      connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
-    })
+    expect(openSqlTab).toHaveBeenCalledWith({ resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' })
   })
 
   // Current Operations is connection-scoped: its dbName/collName are filters, so a
