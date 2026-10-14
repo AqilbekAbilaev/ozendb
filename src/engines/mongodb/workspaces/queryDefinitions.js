@@ -4,7 +4,6 @@
 // the factory.
 import { resourceName } from '../../../utils/resourceRef'
 import { closeShellSession } from '../api/shell'
-import { createdFields } from './createdFields'
 import {
   createCollectionState, createCollectionUi, createCollectionRuntime,
   migrateCollectionState,
@@ -99,26 +98,17 @@ function restoreCollection(saved, defaults = {}) {
   }
 }
 
-// A shell workspace is database-scoped, so its identity is the connection plus the
-// database — never the collection a sibling tab happens to be on.
-function shellTarget(source) {
-  return {
-    connectionId: source.connectionId,
-    connectionName: source.connectionName,
-    dbName: source.dbName,
-  }
-}
-
-// The full shape of a shell tab. Create, duplicate and restore all produce exactly
-// this — they differ only in the editor text they carry over — so the runtime spine
-// is written once. Getting it wrong in one of three copies is how a duplicated tab
+// The full shape of a shell tab. A shell is database-scoped, and its identity is its
+// `target` alone (#303): beside it the tab keeps only the connection's display name.
+// Create, duplicate and restore all produce exactly this — they differ only in the
+// editor text they carry over — so the runtime spine is written once. Getting it wrong in one of three copies is how a duplicated tab
 // ends up sharing its predecessor's results.
 //
 // `sessionId` is always freshly minted: each shell tab owns its own backend JS
 // session so variables persist across runs within a tab and never leak between them.
 function shellFields(source, sessionId, durable = {}) {
   return {
-    ...shellTarget(source),
+    connectionName: source.connectionName ?? null,
     sessionId: sessionId,
     code: durable.code ?? '',
     scriptPath: durable.scriptPath ?? null,
@@ -132,7 +122,7 @@ function shellFields(source, sessionId, durable = {}) {
 
 function shellWorkspace(source, ctx, durable) {
   return {
-    title: source.title || 'mongosh: ' + source.dbName,
+    title: source.title || 'mongosh: ' + resourceName(source.target),
     target: source.target,
     fields: shellFields(source, ctx.ids.session(), durable),
   }
@@ -232,7 +222,7 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: ShellConsole,
     create(ctx) {
-      return shellWorkspace({ ...createdFields(ctx), target: ctx.target.resource }, ctx)
+      return shellWorkspace({ connectionName: ctx.target.connectionName, target: ctx.target.resource }, ctx)
     },
     serialize(workspace) {
       // The session is backend state keyed by id; only the editor text is durable.

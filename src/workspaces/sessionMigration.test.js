@@ -307,9 +307,9 @@ describe('toLegacyRecord bridge', () => {
       // The pinned v1 records name their tab by `kind`, the old file format; a live
       // workspace names itself by `type` alone (#193), so that one field is not compared.
       const { kind: _kind, ...legacyFields } = legacy[conf.key]
-      // A collection tab's identity is its target alone (#303), so its flat identity
-      // fields are not compared either; the target is compared above.
-      if (isCollectionTab(restored)) {
+      // A collection or shell tab's identity is its target alone (#303), so its flat
+      // identity fields are not compared either; the target is compared above.
+      if (isCollectionTab(restored) || restored.type === 'mongodb.shell') {
         delete legacyFields.connectionId
         delete legacyFields.dbName
         delete legacyFields.collectionName

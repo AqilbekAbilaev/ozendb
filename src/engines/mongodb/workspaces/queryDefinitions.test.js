@@ -114,10 +114,11 @@ describe('mongodb.sql_to_mql', () => {
 describe('mongodb.shell', () => {
   const created = defFor('mongodb.shell').create(ctx(DATABASE, {}, { session: () => 'sess-7' }))
 
+  // Identity is the target alone (#303); only the display name stays a flat field.
   it('titles from the database and scopes to database depth', () => {
     expect(created.title).toBe('mongosh: shop')
-    expect(created.fields.connectionId).toBe('c1')
-    expect(created.fields.dbName).toBe('shop')
+    expect(created.fields).not.toHaveProperty('connectionId')
+    expect(created.fields).not.toHaveProperty('dbName')
     expect(created.fields.connectionName).toBe('Sales')
     const ref = created.target
     expect(ref.segments.map(s => s.name)).toEqual(['shop'])

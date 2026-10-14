@@ -5,6 +5,8 @@ import { readShellScript, writeShellScript } from '../../appApi/files'
 import { runShellCommand, getShellHistory, pushShellCommand, clearShellHistory } from '../../engines/mongodb/api/shell'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
+import { resourceName } from '../../utils/resourceRef'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -54,8 +56,9 @@ const shellExt = shellExtensions({
 // Best-effort: preload this database's collection names for `db.` completion.
 async function loadCollections() {
   try {
-    const dbs = await listDatabases(props.activeTab.connectionId)
-    const match = Array.isArray(dbs) ? dbs.find(d => d.name === props.activeTab.dbName) : null
+    const { connectionId, database } = apiTarget(props.activeTab.target)
+    const dbs = await listDatabases(connectionId)
+    const match = Array.isArray(dbs) ? dbs.find(d => d.name === database) : null
     if (match && Array.isArray(match.collections)) dbCollections.value = match.collections
   } catch (_) {}
 }
@@ -65,7 +68,7 @@ onMounted(async () => {
   // Load this connection's persisted command history so the History dropdown
   // (and recall) spans previous sessions.
   try {
-    const past = await getShellHistory(props.activeTab.connectionId)
+    const past = await getShellHistory(props.activeTab.target.connectionId)
     if (Array.isArray(past)) props.activeTab.history = past
   } catch (_) {}
 })
@@ -85,12 +88,12 @@ async function run(codeOverride) {
   tab.isRunning = true
   tab.runError = null
   const t0 = Date.now()
-  pushShellCommand(tab.connectionId, code).catch(() => {})
+  pushShellCommand(tab.target.connectionId, code).catch(() => {})
   if (!tab.history.includes(code)) tab.history.push(code)
 
   try {
     const res = await runShellCommand(
-      { connectionId: tab.connectionId, database: tab.dbName, sessionId: tab.sessionId },
+      { ...apiTarget(tab.target), sessionId: tab.sessionId },
       code,
     )
     tab.elapsedMs = Date.now() - t0
@@ -158,7 +161,7 @@ async function clearHistory() {
   const tab = props.activeTab
   if (!tab) return
   try {
-    await clearShellHistory(tab.connectionId)
+    await clearShellHistory(tab.target.connectionId)
     tab.history = []
   } catch (_) {}
 }
@@ -232,7 +235,7 @@ function formatScalar(value) {
 <template>
   <div class="shell">
     <!-- Connection → database, same crumb bar the collection panes show -->
-    <CollectionCrumbs :conn="activeTab.connectionName" :db="activeTab.dbName" />
+    <CollectionCrumbs :conn="activeTab.connectionName" :db="resourceName(activeTab.target)" />
 
     <!-- Toolbar -->
     <div class="shell-toolbar">
