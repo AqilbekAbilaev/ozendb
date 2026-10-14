@@ -5,7 +5,7 @@ describe('saved query browser lifetime', () => {
   it('keeps the opening collection as the load target after a workspace switch', () => {
     const activate = vi.fn()
     const browser = useSavedQueryBrowser({ activate })
-    const openingTab = { id: 'orders', kind: 'collection' }
+    const openingTab = { id: 'orders', type: 'mongodb.find' }
 
     browser.open(openingTab)
     browser.apply({ id: 'saved-1', mode: 'find' })
@@ -20,14 +20,14 @@ describe('saved query browser lifetime', () => {
 
   it('clears an applied request and dismisses when the target closes', () => {
     const browser = useSavedQueryBrowser({ activate: vi.fn() })
-    browser.open({ id: 'orders', kind: 'collection' })
+    browser.open({ id: 'orders', type: 'mongodb.find' })
     browser.apply({ id: 'saved-1' })
     const nonce = browser.request.value.nonce
 
     browser.acknowledge(nonce)
     expect(browser.request.value).toBe(null)
 
-    browser.open({ id: 'orders', kind: 'collection' })
+    browser.open({ id: 'orders', type: 'mongodb.find' })
     browser.retainTargets(new Set(['people']))
     expect(browser.isOpen.value).toBe(false)
     expect(browser.targetTabId.value).toBe(null)

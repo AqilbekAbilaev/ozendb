@@ -212,7 +212,7 @@ function onTabClick(t) {
 // The workspace always keeps one tab open, so the lone Quickstart tab has no ✕ — and
 // middle-click must honour the same rule rather than being a second way to empty the strip.
 function closable(t) {
-  return props.tabs.length > 1 || t.kind !== 'quickstart'
+  return props.tabs.length > 1 || t.type !== 'app.quickstart'
 }
 
 // Middle-click closes a tab, as in a browser's tab strip. Drag ignores non-left buttons

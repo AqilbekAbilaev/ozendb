@@ -21,9 +21,9 @@ function selection(connectionId, connectionName, dbName, collectionName, engine 
   return { resource: ref(connectionId, dbName, collectionName), connectionName, engine }
 }
 
-const quickstart = { id: 't0', kind: 'quickstart', title: 'Quickstart' }
+const quickstart = { id: 't0', type: 'app.quickstart', title: 'Quickstart' }
 const collectionTab = {
-  id: 't1', kind: 'collection', target: ref('c1', 'shop', 'orders'),
+  id: 't1', type: 'mongodb.find', target: ref('c1', 'shop', 'orders'),
   connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders',
   runtime: { results: [], selectedRow: -1, selectedField: null },
 }
@@ -149,7 +149,7 @@ describe('deriveMenuContext', () => {
   // A Current Operations tab carries dbName/collName as *filters*, not identity. The
   // old field-presence check read them as identity and lit the whole Database menu.
   it('does not let Current Operations filters enable the database menu', () => {
-    const ops = { id: 't2', kind: 'currentOps', target: ref('c1'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collName: 'orders' }
+    const ops = { id: 't2', type: 'mongodb.current_operations', target: ref('c1'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collName: 'orders' }
     const ctx = deriveMenuContext(ops, null, 1)
     expect(ctx.hasConnection).toBe(true)
     expect(ctx.hasDatabase).toBe(false)
@@ -159,7 +159,7 @@ describe('deriveMenuContext', () => {
   // Schema/Indexes/Export/Import are collection-scoped workspaces, so collection
   // actions apply to them just as they do to a find tab.
   it('enables collection actions for collection-scoped tool tabs', () => {
-    const schema = { id: 't3', kind: 'schema', target: ref('c1', 'shop', 'orders'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders' }
+    const schema = { id: 't3', type: 'mongodb.schema', target: ref('c1', 'shop', 'orders'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders' }
     const ctx = deriveMenuContext(schema, null, 1)
     expect(ctx.hasDatabase).toBe(true)
     expect(ctx.hasCollection).toBe(true)
@@ -177,7 +177,7 @@ describe('deriveMenuContext', () => {
 describe('PostgreSQL never reaches the MongoDB gates', () => {
   const pgConnection = selection('p1', 'Payments PG', null, null, 'postgresql')
   const pgTableTab = {
-    id: 't9', kind: 'pgTable', engine: 'postgresql',
+    id: 't9', type: 'postgresql.table_browse', engine: 'postgresql',
     target: createResourceRef('p1', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }]),
     connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
   }
@@ -263,7 +263,7 @@ describe('resolveMenuTarget', () => {
 
   // A tool tab resolves through its target, like every other tab.
   it('resolves a tool tab through its target', () => {
-    const schema = { id: 't3', kind: 'schema', target: ref('c1', 'shop', 'orders'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders' }
+    const schema = { id: 't3', type: 'mongodb.schema', target: ref('c1', 'shop', 'orders'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders' }
     expect(resolveMenuTarget(schema, null, 'collection')).toEqual({
       resource: ref('c1', 'shop', 'orders'), connectionName: 'Local',
     })

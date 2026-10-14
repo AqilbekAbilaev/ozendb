@@ -63,7 +63,7 @@ const tab = (id, connId, db, coll, kind = 'collection') => {
   if (db) segments.push({ kind: 'database', name: db })
   if (coll) segments.push({ kind: 'collection', name: coll })
   return {
-    id, kind, type: 'mongodb.' + (kind === 'shell' ? 'shell' : kind === 'indexes' ? 'indexes' : 'find'),
+    id, type: 'mongodb.' + (kind === 'shell' ? 'shell' : kind === 'indexes' ? 'indexes' : 'find'),
     connectionId: connId, connectionName: 'Sales', dbName: db, collectionName: coll,
     connId, connName: 'Sales', collName: coll,
     target: createResourceRef(connId, segments),
@@ -75,7 +75,7 @@ const collRef = (connId, db, coll) => createResourceRef(connId, [
   { kind: 'database', name: db }, { kind: 'collection', name: coll },
 ])
 
-const quickstart = { id: 'q', kind: 'quickstart', type: 'app.quickstart', title: 'Quickstart' }
+const quickstart = { id: 'q', type: 'app.quickstart', title: 'Quickstart' }
 
 function seedStore(arr, activeId) {
   tabs.value = arr
@@ -364,7 +364,7 @@ describe('color tag persistence', () => {
 const toolTab = (id, connId, db, coll, kind) => {
   const connectionScoped = kind === 'currentOps'
   return {
-    id, kind, type: connectionScoped ? 'mongodb.current_operations' : 'mongodb.' + kind,
+    id, type: connectionScoped ? 'mongodb.current_operations' : 'mongodb.' + kind,
     connectionId: connId, connectionName: 'Sales', dbName: db,
     ...(connectionScoped ? { collName: coll } : { collectionName: coll }),
     target: createResourceRef(connId, connectionScoped ? [] : [
@@ -406,7 +406,7 @@ describe('handleTool falling back to the active workspace', () => {
   // database: only its engine says it names nothing a MongoDB tool can act on.
   it('does not treat a PostgreSQL tab as a MongoDB database', () => {
     tabs.value = [{
-      id: 'p1', kind: 'pgQuery', type: 'postgresql.query', engine: 'postgresql',
+      id: 'p1', type: 'postgresql.query', engine: 'postgresql',
       connectionId: 'pg1', connectionName: 'Payments', database: 'app',
       target: createResourceRef('pg1', [{ kind: 'database', name: 'app' }]),
     }]

@@ -17,6 +17,7 @@ import {
   consumeConnectionOpenRequest,
   treeSelection, setTreeSelection,
 } from '../stores/connectionNavigation'
+import { isCollectionTab } from '../utils/workspaceTypes'
 
 const databaseResource = (connectionId, dbName) => createResourceRef(connectionId, [{ kind: 'database', name: dbName }])
 
@@ -185,14 +186,14 @@ export function useConnectionTree({ emit }) {
   // PostgreSQL table. Its row is the one the tree highlights.
   const activeResource = computed(() => {
     const t = activeTab.value
-    return t?.kind === 'collection' || t?.kind === 'pgTable' ? t : null
+    return isCollectionTab(t) || t?.type === 'postgresql.table_browse' ? t : null
   })
   // The connection whose row highlights. Was a startsWith() over the collection key,
   // which prefix-matched an id instead of comparing one, and only ever for MongoDB.
   const activeConnectionId = computed(() => activeResource.value?.connectionId ?? null)
   const activeCollectionKey = computed(() => {
     const t = activeResource.value
-    return t?.kind === 'collection' ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
+    return isCollectionTab(t) ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
   })
 
   // Keyboard tab switches never click outside the sidebar, so clear the selection here.
@@ -210,7 +211,7 @@ export function useConnectionTree({ emit }) {
     if (!expandedConns.value[t.connectionId]) {
       await toggleConnection(conn)
     }
-    if (t.kind === 'collection') expandedDbs.value[`${t.connectionId}/${t.dbName}`] = true
+    if (isCollectionTab(t)) expandedDbs.value[`${t.connectionId}/${t.dbName}`] = true
   })
 
   const filtered = computed(() => {

@@ -3,6 +3,8 @@
 // colour can never drift between where it's chosen and where it's shown. Each preset
 // points at an existing theme token (never a raw hex), so the tags stay theme-aware
 // and in step with the rest of the UI — blue is literally the app accent.
+import { isCollectionTab } from './workspaceTypes'
+
 const TAG_COLORS = {
   blue:   'var(--accent)',
   green:  'var(--green)',
@@ -43,14 +45,14 @@ export function tabColorName(tab, tagOverrides) {
   if (!tab) return null
   if (tab.color) return tab.color
   const keys = []
-  if (tab.kind === 'collection') {
+  if (isCollectionTab(tab)) {
     keys.push(`${tab.connectionId}/${tab.dbName}/${tab.collectionName}`)
     keys.push(`${tab.connectionId}/${tab.dbName}`)
     keys.push(tab.connectionId)
-  } else if (tab.kind === 'shell') {
+  } else if (tab.type === 'mongodb.shell') {
     keys.push(`${tab.connectionId}/${tab.dbName}`)
     keys.push(tab.connectionId)
-  } else if (tab.kind === 'pgTable' || tab.kind === 'pgQuery') {
+  } else if (tab.type === 'postgresql.table_browse' || tab.type === 'postgresql.query') {
     // PostgreSQL nodes below the connection have no colours of their own yet.
     keys.push(tab.connectionId)
   }

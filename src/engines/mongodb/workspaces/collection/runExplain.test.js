@@ -12,7 +12,7 @@ const open = () => true
 function tab(mode = 'find', query = {}) {
   const state = createCollectionState()
   Object.assign(state.query, query)
-  return { id: 't1', kind: 'collection', mode, connectionId: 'c1', dbName: 'shop', collectionName: 'orders', state, runtime: createCollectionRuntime() }
+  return { id: 't1', type: 'mongodb.find', mode, connectionId: 'c1', dbName: 'shop', collectionName: 'orders', state, runtime: createCollectionRuntime() }
 }
 
 beforeEach(() => {

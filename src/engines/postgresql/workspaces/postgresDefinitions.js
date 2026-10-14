@@ -32,7 +32,7 @@ function tableWorkspace({ connectionId, connectionName, database, schema, table 
       { kind: 'table', name: table },
     ]),
     fields: {
-      kind: 'pgTable', connectionId, connectionName, database, schema, table,
+      connectionId, connectionName, database, schema, table,
       state, ui, runtime: createTableRuntime(connectionId),
     },
   }
@@ -44,7 +44,7 @@ function queryWorkspace({ connectionId, connectionName, database }, sql = '') {
     title: 'SQL: ' + database,
     target: createResourceRef(connectionId, [{ kind: 'database', name: database }]),
     fields: {
-      kind: 'pgQuery', connectionId, connectionName, database,
+      connectionId, connectionName, database,
       state: { sql },
       runtime: { run: createSqlRun(connectionId, database) },
     },
@@ -61,7 +61,7 @@ function searchWorkspace({ connectionId, connectionName, database, schema }, sta
       { kind: 'schema', name: schema },
     ]),
     fields: {
-      kind: 'pgSearch', connectionId, connectionName, database, schema,
+      connectionId, connectionName, database, schema,
       state, runtime: createSearchRuntime(),
     },
   }

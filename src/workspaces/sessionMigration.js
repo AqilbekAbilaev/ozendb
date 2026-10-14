@@ -163,26 +163,23 @@ export function migrateSession(raw, { connections = null } = {}) {
   return okResult(buildSession(validated.tabs, raw.activeTabId), 2, false, warnings, raw)
 }
 
-// Per-type legacy key conventions for the restore bridge: collection/shell records
-// carry the long keys, tool records the short aliases, and the connection scope of
-// a current-ops record is empty even when its filters are populated.
+// Per-type extras for the restore bridge: a collection record names its mode, and a
+// PostgreSQL target is deeper than MongoDB's, so each names its own levels.
 const LEGACY_KEYS = {
-  'mongodb.find':           { kind: 'collection', extra: { mode: 'find' } },
-  'mongodb.aggregate':      { kind: 'collection', extra: { mode: 'aggregate' } },
-  'mongodb.sql_to_mql':     { kind: 'collection', extra: { mode: 'sql' } },
-  'mongodb.shell':          { kind: 'shell' },
-  'mongodb.indexes':        { kind: 'indexes' },
-  'mongodb.schema':         { kind: 'schema' },
-  'mongodb.search':         { kind: 'search' },
-  'mongodb.import':         { kind: 'import' },
-  'mongodb.export':         { kind: 'export' },
-  'mongodb.current_operations': { kind: 'currentOps' },
-  // PostgreSQL targets are deeper than MongoDB's, so each names its own levels.
+  'mongodb.find':           { extra: { mode: 'find' } },
+  'mongodb.aggregate':      { extra: { mode: 'aggregate' } },
+  'mongodb.sql_to_mql':     { extra: { mode: 'sql' } },
+  'mongodb.shell':          {},
+  'mongodb.indexes':        {},
+  'mongodb.schema':         {},
+  'mongodb.search':         {},
+  'mongodb.import':         {},
+  'mongodb.export':         {},
+  'mongodb.current_operations': {},
   'postgresql.table_browse': {
-    kind: 'pgTable',
     identity: ([db, schema, table]) => ({ database: db.name, schema: schema.name, table: table.name }),
   },
-  'postgresql.query': { kind: 'pgQuery', identity: ([db]) => ({ database: db.name }) },
+  'postgresql.query': { identity: ([db]) => ({ database: db.name }) },
 }
 
 // The v2 → legacy bridge. Restore hooks consume the flat legacy shape and
@@ -206,7 +203,7 @@ export function toLegacyRecord(v2, connectionName = null) {
       }
   return {
     id: v2.id,
-    kind: conf.kind,
+    type: v2.type,
     title: v2.title,
     color: v2.color,
     ...identity,

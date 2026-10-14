@@ -14,6 +14,7 @@
 // *filters*, from enabling the Database menu. A tab without a target (Quickstart)
 // names no resource and gates everything off.
 import { sameResource } from './resourceRef'
+import { isCollectionTab } from './workspaceTypes'
 
 // How many segments each gated level needs.
 const DEPTH = { connection: 0, database: 1, collection: 2 }
@@ -79,7 +80,7 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   // view only — never the sidebar. The Document menu acts on the row/field the user
   // has selected in the grid, which only exists while a collection tab is active and
   // has run a query. A field selection implies a row selection.
-  const isCollection = tab?.kind === 'collection'
+  const isCollection = isCollectionTab(tab)
   const rowCount = isCollection ? (tab.runtime.results?.length ?? 0) : 0
   const selectedRow = isCollection ? (tab.runtime.selectedRow ?? -1) : -1
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount

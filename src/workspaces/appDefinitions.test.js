@@ -13,6 +13,6 @@ describe('app.quickstart definition', () => {
     const created = def.create({ target: null, defaults: {}, options: {}, ids: { workspace: () => 'w', session: () => 's' } })
     expect(created.title).toBe('Quickstart')
     expect(created.target).toBe(null)
-    expect(created.fields).toEqual({ kind: 'quickstart' })
+    expect(created.fields).toEqual({})
   })
 })

@@ -38,8 +38,9 @@ const COLLECTION = {
 describe('mongodb.find', () => {
   const created = defFor('mongodb.find').create(ctx(COLLECTION, { queryLimit: 25, resultView: 'grid' }))
 
-  it('owns the compatibility kind and mode', () => {
-    expect(created.fields.kind).toBe('collection')
+  // A workspace is named by its `type`; the old `kind` is no longer written (#193).
+  it('owns its mode and carries no kind', () => {
+    expect(created.fields).not.toHaveProperty('kind')
     expect(created.fields.mode).toBe('find')
   })
 
@@ -87,7 +88,6 @@ describe('mongodb.aggregate', () => {
   const created = defFor('mongodb.aggregate').create(ctx(COLLECTION))
 
   it('is a collection workspace in aggregate mode with an empty pipeline', () => {
-    expect(created.fields.kind).toBe('collection')
     expect(created.fields.mode).toBe('aggregate')
     expect(created.fields.state.query.pipeline).toBe('')
     expect(created.title).toBe('orders')
@@ -105,7 +105,6 @@ describe('mongodb.sql_to_mql', () => {
   })
 
   it('shares the collection result spine', () => {
-    expect(created.fields.kind).toBe('collection')
     expect(created.fields.runtime.results).toEqual([])
     expect(created.fields.ui.resultView).toBe('table')
   })
@@ -116,7 +115,6 @@ describe('mongodb.shell', () => {
 
   it('titles from the database and scopes to database depth', () => {
     expect(created.title).toBe('mongosh: shop')
-    expect(created.fields.kind).toBe('shell')
     expect(created.fields.connectionId).toBe('c1')
     expect(created.fields.dbName).toBe('shop')
     expect(created.fields.connectionName).toBe('Sales')
@@ -167,7 +165,7 @@ describe('query definitions — no shared mutable state', () => {
 })
 
 const SOURCE = {
-  id: 'src', kind: 'collection', type: 'mongodb.find', engine: 'mongodb',
+  id: 'src', type: 'mongodb.find', engine: 'mongodb',
   title: 'orders', color: '#f00',
   connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
   mode: 'find', filter: '{ "a": 1 }', projection: '{ "a": 1 }', sort: '{ "a": -1 }',
@@ -243,7 +241,7 @@ describe('lifecycle — duplicate', () => {
 
   it('shell duplicate clones code but gets a fresh session and cleared output', () => {
     const shell = {
-      id: 's', kind: 'shell', type: 'mongodb.shell', engine: 'mongodb',
+      id: 's', type: 'mongodb.shell', engine: 'mongodb',
       title: 'mongosh: shop', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
       sessionId: 'old-session', code: 'db.orders.find()', scriptPath: '/tmp/x.js',
@@ -269,7 +267,7 @@ describe('lifecycle — duplicate', () => {
 
 describe('lifecycle — restore', () => {
   const savedFind = {
-    id: 'r1', kind: 'collection', title: 'orders', color: '#0f0',
+    id: 'r1', type: 'mongodb.find', title: 'orders', color: '#0f0',
     connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     filter: '{ "a": 1 }', sort: '{ "a": -1 }', projection: '{ "a": 1 }',
     skip: 2, limit: 25, mode: 'find', pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 },
@@ -291,14 +289,14 @@ describe('lifecycle — restore', () => {
   })
 
   it('aggregate restores its pipeline and does not run', () => {
-    const tab = restoreWorkspace({ ...savedFind, id: 'a', mode: 'aggregate', pipeline: '[{ "$match": {} }]' })
+    const tab = restoreWorkspace({ ...savedFind, id: 'a', type: 'mongodb.aggregate', mode: 'aggregate', pipeline: '[{ "$match": {} }]' })
     expect(tab.mode).toBe('aggregate')
     expect(tab.state.query.pipeline).toBe('[{ "$match": {} }]')
     expect(tab.needsInitialRun).toBeUndefined()
   })
 
   it('sql restores the SQL text but clears translated pieces and does not run', () => {
-    const tab = restoreWorkspace({ ...savedFind, id: 's', mode: 'sql', sql: 'SELECT 1', readOnly: true })
+    const tab = restoreWorkspace({ ...savedFind, id: 's', type: 'mongodb.sql_to_mql', mode: 'sql', sql: 'SELECT 1', readOnly: true })
     expect(tab.mode).toBe('sql')
     expect(tab.sql).toBe('SELECT 1')
     expect(tab.sqlError).toBe(null)
@@ -311,7 +309,7 @@ describe('lifecycle — restore', () => {
 
   it('shell restore gets a fresh session id from the injected source', () => {
     const tab = restoreWorkspace({
-      id: 'sh', kind: 'shell', title: 'mongosh: shop', color: null,
+      id: 'sh', type: 'mongodb.shell', title: 'mongosh: shop', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
       sessionId: 'old-session', code: 'db.orders.find()', scriptPath: '/tmp/x.js',
     }, { ids: { session: () => 'fresh-session' } })
@@ -325,7 +323,7 @@ describe('lifecycle — restore', () => {
 describe('lifecycle — shell disposal', () => {
   it('calls closeSession exactly once per disposed shell workspace', async () => {
     const shell = {
-      id: 's', kind: 'shell', type: 'mongodb.shell', engine: 'mongodb',
+      id: 's', type: 'mongodb.shell', engine: 'mongodb',
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
       sessionId: 'sess-1', code: '', history: [], isRunning: false,
       results: [], resultView: 'table', resultTab: 'Console',

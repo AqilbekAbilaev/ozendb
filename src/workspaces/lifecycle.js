@@ -2,7 +2,7 @@
 // route through the registered definitions. The helpers own what every definition
 // must share — fresh IDs, deep detachment of durable state, common metadata, and
 // contained failure — so definitions never touch the workspace array directly.
-import { getWorkspaceDefinition, workspaceTypeForSaved } from './registry'
+import { getWorkspaceDefinition } from './registry'
 import { createResourceRef, sameResource, isResourceAncestor } from '../utils/resourceRef'
 
 function defaultId() {
@@ -50,14 +50,18 @@ export function duplicateWorkspace(workspace, context = {}) {
   })
 }
 
-// Restore reconstructs a fresh runtime workspace from a projected saved record.
-// The saved id is preserved (that is what session persistence re-activates); the
-// type comes from the saved kind/mode. Returns null for records of non-persisted
-// kinds, so a stale file can never materialize a workspace the app no longer saves.
+// Restore reconstructs a fresh runtime workspace from a projected saved record (see
+// sessionMigration's toLegacyRecord), which names its workspace `type`. The saved id is
+// preserved (that is what session persistence re-activates). Returns null for a type
+// that is not restorable, so a stale file can never materialize a workspace the app no
+// longer saves.
 export function restoreWorkspace(saved, context = {}) {
-  const type = workspaceTypeForSaved(saved)
-  if (!type) return null
-  const def = getWorkspaceDefinition(type)
+  let def
+  try {
+    def = getWorkspaceDefinition(saved?.type)
+  } catch {
+    return null
+  }
   if (!def.restore) return null
   const result = def.restore(saved, {
     ...context,

@@ -28,7 +28,7 @@ describe('postgresql.table_browse', () => {
         { kind: 'table', name: 'users' },
       ],
     })
-    expect(created.fields).toEqual({ kind: 'pgTable', ...target, state: createTableState(), ui: createTableUi(), runtime: createTableRuntime('c1') })
+    expect(created.fields).toEqual({ ...target, state: createTableState(), ui: createTableUi(), runtime: createTableRuntime('c1') })
   })
 
   // A table tab with a query built, on page 3, a sort paused and the builder open.
@@ -74,7 +74,7 @@ describe('postgresql.query', () => {
     const created = def.create({ target: db })
     expect(created.title).toBe('SQL: app')
     expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }] })
-    expect(created.fields).toEqual({ kind: 'pgQuery', ...db, state: { sql: '' }, runtime: { run: createSqlRun('c1', 'app') } })
+    expect(created.fields).toEqual({ ...db, state: { sql: '' }, runtime: { run: createSqlRun('c1', 'app') } })
   })
 
   it('duplicates the SQL but not the result', () => {
@@ -96,7 +96,7 @@ describe('postgresql.search', () => {
     expect(created.title).toBe('Search: public')
     expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }] })
     expect(created.fields).toEqual({
-      kind: 'pgSearch', ...schema,
+      ...schema,
       state: { term: '', tables: '', matchCase: false, regex: false },
       runtime: { result: null, loading: false, error: null, errorCode: null, runId: null },
     })

@@ -14,7 +14,7 @@ export const appDefinitions = [
       return {
         title: 'Quickstart',
         target: null,
-        fields: { kind: 'quickstart' },
+        fields: {},
       }
     },
   },

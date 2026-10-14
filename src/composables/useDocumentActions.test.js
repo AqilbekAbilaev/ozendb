@@ -15,7 +15,7 @@ import { useDocumentActions } from './useDocumentActions'
 
 const collectionTab = (connectionId, collectionName) => reactive({
   id: collectionName,
-  kind: 'collection',
+  type: 'mongodb.find',
   connectionId,
   dbName: 'shop',
   collectionName,

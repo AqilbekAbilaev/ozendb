@@ -36,7 +36,7 @@ describe('mongodb.indexes', () => {
 
   it('is collection-scoped with the open/focus identity fields', () => {
     expect(created.title).toBe('Index Manager: orders')
-    expect(created.fields).toEqual({ kind: 'indexes', ...COLLECTION_FIELDS })
+    expect(created.fields).toEqual(COLLECTION_FIELDS)
     expectCollectionDepth(created)
   })
 })
@@ -46,7 +46,6 @@ describe('mongodb.schema', () => {
 
   it('is collection-scoped like indexes', () => {
     expect(created.title).toBe('Schema: orders')
-    expect(created.fields.kind).toBe('schema')
     expect(created.fields.connectionId).toBe('c1')
     expect(created.fields.collectionName).toBe('orders')
     expectCollectionDepth(created)
@@ -58,7 +57,7 @@ describe('mongodb.search', () => {
 
   it('is database-scoped (searches every collection in the db)', () => {
     expect(created.title).toBe('Search: shop')
-    expect(created.fields).toEqual({ kind: 'search', ...DATABASE_FIELDS })
+    expect(created.fields).toEqual(DATABASE_FIELDS)
     expect(isResourceRef(created.target)).toBe(true)
     expect(created.target.segments.map(s => s.name)).toEqual(['shop'])
   })
@@ -108,7 +107,6 @@ describe('mongodb.export', () => {
   it('starts at the collection source with no frozen filter', () => {
     const created = defFor('mongodb.export').create(ctx(COLLECTION))
     expect(created.title).toBe('Export: orders')
-    expect(created.fields.kind).toBe('export')
     expect(created.fields.source).toBe('collection')
     expect(created.fields.filter).toBe('{}')
     expect(created.fields.sourceCount).toBe(null)
@@ -149,7 +147,6 @@ describe('mongodb.current_operations', () => {
 
   it('is connection-scoped with the toolbar settings on the tab', () => {
     expect(created.title).toBe('Current Operations: Sales')
-    expect(created.fields.kind).toBe('currentOps')
     expect(created.fields.connectionId).toBe('c1')
     expect(created.fields.connectionName).toBe('Sales')
     expect(created.fields.frequency).toBe(2000)
@@ -175,27 +172,27 @@ describe('mongodb.current_operations', () => {
 
 describe('lifecycle — tools', () => {
   it('duplicates indexes and schema to the same target (pane reloads its own data)', () => {
-    const idx = duplicateWorkspace({ id: 'i', type: 'mongodb.indexes', kind: 'indexes', title: 'Index Manager: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
+    const idx = duplicateWorkspace({ id: 'i', type: 'mongodb.indexes', title: 'Index Manager: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
     expect(idx.type).toBe('mongodb.indexes')
-    expect(idx.kind).toBe('indexes')
+    expect(idx.type).toBe('mongodb.indexes')
     expect(idx.target.segments.map(s => s.name)).toEqual(['shop', 'orders'])
-    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', kind: 'schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
+    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
     expect(sch.type).toBe('mongodb.schema')
-    expect(sch.kind).toBe('schema')
+    expect(sch.type).toBe('mongodb.schema')
   })
 
   it('schema and search duplicates can never become collection workspaces', () => {
-    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', kind: 'schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
-    expect(sch.kind).toBe('schema')
+    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
+    expect(sch.type).toBe('mongodb.schema')
     expect(sch.mode).toBeUndefined()
-    const search = duplicateWorkspace({ id: 'q', type: 'mongodb.search', kind: 'search', title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
-    expect(search.kind).toBe('search')
+    const search = duplicateWorkspace({ id: 'q', type: 'mongodb.search', title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
+    expect(search.type).toBe('mongodb.search')
     expect(search.target.segments.map(s => s.name)).toEqual(['shop'])
   })
 
   it('csv import duplicate keeps source and options but resets the mapping', () => {
     const src = {
-      id: 'i', type: 'mongodb.import', kind: 'import', title: 'Import: orders',
+      id: 'i', type: 'mongodb.import', title: 'Import: orders',
       connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
       format: 'csv', subTab: 'target', sourceType: 'clipboard', filePath: '/tmp/a.csv',
       csv: { delimiter: ';', other: '', qualifier: "'", skipLines: 2, hasHeader: false },
@@ -216,7 +213,7 @@ describe('lifecycle — tools', () => {
   it('json import duplicate detaches sources and resets preview state', () => {
     const source = { path: '/a.json', name: 'a', targetDb: 'shop', targetColl: 'orders', mode: 'insert' }
     const dup = duplicateWorkspace({
-      id: 'i', type: 'mongodb.import', kind: 'import', title: 'Import: orders',
+      id: 'i', type: 'mongodb.import', title: 'Import: orders',
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders',
       format: 'json', validate: true,
       sources: [source], selectedSource: 0, previewOpen: true,
@@ -234,7 +231,7 @@ describe('lifecycle — tools', () => {
 
   it('export duplicate persists mapping, filter and json value style but clears the result banner', () => {
     const dup = duplicateWorkspace({
-      id: 'e', type: 'mongodb.export', kind: 'export', title: 'Export: orders',
+      id: 'e', type: 'mongodb.export', title: 'Export: orders',
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders',
       step: 2, format: 'csv', incremental: true, jsonStyle: 'extended', source: 'query',
       sourceCount: 5, filter: '{ "a": 1 }',
@@ -253,7 +250,7 @@ describe('lifecycle — tools', () => {
 
   it('export duplicate defaults the json value style to plain when the source tab has none', () => {
     const dup = duplicateWorkspace({
-      id: 'e', type: 'mongodb.export', kind: 'export', title: 'Export: orders',
+      id: 'e', type: 'mongodb.export', title: 'Export: orders',
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders',
       format: 'json', source: 'collection', filter: '{}', fields: [],
     })
@@ -262,7 +259,7 @@ describe('lifecycle — tools', () => {
 
   it('current operations duplicate clones settings over fresh defaults', () => {
     const dup = duplicateWorkspace({
-      id: 'o', type: 'mongodb.current_operations', kind: 'currentOps', title: 'Current Operations: Sales',
+      id: 'o', type: 'mongodb.current_operations', title: 'Current Operations: Sales',
       connectionId: 'c1', connectionName: 'Sales',
       frequency: 500, retention: 30_000, ownOnly: true, showSys: true,
       slowOnly: true, slowSecs: 7, dbName: 'shop', collName: 'orders', view: 'text',
@@ -286,7 +283,7 @@ describe('lifecycle — tools', () => {
 describe('lifecycle — tool restore', () => {
   it('csv import restores options with safe defaults when they are missing', () => {
     const tab = restoreWorkspace({
-      id: 'i', kind: 'import', title: 'Import: orders', color: null,
+      id: 'i', type: 'mongodb.import', title: 'Import: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
       format: 'csv',
     })
@@ -300,7 +297,7 @@ describe('lifecycle — tool restore', () => {
 
   it('json import restores sources and selects the first one', () => {
     const tab = restoreWorkspace({
-      id: 'i', kind: 'import', title: 'Import: orders', color: null,
+      id: 'i', type: 'mongodb.import', title: 'Import: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
       format: 'json', validate: true,
       sources: [{ path: '/a.json', name: 'a', targetDb: 'shop', targetColl: 'orders', mode: 'insert' }],
@@ -314,7 +311,7 @@ describe('lifecycle — tool restore', () => {
 
   it('export restore keeps the mapping and json value style but clears the run result', () => {
     const tab = restoreWorkspace({
-      id: 'e', kind: 'export', title: 'Export: orders', color: null,
+      id: 'e', type: 'mongodb.export', title: 'Export: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
       step: 1, format: 'csv', incremental: true, jsonStyle: 'extended', source: 'collection',
       sourceCount: null, filter: '{ "a": 1 }',
@@ -330,7 +327,7 @@ describe('lifecycle — tool restore', () => {
 
   it('export restore defaults the json value style to plain for a session saved before #282', () => {
     const tab = restoreWorkspace({
-      id: 'e', kind: 'export', title: 'Export: orders', color: null,
+      id: 'e', type: 'mongodb.export', title: 'Export: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
       format: 'json', source: 'collection', filter: '{}', fields: [],
     })
@@ -339,7 +336,7 @@ describe('lifecycle — tool restore', () => {
 
   it('current operations restore settings over fresh defaults', () => {
     const tab = restoreWorkspace({
-      id: 'o', kind: 'currentOps', title: 'Current Operations: Sales', color: null,
+      id: 'o', type: 'mongodb.current_operations', title: 'Current Operations: Sales', color: null,
       connectionId: 'c1', connectionName: 'Sales',
       frequency: 500, retention: 30_000, ownOnly: true, showSys: true,
       slowOnly: true, slowSecs: 7, dbName: 'shop', collectionName: 'orders', view: 'text',
@@ -360,7 +357,7 @@ describe('lifecycle — tool restore', () => {
     // dbName/collName are filters, never identity: the target must stay at the
     // connection level so a database drop does not close the tab.
     const record = {
-      id: 'o', kind: 'currentOps', title: 'Current Operations: Sales', color: null,
+      id: 'o', type: 'mongodb.current_operations', title: 'Current Operations: Sales', color: null,
       connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
       frequency: 500,
     }
@@ -373,24 +370,24 @@ describe('lifecycle — tool restore', () => {
 
   it('indexes restore keeps identity only', () => {
     const tab = restoreWorkspace({
-      id: 'x', kind: 'indexes', title: 'Index Manager: orders', color: null,
+      id: 'x', type: 'mongodb.indexes', title: 'Index Manager: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     })
-    expect(tab.kind).toBe('indexes')
+    expect(tab.type).toBe('mongodb.indexes')
     expect(tab.connectionId).toBe('c1')
     expect(tab.collectionName).toBe('orders')
     expect(tab.target.segments.map(s => s.name)).toEqual(['shop', 'orders'])
   })
 
   it('restores schema and search as identity-only tabs', () => {
-    const schema = restoreWorkspace({ id: 's', kind: 'schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' })
+    const schema = restoreWorkspace({ id: 's', type: 'mongodb.schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' })
     expect(schema.type).toBe('mongodb.schema')
-    expect(schema.kind).toBe('schema')
+    expect(schema.type).toBe('mongodb.schema')
     expect(schema.connectionId).toBe('c1')
 
-    const search = restoreWorkspace({ id: 'q', kind: 'search', title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
+    const search = restoreWorkspace({ id: 'q', type: 'mongodb.search', title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
     expect(search.type).toBe('mongodb.search')
-    expect(search.kind).toBe('search')
+    expect(search.type).toBe('mongodb.search')
     expect(search.dbName).toBe('shop')
   })
 })

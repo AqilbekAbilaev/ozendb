@@ -9,6 +9,7 @@ import CodeEditor from '../base/CodeEditor.vue'
 import { generateCode, LANGUAGES } from '../../utils/queryCodegen'
 import { showToast } from '../../stores/toast'
 import FlexSpacer from '../base/FlexSpacer.vue'
+import { isCollectionTab } from '../../utils/workspaceTypes'
 
 const languageOptions = LANGUAGES.map((lang) => ({ value: lang.id, label: lang.label }))
 
@@ -31,7 +32,7 @@ const viewerExt = [keymap.of([...defaultKeymap])]
 
 const queryCode = computed(() => {
   const tab = props.activeTab
-  if (!tab || tab.kind !== 'collection') return ''
+  if (!isCollectionTab(tab)) return ''
   return generateCode({
     collection: tab.collectionName,
     database: tab.dbName,

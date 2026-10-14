@@ -13,7 +13,7 @@ import { useCollectionRun } from './useCollectionRun'
 function setup({ mode = 'find', query = {}, resultTab = 'Result' } = {}) {
   const state = createCollectionState()
   Object.assign(state.query, query)
-  const tab = reactive({ id: 't1', kind: 'collection', mode, connectionId: 'c1', dbName: 'shop', collectionName: 'orders', state, runtime: createCollectionRuntime() })
+  const tab = reactive({ id: 't1', type: 'mongodb.find', mode, connectionId: 'c1', dbName: 'shop', collectionName: 'orders', state, runtime: createCollectionRuntime() })
   const props = reactive({ activeTab: tab, tabs: [tab], resultTab, savedQueryRequest: null })
   const emit = vi.fn()
   const run = useCollectionRun({

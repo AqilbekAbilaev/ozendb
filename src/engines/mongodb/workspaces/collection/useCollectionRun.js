@@ -6,6 +6,7 @@ import { runTranslatedSql } from '../../../../utils/sqlWorkspace'
 import { refreshRequest } from '../../../../stores/menuRequests'
 import { parseFindQuery, findQueryValid, findQueryError, pipelineError, expandIdFilter, findArgs } from './collectionQuery'
 import { runExplain } from './runExplain'
+import { isCollectionTab } from '../../../../utils/workspaceTypes'
 
 // What MongoCollectionWorkspace does with its query: live validation, the Run button's
 // dispatch on the tab's mode, Explain, and applying a saved query. Runs leave as the
@@ -15,13 +16,12 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
   const activeTab = computed(getActiveTab)
   const isAggregate = computed(() => activeTab.value && activeTab.value.mode === 'aggregate')
   const isSql = computed(() => activeTab.value && activeTab.value.mode === 'sql')
-  const isCollection = (tab) => !!tab && tab.kind === 'collection'
   const isOpen = (tab) => tabs().includes(tab)
 
   // Parsed live, so an invalid field shows its error and disables Run instead of
   // sending corrupted JSON.
-  const parsedQuery = computed(() => isCollection(activeTab.value) ? parseFindQuery(activeTab.value.state.query) : null)
-  const parsedPipeline = computed(() => isCollection(activeTab.value) ? parsePipeline(activeTab.value.state.query.pipeline) : null)
+  const parsedQuery = computed(() => isCollectionTab(activeTab.value) ? parseFindQuery(activeTab.value.state.query) : null)
+  const parsedPipeline = computed(() => isCollectionTab(activeTab.value) ? parsePipeline(activeTab.value.state.query.pipeline) : null)
   // SQL validity is checked by the backend on translate, so Run is never gated for it.
   const runValid = computed(() => {
     if (isSql.value) return true
@@ -32,11 +32,11 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
   const pipelineErrorText = computed(() => pipelineError(parsedPipeline.value))
 
   const explainVisible = () => resultTab() === 'Explain'
-  const explain = (tab = activeTab.value) => { if (isCollection(tab)) return runExplain(tab, isOpen) }
+  const explain = (tab = activeTab.value) => { if (isCollectionTab(tab)) return runExplain(tab, isOpen) }
 
   // The Run button (and the result toolbar's refresh) dispatch on the tab's mode.
   function run(tab = activeTab.value) {
-    if (!isCollection(tab)) return
+    if (!isCollectionTab(tab)) return
     if (tab.mode === 'sql') runSql(tab)
     else if (tab.mode === 'aggregate') runAggregate(tab)
     else runQuery(true, tab)
@@ -46,7 +46,7 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
   // Explain all work on the same query. The collection is fixed by the tab; the one named
   // in the SQL's FROM is deliberately ignored.
   async function runSql(tab = activeTab.value) {
-    if (!isCollection(tab)) return
+    if (!isCollectionTab(tab)) return
     await runTranslatedSql(tab, {
       translate: translateSqlToMql,
       runQuery: (workspace, query) => emit('run-query', workspace.id, query),
@@ -57,7 +57,7 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
   }
 
   function runAggregate(tab = activeTab.value) {
-    if (!isCollection(tab)) return
+    if (!isCollectionTab(tab)) return
     const parsed = parsePipeline(tab.state.query.pipeline)
     if (!parsed || !parsed.ok) return  // inline error is already shown
     emit('run-aggregate', tab.id, { pipeline: parsed.ejson })
@@ -65,7 +65,7 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
   }
 
   function runQuery(addToHistory = true, tab = activeTab.value) {
-    if (!isCollection(tab)) return
+    if (!isCollectionTab(tab)) return
     // At run time, not per keystroke: rewriting the field's value on input is what
     // defeats the browser's native undo/redo.
     tab.state.query.filter = expandIdFilter(tab.state.query.filter)

@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { insertDocuments } from '../engines/mongodb/api/documents'
 import { errText } from '../utils/errors'
+import { isCollectionTab } from '../utils/workspaceTypes'
 
 // Holds a clipboard paste until the user confirms it, keeping the original collection
 // target even when they change tabs while the confirmation dialog is open.
@@ -10,7 +11,7 @@ export function useDocumentPaste({ activeTab, showToast, requery }) {
 
   async function pasteDocuments() {
     const tab = activeTab()
-    if (!tab || tab.kind !== 'collection' || !tab.collectionName) {
+    if (!isCollectionTab(tab) || !tab.collectionName) {
       showToast('Open a collection first')
       return
     }

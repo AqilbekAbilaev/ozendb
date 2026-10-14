@@ -40,7 +40,7 @@ describe('pasteQuery', () => {
   // Mode goes through the shared switcher so a find tab becomes a proper aggregate tab.
   it('switches the tab into the copied mode', () => {
     clipboardQuery.value = { mode: 'aggregate', filter: '', sort: '', projection: '', skip: 0, limit: 50, pipeline: '[{ $match: {} }]' }
-    const tab = withQuery({}, { mode: 'find', kind: 'collection' })
+    const tab = withQuery({}, { mode: 'find', type: 'mongodb.find' })
     pasteQuery(tab)
     expect(tab.mode).toBe('aggregate')
     expect(tab.state.query.pipeline).toBe('[{ $match: {} }]')

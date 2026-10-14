@@ -58,7 +58,7 @@ it('expands the connection of an active PostgreSQL table tab', async () => {
   listSchemas.mockResolvedValue([])
   tree.connections.value = [{ id: 'a', name: 'Connection', engine: 'postgresql' }]
   tabs.value = [{
-    id: 'pg', kind: 'pgTable', type: 'postgresql.table_browse',
+    id: 'pg', type: 'postgresql.table_browse',
     connectionId: 'a', database: 'payments', schema: 'public', table: 'merchants',
   }]
   activeTabId.value = 'pg'
@@ -71,7 +71,7 @@ it('expands the connection of an active PostgreSQL table tab', async () => {
 it('expands the connection and database of an active MongoDB collection tab', async () => {
   listDatabases.mockResolvedValue([])
   tabs.value = [{
-    id: 'mongo', kind: 'collection', type: 'mongodb.find',
+    id: 'mongo', type: 'mongodb.find',
     connectionId: 'a', dbName: 'shop', collectionName: 'orders',
   }]
   activeTabId.value = 'mongo'
@@ -84,9 +84,9 @@ it('expands the connection and database of an active MongoDB collection tab', as
 it('names the connection holding the active tab\'s resource, either engine', async () => {
   listDatabases.mockResolvedValue([])
   tabs.value = [
-    { id: 'm', kind: 'collection', connectionId: 'a', dbName: 'shop', collectionName: 'orders' },
-    { id: 'p', kind: 'pgTable', type: 'postgresql.table_browse', connectionId: 'a', schema: 'public', table: 'merchants' },
-    { id: 'q', kind: 'quickstart' },
+    { id: 'm', type: 'mongodb.find', connectionId: 'a', dbName: 'shop', collectionName: 'orders' },
+    { id: 'p', type: 'postgresql.table_browse', connectionId: 'a', schema: 'public', table: 'merchants' },
+    { id: 'q', type: 'app.quickstart' },
   ]
   activeTabId.value = 'm'
   expect(tree.activeConnectionId.value).toBe('a')
@@ -244,7 +244,7 @@ it('unlistens from every backend event on unmount', async () => {
 // #153: a keyboard tab switch never clicks outside the sidebar, so the selection
 // used to outlive it and the native menu kept acting on the old row.
 it('clears the selection when the active tab changes', async () => {
-  tabs.value = [{ id: 't1', kind: 'quickstart' }, { id: 't2', kind: 'quickstart' }]
+  tabs.value = [{ id: 't1', type: 'app.quickstart' }, { id: 't2', type: 'app.quickstart' }]
   activeTabId.value = 't1'
   await nextTick()
   tree.highlightCollection(conn, { name: 'shop' }, 'orders')
@@ -254,7 +254,7 @@ it('clears the selection when the active tab changes', async () => {
 })
 
 it('keeps the selection while the active tab stays put', async () => {
-  tabs.value = [{ id: 't1', kind: 'quickstart' }]
+  tabs.value = [{ id: 't1', type: 'app.quickstart' }]
   activeTabId.value = 't1'
   await nextTick()
   tree.highlightCollection(conn, { name: 'shop' }, 'orders')
