@@ -30,7 +30,8 @@ function harness() {
   ix.resetIndexes()
   const toasts = []
   showToast.mockImplementation((m) => toasts.push(m))
-  ix.indexesTarget.value = { connId: 'c1', dbName: 'db', collName: 'coll' }
+  // The shape the Index Manager pane writes (useIndexManager).
+  ix.indexesTarget.value = { connectionId: 'c1', dbName: 'db', collectionName: 'coll' }
   return { ix, toasts }
 }
 
@@ -42,7 +43,7 @@ describe('openDropIndexConfirm', () => {
     ix.openDropIndexConfirm()
 
     expect(ix.dropIndexTarget.value).toEqual({
-      name: 'idx_a', connId: 'c1', dbName: 'db', collName: 'coll',
+      name: 'idx_a', connectionId: 'c1', dbName: 'db', collectionName: 'coll',
     })
   })
 
@@ -62,7 +63,7 @@ describe('confirmDropIndex', () => {
     ix.selectedIndex.value = { name: 'idx_a' }
     ix.openDropIndexConfirm()
     // The user switched to another collection's Index Manager while the modal was up.
-    ix.indexesTarget.value = { connId: 'c2', dbName: 'other', collName: 'other' }
+    ix.indexesTarget.value = { connectionId: 'c2', dbName: 'other', collectionName: 'other' }
     ix.dropIndexConfirmText.value = 'idx_a'
     api.dropIndex.mockResolvedValue(undefined)
 

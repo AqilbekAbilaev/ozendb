@@ -126,7 +126,7 @@ const {
         <div class="del-body">
           <p>This permanently drops the index
             <code>{{ dropIndexTarget.name }}</code> from
-            <code>{{ dropIndexTarget.dbName }}.{{ dropIndexTarget.collName }}</code>.
+            <code>{{ dropIndexTarget.dbName }}.{{ dropIndexTarget.collectionName }}</code>.
             Queries that relied on it may slow down.
             This cannot be undone.</p>
           <p class="cc-prompt">Type <code>{{ dropIndexTarget.name }}</code> to confirm:</p>

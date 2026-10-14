@@ -7,12 +7,12 @@ import { showToast } from './toast'
 // The app-level index surfaces that overlay or act on the Index Manager tab: View
 // Details, the type-to-confirm Drop, and the Index menu actions. The tab keeps its own
 // per-tab list, form and metrics (IndexManagerPane).
-export const indexesTarget = ref(null)  // { connId, dbName, collName } | null
+export const indexesTarget = ref(null)  // { connectionId, dbName, collectionName } | null, as the Index Manager pane writes it
 
 // API target derived from the current indexes target.
 function apiTarget() {
   const t = indexesTarget.value
-  return { connectionId: t.connId, database: t.dbName, collection: t.collName }
+  return { connectionId: t.connectionId, database: t.dbName, collection: t.collectionName }
 }
 
 // Index-menu selection. `selectedIndex` is the index row highlighted in the Index
@@ -22,7 +22,7 @@ export const selectedIndex = ref(null)  // the selected index doc | null
 export const indexDetailsTarget = ref(null)   // the index shown in the View Details modal | null
 export const indexDetailsStats  = ref(null)   // its $indexStats entry | null
 export const indexDetailsLoading = ref(false)
-export const dropIndexTarget = ref(null)   // { name, connId, dbName, collName } armed for the type-to-confirm drop | null
+export const dropIndexTarget = ref(null)   // { name, connectionId, dbName, collectionName } armed for the type-to-confirm drop | null
 export const dropIndexConfirmText = ref('')
 export const dropIndexError = ref(null)
 export const dropIndexBusy = ref(false)
@@ -100,13 +100,13 @@ export function openDropIndexConfirm() {
 
 export async function confirmDropIndex() {
   const drop = dropIndexTarget.value
-  if (!drop || !drop.connId) return
+  if (!drop || !drop.connectionId) return
   if (dropIndexConfirmText.value !== drop.name) return
   dropIndexBusy.value = true
   dropIndexError.value = null
   try {
     await dropIndexApi(
-      { connectionId: drop.connId, database: drop.dbName, collection: drop.collName },
+      { connectionId: drop.connectionId, database: drop.dbName, collection: drop.collectionName },
       drop.name,
     )
     dropIndexTarget.value = null
