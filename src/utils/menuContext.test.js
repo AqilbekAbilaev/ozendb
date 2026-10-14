@@ -5,7 +5,6 @@ import { deriveMenuContext, resolveMenuTarget, resolvePgMenuTarget } from './men
 // active tab and the sidebar/tree selection, so selecting a node in the tree
 // enables the matching items even while the context-less Quickstart tab is active.
 
-import { resourceFromTreeSelection } from './legacyResourceRef'
 import { createResourceRef } from './resourceRef'
 
 // A tab's identity is the `target` its definition gives it; these mirror those.
@@ -18,9 +17,8 @@ function ref(connectionId, dbName, collectionName) {
 
 // Selections are built exactly the way useConnectionTree builds them, so these
 // fixtures cannot drift from the payload the menu actually receives at runtime.
-function selection(connectionId, connectionName, dbName, collectionName, kind, engine = 'mongodb') {
-  const sel = { connectionId, connectionName, dbName, collectionName, kind, engine }
-  return { ...sel, resource: resourceFromTreeSelection(sel) }
+function selection(connectionId, connectionName, dbName, collectionName, engine = 'mongodb') {
+  return { resource: ref(connectionId, dbName, collectionName), connectionName, engine }
 }
 
 const quickstart = { id: 't0', kind: 'quickstart', title: 'Quickstart' }
@@ -49,7 +47,7 @@ describe('deriveMenuContext', () => {
   })
 
   it('no GridFS file selected leaves hasGridfsFile false even with a collection selected', () => {
-    const sel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+    const sel = selection('c1', 'Local', 'shop', 'orders')
     expect(deriveMenuContext(quickstart, sel, 1).hasGridfsFile).toBe(false)
   })
 
@@ -61,7 +59,7 @@ describe('deriveMenuContext', () => {
   })
 
   it('a collection selected in the sidebar enables all three, even on Quickstart', () => {
-    const sel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+    const sel = selection('c1', 'Local', 'shop', 'orders')
     const ctx = deriveMenuContext(quickstart, sel, 1)
     expect(ctx.hasConnection).toBe(true)
     expect(ctx.hasDatabase).toBe(true)
@@ -69,7 +67,7 @@ describe('deriveMenuContext', () => {
   })
 
   it('a database selected in the sidebar enables connection + database only', () => {
-    const sel = selection('c1', 'Local', 'shop', null, 'database')
+    const sel = selection('c1', 'Local', 'shop', null)
     const ctx = deriveMenuContext(quickstart, sel, 1)
     expect(ctx.hasConnection).toBe(true)
     expect(ctx.hasDatabase).toBe(true)
@@ -77,7 +75,7 @@ describe('deriveMenuContext', () => {
   })
 
   it('a connection selected in the sidebar enables connection only', () => {
-    const sel = selection('c1', 'Local', null, null, 'connection')
+    const sel = selection('c1', 'Local', null, null)
     const ctx = deriveMenuContext(quickstart, sel, 1)
     expect(ctx.hasConnection).toBe(true)
     expect(ctx.hasDatabase).toBe(false)
@@ -101,7 +99,7 @@ describe('deriveMenuContext', () => {
   it('document/field context comes from the active collection tab, never the sidebar', () => {
     // A collection selected in the sidebar enables collection items but NOT the
     // Document menu — there is no results grid / selection there.
-    const collSel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+    const collSel = selection('c1', 'Local', 'shop', 'orders')
     const fromSidebar = deriveMenuContext(quickstart, collSel, 1)
     expect(fromSidebar.hasCollection).toBe(true)
     expect(fromSidebar.hasDocument).toBe(false)
@@ -133,13 +131,13 @@ describe('deriveMenuContext', () => {
   })
 
   it('enables Refresh as the active tab says, whatever the sidebar holds', () => {
-    const sel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+    const sel = selection('c1', 'Local', 'shop', 'orders')
     expect(deriveMenuContext(collectionTab, sel, 1, false, true).canRefreshTab).toBe(true)
     expect(deriveMenuContext(quickstart, sel, 1, false, false).canRefreshTab).toBe(false)
   })
 
   it('readOnly comes from the active tab, never the sidebar', () => {
-    const collSel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+    const collSel = selection('c1', 'Local', 'shop', 'orders')
     // A locked tab locks the context even with no sidebar selection.
     expect(deriveMenuContext({ ...collectionTab, readOnly: true }, null, 1).readOnly).toBe(true)
     // An unlocked tab stays unlocked even when a sidebar node is selected.
@@ -177,7 +175,7 @@ describe('deriveMenuContext', () => {
 // Every item behind the Connection / Database / Collection gates is a MongoDB action,
 // so a PostgreSQL selection or tab must never light one up or be handed to one.
 describe('PostgreSQL never reaches the MongoDB gates', () => {
-  const pgConnection = selection('p1', 'Payments PG', null, null, 'connection', 'postgresql')
+  const pgConnection = selection('p1', 'Payments PG', null, null, 'postgresql')
   const pgTableTab = {
     id: 't9', kind: 'pgTable', engine: 'postgresql',
     target: createResourceRef('p1', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }]),
@@ -210,22 +208,22 @@ describe('PostgreSQL never reaches the MongoDB gates', () => {
 
 describe('resolveMenuTarget', () => {
   it('prefers the sidebar selection over the active tab', () => {
-    const sel = selection('c2', 'Prod', 'analytics', 'events', 'collection')
+    const sel = selection('c2', 'Prod', 'analytics', 'events')
     expect(resolveMenuTarget(collectionTab, sel)).toEqual({
       resource: ref('c2', 'analytics', 'events'), connectionName: 'Prod',
     })
   })
 
-  // The tree always emits an explicit kind (see useConnectionTree), and that is
+  // The tree builds the selection's ref (see useConnectionTree), and that is
   // authoritative — the level is never guessed from which fields happen to be set.
-  it('takes the level from the selection kind, not from field presence', () => {
-    const dbSel = selection('c1', 'Local', 'shop', null, 'database')
+  it('takes the level from the selection\'s ref', () => {
+    const dbSel = selection('c1', 'Local', 'shop', null)
     expect(resolveMenuTarget(null, dbSel).resource).toEqual(ref('c1', 'shop'))
-    const connSel = selection('c1', 'Local', null, null, 'connection')
+    const connSel = selection('c1', 'Local', null, null)
     expect(resolveMenuTarget(null, connSel).resource).toEqual(ref('c1'))
   })
 
-  it('names no resource for a kindless selection rather than guessing one', () => {
+  it('names no resource for a selection without a ref rather than guessing one', () => {
     expect(resolveMenuTarget(null, { connectionId: 'c1', dbName: 'shop' })).toBe(null)
   })
 
@@ -243,7 +241,7 @@ describe('resolveMenuTarget', () => {
     // Collection tab active, but a bare connection is highlighted. A collection-
     // scoped action must act on the tab (which its gate lit up), not the shallow
     // selection — otherwise the enabled item would only toast a guide message.
-    const connSel = selection('c2', 'Prod', null, null, 'connection')
+    const connSel = selection('c2', 'Prod', null, null)
     expect(resolveMenuTarget(collectionTab, connSel, 'collection')).toEqual({
       resource: ref('c1', 'shop', 'orders'), connectionName: 'Local',
     })
@@ -254,12 +252,12 @@ describe('resolveMenuTarget', () => {
   })
 
   it('prefers the sidebar selection when it satisfies the required level', () => {
-    const collSel = selection('c2', 'Prod', 'analytics', 'events', 'collection')
+    const collSel = selection('c2', 'Prod', 'analytics', 'events')
     expect(resolveMenuTarget(collectionTab, collSel, 'collection').resource).toEqual(ref('c2', 'analytics', 'events'))
   })
 
   it('returns the shallow selection for the guide message when neither satisfies', () => {
-    const connSel = selection('c2', 'Prod', null, null, 'connection')
+    const connSel = selection('c2', 'Prod', null, null)
     expect(resolveMenuTarget(quickstart, connSel, 'collection').resource).toEqual(ref('c2'))
   })
 
@@ -317,7 +315,11 @@ function pgSelection(kind, fields) {
     connectionId: 'c1', connectionName: 'PG', engine: 'postgresql',
     database: null, schema: null, table: null, kind, ...fields,
   }
-  return { ...sel, resource: resourceFromTreeSelection(sel) }
+  const segments = []
+  if (sel.database) segments.push({ kind: 'database', name: sel.database })
+  if (sel.schema) segments.push({ kind: 'schema', name: sel.schema })
+  if (sel.table) segments.push({ kind: 'table', name: sel.table })
+  return { ...sel, resource: createResourceRef(sel.connectionId, segments) }
 }
 
 describe('deriveMenuContext (PostgreSQL sidebar selection)', () => {
@@ -342,7 +344,7 @@ describe('deriveMenuContext (PostgreSQL sidebar selection)', () => {
   // A Mongo collection is two segments deep, as a Postgres schema is — the engine is
   // what separates them, not the depth.
   it('a MongoDB selection never enables the PostgreSQL gates', () => {
-    const ctx = deriveMenuContext(quickstart, selection('c1', 'Local', 'shop', 'orders', 'collection'), 1)
+    const ctx = deriveMenuContext(quickstart, selection('c1', 'Local', 'shop', 'orders'), 1)
     expect(ctx.hasPgSchema).toBe(false)
     expect(ctx.hasPgTable).toBe(false)
   })
@@ -396,7 +398,7 @@ describe('resolvePgMenuTarget', () => {
   })
 
   it('is null when neither the tab nor the selection is PostgreSQL', () => {
-    expect(resolvePgMenuTarget(collectionTab, selection('c1', 'Local', 'shop', 'orders', 'collection'), 'schema')).toBeNull()
+    expect(resolvePgMenuTarget(collectionTab, selection('c1', 'Local', 'shop', 'orders'), 'schema')).toBeNull()
   })
 })
 
@@ -418,7 +420,7 @@ describe('deriveMenuContext engine (#152)', () => {
     const app = { ...quickstart, engine: 'app' }
     const pgSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
     expect(deriveMenuContext(app, pgSel, 1).engine).toBe('postgresql')
-    expect(deriveMenuContext(app, selection('c1', 'Local', 'shop', 'orders', 'collection'), 1).engine).toBe('mongodb')
+    expect(deriveMenuContext(app, selection('c1', 'Local', 'shop', 'orders'), 1).engine).toBe('mongodb')
   })
 
   it('ignores a PostgreSQL selection too shallow to enable anything', () => {
@@ -434,7 +436,7 @@ describe('deriveMenuContext engine (#152)', () => {
   it('lets a live selection win over a tab of the other engine', () => {
     const pgSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
     expect(deriveMenuContext(mongoTab, pgSel, 2).engine).toBe('postgresql')
-    expect(deriveMenuContext(pgTab, selection('c1', 'Local', null, null, 'connection'), 2).engine).toBe('mongodb')
+    expect(deriveMenuContext(pgTab, selection('c1', 'Local', null, null), 2).engine).toBe('mongodb')
   })
 
   it('agrees with a live selection of the same engine as the tab', () => {
@@ -443,7 +445,7 @@ describe('deriveMenuContext engine (#152)', () => {
   })
 
   it('treats a selection with no engine as MongoDB, like the gates do', () => {
-    const legacy = { ...selection('c1', 'Local', 'shop', 'orders', 'collection'), engine: undefined }
+    const legacy = { ...selection('c1', 'Local', 'shop', 'orders'), engine: undefined }
     expect(deriveMenuContext({ ...quickstart, engine: 'app' }, legacy, 1).engine).toBe('mongodb')
   })
 
@@ -462,7 +464,7 @@ describe('deriveMenuContext read-only for a sidebar target', () => {
     connectionId: 'c1',
     segments: [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'widgets' }],
   }
-  const ordersSel = selection('c1', 'Local', 'shop', 'orders', 'collection')
+  const ordersSel = selection('c1', 'Local', 'shop', 'orders')
   const widgetsSel = pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' })
 
   it('locks when an open tab on the selected collection is locked', () => {

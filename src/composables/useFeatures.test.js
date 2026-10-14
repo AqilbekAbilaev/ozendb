@@ -225,7 +225,7 @@ describe('global toolbar routing', () => {
   // highlighted in the sidebar — and clears that highlight, since the opened tab's
   // own active-collection highlight takes over.
   it('opens the sidebar selection when no target is given', () => {
-    setTreeSelection({ connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders', kind: 'collection' })
+    setTreeSelection({ resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales', engine: 'mongodb' })
     makeFeatures().handleTool('collection')
 
     expect(openCollectionTab).toHaveBeenCalledWith({ resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' })
@@ -233,7 +233,7 @@ describe('global toolbar routing', () => {
   })
 
   it('guides the user when nothing in the sidebar is a collection', () => {
-    setTreeSelection({ connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', kind: 'database' })
+    setTreeSelection({ resource: dbRef('c1', 'shop'), connectionName: 'Sales', engine: 'mongodb' })
     makeFeatures().handleTool('collection')
 
     expect(openCollectionTab).not.toHaveBeenCalled()
@@ -246,7 +246,7 @@ describe('global toolbar routing', () => {
 describe('feature nodes arrive as a ResourceRef', () => {
   const ordersRow = {
     type: 'collection', x: 0, y: 0, label: 'orders',
-    nodeData: { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' },
+    nodeData: { resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' },
   }
 
   it('opens a database tool for the database of a right-clicked collection', () => {
@@ -347,7 +347,7 @@ describe('color tag persistence', () => {
   it('shows a normalized error when saving a tag fails', async () => {
     contextMenu.value = {
       type: 'collection',
-      nodeData: { connId: 'c1', dbName: 'db', collName: 'orders' },
+      nodeData: { resource: collRef('c1', 'db', 'orders'), connectionName: 'Sales' },
     }
     applyColorTag.mockRejectedValue({ code: 'command', message: 'disk full' })
     const features = makeFeatures()
@@ -464,6 +464,17 @@ describe('context menu coverage', () => {
     contextMenu.value = { type: 'pg:database', x: 0, y: 0, label: 'payments', nodeData: node, items: PG_MENUS.database }
     makeFeatures().handleContextAction('pg:new_sql')
     expect(openPostgresQuery).toHaveBeenCalledWith({ connectionId: 'p1', connectionName: 'Payments PG', database: 'payments' })
+  })
+
+  // A PostgreSQL row offers the shared Refresh; it acts on the row's connection.
+  it('refreshes the connection of a right-clicked PostgreSQL row', async () => {
+    const node = {
+      connId: 'p1', connName: 'Payments PG', engine: 'postgresql', database: 'payments', schema: 'public',
+      resource: createResourceRef('p1', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }]),
+    }
+    contextMenu.value = { type: 'pg:schema', x: 0, y: 0, label: 'public', nodeData: node, items: PG_MENUS.schema }
+    await makeFeatures().handleContextAction('node:refresh')
+    expect(refreshConnectionResources).toHaveBeenCalledWith('p1')
   })
 
   it('keeps no placeholder for an action that is in fact implemented', () => {

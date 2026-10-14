@@ -1,5 +1,4 @@
 import { ref } from 'vue'
-import { resourceFromTreeSelection } from '../utils/legacyResourceRef'
 import { sameResource, isResourceAncestor } from '../utils/resourceRef'
 
 // A request is consumed by the tree after it opens the matching connection. The nonce
@@ -21,14 +20,15 @@ export function consumeConnectionOpenRequest() {
   return request
 }
 
-// The sidebar's single-click selection, at whatever level was clicked:
-//   { connectionId, connectionName, dbName, collectionName, kind, resource } | null
-// The native menu gates on it and menu actions act on it. The canonical ResourceRef
-// rides alongside the flat fields, derived here where the clicked level is certain.
+// The sidebar's single-click selection, at whatever level was clicked, or null. Every
+// selection carries the row's `resource`, built by the tree where the clicked level is
+// certain, plus `connectionName` and `engine`. A MongoDB selection is just that; a
+// PostgreSQL one also keeps the fields its consumers read (connectionId, database,
+// schema, table, kind). The native menu gates on it and menu actions act on it.
 export const treeSelection = ref(null)
 
 export function setTreeSelection(sel) {
-  treeSelection.value = sel && { ...sel, resource: resourceFromTreeSelection(sel) }
+  treeSelection.value = sel
 }
 
 // Called beside closeWhere(affectedByResource(drop)) so a dropped node, or one inside it,

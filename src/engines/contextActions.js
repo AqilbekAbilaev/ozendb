@@ -1,6 +1,7 @@
 // Right-click menus and actions an engine handles itself, keyed by engine. MongoDB's are still the
 // FEATURES table in composables/useFeatures.js, which takes any action not found here.
 import { PG_ACTIONS, PG_MENUS } from './postgresql/tree/contextMenus.js'
+import { createResourceRef } from '../utils/resourceRef.js'
 
 const CONTEXT_ACTIONS = Object.freeze({ postgresql: PG_ACTIONS })
 
@@ -10,10 +11,14 @@ export function contextAction(nodeData, action) {
 }
 
 // A connection whose engine has a menu of its own: the node its actions get, and the
-// items. MongoDB has none here; it uses the shared `connection` menu.
+// items. MongoDB has none here; it uses the shared `connection` menu. The node carries a
+// `resource` beside the engine's own fields, for the shared actions (Refresh, Disconnect…).
 const CONNECTION_MENUS = Object.freeze({
   postgresql: (conn) => ({
-    node: { connId: conn.id, connName: conn.name, engine: 'postgresql', database: conn.database || 'postgres' },
+    node: {
+      connId: conn.id, connName: conn.name, engine: 'postgresql', database: conn.database || 'postgres',
+      resource: createResourceRef(conn.id),
+    },
     items: PG_MENUS.connection,
   }),
 })

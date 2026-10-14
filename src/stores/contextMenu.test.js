@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { contextMenu, contextActiveNodeKey, pgNodeKey } from './contextMenu'
+import { appendResource, createResourceRef } from '../utils/resourceRef'
 
 beforeEach(() => { contextMenu.value = null })
 
@@ -9,11 +10,12 @@ describe('contextActiveNodeKey', () => {
   })
 
   it('names the tree node the menu was opened on', () => {
-    contextMenu.value = { type: 'connection', nodeData: { connId: 'c1' } }
+    const shop = createResourceRef('c1', [{ kind: 'database', name: 'shop' }])
+    contextMenu.value = { type: 'connection', nodeData: { resource: createResourceRef('c1') } }
     expect(contextActiveNodeKey.value).toBe('c1')
-    contextMenu.value = { type: 'database', nodeData: { connId: 'c1', dbName: 'shop' } }
+    contextMenu.value = { type: 'database', nodeData: { resource: shop } }
     expect(contextActiveNodeKey.value).toBe('c1/shop')
-    contextMenu.value = { type: 'collection', nodeData: { connId: 'c1', dbName: 'shop', collName: 'a/b' } }
+    contextMenu.value = { type: 'collection', nodeData: { resource: appendResource(shop, 'collection', 'a/b') } }
     expect(contextActiveNodeKey.value).toBe('c1/shop/a/b')
   })
 

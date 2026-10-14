@@ -61,6 +61,13 @@ export function tabColorName(tab, tagOverrides) {
   return null
 }
 
+// A MongoDB tree node's key in the tag store: the connection id, then each name below
+// it, joined by `/` (`c1`, `c1/shop`, `c1/shop/orders`). This is the persisted format,
+// so it never changes; names are never split back out of it.
+export function nodeTagKey(resource) {
+  return [resource.connectionId, ...resource.segments.map((s) => s.name)].join('/')
+}
+
 // The colour a tree node sets itself: its override (keyed by the node's path) wins,
 // otherwise its stored tag (connections only). Null when it has none or it's 'none';
 // the tree then shows the nearest coloured ancestor's.

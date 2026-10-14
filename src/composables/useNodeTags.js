@@ -1,13 +1,15 @@
 import { setConnectionTag, setNodeTag, clearNodeTagsUnder } from '../appApi/tags'
 import { tagOverrides } from '../stores/nodeTags'
+import { nodeTagKey } from '../utils/tabColor'
 
 // Writes a colour tag and mirrors it into the store's tagOverrides once persisted.
 export function useNodeTags() {
   let tagWrite = Promise.resolve()
 
   // Apply a colour to a node. `type` is 'connection' | 'database' | 'collection'; `nodeData`
-  // is the sidebar shape ({ connId, connName, dbName, collName }). Colouring a parent resets
-  // its descendants (drop their own tags so they inherit the parent's new colour).
+  // is the sidebar's right-click node, which carries the row's `resource`. Colouring a
+  // parent resets its descendants (drop their own tags so they inherit the parent's new
+  // colour).
   function applyColorTag(request) {
     const write = tagWrite.then(() => persistColorTag(request))
     tagWrite = write.catch(() => {})
@@ -15,21 +17,19 @@ export function useNodeTags() {
   }
 
   async function persistColorTag({ type, nodeData, color }) {
-    const nd = nodeData
+    const resource = nodeData.resource
     let clearPrefix = null
     let key
     if (type === 'connection') {
-      key = nd.connId
-      await setConnectionTag(nd.connId, color)
-      clearPrefix = nd.connId + '/'
+      key = resource.connectionId
+      await setConnectionTag(resource.connectionId, color)
+      clearPrefix = key + '/'
     } else {
       // Database/collection tags go in the dedicated node-tag store, keyed by the node's tree
       // path so a colour tags only that node, not the whole connection.
-      key = type === 'database'
-        ? nd.connId + '/' + nd.dbName
-        : nd.connId + '/' + nd.dbName + '/' + nd.collName
+      key = nodeTagKey(resource)
       await setNodeTag(key, color)
-      if (type === 'database') clearPrefix = nd.connId + '/' + nd.dbName + '/'
+      if (type === 'database') clearPrefix = key + '/'
     }
     if (clearPrefix) {
       try {

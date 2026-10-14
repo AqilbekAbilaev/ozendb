@@ -19,6 +19,7 @@ import { connDatabases, clearConnectionResources, invalidateConnectionResources,
 import { consumeConnectionOpenRequest, requestConnectionOpen, setTreeSelection, treeSelection } from '../stores/connectionNavigation'
 import { tabs, activeTabId } from '../stores/tabs'
 import { useConnectionTree } from './useConnectionTree'
+import { createResourceRef, resourceName } from '../utils/resourceRef'
 
 let scope
 let tree
@@ -139,19 +140,16 @@ it('does not repopulate disconnected data when discovery finishes late', async (
   expect(tree.connections.value).toEqual([])
 })
 
-// The selection payload dual-carries a canonical ResourceRef alongside the legacy
-// flat fields, so consumers can move onto it before the flat ones are dropped. The
-// ref is built here, where the clicked level is known for certain, rather than being
-// re-inferred downstream from which fields happen to be set.
+// A selection is the row's ResourceRef plus the connection's name and engine. The ref is
+// built here, where the clicked level is known for certain (#193).
 it('records a resource ref for a selected connection', () => {
   const emit = vi.fn()
   const s = effectScope()
   const t = s.run(() => useConnectionTree({ emit }))
   t.selectConnection(conn)
-  expect(treeSelection.value).toEqual(expect.objectContaining({
-    resource: { connectionId: 'a', segments: [] },
-    connectionId: 'a', kind: 'connection',
-  }))
+  expect(treeSelection.value).toEqual({
+    resource: { connectionId: 'a', segments: [] }, connectionName: conn.name, engine: conn.engine,
+  })
   s.stop()
 })
 
@@ -161,7 +159,7 @@ it('records the selected connection\'s engine', () => {
   const s = effectScope()
   const t = s.run(() => useConnectionTree({ emit }))
   t.selectConnection({ id: 'p', name: 'PG', engine: 'postgresql' })
-  expect(treeSelection.value).toEqual(expect.objectContaining({ connectionId: 'p', engine: 'postgresql' }))
+  expect(treeSelection.value).toEqual(expect.objectContaining({ engine: 'postgresql' }))
   s.stop()
 })
 
@@ -172,7 +170,6 @@ it('records a resource ref for a selected database', () => {
   t.toggleDatabase(conn, 'shop')
   expect(treeSelection.value).toEqual(expect.objectContaining({
     resource: { connectionId: 'a', segments: [{ kind: 'database', name: 'shop' }] },
-    dbName: 'shop', kind: 'database',
   }))
   s.stop()
 })
@@ -187,7 +184,6 @@ it('records a resource ref for a highlighted collection', () => {
       connectionId: 'a',
       segments: [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }],
     },
-    collectionName: 'orders', kind: 'collection',
   }))
   s.stop()
 })
@@ -263,7 +259,7 @@ it('keeps the selection while the active tab stays put', async () => {
   await nextTick()
   tree.highlightCollection(conn, { name: 'shop' }, 'orders')
   await nextTick()
-  expect(treeSelection.value).toEqual(expect.objectContaining({ collectionName: 'orders' }))
+  expect(resourceName(treeSelection.value.resource)).toBe('orders')
 })
 
 // #155: double-click, right-click Open Table and the auto-open after Create Table
@@ -274,6 +270,9 @@ it('clears a PostgreSQL selection when a table is opened by any route', async ()
   registerWorkspaceDefinitions()
   const { openPostgresTable } = await import('../stores/tabCreators')
   setTreeSelection({
+    resource: createResourceRef('a', [
+      { kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'widgets' },
+    ]),
     connectionId: 'a', connectionName: 'PG', engine: 'postgresql',
     database: 'app', schema: 'public', table: 'widgets', kind: 'table',
   })

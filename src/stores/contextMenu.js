@@ -1,6 +1,9 @@
 import { ref, computed } from 'vue'
+import { nodeTagKey } from '../utils/tabColor'
 
-// The one open right-click menu: { type, x, y, label?, nodeData }. Opened by whichever
+// The one open right-click menu: { type, x, y, label?, nodeData }. A MongoDB row's
+// nodeData is `{ resource, connectionName }`; PostgreSQL rows keep their own fields and
+// carry a `resource` beside them for the shared actions. Opened by whichever
 // component was clicked, rendered once by App.vue, dispatched by useFeatures.
 export const contextMenu = ref(null)
 
@@ -10,9 +13,9 @@ export const contextActiveNodeKey = computed(() => {
   if (!m) return null
   const nd = m.nodeData
   switch (m.type) {
-    case 'connection': return nd.connId
-    case 'database':   return nd.connId + '/' + nd.dbName
-    case 'collection': return nd.connId + '/' + nd.dbName + '/' + nd.collName
+    case 'connection': return nd.resource.connectionId
+    case 'database':
+    case 'collection': return nodeTagKey(nd.resource)
     case 'pg:database':
     case 'pg:schema':
     case 'pg:table':   return pgNodeKey(m.type.slice(3), nd)

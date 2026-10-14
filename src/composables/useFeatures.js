@@ -16,7 +16,6 @@ import { COLOR_ACTION } from '../constants/contextMenus'
 import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef, resourceAt, resourceName } from '../utils/resourceRef'
-import { resourceFromFeatureNode } from '../utils/legacyResourceRef'
 import { resolveMenuTarget } from '../utils/menuContext'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
@@ -266,9 +265,9 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
     const engineAction = contextAction(saved.nodeData, action)
     if (engineAction) return engineAction(saved.nodeData)
-    // The tree's rows still hand over the short-alias node; this is where it becomes a ref.
-    const ref = resourceFromFeatureNode(saved.nodeData)
-    return runFeature(action, ref, { label: saved.label, connectionName: saved.nodeData.connName })
+    return runFeature(action, saved.nodeData.resource ?? null, {
+      label: saved.label, connectionName: saved.nodeData.connectionName ?? null,
+    })
   }
 
   // Toolbar / native-menu tool dispatch. `connect`/`sql` are app-level (no
@@ -289,12 +288,13 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
       // Opening makes it the active collection, whose highlight takes over — so the
       // single-click selection is cleared rather than lingering as a second one.
       const sel = treeSelection.value
-      if (!sel || sel.kind !== 'collection') {
+      const selected = resourceAt(sel?.resource, 'collection')
+      if (!selected) {
         showToast('Select a collection in the sidebar first')
         return
       }
       setTreeSelection(null)
-      openCollectionTab({ resource: sel.resource, connectionName: sel.connectionName })
+      openCollectionTab({ resource: selected, connectionName: sel.connectionName })
       return
     }
 
