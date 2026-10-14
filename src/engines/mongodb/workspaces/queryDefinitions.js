@@ -32,7 +32,11 @@ function createCollection(ctx, mode, extra = {}) {
   return {
     title: resourceName(ctx.target.resource),
     target: ctx.target.resource,
-    fields: { ...collectionFields({ ...ctx, connectionName: ctx.target.connectionName }), mode: mode, ...extra },
+    fields: {
+      ...collectionFields({ ...ctx, connectionName: ctx.target.connectionName }),
+      mode: mode,
+      ...extra,
+    },
   }
 }
 
@@ -101,8 +105,9 @@ function restoreCollection(saved, defaults = {}) {
 // The full shape of a shell tab. A shell is database-scoped, and its identity is its
 // `target` alone (#303): beside it the tab keeps only the connection's display name.
 // Create, duplicate and restore all produce exactly this — they differ only in the
-// editor text they carry over — so the runtime spine is written once. Getting it wrong in one of three copies is how a duplicated tab
-// ends up sharing its predecessor's results.
+// editor text they carry over — so the runtime spine is written once. Getting it wrong
+// in one of three copies is how a duplicated tab ends up sharing its predecessor's
+// results.
 //
 // `sessionId` is always freshly minted: each shell tab owns its own backend JS
 // session so variables persist across runs within a tab and never leak between them.
@@ -222,7 +227,8 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: ShellConsole,
     create(ctx) {
-      return shellWorkspace({ connectionName: ctx.target.connectionName, target: ctx.target.resource }, ctx)
+      const { resource, connectionName } = ctx.target
+      return shellWorkspace({ connectionName: connectionName, target: resource }, ctx)
     },
     serialize(workspace) {
       // The session is backend state keyed by id; only the editor text is durable.

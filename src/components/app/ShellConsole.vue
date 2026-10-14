@@ -5,7 +5,7 @@ import { readShellScript, writeShellScript } from '../../appApi/files'
 import { runShellCommand, getShellHistory, pushShellCommand, clearShellHistory } from '../../engines/mongodb/api/shell'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../../utils/errors'
-import { resourceName } from '../../utils/resourceRef'
+import { segmentName } from '../../utils/resourceRef'
 import { apiTarget } from '../../engines/mongodb/api/payload'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
@@ -235,7 +235,7 @@ function formatScalar(value) {
 <template>
   <div class="shell">
     <!-- Connection → database, same crumb bar the collection panes show -->
-    <CollectionCrumbs :conn="activeTab.connectionName" :db="resourceName(activeTab.target)" />
+    <CollectionCrumbs :conn="activeTab.connectionName" :db="segmentName(activeTab.target, 'database')" />
 
     <!-- Toolbar -->
     <div class="shell-toolbar">
