@@ -268,6 +268,7 @@ describe('lifecycle — duplicate', () => {
 describe('lifecycle — restore', () => {
   const savedFind = {
     id: 'r1', type: 'mongodb.find', title: 'orders', color: '#0f0',
+    target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
     connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     filter: '{ "a": 1 }', sort: '{ "a": -1 }', projection: '{ "a": 1 }',
     skip: 2, limit: 25, mode: 'find', pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 },
@@ -309,7 +310,7 @@ describe('lifecycle — restore', () => {
 
   it('shell restore gets a fresh session id from the injected source', () => {
     const tab = restoreWorkspace({
-      id: 'sh', type: 'mongodb.shell', title: 'mongosh: shop', color: null,
+      id: 'sh', type: 'mongodb.shell', title: 'mongosh: shop', color: null, target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]),
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
       sessionId: 'old-session', code: 'db.orders.find()', scriptPath: '/tmp/x.js',
     }, { ids: { session: () => 'fresh-session' } })

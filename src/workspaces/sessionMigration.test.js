@@ -9,6 +9,7 @@ import { getWorkspaceDefinition } from './registry'
 import { legacy, expected, sessions } from './sessionMigration.fixtures'
 import { migrateTableState } from '../engines/postgresql/workspaces/tableState'
 import { isCollectionTab } from '../utils/workspaceTypes'
+import { createResourceRef } from '../utils/resourceRef'
 
 registerWorkspaceDefinitions()
 
@@ -137,6 +138,36 @@ describe('legacy sessions (schemaVersion 1)', () => {
     expect(result.ok).toBe(true)
     expect(result.session.tabs).toEqual([])
     expect(result.warnings).toEqual([{ id: 'w1', message: expect.stringContaining('cannot resolve') }])
+  })
+})
+
+// A v1 record's identity, as the migration reads it: its target, or null when the
+// record is dropped for naming no resource.
+describe('v1 record identity', () => {
+  const targetOf = (record) => migrateSession({ tabs: [{ id: 'x', title: '', ...record }] }).session.tabs[0]?.target ?? null
+  const CONN = createResourceRef('c1')
+  const DB = createResourceRef('c1', [{ kind: 'database', name: 'shop' }])
+  const COLL = createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }])
+
+  it('reads every kind, in the long spelling or the short one', () => {
+    expect(targetOf({ kind: 'collection', connectionId: 'c1', dbName: 'shop', collectionName: 'orders' })).toEqual(COLL)
+    expect(targetOf({ kind: 'shell', connectionId: 'c1', dbName: 'shop' })).toEqual(DB)
+    expect(targetOf({ kind: 'indexes', connId: 'c1', dbName: 'shop', collName: 'orders' })).toEqual(COLL)
+    expect(targetOf({ kind: 'schema', connId: 'c1', dbName: 'shop', collName: 'orders' })).toEqual(COLL)
+    expect(targetOf({ kind: 'export', connId: 'c1', dbName: 'shop', collName: 'orders' })).toEqual(COLL)
+    expect(targetOf({ kind: 'search', connId: 'c1', dbName: 'shop' })).toEqual(DB)
+    expect(targetOf({ kind: 'currentOps', connId: 'c1' })).toEqual(CONN)
+    expect(targetOf({ kind: 'collection', connId: 'c1', dbName: 'shop', collName: 'orders' })).toEqual(COLL)
+  })
+
+  it('keeps Current Operations connection-scoped when its filters are set', () => {
+    expect(targetOf({ kind: 'currentOps', connId: 'c1', dbName: 'shop', collName: 'orders' })).toEqual(CONN)
+  })
+
+  it('drops a record that names no resource', () => {
+    expect(targetOf({ kind: 'shell' })).toBe(null)
+    expect(targetOf({ kind: 'collection', connectionId: 'c1', dbName: 'shop' })).toBe(null)
+    expect(targetOf({ kind: 'gridfs', connectionId: 'c1' })).toBe(null)
   })
 })
 
@@ -286,6 +317,13 @@ describe('toLegacyRecord bridge', () => {
         expect(view[key], `${type}.${key}`).toEqual(v2.state[key])
       }
     }
+  })
+
+  // A restored workspace takes its identity as saved; the flat fields are only names.
+  it('hands the saved target to the restore hook unchanged', () => {
+    const record = toLegacyRecord(expected.find, 'Sales')
+    expect(record.target).toEqual(expected.find.target)
+    expect(restoreWorkspace({ ...record, dbName: 'stale' }).target).toEqual(expected.find.target)
   })
 
   it('restores identity-only schema and search workspaces through the bridge', () => {

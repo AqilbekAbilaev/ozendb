@@ -1,15 +1,15 @@
 // MongoDB tool workspace definitions: indexes, schema, search, import, export, and
 // current operations. Same contract as the query definitions. duplicate/restore clone
 // the durable configuration (sources, mapping, ops settings) and reset runtime state.
-import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { resourceName } from '../../../utils/resourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
 import { createdFields } from './createdFields'
 import { IndexManagerPane, SchemaPane, SearchPane, CurrentOpsPane, ImportPane, CsvImportPane, ExportPane } from './panes'
 
-// A tool workspace's identity fields, in the long spelling collection/shell workspaces
-// use. `duplicate`/`restore` read it off a workspace or a saved record, which spell the
-// fields either way; `create` no longer goes through here — it is handed a ResourceRef.
+// A tool workspace's own flat identity fields, in the long spelling collection/shell
+// workspaces use. `duplicate`/`restore` copy them off a workspace or a saved record, which
+// spell the fields either way; the workspace's `target` is the source's own ref, and
+// `create` is handed a ResourceRef instead.
 function toolTarget(source) {
   return {
     connectionId: source.connectionId ?? source.connId ?? null,
@@ -17,13 +17,6 @@ function toolTarget(source) {
     dbName: source.dbName ?? null,
     collectionName: source.collectionName ?? source.collName ?? null,
   }
-}
-
-// Current Operations is connection-scoped: dbName/collName on the tab are *filters*,
-// not identity, so duplicate/restore must not read them into the target (a
-// collection-scoped target would also close the tab when its database drops).
-function connectionScope(node) {
-  return { connId: node.connId ?? node.connectionId, connName: node.connName ?? node.connectionName }
 }
 
 // Identity for a connection-scoped tool. Deliberately not toolTarget: Current
@@ -36,10 +29,6 @@ function toolConnectionTarget(source) {
   }
 }
 
-function opsTarget(node) {
-  return resourceFromFeatureNode(connectionScope(node))
-}
-
 // The connection-scoped half of the same, for Current Operations, whose dbName/collName
 // are filters rather than identity.
 function createdConnectionFields(ctx) {
@@ -50,11 +39,11 @@ function createdConnectionFields(ctx) {
 // Indexes/Schema/Search tabs are identity-only: the pane reloads its data on mount,
 // so a duplicate is just the same target with a fresh id. Schema and Search persist
 // too (identity only, like Indexes) — the restore hook is shared.
-function identityTool(kind, titlePrefix, anchor = (source) => source.collectionName || source.dbName) {
+function identityTool(titlePrefix, anchor = (source) => source.collectionName || source.dbName) {
   const rebuild = (source) => ({
     title: source.title || titlePrefix + ' ' + anchor(source),
-    target: resourceFromFeatureNode(toolTarget(source)),
-    fields: { kind, ...toolTarget(source) },
+    target: source.target,
+    fields: toolTarget(source),
   })
   return { duplicate: rebuild, restore: rebuild }
 }
@@ -84,7 +73,7 @@ export const toolDefinitions = [
       }
     },
     serialize: () => ({}),
-    ...identityTool('indexes', 'Index Manager:'),
+    ...identityTool('Index Manager:'),
   },
   {
     type: 'mongodb.schema',
@@ -99,7 +88,7 @@ export const toolDefinitions = [
       }
     },
     serialize: () => ({}),
-    ...identityTool('schema', 'Schema:'),
+    ...identityTool('Schema:'),
   },
   {
     type: 'mongodb.search',
@@ -116,7 +105,7 @@ export const toolDefinitions = [
     serialize: () => ({}),
     // Search is database-scoped, so its title falls back to dbName rather than the
     // collName the shared helper reaches for.
-    ...identityTool('search', 'Search:', (saved) => saved.dbName),
+    ...identityTool('Search:', (saved) => saved.dbName),
   },
   {
     type: 'mongodb.import',
@@ -177,7 +166,7 @@ export const toolDefinitions = [
       if (workspace.format === 'csv') {
         return {
           title: workspace.title,
-          target: resourceFromFeatureNode(toolTarget(workspace)),
+          target: workspace.target,
           fields: {
             ...toolTarget(workspace), format: 'csv',
             subTab: 'source', sourceType: workspace.sourceType || 'file',
@@ -191,7 +180,7 @@ export const toolDefinitions = [
       }
       return {
         title: workspace.title,
-        target: resourceFromFeatureNode(toolTarget(workspace)),
+        target: workspace.target,
         fields: {
           ...toolTarget(workspace), format: 'json',
           validate: !!workspace.validate,
@@ -211,7 +200,7 @@ export const toolDefinitions = [
       if (saved.format === 'csv') {
         return {
           title: saved.title,
-          target: resourceFromFeatureNode(toolTarget(saved)),
+          target: saved.target,
           fields: {
             ...toolTarget(saved), format: 'csv',
             subTab: 'source',
@@ -229,7 +218,7 @@ export const toolDefinitions = [
       }))
       return {
         title: saved.title,
-        target: resourceFromFeatureNode(toolTarget(saved)),
+        target: saved.target,
         fields: {
           ...toolTarget(saved), format: 'json',
           validate: !!saved.validate,
@@ -295,7 +284,7 @@ export const toolDefinitions = [
       // survive; the result banner is runtime state and starts clear.
       return {
         title: workspace.title,
-        target: resourceFromFeatureNode(toolTarget(workspace)),
+        target: workspace.target,
         fields: {
           ...toolTarget(workspace),
           step: workspace.step || 0, format: workspace.format || 'json',
@@ -314,7 +303,7 @@ export const toolDefinitions = [
     restore(saved) {
       return {
         title: saved.title,
-        target: resourceFromFeatureNode(toolTarget(saved)),
+        target: saved.target,
         fields: {
           ...toolTarget(saved),
           step: saved.step || 0, format: saved.format || 'json',
@@ -366,7 +355,7 @@ export const toolDefinitions = [
       // the operation rows and grid state are live server state and start fresh.
       return {
         title: workspace.title,
-        target: opsTarget(workspace),
+        target: workspace.target,
         fields: {
           ...toolConnectionTarget(workspace),
           ...opsDefaults(),
@@ -385,7 +374,7 @@ export const toolDefinitions = [
       // scope.
       return {
         title: saved.title,
-        target: opsTarget(saved),
+        target: saved.target,
         fields: {
           ...toolConnectionTarget(saved),
           ...opsDefaults(),

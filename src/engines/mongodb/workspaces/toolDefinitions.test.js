@@ -172,20 +172,18 @@ describe('mongodb.current_operations', () => {
 
 describe('lifecycle — tools', () => {
   it('duplicates indexes and schema to the same target (pane reloads its own data)', () => {
-    const idx = duplicateWorkspace({ id: 'i', type: 'mongodb.indexes', title: 'Index Manager: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
-    expect(idx.type).toBe('mongodb.indexes')
+    const idx = duplicateWorkspace({ id: 'i', type: 'mongodb.indexes', target: COLLECTION.resource, title: 'Index Manager: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
     expect(idx.type).toBe('mongodb.indexes')
     expect(idx.target.segments.map(s => s.name)).toEqual(['shop', 'orders'])
-    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
-    expect(sch.type).toBe('mongodb.schema')
+    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', target: COLLECTION.resource, title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
     expect(sch.type).toBe('mongodb.schema')
   })
 
   it('schema and search duplicates can never become collection workspaces', () => {
-    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
+    const sch = duplicateWorkspace({ id: 's', type: 'mongodb.schema', target: COLLECTION.resource, title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collName: 'orders' })
     expect(sch.type).toBe('mongodb.schema')
     expect(sch.mode).toBeUndefined()
-    const search = duplicateWorkspace({ id: 'q', type: 'mongodb.search', title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
+    const search = duplicateWorkspace({ id: 'q', type: 'mongodb.search', target: DATABASE.resource, title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
     expect(search.type).toBe('mongodb.search')
     expect(search.target.segments.map(s => s.name)).toEqual(['shop'])
   })
@@ -354,10 +352,10 @@ describe('lifecycle — tool restore', () => {
   })
 
   it('current operations identity stays connection-scoped on duplicate and restore', () => {
-    // dbName/collName are filters, never identity: the target must stay at the
-    // connection level so a database drop does not close the tab.
+    // dbName/collName are filters, never identity: the target stays the
+    // connection-level one the tab was saved with, so a database drop does not close it.
     const record = {
-      id: 'o', type: 'mongodb.current_operations', title: 'Current Operations: Sales', color: null,
+      id: 'o', type: 'mongodb.current_operations', target: CONNECTION.resource, title: 'Current Operations: Sales', color: null,
       connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders',
       frequency: 500,
     }
@@ -370,7 +368,7 @@ describe('lifecycle — tool restore', () => {
 
   it('indexes restore keeps identity only', () => {
     const tab = restoreWorkspace({
-      id: 'x', type: 'mongodb.indexes', title: 'Index Manager: orders', color: null,
+      id: 'x', type: 'mongodb.indexes', target: COLLECTION.resource, title: 'Index Manager: orders', color: null,
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     })
     expect(tab.type).toBe('mongodb.indexes')
@@ -380,13 +378,11 @@ describe('lifecycle — tool restore', () => {
   })
 
   it('restores schema and search as identity-only tabs', () => {
-    const schema = restoreWorkspace({ id: 's', type: 'mongodb.schema', title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' })
-    expect(schema.type).toBe('mongodb.schema')
+    const schema = restoreWorkspace({ id: 's', type: 'mongodb.schema', target: COLLECTION.resource, title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' })
     expect(schema.type).toBe('mongodb.schema')
     expect(schema.connectionId).toBe('c1')
 
-    const search = restoreWorkspace({ id: 'q', type: 'mongodb.search', title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
-    expect(search.type).toBe('mongodb.search')
+    const search = restoreWorkspace({ id: 'q', type: 'mongodb.search', target: DATABASE.resource, title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
     expect(search.type).toBe('mongodb.search')
     expect(search.dbName).toBe('shop')
   })

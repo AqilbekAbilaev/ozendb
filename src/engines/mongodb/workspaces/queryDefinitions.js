@@ -2,7 +2,6 @@
 // owns the full shape of its fresh tab and the lifecycle hooks (duplicate, restore,
 // dispose) the generic helpers dispatch through; the canonical envelope comes from
 // the factory.
-import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
 import { resourceName } from '../../../utils/resourceRef'
 import { closeShellSession } from '../api/shell'
 import { createdFields } from './createdFields'
@@ -28,19 +27,6 @@ function collectionFields({ target, defaults = {}, state, ui }) {
   }
 }
 
-function collectionTarget(target) {
-  return {
-    connectionId: target.connectionId,
-    connectionName: target.connectionName,
-    dbName: target.dbName,
-    collectionName: target.collectionName,
-  }
-}
-
-// Identity for a collection-scoped workspace, from whichever object carries the flat
-// fields — a creation context's target, a live workspace, or a saved record.
-const collectionRef = (source) => resourceFromFeatureNode(collectionTarget(source))
-
 // A fresh tab in the given mode. Every collection query starts from the same spine
 // and differs only in `mode` and a few mode-specific fields. It is handed a ref, which
 // becomes the workspace's target as it is.
@@ -58,7 +44,7 @@ function createCollection(ctx, mode, extra = {}) {
 function duplicateCollection(workspace, mode, durable) {
   return {
     title: workspace.title,
-    target: collectionRef(workspace),
+    target: workspace.target,
     // `durable` is the flat editorState shape, which migrateCollectionState reads.
     fields: {
       ...collectionFields({
@@ -94,11 +80,11 @@ function editorState(workspace) {
 
 // Restore reconstructs the full spine from a projected saved record: the saved
 // editor fields come back verbatim, runtime state starts fresh, and the canonical
-// target is re-derived from the saved identity fields. The flat identity names
+// target is the one the record was saved with. The flat identity names
 // (connectionName/dbName/collectionName) ride along from the saved record — the
 // canonical target carries no names, and panes still read the flat fields.
 function restoreCollection(saved, defaults = {}) {
-  const target = resourceFromFeatureNode(collectionTarget(saved))
+  const target = saved.target
   return {
     title: saved.title || saved.collectionName,
     target,
@@ -153,7 +139,7 @@ function shellFields(source, sessionId, durable = {}) {
 function shellWorkspace(source, ctx, durable) {
   return {
     title: source.title || 'mongosh: ' + source.dbName,
-    target: resourceFromFeatureNode(shellTarget(source)),
+    target: source.target,
     fields: shellFields(source, ctx.ids.session(), durable),
   }
 }
@@ -252,7 +238,7 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: ShellConsole,
     create(ctx) {
-      return { ...shellWorkspace(createdFields(ctx), ctx), target: ctx.target.resource }
+      return shellWorkspace({ ...createdFields(ctx), target: ctx.target.resource }, ctx)
     },
     serialize(workspace) {
       // The session is backend state keyed by id; only the editor text is durable.
