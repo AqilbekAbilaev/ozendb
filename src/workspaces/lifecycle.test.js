@@ -71,6 +71,7 @@ describe('duplicateWorkspace', () => {
 describe('restoreWorkspace', () => {
   const saved = {
     id: 'r1', type: 'mongodb.find', title: 'orders', color: '#0f0',
+    target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
     connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     filter: '{ "a": 1 }', sort: '{}', projection: '{}', skip: 0, limit: 25,
     mode: 'find', pipeline: '', vqb: { rows: [1] }, colOrder: { a: 0 },
@@ -109,7 +110,7 @@ describe('restoreWorkspace', () => {
 
   it('gives restored shells a fresh session from the injected source', () => {
     const tab = restoreWorkspace({
-      id: 'sh', type: 'mongodb.shell', title: 'mongosh: shop', color: null,
+      id: 'sh', type: 'mongodb.shell', title: 'mongosh: shop', color: null, target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]),
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop',
       sessionId: 'old-session', code: 'db.orders.find()', scriptPath: null,
     }, { ids: { session: () => 'fresh-session' } })

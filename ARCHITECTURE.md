@@ -137,11 +137,14 @@ are presentation, not identity.
 Every workspace carries one as `target`, and containment questions are asked of it —
 "does dropping this close that tab?" is `affectedByResource`, not string comparison.
 
-`src/utils/legacyResourceRef.js` converts in both directions between a ResourceRef and
-the older flat shapes. **Those flat shapes are still live** — `{ connId, connName,
-dbName, collName }` in tool tabs and modal props, `{ connectionId, connectionName,
-dbName, collectionName }` in collection and shell tabs — and retiring them is unfinished
-work, not a pattern to copy. New code takes a ResourceRef.
+Everything between the sidebar and menus and the code that opens a tab or a modal passes
+`{ resource, connectionName }`: the ref, plus the display name a ref never carries.
+`apiTarget` in `src/engines/mongodb/api/payload.js` is the one place a ref becomes the
+MongoDB API's `{ connectionId, database, collection }`. A tab still keeps flat copies
+of its identity (`connectionId`, `dbName`, `collectionName`; PostgreSQL's `database`,
+`schema`, `table`) for its panes to read. They are written from the ref when the tab is
+created, and moving the panes onto `target` is unfinished work (#303), not a pattern
+to copy. New code takes a ResourceRef.
 
 ## PostgreSQL (preview)
 

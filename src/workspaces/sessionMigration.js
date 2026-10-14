@@ -12,8 +12,7 @@
 // the migration hands each legacy record to its definition, so there is exactly one
 // source of truth for what survives a session.
 import { getWorkspaceDefinition, workspaceTypeForSaved } from './registry'
-import { resourceFromLegacyTab } from '../utils/legacyResourceRef'
-import { isResourceRef } from '../utils/resourceRef'
+import { createResourceRef, isResourceRef } from '../utils/resourceRef'
 
 function isValidId(id) {
   return typeof id === 'string' && id.length > 0
@@ -29,6 +28,23 @@ function isNonEmptyString(v) {
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
+}
+
+// A v1 record names its tab by `kind` and spells its identity flat: the long way
+// (connectionId/collectionName) on collection and shell tabs, the short way
+// (connId/collName) on tool tabs. Its depth comes from the kind, never from which
+// fields are set, because Current Operations carries dbName/collName as filters.
+const V1_DEPTH = { collection: 2, shell: 1, indexes: 2, schema: 2, export: 2, import: 2, search: 1, currentOps: 0 }
+
+// The ResourceRef a v1 record names, or null when it names none: Quickstart, an
+// unknown kind, or a record missing a name its depth needs.
+function resourceFromV1Record(record) {
+  const depth = V1_DEPTH[record?.kind]
+  if (depth === undefined) return null
+  const connectionId = record.connectionId || record.connId
+  const names = [record.dbName, record.collectionName || record.collName].slice(0, depth)
+  if (!isNonEmptyString(connectionId) || !names.every(isNonEmptyString)) return null
+  return createResourceRef(connectionId, names.map((name, i) => ({ kind: i === 0 ? 'database' : 'collection', name })))
 }
 
 function knownType(type) {
@@ -62,7 +78,7 @@ function migrateLegacyRecord(record, connections, warnings) {
     return null
   }
   const def = getWorkspaceDefinition(type)
-  const target = resourceFromLegacyTab(record)
+  const target = resourceFromV1Record(record)
   if (def.engine !== 'app' && !target) {
     warnings.push({ id: record.id, message: `cannot resolve a resource target for ${type}` })
     return null
@@ -182,10 +198,12 @@ const LEGACY_KEYS = {
   'postgresql.query': { identity: ([db]) => ({ database: db.name }) },
 }
 
-// The v2 → legacy bridge. Restore hooks consume the flat legacy shape and
-// are deliberately unchanged; this un-projects the canonical record back into it,
-// with the display name re-resolved from the connection list (names are not
-// identity, so they are never stored). Returns null for types outside the table.
+// The v2 → legacy bridge. Restore hooks consume the flat legacy shape;
+// this un-projects the canonical record back into it, with the display name
+// re-resolved from the connection list (names are not identity, so they are never
+// stored). The record's `type` and `target` ride along, so a restore hook takes its
+// identity as saved instead of rebuilding it from the flat fields. Returns null for
+// types outside the table.
 export function toLegacyRecord(v2, connectionName = null) {
   const conf = LEGACY_KEYS[v2 && v2.type]
   if (!conf || !isValidTarget(v2.target)) return null
@@ -204,6 +222,7 @@ export function toLegacyRecord(v2, connectionName = null) {
   return {
     id: v2.id,
     type: v2.type,
+    target: v2.target,
     title: v2.title,
     color: v2.color,
     ...identity,
