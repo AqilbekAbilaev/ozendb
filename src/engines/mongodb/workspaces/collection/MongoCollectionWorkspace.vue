@@ -11,6 +11,7 @@ import CollectionCrumbs from '../../../../components/base/CollectionCrumbs.vue'
 import { computed } from 'vue'
 import { useInitialFindRun } from './useInitialFindRun'
 import { useCollectionRun } from './useCollectionRun'
+import { apiTarget } from '../../api/payload'
 
 const props = defineProps({
   activeTab:        { type: Object, required: true },
@@ -37,11 +38,14 @@ const {
   resultTab:         () => props.resultTab,
   savedQueryRequest: () => props.savedQueryRequest,
 }, emit)
+
+// The breadcrumb's names, read off the tab's ref.
+const names = computed(() => apiTarget(props.activeTab.target))
 </script>
 
 <template>
   <!-- Breadcrumb -->
-  <CollectionCrumbs :conn="activeTab.connectionName" :db="activeTab.dbName" :coll="activeTab.collectionName" />
+  <CollectionCrumbs :conn="activeTab.connectionName" :db="names.database" :coll="names.collection" />
 
   <!-- SQL query bar (sql mode) -->
   <SqlQueryBar

@@ -58,7 +58,7 @@ it('expands the connection of an active PostgreSQL table tab', async () => {
   listSchemas.mockResolvedValue([])
   tree.connections.value = [{ id: 'a', name: 'Connection', engine: 'postgresql' }]
   tabs.value = [{
-    id: 'pg', type: 'postgresql.table_browse',
+    id: 'pg', type: 'postgresql.table_browse', target: createResourceRef('a', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }]),
     connectionId: 'a', database: 'payments', schema: 'public', table: 'merchants',
   }]
   activeTabId.value = 'pg'
@@ -72,11 +72,27 @@ it('expands the connection and database of an active MongoDB collection tab', as
   listDatabases.mockResolvedValue([])
   tabs.value = [{
     id: 'mongo', type: 'mongodb.find',
-    connectionId: 'a', dbName: 'shop', collectionName: 'orders',
+    target: createResourceRef('a', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
   }]
   activeTabId.value = 'mongo'
   await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
   expect(tree.expandedDbs.value['a/shop']).toBe(true)
+})
+
+// The rows look their state up by databaseKey/collectionKey, and the active tab writes it
+// from its target: both go through nodeTagKey, so the row that lights up and opens is the
+// active tab's own, and a click on that database row closes the same entry.
+it('keys the active tab\'s rows the way the rows look themselves up', async () => {
+  listDatabases.mockResolvedValue([])
+  tabs.value = [{
+    id: 'mongo', type: 'mongodb.find',
+    target: createResourceRef('a', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
+  }]
+  activeTabId.value = 'mongo'
+  await vi.waitFor(() => expect(tree.expandedDbs.value[tree.databaseKey('a', 'shop')]).toBe(true))
+  expect(tree.activeCollectionKey.value).toBe(tree.collectionKey('a', 'shop', 'orders'))
+  tree.toggleDatabase({ id: 'a', name: 'Connection' }, 'shop')
+  expect(tree.expandedDbs.value[tree.databaseKey('a', 'shop')]).toBe(false)
 })
 
 // The connection row used to prefix-match the collection key, so it lit up for MongoDB
@@ -84,8 +100,8 @@ it('expands the connection and database of an active MongoDB collection tab', as
 it('names the connection holding the active tab\'s resource, either engine', async () => {
   listDatabases.mockResolvedValue([])
   tabs.value = [
-    { id: 'm', type: 'mongodb.find', connectionId: 'a', dbName: 'shop', collectionName: 'orders' },
-    { id: 'p', type: 'postgresql.table_browse', connectionId: 'a', schema: 'public', table: 'merchants' },
+    { id: 'm', type: 'mongodb.find', target: createResourceRef('a', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]) },
+    { id: 'p', type: 'postgresql.table_browse', target: createResourceRef('a', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }]), connectionId: 'a', database: 'payments', schema: 'public', table: 'merchants' },
     { id: 'q', type: 'app.quickstart' },
   ]
   activeTabId.value = 'm'

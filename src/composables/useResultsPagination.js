@@ -3,6 +3,7 @@ import { countDocuments } from '../engines/mongodb/api/queries'
 import { errText } from '../utils/errors'
 import { parseField } from '../utils/queryParser'
 import { isCollectionTab } from '../utils/workspaceTypes'
+import { apiTarget } from '../engines/mongodb/api/payload'
 
 // Owns collection pagination and the optional server-side count shown in the results footer.
 export function useResultsPagination({ activeTab, isAggregate, requery, showToast }) {
@@ -15,7 +16,7 @@ export function useResultsPagination({ activeTab, isAggregate, requery, showToas
     const parsed = parseField(tab.state.query.filter || '')
     if (!parsed.ok) throw new Error(parsed.error)
     const total = await countDocuments(
-      { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+      apiTarget(tab.target),
       parsed.ejson,
     )
     tab.runtime.total = total

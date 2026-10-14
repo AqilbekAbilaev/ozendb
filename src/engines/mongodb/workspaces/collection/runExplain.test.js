@@ -5,6 +5,7 @@ vi.mock('../../api/queries', () => ({ explainFind: vi.fn(), explainAggregate: vi
 import { explainFind, explainAggregate, loadExplainStorage } from '../../api/queries'
 import { createCollectionState, createCollectionRuntime } from '../collectionState'
 import { runExplain } from './runExplain'
+import { createResourceRef } from '../../../../utils/resourceRef'
 
 const TARGET = { connectionId: 'c1', database: 'shop', collection: 'orders' }
 const open = () => true
@@ -12,7 +13,7 @@ const open = () => true
 function tab(mode = 'find', query = {}) {
   const state = createCollectionState()
   Object.assign(state.query, query)
-  return { id: 't1', type: 'mongodb.find', mode, connectionId: 'c1', dbName: 'shop', collectionName: 'orders', state, runtime: createCollectionRuntime() }
+  return { id: 't1', type: 'mongodb.find', mode, target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]), state, runtime: createCollectionRuntime() }
 }
 
 beforeEach(() => {

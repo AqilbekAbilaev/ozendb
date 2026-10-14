@@ -8,6 +8,8 @@ import { ref, computed, watch } from 'vue'
 import { deleteMany } from '../../engines/mongodb/api/documents'
 import { countDocuments } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
+import { resourceName } from '../../utils/resourceRef'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { parseField } from '../../utils/queryParser'
 import { predefinedQuery, hasSelectedDocs } from '../../utils/predefinedQuery'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -65,7 +67,7 @@ async function onCount() {
   busy.value = true
   try {
     const total = await countDocuments(
-      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      apiTarget(props.activeTab.target),
       pf.ejson,
     )
     matched.value = total
@@ -86,7 +88,7 @@ async function onDelete() {
   busy.value = true
   try {
     const deleted = await deleteMany(
-      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      apiTarget(props.activeTab.target),
       pf.ejson,
     )
     emit('done', `Deleted ${deleted} document${deleted !== 1 ? 's' : ''}`)
@@ -102,7 +104,7 @@ async function onDelete() {
   <BaseModal title="Delete Documents" width="540px" max-width="94vw" @close="$emit('close')">
       <BaseModalBody>
         <div class="dw-hint">Deletes every document in
-          <code>{{ activeTab.collectionName }}</code> that matches the query. This cannot be undone.</div>
+          <code>{{ resourceName(activeTab.target) }}</code> that matches the query. This cannot be undone.</div>
 
         <label class="dw-row">
           <span class="dw-lbl">Query <span class="dw-note">(empty <code>{}</code> matches all)</span></span>

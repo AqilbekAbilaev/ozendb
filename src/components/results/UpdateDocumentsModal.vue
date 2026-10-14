@@ -8,6 +8,8 @@ import { ref, computed, watch } from 'vue'
 import { updateMany } from '../../engines/mongodb/api/documents'
 import { countDocuments } from '../../engines/mongodb/api/queries'
 import { errText } from '../../utils/errors'
+import { resourceName } from '../../utils/resourceRef'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { parseField } from '../../utils/queryParser'
 import { predefinedQuery, hasSelectedDocs } from '../../utils/predefinedQuery'
 import BaseIcon from '../base/BaseIcon.vue'
@@ -92,7 +94,7 @@ async function onCount() {
   busy.value = true
   try {
     const total = await countDocuments(
-      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      apiTarget(props.activeTab.target),
       pf.ejson,
     )
     matched.value = total
@@ -115,7 +117,7 @@ async function onRun() {
   busy.value = true
   try {
     const modified = await updateMany(
-      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      apiTarget(props.activeTab.target),
       pf.ejson,
       pu.ejson,
       { upsert: upsert.value, multi: multi.value },
@@ -142,7 +144,7 @@ async function onRun() {
       <BaseModalBody>
         <HintText dim>
           <template v-if="pane === 'query'">Update the document(s) in
-            <code>{{ activeTab.collectionName }}</code> matching the query below:</template>
+            <code>{{ resourceName(activeTab.target) }}</code> matching the query below:</template>
           <template v-else>Update operators to apply, e.g. <code>{ "$set": { "field": 1 } }</code></template>
         </HintText>
 

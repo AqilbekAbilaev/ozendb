@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { refreshFindWorkspacesAfterDocumentSave } from './documentSaveRefresh'
+import { createResourceRef } from './resourceRef'
 
-const matchingFind = ({ hasRun = true, ...fields } = {}) => ({
+// A Find on c1/shop/orders; any level can be swapped to build an unrelated one.
+const matchingFind = ({ hasRun = true, connectionId = 'c1', dbName = 'shop', collectionName = 'orders', ...fields } = {}) => ({
   id: 'find-1',
   type: 'mongodb.find',
-  connectionId: 'c1',
-  dbName: 'shop',
-  collectionName: 'orders',
+  target: createResourceRef(connectionId, [
+    { kind: 'database', name: dbName }, { kind: 'collection', name: collectionName },
+  ]),
   state: {
     query: { filter: '{ status: "open" }', projection: '{ total: 1 }', sort: '{ createdAt: -1 }', skip: '2', limit: '25' },
   },

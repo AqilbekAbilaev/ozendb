@@ -14,13 +14,12 @@ import { MongoCollectionWorkspace, ShellConsole } from './panes'
 // The editor+result spine shared by every collection-scoped query mode. Scalar
 // defaults arrive from the creator; the fallbacks mirror the app's settings defaults
 // so a definition used without a context still produces a sane tab.
-// Identity plus the state / ui / runtime split (collectionState.js).
-function collectionFields({ target, defaults = {}, state, ui }) {
+// The connection's display name plus the state / ui / runtime split
+// (collectionState.js). Identity is the workspace's `target` alone (#303): a collection
+// tab keeps no flat copy of its connection, database or collection.
+function collectionFields({ connectionName = null, defaults = {}, state, ui }) {
   return {
-    connectionId: target.connectionId,
-    connectionName: target.connectionName,
-    dbName: target.dbName,
-    collectionName: target.collectionName,
+    connectionName: connectionName,
     state: state ?? createCollectionState({ queryLimit: defaults.queryLimit }),
     ui: ui ?? createCollectionUi({ resultView: defaults.resultView }),
     runtime: createCollectionRuntime(),
@@ -34,7 +33,7 @@ function createCollection(ctx, mode, extra = {}) {
   return {
     title: resourceName(ctx.target.resource),
     target: ctx.target.resource,
-    fields: { ...collectionFields({ ...ctx, target: createdFields(ctx) }), mode: mode, ...extra },
+    fields: { ...collectionFields({ ...ctx, connectionName: ctx.target.connectionName }), mode: mode, ...extra },
   }
 }
 
@@ -48,7 +47,7 @@ function duplicateCollection(workspace, mode, durable) {
     // `durable` is the flat editorState shape, which migrateCollectionState reads.
     fields: {
       ...collectionFields({
-        target: workspace,
+        connectionName: workspace.connectionName,
         state: migrateCollectionState(durable),
         ui: createCollectionUi({ resultView: durable.resultView }),
       }),
@@ -80,25 +79,20 @@ function editorState(workspace) {
 
 // Restore reconstructs the full spine from a projected saved record: the saved
 // editor fields come back verbatim, runtime state starts fresh, and the canonical
-// target is the one the record was saved with. The flat identity names
-// (connectionName/dbName/collectionName) ride along from the saved record — the
-// canonical target carries no names, and panes still read the flat fields.
+// target is the one the record was saved with. Only the connection's display name rides
+// along from the saved record, since a ref carries no display names.
 function restoreCollection(saved, defaults = {}) {
   const target = saved.target
   return {
-    title: saved.title || saved.collectionName,
+    title: saved.title || resourceName(target),
     target,
     fields: {
       ...collectionFields({
-        target,
+        connectionName: saved.connectionName,
         defaults,
         state: migrateCollectionState(saved),
         ui: createCollectionUi({ resultView: saved.resultView ?? defaults.resultView }),
       }),
-      connectionId: saved.connectionId,
-      connectionName: saved.connectionName ?? null,
-      dbName: saved.dbName ?? null,
-      collectionName: saved.collectionName ?? null,
       mode: saved.mode || 'find',
       readOnly: !!saved.readOnly,
     },

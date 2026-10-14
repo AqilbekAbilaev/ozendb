@@ -1,6 +1,7 @@
 import { markRaw } from 'vue'
 import * as qapi from '../engines/mongodb/api/queries'
 import { pushQueryHistory } from '../engines/mongodb/api/queryLibrary'
+import { apiTarget } from '../engines/mongodb/api/payload'
 import { errText, errCode } from '../utils/errors'
 import { tabs } from './tabs'
 import { showToast } from './toast'
@@ -33,7 +34,7 @@ export async function cancelQuery(tabId) {
   tab.runtime.runError = 'Query cancelled.'
   tab.runtime.runErrorCode = null
   try {
-    await qapi.cancelRun(tab.connectionId, tab.runtime.runId)
+    await qapi.cancelRun(tab.target.connectionId, tab.runtime.runId)
     showToast('Query cancelled')
   } catch (e) {
     // The server refused to kill the op, so it is still running and its results are
@@ -68,7 +69,7 @@ export async function runQuery(tabId, params) {
   const { addToHistory = true, ...queryParams } = params
   try {
     const res = await qapi.runFind(
-      { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+      apiTarget(tab.target),
       queryParams,
       runId,
     )
@@ -85,7 +86,7 @@ export async function runQuery(tabId, params) {
     showToast(`Query returned ${tab.runtime.results.length} document${tab.runtime.results.length !== 1 ? 's' : ''} in ${(tab.runtime.elapsedMs / 1000).toFixed(3)}s`)
     if (addToHistory) {
       pushQueryHistory(
-        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        apiTarget(tab.target),
         {
           mode:       'find',
           filter:     tab.state.query.filter     || '',
@@ -131,7 +132,7 @@ export async function runAggregate(tabId, params) {
   tab.runtime.runId = runId
   try {
     const res = await qapi.runAggregate(
-      { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+      apiTarget(tab.target),
       params.pipeline,
       runId,
     )
@@ -145,7 +146,7 @@ export async function runAggregate(tabId, params) {
       showToast(`Aggregation returned ${res.documents.length} document${res.documents.length !== 1 ? 's' : ''} in ${(tab.runtime.elapsedMs / 1000).toFixed(3)}s`)
     }
     pushQueryHistory(
-      { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+      apiTarget(tab.target),
       {
         mode:       'aggregate',
         filter:     '',

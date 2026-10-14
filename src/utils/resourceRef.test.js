@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   createResourceRef, appendResource, isResourceRef,
-  resourceKind, resourceName, resourceAt, sameResource, isResourceAncestor,
+  resourceKind, resourceName, resourceAt, segmentName, sameResource, isResourceAncestor,
 } from './resourceRef'
 
 const db = (name) => ({ kind: 'database', name: name })
@@ -172,5 +172,19 @@ describe('resourceAt', () => {
   it('matches by kind, never by depth', () => {
     const schema = createResourceRef('p1', [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }])
     expect(resourceAt(schema, 'collection')).toBe(null)
+  })
+})
+
+describe('segmentName', () => {
+  const orders = createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'a/b' }])
+
+  it('names the segment of the given kind', () => {
+    expect(segmentName(orders, 'database')).toBe('shop')
+    expect(segmentName(orders, 'collection')).toBe('a/b')
+  })
+
+  it('is null for a level the ref does not have, and for no ref', () => {
+    expect(segmentName(orders, 'schema')).toBe(null)
+    expect(segmentName(null, 'database')).toBe(null)
   })
 })

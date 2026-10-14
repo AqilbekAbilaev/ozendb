@@ -30,7 +30,7 @@ beforeEach(() => {
 // shell and Current Operations hand over one flat object.
 describe('useMongoCellActions holder', () => {
   it('reads results and selection from a separate holder when given one', () => {
-    const tab = { id: 't', connectionId: 'c1', dbName: 'shop', collectionName: 'orders' }
+    const tab = { id: 't', target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]) }
     const holder = { results: [{ _id: 1 }, { _id: 2 }, { _id: 3 }], selectedRow: 2, selectedRows: [0, 2] }
     setup({ tab, holder }).copySelection()
     expect(JSON.parse(written)).toEqual([{ _id: 1 }, { _id: 3 }])
@@ -48,7 +48,7 @@ describe('useMongoCellActions holder', () => {
 describe('Follow Reference', () => {
   function follow(dbRef) {
     const emit = vi.fn()
-    const tab = { id: 't', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', results: [{ _id: 1, owner: dbRef }] }
+    const tab = { id: 't', target: target('shop', 'orders'), connectionName: 'Sales', results: [{ _id: 1, owner: dbRef }] }
     const cellCtx = ref({ row: 0, col: 'owner' })
     useMongoCellActions({
       activeTab: () => tab, drillPath: () => [], readonly: () => false,

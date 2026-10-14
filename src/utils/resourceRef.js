@@ -64,6 +64,13 @@ export function resourceAt(ref, kind) {
   return i < 0 ? null : createResourceRef(ref.connectionId, ref.segments.slice(0, i + 1))
 }
 
+// The name of `ref`'s segment of `kind` (a collection ref's 'database', say), or null
+// when it has none.
+export function segmentName(ref, kind) {
+  if (!isResourceRef(ref)) return null
+  return ref.segments.find((s) => s.kind === kind)?.name ?? null
+}
+
 export function resourceName(ref) {
   if (!isResourceRef(ref) || ref.segments.length === 0) return null
   return ref.segments[ref.segments.length - 1].name

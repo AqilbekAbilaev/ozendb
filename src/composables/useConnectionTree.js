@@ -134,7 +134,7 @@ export function useConnectionTree({ emit }) {
   function toggleDatabase(conn, dbName) {
     // Selecting a database row enables database-scoped menu items.
     setSelection({ resource: databaseResource(conn.id, dbName), connectionName: conn.name, engine: conn.engine })
-    const key = `${conn.id}/${dbName}`
+    const key = databaseKey(conn.id, dbName)
     expandedDbs.value[key] = !expandedDbs.value[key]
   }
 
@@ -164,8 +164,14 @@ export function useConnectionTree({ emit }) {
     })
   }
 
+  // A database or collection row's key, built from its ref by nodeTagKey: the one
+  // spelling the colour tags, the right-click highlight, the active row and the expanded
+  // databases are all compared in, so no two of them can drift apart.
+  function databaseKey(connId, dbName) {
+    return nodeTagKey(databaseResource(connId, dbName))
+  }
   function collectionKey(connId, dbName, collName) {
-    return `${connId}/${dbName}/${collName}`
+    return nodeTagKey(appendResource(databaseResource(connId, dbName), 'collection', collName))
   }
 
   async function openRequestedConnection(request) {
@@ -190,10 +196,10 @@ export function useConnectionTree({ emit }) {
   })
   // The connection whose row highlights. Was a startsWith() over the collection key,
   // which prefix-matched an id instead of comparing one, and only ever for MongoDB.
-  const activeConnectionId = computed(() => activeResource.value?.connectionId ?? null)
+  const activeConnectionId = computed(() => activeResource.value?.target?.connectionId ?? null)
   const activeCollectionKey = computed(() => {
     const t = activeResource.value
-    return isCollectionTab(t) ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
+    return isCollectionTab(t) ? nodeTagKey(t.target) : null
   })
 
   // Keyboard tab switches never click outside the sidebar, so clear the selection here.
@@ -205,13 +211,13 @@ export function useConnectionTree({ emit }) {
   // tree holds the schema state below it and opens itself (PostgresTreeNodes).
   watch(activeResource, async (t) => {
     if (!t) return
-    const conn = connections.value.find(c => c.id === t.connectionId)
+    const conn = connections.value.find(c => c.id === t.target.connectionId)
     if (!conn) return  // not a connection the sidebar currently shows
 
-    if (!expandedConns.value[t.connectionId]) {
+    if (!expandedConns.value[conn.id]) {
       await toggleConnection(conn)
     }
-    if (isCollectionTab(t)) expandedDbs.value[`${t.connectionId}/${t.dbName}`] = true
+    if (isCollectionTab(t)) expandedDbs.value[nodeTagKey(resourceAt(t.target, 'database'))] = true
   })
 
   const filtered = computed(() => {
@@ -247,6 +253,7 @@ export function useConnectionTree({ emit }) {
     activeCollectionKey,
     openCollection,
     collectionKey,
+    databaseKey,
     disconnectConn,
   }
 }

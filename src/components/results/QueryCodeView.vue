@@ -10,6 +10,7 @@ import { generateCode, LANGUAGES } from '../../utils/queryCodegen'
 import { showToast } from '../../stores/toast'
 import FlexSpacer from '../base/FlexSpacer.vue'
 import { isCollectionTab } from '../../utils/workspaceTypes'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 
 const languageOptions = LANGUAGES.map((lang) => ({ value: lang.id, label: lang.label }))
 
@@ -33,9 +34,10 @@ const viewerExt = [keymap.of([...defaultKeymap])]
 const queryCode = computed(() => {
   const tab = props.activeTab
   if (!isCollectionTab(tab)) return ''
+  const { database, collection } = apiTarget(tab.target)
   return generateCode({
-    collection: tab.collectionName,
-    database: tab.dbName,
+    collection: collection,
+    database: database,
     mode: tab.mode,
     filter: tab.state.query.filter,
     projection: tab.state.query.projection,

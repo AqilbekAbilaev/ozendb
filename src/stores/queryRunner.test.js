@@ -7,6 +7,7 @@ vi.mock('./toast', () => ({ showToast: vi.fn() }))
 // initializeTabs in stores/tabs.js), so definitions are registered before the store
 // evaluates. Static imports run before this file's body, hence the dynamic import.
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
+import { createResourceRef } from '../utils/resourceRef'
 registerWorkspaceDefinitions()
 
 const { invoke } = await import('@tauri-apps/api/core')
@@ -22,7 +23,7 @@ const { createCollectionState, createCollectionRuntime } = await import('../engi
 function harness() {
   const toasts = []
   tabs.value = [{
-    id: 't1', connectionId: 'c1', dbName: 'db', collectionName: 'coll', mode: 'find',
+    id: 't1', target: createResourceRef('c1', [{ kind: 'database', name: 'db' }, { kind: 'collection', name: 'coll' }]), mode: 'find',
     state: createCollectionState(), runtime: createCollectionRuntime(),
   }]
   showToast.mockImplementation((m) => toasts.push(m))

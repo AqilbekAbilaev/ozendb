@@ -161,8 +161,6 @@ describe('initializeSession', () => {
     expect(find.type).toBe('mongodb.find')
     expect(find.state.query.filter).toBe('{ "a": 1 }')
     expect(find.connectionName).toBe('Sales')
-    expect(find.dbName).toBe('shop')
-    expect(find.collectionName).toBe('orders')
     expect(find.target).toEqual(TARGET('c1'))
     expect(find.runtime.results).toEqual([])
     expect(find.needsInitialRun).toBe(true)

@@ -16,6 +16,7 @@ import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import ContextMenu from '../base/ContextMenu.vue'
 import SearchBar from '../base/SearchBar.vue'
+import { resourceName } from '../../utils/resourceRef'
 
 const props = defineProps({
   activeTab: { type: Object,  required: true },
@@ -251,7 +252,7 @@ watch([() => props.activeTab?.id, () => held()?.results, () => props.drillPath],
     />
 
     <div class="fieldpath">
-      <span class="fp fp-link" @click="goToDrillLevel(-1)">{{ activeTab.collectionName }}</span>
+      <span class="fp fp-link" @click="goToDrillLevel(-1)">{{ resourceName(activeTab.target) }}</span>
       <template v-for="(seg, idx) in drillPath" :key="idx">
         <BaseIcon name="caret" :size="11" class="fp-sep" />
         <span class="fp fp-link" @click="goToDrillLevel(idx)">{{ seg }}</span>

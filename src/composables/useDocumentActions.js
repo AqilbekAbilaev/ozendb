@@ -12,11 +12,20 @@ import { inspectField, setFieldValue, addFieldValue, removeField, renameField, g
 import { valueToClipboard, valueToEjson, documentToClipboard, fieldPath } from '../utils/clipboardCopy'
 import { useDocumentPaste } from './useDocumentPaste'
 import { isCollectionTab } from '../utils/workspaceTypes'
+import { resourceName } from '../utils/resourceRef'
+import { apiTarget } from '../engines/mongodb/api/payload'
 
 // Document CRUD + field-edit + native Document/Collection menu dispatch for the results
 // grid. UI-agnostic: `activeTab` is a getter onto ResultsPanel's props, `docMenuRequest`
 // the store's one-shot request ref, `viewMode` the shared view ref the menu's View items
 // flip, and `showToast`/`requery` are injected callbacks (ResultsPanel's emits).
+// The document editor window's own target spelling: connection id, database and
+// collection, read off the collection tab's ref.
+function editorTarget(tab) {
+  const { connectionId, database, collection } = apiTarget(tab.target)
+  return { connId: connectionId, db: database, coll: collection }
+}
+
 export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showToast, requery }) {
   // ── drill into nested object cells ─────────────────────
   // field-name path navigated into, e.g. ['bank_account', 'account']. Owned here
@@ -52,15 +61,13 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   // insert modal.
   function openInsert() {
     const tab = activeTab()
-    if (!isCollectionTab(tab) || !tab.collectionName) {
+    if (!isCollectionTab(tab)) {
       showToast('Open a collection first')
       return
     }
     if (!ensureWritable()) return
     const target = {
-      connId: tab.connectionId,
-      db: tab.dbName,
-      coll: tab.collectionName,
+      ...editorTarget(tab),
       idFilter: '',
       label: '',
       mode: 'insert',
@@ -96,9 +103,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   function openDocumentWindow(tab, doc, mode) {
     if (mode === 'edit' && !ensureWritable()) return
     const target = {
-      connId: tab.connectionId,
-      db: tab.dbName,
-      coll: tab.collectionName,
+      ...editorTarget(tab),
       idFilter: buildIdFilter(doc),
       label: (doc._id !== null && typeof doc._id === 'object')
         ? JSON.stringify(doc._id)
@@ -138,7 +143,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
     try {
       if (rows.length === 1) {
         await deleteDocument(
-          { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+          apiTarget(tab.target),
           buildIdFilter(tab.runtime.results[rows[0]]),
         )
       } else {
@@ -146,7 +151,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
         // already in the same Extended-JSON shape buildIdFilter relies on.
         const ids = rows.map((i) => tab.runtime.results[i]).filter((d) => d != null).map((d) => d._id)
         await deleteMany(
-          { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+          apiTarget(tab.target),
           JSON.stringify({ _id: { $in: ids } }),
         )
       }
@@ -341,7 +346,7 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
   async function saveDocReplacement(newDoc, original) {
     const tab = activeTab()
     await replaceDocument(
-      { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+      apiTarget(tab.target),
       buildIdFilter(original),
       JSON.stringify(newDoc),
     )
@@ -389,17 +394,17 @@ export function useDocumentActions({ activeTab, docMenuRequest, viewMode, showTo
 
   async function onClearConfirm() {
     const tab = activeTab()
-    if (clearConfirmText.value !== tab.collectionName) return
+    if (clearConfirmText.value !== resourceName(tab.target)) return
     clearError.value = null
     clearBusy.value = true
     try {
       const removed = await clearCollection(
-        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        apiTarget(tab.target),
       )
       showClearConfirm.value = false
       tab.runtime.selectedRow = -1
       tab.runtime.selectedField = null
-      showToast(`Cleared ${removed} document${removed !== 1 ? 's' : ''} from ${tab.collectionName}`)
+      showToast(`Cleared ${removed} document${removed !== 1 ? 's' : ''} from ${resourceName(tab.target)}`)
       requery(true)
     } catch (e) {
       clearError.value = errText(e)
