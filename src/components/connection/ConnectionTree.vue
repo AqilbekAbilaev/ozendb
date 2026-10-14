@@ -24,7 +24,7 @@ const {
   expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
   retryConnection, toggleDatabase, highlightCollection, activeConnectionId, activeCollectionKey,
-  openCollection, collectionKey,
+  openCollection, collectionKey, databaseKey,
 } = useConnectionTree({ emit })
 
 const nodeTag = (key, fallbackTag) => nodeTagName(tagOverrides.value, key, fallbackTag)
@@ -38,7 +38,7 @@ function connColor(conn) {
   return nodeTag(conn.id, conn.tag)
 }
 function dbColor(conn, dbName) {
-  return nodeTag(`${conn.id}/${dbName}`, null) || connColor(conn)
+  return nodeTag(databaseKey(conn.id, dbName), null) || connColor(conn)
 }
 function collColor(conn, dbName, collName) {
   return nodeTag(collectionKey(conn.id, dbName, collName), null) || dbColor(conn, dbName)
@@ -171,7 +171,7 @@ const { tip, ...statsTip } = useStatsTip()
               :class="{
                 tagged: !!dbColor(conn, db.name),
                 locked: !db.accessible,
-                'ctx-sel': contextActiveNodeKey === conn.id + '/' + db.name,
+                'ctx-sel': contextActiveNodeKey === databaseKey(conn.id, db.name),
               }"
               :style="dbColor(conn, db.name) ? { '--tag-color': colorHex(dbColor(conn, db.name)) } : null"
               style="padding-left: 21px"
@@ -183,7 +183,7 @@ const { tip, ...statsTip } = useStatsTip()
             >
               <span class="tw">
                 <BaseIcon v-if="!db.accessible" name="lock" :size="12" />
-                <BaseIcon v-else :name="expandedDbs[`${conn.id}/${db.name}`] ? 'caretDown' : 'caret'" :size="12" />
+                <BaseIcon v-else :name="expandedDbs[databaseKey(conn.id, db.name)] ? 'caretDown' : 'caret'" :size="12" />
               </span>
               <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
               <span class="tt">{{ db.name }}</span>
@@ -191,7 +191,7 @@ const { tip, ...statsTip } = useStatsTip()
             </div>
 
             <!-- Collections -->
-            <template v-if="expandedDbs[`${conn.id}/${db.name}`]">
+            <template v-if="expandedDbs[databaseKey(conn.id, db.name)]">
               <div
                 v-for="coll in db.collections"
                 :key="coll"

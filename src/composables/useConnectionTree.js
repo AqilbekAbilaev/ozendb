@@ -134,7 +134,7 @@ export function useConnectionTree({ emit }) {
   function toggleDatabase(conn, dbName) {
     // Selecting a database row enables database-scoped menu items.
     setSelection({ resource: databaseResource(conn.id, dbName), connectionName: conn.name, engine: conn.engine })
-    const key = `${conn.id}/${dbName}`
+    const key = databaseKey(conn.id, dbName)
     expandedDbs.value[key] = !expandedDbs.value[key]
   }
 
@@ -164,8 +164,14 @@ export function useConnectionTree({ emit }) {
     })
   }
 
+  // A database or collection row's key, built from its ref by nodeTagKey: the one
+  // spelling the colour tags, the right-click highlight, the active row and the expanded
+  // databases are all compared in, so no two of them can drift apart.
+  function databaseKey(connId, dbName) {
+    return nodeTagKey(databaseResource(connId, dbName))
+  }
   function collectionKey(connId, dbName, collName) {
-    return `${connId}/${dbName}/${collName}`
+    return nodeTagKey(appendResource(databaseResource(connId, dbName), 'collection', collName))
   }
 
   async function openRequestedConnection(request) {
@@ -247,6 +253,7 @@ export function useConnectionTree({ emit }) {
     activeCollectionKey,
     openCollection,
     collectionKey,
+    databaseKey,
     disconnectConn,
   }
 }
