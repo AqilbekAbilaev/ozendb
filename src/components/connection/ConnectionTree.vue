@@ -13,6 +13,7 @@ import { useConnectionTree } from '../../composables/useConnectionTree.js'
 import { TREE_NODES } from '../../engines/ui.js'
 import EngineBadge from '../base/EngineBadge.vue'
 import { connectionMenu } from '../../engines/contextActions.js'
+import { appendResource, createResourceRef } from '../../utils/resourceRef'
 
 const props = defineProps({
   width: { type: Number, default: 320 },
@@ -63,6 +64,9 @@ const STATUS_LABEL = {
   idle:      'Not connected',
 }
 
+// A database row's ResourceRef; a collection row's appends its own name to it.
+const dbResource = (conn, dbName) => createResourceRef(conn.id, [{ kind: 'database', name: dbName }])
+
 function onNodeContext(e, type, label, nodeData, items) {
   // The stats card opens at the pointer, which is exactly where the menu is about to
   // appear — drop it at once rather than leaving it to the hover grace period.
@@ -74,7 +78,7 @@ function onNodeContext(e, type, label, nodeData, items) {
 // tags and the right-click highlight work as for MongoDB) but offers only what works on it.
 function onConnectionContext(e, conn) {
   const own = connectionMenu(conn)
-  if (!own) return onNodeContext(e, 'connection', conn.name, { connId: conn.id, connName: conn.name })
+  if (!own) return onNodeContext(e, 'connection', conn.name, { resource: createResourceRef(conn.id), connectionName: conn.name })
   onNodeContext(e, 'connection', conn.name, own.node, own.items)
 }
 // Hovering a database or collection row pops its stats card (see useStatsTip). The rows
@@ -172,7 +176,7 @@ const { tip, ...statsTip } = useStatsTip()
               :style="dbColor(conn, db.name) ? { '--tag-color': colorHex(dbColor(conn, db.name)) } : null"
               style="padding-left: 21px"
               @click="db.accessible ? toggleDatabase(conn, db.name) : setSelection(null)"
-              @contextmenu.prevent="onNodeContext($event, 'database', db.name, { connId: conn.id, connName: conn.name, dbName: db.name })"
+              @contextmenu.prevent="onNodeContext($event, 'database', db.name, { resource: dbResource(conn, db.name), connectionName: conn.name })"
               @mouseenter="db.accessible && statsTip.show($event, { connId: conn.id, dbName: db.name })"
               @mousemove="statsTip.move"
               @mouseleave="statsTip.hideSoon"
@@ -205,7 +209,7 @@ const { tip, ...statsTip } = useStatsTip()
                 @mouseenter="statsTip.show($event, { connId: conn.id, dbName: db.name, collName: coll })"
                 @mousemove="statsTip.move"
                 @mouseleave="statsTip.hideSoon"
-                @contextmenu.prevent="onNodeContext($event, 'collection', coll, { connId: conn.id, connName: conn.name, dbName: db.name, collName: coll })"
+                @contextmenu.prevent="onNodeContext($event, 'collection', coll, { resource: appendResource(dbResource(conn, db.name), 'collection', coll), connectionName: conn.name })"
               >
                 <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
                 <span class="ti"><BaseIcon name="collSmall" :size="15" /></span>

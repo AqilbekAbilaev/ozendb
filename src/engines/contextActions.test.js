@@ -22,7 +22,9 @@ describe('contextAction', () => {
 describe('connectionMenu', () => {
   it('gives a PostgreSQL connection its own menu, defaulting the database', () => {
     const menu = connectionMenu({ id: 'c1', name: 'pg', engine: 'postgresql' })
-    expect(menu.node).toEqual({ connId: 'c1', connName: 'pg', engine: 'postgresql', database: 'postgres' })
+    expect(menu.node).toEqual({
+      connId: 'c1', connName: 'pg', engine: 'postgresql', database: 'postgres', resource: { connectionId: 'c1', segments: [] },
+    })
     expect(menu.items).toBe(PG_MENUS.connection)
     expect(connectionMenu({ id: 'c1', name: 'pg', engine: 'postgresql', database: 'shop' }).node.database).toBe('shop')
   })

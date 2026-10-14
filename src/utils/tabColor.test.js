@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { nodeTagName, tabColorName } from './tabColor.js'
+import { nodeTagKey, nodeTagName, tabColorName } from './tabColor.js'
+import { createResourceRef } from './resourceRef.js'
 
 describe('nodeTagName', () => {
   it('prefers the node\'s override, then its stored tag, and treats none as no colour', () => {
@@ -25,5 +26,15 @@ describe('tabColorName', () => {
     const tab = { kind: 'collection', connectionId: 'c1', dbName: 'shop', collectionName: 'orders' }
     expect(tabColorName(tab, { c1: 'green', 'c1/shop': 'blue' })).toBe('blue')
     expect(tabColorName(tab, { c1: 'green' })).toBe('green')
+  })
+})
+
+describe('nodeTagKey', () => {
+  it('joins the connection id and the names below it, as the tag store keys them', () => {
+    expect(nodeTagKey(createResourceRef('c1'))).toBe('c1')
+    expect(nodeTagKey(createResourceRef('c1', [{ kind: 'database', name: 'shop' }]))).toBe('c1/shop')
+    expect(nodeTagKey(createResourceRef('c1', [
+      { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'a/b' },
+    ]))).toBe('c1/shop/a/b')
   })
 })

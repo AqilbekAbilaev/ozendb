@@ -9,6 +9,7 @@ vi.mock('../appApi/tags', () => ({
 }))
 
 const { useNodeTags } = await import('./useNodeTags')
+const { createResourceRef } = await import('../utils/resourceRef')
 const { tagOverrides } = await import('../stores/nodeTags')
 const tagsApi = await import('../appApi/tags')
 
@@ -27,7 +28,7 @@ describe('applyColorTag', () => {
 
     await expect(tags.applyColorTag({
       type: 'collection',
-      nodeData: { connId: 'c1', dbName: 'db', collName: 'orders' },
+      nodeData: { resource: createResourceRef('c1', [{ kind: 'database', name: 'db' }, { kind: 'collection', name: 'orders' }]) },
       color: 'red',
     })).rejects.toThrow('disk full')
 
@@ -40,7 +41,7 @@ describe('applyColorTag', () => {
     tagsApi.clearNodeTagsUnder.mockRejectedValue(new Error('write failed'))
 
     await expect(tags.applyColorTag({
-      type: 'connection', nodeData: { connId: 'c1' }, color: 'red',
+      type: 'connection', nodeData: { resource: createResourceRef('c1') }, color: 'red',
     })).rejects.toThrow('write failed')
 
     expect(tagOverrides.value).toEqual({ c1: 'red', 'c1/db': 'green' })
@@ -51,7 +52,7 @@ describe('applyColorTag', () => {
     tagOverrides.value = { 'c1/db': 'green', c2: 'blue' }
 
     await tags.applyColorTag({
-      type: 'connection', nodeData: { connId: 'c1' }, color: 'red',
+      type: 'connection', nodeData: { resource: createResourceRef('c1') }, color: 'red',
     })
 
     expect(tagOverrides.value).toEqual({ c1: 'red', c2: 'blue' })
@@ -65,10 +66,10 @@ describe('applyColorTag', () => {
       .mockResolvedValueOnce(undefined)
 
     const first = tags.applyColorTag({
-      type: 'connection', nodeData: { connId: 'c1' }, color: 'red',
+      type: 'connection', nodeData: { resource: createResourceRef('c1') }, color: 'red',
     })
     const second = tags.applyColorTag({
-      type: 'connection', nodeData: { connId: 'c1' }, color: 'blue',
+      type: 'connection', nodeData: { resource: createResourceRef('c1') }, color: 'blue',
     })
     await vi.waitFor(() => expect(tagsApi.setConnectionTag).toHaveBeenCalledTimes(1))
     releaseFirst()

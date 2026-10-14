@@ -9,6 +9,7 @@ import { treeSelection, setTreeSelection } from '../../../stores/connectionNavig
 import { PG_MENUS } from './contextMenus.js'
 import { tagOverrides } from '../../../stores/nodeTags'
 import { colorHex, nodeTagName } from '../../../utils/tabColor.js'
+import { createResourceRef } from '../../../utils/resourceRef'
 import { formatCompact, fmtBytes } from '../../../utils/format'
 
 const props = defineProps({
@@ -63,16 +64,23 @@ function openOtherQuery(name) {
 const color = computed(() => nodeTagName(tagOverrides.value, props.conn.id, props.conn.tag))
 const tagStyle = computed(() => (color.value ? { '--tag-color': colorHex(color.value) } : null))
 
+// A row's ResourceRef: the database, then the schema and table when the row names them.
+function rowResource(schemaName, tableName) {
+  const segments = [{ kind: 'database', name: database.value }]
+  if (schemaName) segments.push({ kind: 'schema', name: schemaName })
+  if (tableName) segments.push({ kind: 'table', name: tableName })
+  return createResourceRef(props.conn.id, segments)
+}
+
 // Clicking a row selects it, which is what the native menu's PostgreSQL gates read
-// (#145) — without this the menu could only ever target an open tab. Both
-// spellings of the database name ride along: `dbName` is what the shared selection
-// store's ref builder reads, `database` is what every PostgreSQL consumer uses.
+// (#145) — without this the menu could only ever target an open tab. The selection
+// carries the row's ref beside the fields every PostgreSQL consumer reads.
 function select(kind, schemaName = null, tableName = null) {
   setTreeSelection({
+    resource: rowResource(schemaName, tableName),
     connectionId: props.conn.id,
     connectionName: props.conn.name,
     engine: 'postgresql',
-    dbName: database.value,
     database: database.value,
     schema: schemaName,
     table: tableName,
@@ -86,8 +94,13 @@ const isSelected = (kind, schemaName = null, tableName = null) =>
 const ctxSel = (level, schema, table) => contextActiveNodeKey.value === pgNodeKey(level, { connId: props.conn.id, schema, table })
 
 // Right-click on a row: `level` picks its menu, `extra` names the schema/table under it.
+// The node keeps PostgreSQL's own fields for its actions, and carries the row's ref for
+// the shared ones (Copy Name, Refresh).
 function onContext(e, level, label, extra = {}) {
-  const node = { connId: props.conn.id, connName: props.conn.name, engine: 'postgresql', database: database.value, ...extra }
+  const node = {
+    connId: props.conn.id, connName: props.conn.name, engine: 'postgresql', database: database.value, ...extra,
+    resource: rowResource(extra.schema ?? null, extra.table ?? null),
+  }
   contextMenu.value = { type: 'pg:' + level, x: e.clientX, y: e.clientY, label, nodeData: node, items: PG_MENUS[level] }
 }
 

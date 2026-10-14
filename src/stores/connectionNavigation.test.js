@@ -5,6 +5,9 @@ import {
   consumeConnectionOpenRequest,
   requestConnectionOpen,
 } from './connectionNavigation'
+import { createResourceRef } from '../utils/resourceRef'
+
+const ref = (connectionId, ...levels) => createResourceRef(connectionId, levels.map(([kind, name]) => ({ kind, name })))
 
 beforeEach(() => {
   consumeConnectionOpenRequest()
@@ -37,24 +40,19 @@ describe('connection navigation requests', () => {
   })
 })
 
-// The canonical ResourceRef is derived here, where the clicked level is known for
-// certain, rather than re-inferred downstream from which flat fields happen to be set.
+// The tree builds each selection's ref where the clicked level is certain; the store
+// keeps the selection as it is given.
 describe('treeSelection', () => {
   beforeEach(() => { treeSelection.value = null })
 
-  it('carries a resource ref for each level', () => {
-    setTreeSelection({ connectionId: 'a', kind: 'connection' })
-    expect(treeSelection.value.resource).toEqual({ connectionId: 'a', segments: [] })
-    setTreeSelection({ connectionId: 'a', dbName: 'shop', kind: 'database' })
-    expect(treeSelection.value.resource.segments).toEqual([{ kind: 'database', name: 'shop' }])
-    setTreeSelection({ connectionId: 'a', dbName: 'shop', collectionName: 'a/b', kind: 'collection' })
-    expect(treeSelection.value.resource.segments).toEqual([
-      { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'a/b' },
-    ])
+  it('keeps the selection it is given', () => {
+    const sel = { resource: ref('a', ['database', 'shop']), connectionName: 'A', engine: 'mongodb' }
+    setTreeSelection(sel)
+    expect(treeSelection.value).toEqual(sel)
   })
 
   it('clears to null', () => {
-    setTreeSelection({ connectionId: 'a', kind: 'connection' })
+    setTreeSelection({ resource: ref('a'), connectionName: 'A', engine: 'mongodb' })
     setTreeSelection(null)
     expect(treeSelection.value).toBeNull()
   })
@@ -66,19 +64,20 @@ describe('clearTreeSelectionUnder', () => {
   beforeEach(() => { treeSelection.value = null })
 
   it('clears the dropped node itself', () => {
-    setTreeSelection({ connectionId: 'a', dbName: 'shop', kind: 'database' })
+    setTreeSelection({ resource: ref('a', ['database', 'shop']) })
     clearTreeSelectionUnder(db)
     expect(treeSelection.value).toBeNull()
   })
 
   it('clears a node inside the dropped one', () => {
-    setTreeSelection({ connectionId: 'a', dbName: 'shop', collectionName: 'orders', kind: 'collection' })
+    setTreeSelection({ resource: ref('a', ['database', 'shop'], ['collection', 'orders']) })
     clearTreeSelectionUnder(db)
     expect(treeSelection.value).toBeNull()
   })
 
   it('clears a PostgreSQL table inside a dropped schema', () => {
     setTreeSelection({
+      resource: ref('a', ['database', 'app'], ['schema', 'public'], ['table', 'widgets']),
       connectionId: 'a', engine: 'postgresql', database: 'app', schema: 'public', table: 'widgets', kind: 'table',
     })
     clearTreeSelectionUnder({
@@ -88,10 +87,10 @@ describe('clearTreeSelectionUnder', () => {
   })
 
   it('keeps a selection outside the dropped node', () => {
-    setTreeSelection({ connectionId: 'a', dbName: 'other', collectionName: 'orders', kind: 'collection' })
+    setTreeSelection({ resource: ref('a', ['database', 'other'], ['collection', 'orders']) })
     clearTreeSelectionUnder(db)
     expect(treeSelection.value).not.toBeNull()
-    setTreeSelection({ connectionId: 'a', kind: 'connection' })
+    setTreeSelection({ resource: ref('a') })
     clearTreeSelectionUnder(db)
     expect(treeSelection.value).not.toBeNull()
   })

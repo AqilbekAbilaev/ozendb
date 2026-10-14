@@ -3,9 +3,9 @@ import { openModal } from '../../../stores/modals'
 
 // The right-click menus for PostgreSQL's sidebar rows, in the same shape as
 // constants/contextMenus.js: `value` is the action id, `label` only what shows. A node
-// here is `{ connId, connName, engine, database, schema?, table? }`. PG_ACTIONS runs the
-// PostgreSQL-only items; every other id (Copy Name, Refresh, Choose Color, Disconnect…)
-// is the shared handler in useFeatures, which works the same for either engine.
+// here is `{ connId, connName, engine, database, schema?, table?, resource }`.
+// PG_ACTIONS runs the PostgreSQL-only items; every other id (Copy Name, Refresh, Choose
+// Color, Disconnect…) is the shared handler in useFeatures, which reads `resource`.
 const REFRESH = { value: 'node:refresh', label: 'Refresh' }
 const COPY_NAME = { value: 'node:copy_name', label: 'Copy Name', shortcut: '⌥⌘C' }
 const NEW_SQL = { value: 'pg:new_sql', label: 'New SQL Query', icon: 'sql' }

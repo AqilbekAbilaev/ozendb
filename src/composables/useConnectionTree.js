@@ -1,7 +1,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onConnectionSaved, onConnectionUpdated, onConnectionDeleted } from '../appApi/events'
 import { errCode, errMessage } from '../utils/errors'
-import { createResourceRef } from '../utils/resourceRef'
+import { appendResource, createResourceRef, resourceAt } from '../utils/resourceRef'
+import { nodeTagKey } from '../utils/tabColor'
 import { activeTab, activeTabId } from '../stores/tabs'
 import {
   connectionResourceLoading, connectionResourceErrors,
@@ -16,6 +17,8 @@ import {
   consumeConnectionOpenRequest,
   treeSelection, setTreeSelection,
 } from '../stores/connectionNavigation'
+
+const databaseResource = (connectionId, dbName) => createResourceRef(connectionId, [{ kind: 'database', name: dbName }])
 
 export function useConnectionTree({ emit }) {
   // The open-connection registry lives in the store; the tree renders it and owns
@@ -32,10 +35,8 @@ export function useConnectionTree({ emit }) {
   // The collection row highlighted by a single click — derived, since the selection
   // can also be cleared from outside the tree (opening it from the toolbar).
   const selectedKey = computed(() => {
-    const sel = treeSelection.value
-    return sel && sel.kind === 'collection'
-      ? collectionKey(sel.connectionId, sel.dbName, sel.collectionName)
-      : null
+    const collection = resourceAt(treeSelection.value?.resource, 'collection')
+    return collection ? nodeTagKey(collection) : null
   })
   const searchText = ref('')
 
@@ -61,7 +62,7 @@ export function useConnectionTree({ emit }) {
   // just to keep its expansion state honest.
   watch(openConnections, (list) => {
     const live = new Set(list.map(c => c.id))
-    if (treeSelection.value && !live.has(treeSelection.value.connectionId)) setSelection(null)
+    if (treeSelection.value && !live.has(treeSelection.value.resource.connectionId)) setSelection(null)
     for (const id of Object.keys(expandedConns.value)) {
       if (!live.has(id)) delete expandedConns.value[id]
     }
@@ -102,14 +103,7 @@ export function useConnectionTree({ emit }) {
   // items enable) and expand/collapse it. Kept separate from `toggleConnection` so
   // the programmatic auto-expand (below) doesn't move the selection.
   function selectConnection(conn) {
-    setSelection({
-      connectionId: conn.id,
-      connectionName: conn.name,
-      engine: conn.engine,
-      dbName: null,
-      collectionName: null,
-      kind: 'connection',
-    })
+    setSelection({ resource: createResourceRef(conn.id), connectionName: conn.name, engine: conn.engine })
     toggleConnection(conn)
   }
 
@@ -138,14 +132,7 @@ export function useConnectionTree({ emit }) {
 
   function toggleDatabase(conn, dbName) {
     // Selecting a database row enables database-scoped menu items.
-    setSelection({
-      connectionId: conn.id,
-      connectionName: conn.name,
-      engine: conn.engine,
-      dbName: dbName,
-      collectionName: null,
-      kind: 'database',
-    })
+    setSelection({ resource: databaseResource(conn.id, dbName), connectionName: conn.name, engine: conn.engine })
     const key = `${conn.id}/${dbName}`
     expandedDbs.value[key] = !expandedDbs.value[key]
   }
@@ -154,12 +141,9 @@ export function useConnectionTree({ emit }) {
   // mirrors Studio-3T and lets the same collection be opened in several tabs.
   function highlightCollection(conn, db, collName) {
     setSelection({
-      connectionId: conn.id,
+      resource: appendResource(databaseResource(conn.id, db.name), 'collection', collName),
       connectionName: conn.name,
       engine: conn.engine,
-      dbName: db.name,
-      collectionName: collName,
-      kind: 'collection',
     })
   }
 
@@ -174,10 +158,7 @@ export function useConnectionTree({ emit }) {
     // after the active tab moves to another collection.
     setSelection(null)
     emit('select-collection', {
-      resource: createResourceRef(connectionId, [
-        { kind: 'database', name: dbName },
-        { kind: 'collection', name: collectionName },
-      ]),
+      resource: appendResource(databaseResource(connectionId, dbName), 'collection', collectionName),
       connectionName: connectionName,
     })
   }
