@@ -54,7 +54,7 @@ const style = computed(() => {
       <div v-else-if="!tip.stats" class="ct-msg">Reading stats…</div>
       <div v-else class="ct-rows">
         <template v-for="[label, value] in rows" :key="label">
-          <span class="ct-k">{{ label }}</span>
+          <span class="ct-k" :title="label">{{ label }}</span>
           <span class="ct-v" @click="copyValue(label, value)">{{ value }}</span>
         </template>
       </div>
@@ -83,12 +83,14 @@ const style = computed(() => {
 }
 .ct-msg { color: var(--text-faint); }
 .ct-msg.err { color: var(--danger-text); white-space: normal; }
-.ct-rows { display: grid; grid-template-columns: auto auto; gap: 3px 18px; }
-.ct-k { color: var(--text-dim); }
+/* A value is useless cut off, while a label still reads from its start, so when a long
+   label (a PostgreSQL index name) runs out of room it is the label that gives way. */
+.ct-rows { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 18px; }
+.ct-k { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The cell already spans its grid column, so the hover target is the whole value column
    and needs no negative margin to widen it — that only spilled past the card's padding. */
 .ct-v {
-  text-align: right; font-family: var(--mono); cursor: pointer;
+  text-align: right; font-family: var(--mono); cursor: pointer; white-space: nowrap;
   padding: 1px 0; border-radius: 3px;
 }
 .ct-v:hover { background: var(--bg-hover); }
