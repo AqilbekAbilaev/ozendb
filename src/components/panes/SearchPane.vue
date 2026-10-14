@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { listDatabases } from '../../engines/mongodb/api/resources'
 import { searchCollections } from '../../engines/mongodb/api/queries'
 import { errText, errCode } from '../../utils/errors'
+import { segmentName } from '../../utils/resourceRef'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
@@ -15,7 +16,7 @@ import StateMessage from '../base/StateMessage.vue'
 // dotted path, and value, with the term highlighted). The database and collection are
 // pickable in the header; "All collections" scans every collection in the database.
 const props = defineProps({
-  activeTab: { type: Object, required: true },  // { connId, connName, dbName }
+  activeTab: { type: Object, required: true },  // { target (the database), connectionName }
 })
 
 const ALL = ''  // collection sentinel: scan every collection in the database
@@ -28,7 +29,7 @@ const scopeOptions = [
 
 // Databases (with their collections) for this connection, loaded once for the pickers.
 const databases = ref([])
-const selectedDb = ref(props.activeTab.dbName)
+const selectedDb = ref(segmentName(props.activeTab.target, 'database'))
 const selectedColl = ref(ALL)
 const initErr = ref(null)
 
@@ -45,7 +46,7 @@ const collOptions = computed(() => [
 async function loadDatabases() {
   initErr.value = null
   try {
-    databases.value = await listDatabases(props.activeTab.connectionId)
+    databases.value = await listDatabases(props.activeTab.target.connectionId)
   } catch (e) {
     initErr.value = errText(e)
   }
@@ -77,7 +78,7 @@ async function search() {
   result.value = null
   try {
     const res = await searchCollections(
-      { connectionId: props.activeTab.connectionId, database: selectedDb.value },
+      { connectionId: props.activeTab.target.connectionId, database: selectedDb.value },
       t,
       {
         collection: selectedColl.value || null,

@@ -1,11 +1,8 @@
 import { ref } from 'vue'
+import { apiTarget } from '../engines/mongodb/api/payload'
 
 function targetOf(tab) {
-  return {
-    connectionId: tab.connectionId,
-    database: tab.dbName,
-    collection: tab.collectionName,
-  }
+  return apiTarget(tab.target)
 }
 
 function sameTarget(left, right) {

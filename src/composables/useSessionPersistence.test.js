@@ -295,7 +295,7 @@ describe('initializeSession', () => {
     expect(schema.type).toBe('mongodb.schema')
     expect(schema.connectionName).toBe('Sales')
     expect(search.type).toBe('mongodb.search')
-    expect(search.dbName).toBe('shop')
+    expect(search.target.segments).toEqual([{ kind: 'database', name: 'shop' }])
   })
 
   it('loads and validates without pushing tabs when restore is off', async () => {

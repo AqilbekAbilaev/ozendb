@@ -1,3 +1,5 @@
+import { segmentName } from '../utils/resourceRef'
+
 function snapshotSource(source) {
   return {
     path: source.path,
@@ -20,8 +22,8 @@ export function useImportPaneLifecycle() {
       tab,
       tabId: tab.id,
       format: tab.format,
-      targetDb: tab.dbName,
-      targetColl: tab.collectionName,
+      targetDb: segmentName(tab.target, 'database'),
+      targetColl: segmentName(tab.target, 'collection'),
     }
   }
 
@@ -29,7 +31,7 @@ export function useImportPaneLifecycle() {
     return {
       version: ++runVersion,
       tabId: tab.id,
-      connectionId: tab.connectionId,
+      connectionId: tab.target.connectionId,
       format: tab.format,
       validate: !!tab.validate,
       sources: tab.sources.map(snapshotSource),

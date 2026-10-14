@@ -18,14 +18,13 @@ import { createResourceRef } from '../utils/resourceRef'
 // Built by the tab's own definition: a hand-written shape once let these tests pass on a
 // field name the real tab never had.
 const definition = toolDefinitions.find((d) => d.type === 'mongodb.current_operations')
-const newTab = (over = {}) => reactive({
-  id: 't1',
-  ...definition.create({
-    target: { resource: createResourceRef('c1'), connectionName: 'Local' },
+const newTab = ({ connectionId = 'c1', ...over } = {}) => {
+  const created = definition.create({
+    target: { resource: createResourceRef(connectionId), connectionName: 'Local' },
     options: {},
-  }).fields,
-  ...over,
-})
+  })
+  return reactive({ id: 't1', target: created.target, ...created.fields, ...over })
+}
 
 beforeEach(() => {
   vi.clearAllMocks()

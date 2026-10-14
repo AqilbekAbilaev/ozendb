@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { useIndexPaneLifecycle } from './useIndexPaneLifecycle'
+import { createResourceRef } from '../utils/resourceRef'
 
 const tab = (id, connId = 'c1', dbName = 'db', collName = 'coll') => ({
-  id, connectionId: connId, dbName, collectionName: collName,
+  id, target: createResourceRef(connId, [{ kind: 'database', name: dbName }, { kind: 'collection', name: collName }]),
 })
 
 describe('index form target', () => {

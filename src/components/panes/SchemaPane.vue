@@ -3,6 +3,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { analyzeSchema, exportSchema } from '../../engines/mongodb/api/schema'
 import { errText, errCode } from '../../utils/errors'
+import { resourceName, segmentName } from '../../utils/resourceRef'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { refreshRequest } from '../../stores/menuRequests'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseSelect from '../base/BaseSelect.vue'
@@ -14,7 +16,7 @@ import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 // Studio-3T's Schema Explorer does. Each tab analyzes its own collection independently and
 // re-runs when the tab's collection changes.
 const props = defineProps({
-  activeTab: { type: Object, required: true },  // { connId, connName, dbName, collName }
+  activeTab: { type: Object, required: true },  // { target (the collection), connectionName }
 })
 
 const SAMPLE_SIZES = [100, 500, 1000, 5000]
@@ -41,7 +43,7 @@ async function analyze() {
   errorCode.value = null
   try {
     report.value = await analyzeSchema(
-      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      apiTarget(props.activeTab.target),
       sampleSize.value,
     )
   } catch (e) {
@@ -56,7 +58,7 @@ async function analyze() {
 onMounted(analyze)
 watch(refreshRequest, analyze)
 // Re-analyze if this tab is retargeted at a different collection.
-watch(() => props.activeTab.connectionId + ':' + props.activeTab.dbName + ':' + props.activeTab.collectionName, () => {
+watch(() => props.activeTab.target, () => {
   analyze()
 })
 
@@ -72,7 +74,7 @@ async function runSchemaExport() {
   let path
   try {
     path = await saveDialog({
-      defaultPath: `${props.activeTab.collectionName}-schema.${ext}`,
+      defaultPath: `${resourceName(props.activeTab.target)}-schema.${ext}`,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     })
   } catch (e) {
@@ -84,7 +86,7 @@ async function runSchemaExport() {
   exportMsg.value = null
   try {
     const count = await exportSchema(
-      { connectionId: props.activeTab.connectionId, database: props.activeTab.dbName, collection: props.activeTab.collectionName },
+      apiTarget(props.activeTab.target),
       sampleSize.value,
       String(path),
       format,
@@ -139,7 +141,7 @@ const fields = computed(() => (report.value ? report.value.fields : []))
 <template>
   <div class="schema-pane">
     <!-- Breadcrumb (mirrors the collection tab) -->
-    <CollectionCrumbs :conn="activeTab.connectionName" :db="activeTab.dbName" :coll="activeTab.collectionName" icon="schema" label="Schema" />
+    <CollectionCrumbs :conn="activeTab.connectionName" :db="segmentName(activeTab.target, 'database')" :coll="resourceName(activeTab.target)" icon="schema" label="Schema" />
 
     <!-- Controls -->
     <div class="sc-controls">

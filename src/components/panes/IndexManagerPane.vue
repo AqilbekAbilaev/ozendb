@@ -8,6 +8,7 @@ import { fmtBytes } from '../../utils/format'
 import { useIndexManager } from '../../composables/useIndexManager'
 import CollectionCrumbs from '../base/CollectionCrumbs.vue'
 import FlexSpacer from '../base/FlexSpacer.vue'
+import { resourceName, segmentName } from '../../utils/resourceRef'
 
 // One Index Manager tab: everything it does lives in useIndexManager.
 const props = defineProps({
@@ -30,7 +31,7 @@ onUnmounted(release)
 <template>
   <div class="idxm">
     <!-- Breadcrumb -->
-    <CollectionCrumbs :conn="activeTab.connectionName" :db="activeTab.dbName" :coll="activeTab.collectionName" icon="anchor" label="Indexes" />
+    <CollectionCrumbs :conn="activeTab.connectionName" :db="segmentName(activeTab.target, 'database')" :coll="resourceName(activeTab.target)" icon="anchor" label="Indexes" />
 
     <!-- Toolbar -->
     <div class="idx-toolbar">

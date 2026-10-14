@@ -4,6 +4,8 @@ import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { exportCollectionFields } from '../../engines/mongodb/api/transfer'
 import { runFind } from '../../engines/mongodb/api/queries'
 import { errText, errCode } from '../../utils/errors'
+import { resourceName, segmentName } from '../../utils/resourceRef'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 import { showToast } from '../../stores/toast'
 import BaseSelect from '../base/BaseSelect.vue'
 import StateMessage from '../base/StateMessage.vue'
@@ -55,7 +57,7 @@ async function loadCollectionSample() {
   error.value = null
   try {
     const { documents: docs } = await runFind(
-      { connectionId: t.value.connectionId, database: t.value.dbName, collection: t.value.collectionName },
+      apiTarget(t.value.target),
       { filter: t.value.filter || '{}', projection: '{}', sort: '{}', skip: 0, limit: PREVIEW_LIMIT },
     )
     sampleRows.value = docs || []
@@ -128,7 +130,7 @@ async function run() {
   let path
   try {
     path = await saveDialog({
-      defaultPath: `${t.value.collectionName}.${t.value.format}`,
+      defaultPath: `${resourceName(t.value.target)}.${t.value.format}`,
       filters: [{ name: t.value.format.toUpperCase(), extensions: [t.value.format] }],
     })
   } catch (e) {
@@ -140,7 +142,7 @@ async function run() {
   error.value = null
   try {
     const count = await exportCollectionFields(
-      { connectionId: t.value.connectionId, database: t.value.dbName, collection: t.value.collectionName },
+      apiTarget(t.value.target),
       String(path),
       t.value.format,
       mappingPayload(),
@@ -177,7 +179,7 @@ const sourceLabel = computed(() => {
 <template>
   <div class="export-pane">
     <CollectionCrumbs
-      :conn="activeTab.connectionName" :db="activeTab.dbName" :coll="activeTab.collectionName"
+      :conn="activeTab.connectionName" :db="segmentName(activeTab.target, 'database')" :coll="resourceName(activeTab.target)"
       icon="export" label="Export"
     />
 
