@@ -192,6 +192,22 @@ it('records a resource ref for a highlighted collection', () => {
   s.stop()
 })
 
+// Double-clicking a collection opens it the way every opener does: with a ref (#193).
+it('opens a collection with its ref and the connection\'s name', () => {
+  const emit = vi.fn()
+  const s = effectScope()
+  const t = s.run(() => useConnectionTree({ emit }))
+  t.openCollection(conn, { name: 'shop' }, 'orders')
+  expect(emit).toHaveBeenCalledWith('select-collection', {
+    resource: {
+      connectionId: 'a',
+      segments: [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }],
+    },
+    connectionName: conn.name,
+  })
+  s.stop()
+})
+
 // Names are opaque: a collection called "a/b" must not be mistaken for two segments.
 it('keeps a name containing a slash in one segment', () => {
   const emit = vi.fn()

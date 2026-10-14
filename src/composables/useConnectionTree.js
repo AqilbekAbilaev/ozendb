@@ -1,6 +1,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onConnectionSaved, onConnectionUpdated, onConnectionDeleted } from '../appApi/events'
 import { errCode, errMessage } from '../utils/errors'
+import { createResourceRef } from '../utils/resourceRef'
 import { activeTab, activeTabId } from '../stores/tabs'
 import {
   connectionResourceLoading, connectionResourceErrors,
@@ -173,10 +174,11 @@ export function useConnectionTree({ emit }) {
     // after the active tab moves to another collection.
     setSelection(null)
     emit('select-collection', {
-      connectionId: connectionId,
+      resource: createResourceRef(connectionId, [
+        { kind: 'database', name: dbName },
+        { kind: 'collection', name: collectionName },
+      ]),
       connectionName: connectionName,
-      dbName: dbName,
-      collectionName: collectionName,
     })
   }
 

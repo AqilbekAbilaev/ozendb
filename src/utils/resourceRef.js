@@ -53,6 +53,17 @@ export function resourceKind(ref) {
   return ref.segments.length === 0 ? 'connection' : ref.segments[ref.segments.length - 1].kind
 }
 
+// `ref` cut back to its ancestor at `kind`: the connection for 'connection', otherwise
+// the first segment of that kind and everything above it. Null when `ref` has no such
+// level, so a caller never mistakes another engine's resource for one of its own just
+// because the depth matches.
+export function resourceAt(ref, kind) {
+  if (!isResourceRef(ref)) return null
+  if (kind === 'connection') return createResourceRef(ref.connectionId)
+  const i = ref.segments.findIndex((s) => s.kind === kind)
+  return i < 0 ? null : createResourceRef(ref.connectionId, ref.segments.slice(0, i + 1))
+}
+
 export function resourceName(ref) {
   if (!isResourceRef(ref) || ref.segments.length === 0) return null
   return ref.segments[ref.segments.length - 1].name

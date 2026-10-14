@@ -1,4 +1,5 @@
 import { getDefaultQuery } from '../engines/mongodb/api/queryLibrary'
+import { apiTarget } from '../engines/mongodb/api/payload'
 import { parseField } from '../utils/queryParser'
 import { sameResource } from '../utils/resourceRef'
 import { tabs, activeTab, activateTab, newTabId } from './tabs'
@@ -16,12 +17,13 @@ const newWorkspace = (type, context) => createWorkspace(type, {
   ids: { workspace: newTabId },
 })
 
-export async function openCollectionTab({ connectionId, connectionName, dbName, collectionName, filter }, startMode = 'find') {
+// The query openers take `{ resource, connectionName }`, as the tool openers do (#193).
+export async function openCollectionTab({ resource, connectionName, filter }, startMode = 'find') {
   // Every open creates a new tab — the same collection may be opened in several
   // tabs (Studio-3T behavior). No dedup/focus-existing here by design.
   const type = startMode === 'aggregate' ? 'mongodb.aggregate' : 'mongodb.find'
   const tab = newWorkspace(type, {
-    target: { connectionId, connectionName, dbName, collectionName },
+    target: { resource, connectionName },
     defaults: { queryLimit: defaultQueryLimit.value, resultView: defaultResultView.value },
   })
   const id = tab.id
@@ -48,7 +50,7 @@ export async function openCollectionTab({ connectionId, connectionName, dbName, 
 
   let def = null
   try {
-    def = await getDefaultQuery({ connectionId, database: dbName, collection: collectionName })
+    def = await getDefaultQuery(apiTarget(resource))
   } catch (_) {}
 
   // Aggregation tabs open with an empty pipeline; nothing to run until the user writes one.
@@ -81,13 +83,12 @@ export async function openCollectionTab({ connectionId, connectionName, dbName, 
 // Opens (or re-focuses) a SQL query tab for a collection. It's a collection tab in
 // `sql` mode: the query area shows a SQL editor, but the whole result stack (grid,
 // paging, Query Code, Explain) is reused. One SQL tab per collection.
-export function openSqlTab({ connectionId, connectionName, dbName, collectionName }) {
+export function openSqlTab({ resource, connectionName }) {
   const existing = tabs.value.find(t =>
-    t.kind === 'collection' && t.mode === 'sql' &&
-    t.connectionId === connectionId && t.dbName === dbName && t.collectionName === collectionName)
+    t.kind === 'collection' && t.mode === 'sql' && sameResource(t.target, resource))
   if (existing) { activateTab(existing.id); return }
   const tab = newWorkspace('mongodb.sql_to_mql', {
-    target: { connectionId, connectionName, dbName, collectionName },
+    target: { resource, connectionName },
     defaults: { queryLimit: defaultQueryLimit.value, resultView: defaultResultView.value },
   })
   tabs.value.push(tab)
@@ -96,9 +97,9 @@ export function openSqlTab({ connectionId, connectionName, dbName, collectionNam
 
 // Open an IntelliShell tab scoped to a connection + database. Each shell tab has
 // its own backend JS session (sessionId), so variables persist across runs.
-export function openShellTab({ connectionId, connectionName, dbName }) {
+export function openShellTab({ resource, connectionName }) {
   const tab = newWorkspace('mongodb.shell', {
-    target: { connectionId, connectionName, dbName },
+    target: { resource, connectionName },
   })
   tabs.value.push(tab)
   activateTab(tab.id)

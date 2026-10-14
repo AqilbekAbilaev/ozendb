@@ -3,7 +3,9 @@
 // dispose) the generic helpers dispatch through; the canonical envelope comes from
 // the factory.
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
+import { resourceName } from '../../../utils/resourceRef'
 import { closeShellSession } from '../api/shell'
+import { createdFields } from './createdFields'
 import {
   createCollectionState, createCollectionUi, createCollectionRuntime,
   migrateCollectionState,
@@ -41,12 +43,13 @@ function collectionTarget(target) {
 const collectionRef = (source) => resourceFromFeatureNode(collectionTarget(source))
 
 // A fresh tab in the given mode. Every collection query starts from the same spine
-// and differs only in `mode` and a few mode-specific fields.
+// and differs only in `mode` and a few mode-specific fields. It is handed a ref, which
+// becomes the workspace's target as it is.
 function createCollection(ctx, mode, extra = {}) {
   return {
-    title: ctx.target.collectionName,
-    target: collectionRef(ctx.target),
-    fields: { ...collectionFields(ctx), mode: mode, ...extra },
+    title: resourceName(ctx.target.resource),
+    target: ctx.target.resource,
+    fields: { ...collectionFields({ ...ctx, target: createdFields(ctx) }), mode: mode, ...extra },
   }
 }
 
@@ -211,10 +214,10 @@ export const queryDefinitions = [
     paneKind: 'collection',
     create(ctx) {
       const base = createCollection(ctx, 'sql', {
-        sql: 'SELECT *\nFROM ' + ctx.target.collectionName,
+        sql: 'SELECT *\nFROM ' + resourceName(ctx.target.resource),
         sqlError: null,
       })
-      return { ...base, title: 'SQL: ' + ctx.target.collectionName }
+      return { ...base, title: 'SQL: ' + resourceName(ctx.target.resource) }
     },
     serialize(workspace) {
       // SQL's translated find pieces are derived state, never stored; only the text
@@ -251,7 +254,7 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: ShellConsole,
     create(ctx) {
-      return shellWorkspace(ctx.target, ctx)
+      return { ...shellWorkspace(createdFields(ctx), ctx), target: ctx.target.resource }
     },
     serialize(workspace) {
       // The session is backend state keyed by id; only the editor text is durable.

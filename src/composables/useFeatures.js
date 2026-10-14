@@ -15,8 +15,8 @@ import { MODALS } from '../constants/modalRegistry'
 import { COLOR_ACTION } from '../constants/contextMenus'
 import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
-import { createResourceRef, resourceName } from '../utils/resourceRef'
-import { resourceFromFeatureNode, resourceFromTreeSelection } from '../utils/legacyResourceRef'
+import { createResourceRef, resourceAt, resourceName } from '../utils/resourceRef'
+import { resourceFromFeatureNode } from '../utils/legacyResourceRef'
 import { resolveMenuTarget } from '../utils/menuContext'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
@@ -51,9 +51,6 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   const { applyColorTag } = useNodeTags()
   const { openImportWizard, exportDatabase, importDatabase } = useDbTransfer()
 
-  // How many segments each level's resource has.
-  const DEPTH = { connection: 0, database: 1, collection: 2 }
-
   // Toolbar tool name → registry action. Tools whose behavior is app-level
   // (connect/sql) or bespoke (collection/shell) are handled in handleTool.
   const TOOL_ALIASES = {
@@ -65,33 +62,18 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   }
 
   // The node's resource cut to `level` — a database action run on a collection row acts
-  // on that row's database — in the long alias spelling the tab creators still read.
-  // Only the fields the level names are present.
-  function target(ref, ctx, level) {
-    const [database, collection] = ref.segments
-    return {
-      connectionId: ref.connectionId,
-      connectionName: ctx.connectionName,
-      ...(DEPTH[level] >= DEPTH.database ? { dbName: database.name } : {}),
-      ...(DEPTH[level] >= DEPTH.collection ? { collectionName: collection.name } : {}),
-    }
-  }
-
-  // The node's resource cut to `level`, with the connection's display name beside it,
-  // since a ref never carries one. This is what every modal, tool tab and wizard takes;
-  // they read the names they show off the ref.
-  function modalTarget(ref, ctx, level) {
-    return {
-      resource: createResourceRef(ref.connectionId, ref.segments.slice(0, DEPTH[level])),
-      connectionName: ctx.connectionName,
-    }
+  // on that row's database — with the connection's display name beside it, since a ref
+  // never carries one. This is what every tab, modal and wizard takes; they read the
+  // names they show off the ref.
+  function targetAt(ref, ctx, level) {
+    return { resource: resourceAt(ref, level), connectionName: ctx.connectionName }
   }
 
   // Add View is the one structural dialog whose payload isn't just the node's level fields:
   // it carries the source collection to prefill (empty from a database node, the clicked
   // collection from "Add View Here…"), so it opens directly instead of via modalFeature.
   function openAddView(ref, ctx, source) {
-    openModal('addView', { ...modalTarget(ref, ctx, 'database'), source: source })
+    openModal('addView', { ...targetAt(ref, ctx, 'database'), source: source })
   }
 
   // A registry-driven modal feature (see constants/modalRegistry.js): its level and
@@ -100,7 +82,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // ResourceRef, whatever its level (#193).
   function modalFeature(id) {
     const level = MODALS[id].level
-    return { requires: level, run: (ref, ctx) => openModal(id, modalTarget(ref, ctx, level)) }
+    return { requires: level, run: (ref, ctx) => openModal(id, targetAt(ref, ctx, level)) }
   }
 
   async function disconnectOne(ref, ctx) {
@@ -160,11 +142,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
   function openServerInfo(ref, ctx, kind, title) {
     openModal('serverInfo', {
-      ...modalTarget(ref, ctx, 'connection'), kind: kind, title: title,
+      ...targetAt(ref, ctx, 'connection'), kind: kind, title: title,
     })
   }
   function copyToClipboard(ref, ctx, kind) {
-    const copied = modalTarget(ref, ctx, kind)
+    const copied = targetAt(ref, ctx, kind)
     dbClipboard.value = { kind: kind, ...copied }
     showToast(`Copied ${kind} "${resourceName(copied.resource)}"`)
   }
@@ -173,15 +155,15 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // native menu's where it offers the same action.
   const FEATURES = {
     // ── open a tab ──
-    'coll:open_tab':           { requires: 'collection', run: (r, c) => openCollectionTab(target(r, c, 'collection')) },
-    'coll:aggregation':        { requires: 'collection', run: (r, c) => openCollectionTab(target(r, c, 'collection'), 'aggregate') },
-    'file:intellishell':       { requires: 'database',   run: (r, c) => openShellTab(target(r, c, 'database')) },
-    'coll:add_index':          { requires: 'collection', run: (r, c) => openIndexManagerTab(modalTarget(r, c, 'collection')) },
+    'coll:open_tab':           { requires: 'collection', run: (r, c) => openCollectionTab(targetAt(r, c, 'collection')) },
+    'coll:aggregation':        { requires: 'collection', run: (r, c) => openCollectionTab(targetAt(r, c, 'collection'), 'aggregate') },
+    'file:intellishell':       { requires: 'database',   run: (r, c) => openShellTab(targetAt(r, c, 'database')) },
+    'coll:add_index':          { requires: 'collection', run: (r, c) => openIndexManagerTab(targetAt(r, c, 'collection')) },
 
     // ── connection-scoped info modals ──
     'file:server_status':      modalFeature('serverStatus'),
     'file:server_charts':      modalFeature('serverCharts'),
-    'db:current_ops':          { requires: 'connection', run: (r, c) => openCurrentOpsTab(modalTarget(r, c, 'connection')) },
+    'db:current_ops':          { requires: 'connection', run: (r, c) => openCurrentOpsTab(targetAt(r, c, 'connection')) },
     'file:server_build':       { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'build',   'Build Info') },
     'conn:host_info':          { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'host',    'Host Info') },
     'conn:replica_status':     { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'replica', 'Replica Set Status') },
@@ -193,11 +175,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'db:manage_roles':         modalFeature('roles'),
     'db:functions':            modalFeature('functions'),
     'gridfs:open':             modalFeature('gridfs'),
-    'file:search':             { requires: 'database', run: (r, c) => openSearchTab(modalTarget(r, c, 'database')) },
+    'file:search':             { requires: 'database', run: (r, c) => openSearchTab(targetAt(r, c, 'database')) },
 
     // ── collection-scoped modals ──
     'coll:validator':          modalFeature('validator'),
-    'coll:schema':             { requires: 'collection', run: (r, c) => openSchemaTab(modalTarget(r, c, 'collection')) },
+    'coll:schema':             { requires: 'collection', run: (r, c) => openSchemaTab(targetAt(r, c, 'collection')) },
     'coll:history':            modalFeature('history'),
     'coll:stats':              modalFeature('stats'),
     'coll:mapreduce':          modalFeature('mapReduce'),
@@ -214,18 +196,18 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'coll:duplicate':          modalFeature('duplicateCollection'),
 
     // ── import / export (collection-level wizards; db-level exports many) ──
-    'coll:export':             { requires: 'collection', run: (r, c) => openExportSource(modalTarget(r, c, 'collection')) },
-    'coll:import':             { requires: 'collection', run: (r, c) => openImportWizard(modalTarget(r, c, 'collection')) },
+    'coll:export':             { requires: 'collection', run: (r, c) => openExportSource(targetAt(r, c, 'collection')) },
+    'coll:import':             { requires: 'collection', run: (r, c) => openImportWizard(targetAt(r, c, 'collection')) },
     // Export / Import Collections… act on a database, so a collection row resolves to
     // its database rather than carrying a collection the handlers would ignore.
-    'db:export':               { requires: 'database',   run: (r, c) => exportDatabase(modalTarget(r, c, 'database')) },
-    'db:import':               { requires: 'database',   run: (r, c) => importDatabase(modalTarget(r, c, 'database')) },
+    'db:export':               { requires: 'database',   run: (r, c) => exportDatabase(targetAt(r, c, 'database')) },
+    'db:import':               { requires: 'database',   run: (r, c) => importDatabase(targetAt(r, c, 'database')) },
 
     // ── clipboard / copy-paste ──
     'node:copy_name':          { requires: null,         run: (r, c) => { navigator.clipboard.writeText(c.label); showToast('Copied') } },
     'coll:copy':               { requires: 'collection', run: (r, c) => copyToClipboard(r, c, 'collection') },
     'db:copy_database':        { requires: 'database',   run: (r, c) => copyToClipboard(r, c, 'database') },
-    'db:paste':                { requires: 'database',   run: (r, c) => pasteClipboard(modalTarget(r, c, 'database')) },
+    'db:paste':                { requires: 'database',   run: (r, c) => pasteClipboard(targetAt(r, c, 'database')) },
 
     // ── connection lifecycle ──
     'conn:disconnect':         { requires: 'connection', run: disconnectOne },
@@ -235,10 +217,10 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     'view:refresh_all':        { requires: null,         run: refreshAll },
   }
 
-  // True when the resource is at least as deep as the level an action needs.
+  // True when the resource reaches the level an action needs.
   function hasLevel(ref, requires) {
     if (!requires) return true
-    return !!ref && ref.segments.length >= DEPTH[requires]
+    return !!resourceAt(ref, requires)
   }
   function levelHint(requires) {
     if (requires === 'collection') return 'Open a collection first'
@@ -298,13 +280,9 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     if (runPgTool(name, pgMenuTarget)) return
 
     if (name === 'collection') {
-      if (target && target.connectionId && target.dbName && target.collectionName) {
-        openCollectionTab({
-          connectionId: target.connectionId,
-          connectionName: target.connectionName,
-          dbName: target.dbName,
-          collectionName: target.collectionName,
-        })
+      const collection = resourceAt(target?.resource, 'collection')
+      if (collection) {
+        openCollectionTab({ resource: collection, connectionName: target.connectionName })
         return
       }
       // Opens the collection highlighted in the sidebar, same as double-clicking it.
@@ -316,7 +294,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
         return
       }
       setTreeSelection(null)
-      openCollectionTab(sel)
+      openCollectionTab({ resource: sel.resource, connectionName: sel.connectionName })
       return
     }
 
@@ -324,15 +302,13 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     // passes an already-resolved target; from the toolbar it is the active workspace,
     // resolved the way the menu resolves it — through its target, and only when that
     // names a MongoDB resource.
-    const tab = target || resolveMenuTarget(activeTab.value, null)
+    const resolved = target || resolveMenuTarget(activeTab.value, null)
+    const ref = resolved?.resource ?? null
+    const ctx = { connectionName: resolved?.connectionName ?? null }
 
     if (name === 'shell') {
-      if (tab && tab.connectionId && tab.dbName) {
-        openShellTab({
-          connectionId: tab.connectionId,
-          connectionName: tab.connectionName,
-          dbName: tab.dbName,
-        })
+      if (hasLevel(ref, 'database')) {
+        openShellTab(targetAt(ref, ctx, 'database'))
       } else {
         showToast('Select a database or collection first to open IntelliShell')
       }
@@ -340,13 +316,8 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     }
 
     if (name === 'sql') {
-      if (tab && tab.connectionId && tab.dbName && tab.collectionName) {
-        openSqlTab({
-          connectionId: tab.connectionId,
-          connectionName: tab.connectionName,
-          dbName: tab.dbName,
-          collectionName: tab.collectionName,
-        })
+      if (hasLevel(ref, 'collection')) {
+        openSqlTab(targetAt(ref, ctx, 'collection'))
       } else {
         showToast('Select a collection first to open SQL')
       }
@@ -355,7 +326,7 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
 
     const action = TOOL_ALIASES[name]
     if (action) {
-      runFeature(action, resourceFromTreeSelection(tab), { connectionName: tab?.connectionName })
+      runFeature(action, ref, ctx)
       return
     }
     // Every entry in TOOLS is handled above or via TOOL_ALIASES, so reaching here
@@ -370,14 +341,14 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   // `requiredType` (the feature's own level unless given) guards the action and guides
   // the user when context is missing.
   function menuNode(action, requiredType = FEATURES[action]?.requires ?? null) {
-    const tab = menuTarget(requiredType)
-    const ref = resourceFromTreeSelection(tab)
+    const resolved = menuTarget(requiredType)
+    const ref = resolved?.resource ?? null
     if (!ref || !hasLevel(ref, requiredType)) {
       showToast(levelHint(requiredType))
       return
     }
-    const label = resourceName(ref) || tab.connectionName
-    runFeature(action, ref, { label: label, connectionName: tab.connectionName })
+    const label = resourceName(ref) || resolved.connectionName
+    runFeature(action, ref, { label: label, connectionName: resolved.connectionName })
   }
 
   return {

@@ -21,7 +21,7 @@ const { gridfsMenuRequest } = await import('../stores/menuRequests')
 const { useAppMenuActions } = await import('./useAppMenuActions')
 
 function actions() {
-  const menuTarget = vi.fn(() => ({ connectionId: 'c1', connectionName: 'Local', dbName: 'other', collectionName: null, kind: 'database' }))
+  const menuTarget = vi.fn(() => ({ resource: db('c1', 'other'), connectionName: 'Local' }))
   const { handleMenuAction } = useAppMenuActions({
     menuTarget, pgMenuTarget: vi.fn(), handleTool: vi.fn(), menuNode: vi.fn(),
     knownActions: new Set(), refreshAll: vi.fn(), toolbarHidden: { value: false },
@@ -75,7 +75,8 @@ describe('GridFS file actions', () => {
   it('opens on the database of a resolved collection', () => {
     const { handleMenuAction, menuTarget } = actions()
     menuTarget.mockReturnValue({
-      connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders', kind: 'collection',
+      resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
+      connectionName: 'Local',
     })
     handleMenuAction('gridfs:add')
     expect(openModal).toHaveBeenCalledWith('gridfs', { resource: db('c1', 'shop'), connectionName: 'Local' })

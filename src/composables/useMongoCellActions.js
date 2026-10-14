@@ -4,6 +4,7 @@ import { runFind } from '../engines/mongodb/api/queries'
 import { valueToClipboard } from '../utils/clipboardCopy'
 import { dbRefOf, idFilterString } from '../utils/dbRef'
 import { errText } from '../utils/errors'
+import { createResourceRef } from '../utils/resourceRef'
 import { formatCell, guessType } from '../utils/resultGrid'
 
 // What a MongoDB grid's cells do beyond being clicked (see useGridCells): drill into a
@@ -102,15 +103,18 @@ export function useMongoCellActions({
   function followReference() {
     const reference = cellRef.value
     const tab = activeTab()
-    if (!reference || !tab) {
+    // A DBRef with an empty `$ref` names no collection, so there is nothing to follow.
+    if (!reference || !reference.ref || !tab) {
       cellCtx.value = null
       return
     }
+    // A DBRef without `$db` points into the active tab's own database.
     emit('follow-reference', {
-      connectionId: tab.connectionId,
+      resource: createResourceRef(tab.connectionId, [
+        { kind: 'database', name: reference.db || tab.dbName },
+        { kind: 'collection', name: reference.ref },
+      ]),
       connectionName: tab.connectionName,
-      dbName: reference.db || tab.dbName,
-      collectionName: reference.ref,
       filter: idFilterString(reference.id),
     })
     cellCtx.value = null
