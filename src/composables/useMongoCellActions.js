@@ -4,7 +4,7 @@ import { runFind } from '../engines/mongodb/api/queries'
 import { valueToClipboard } from '../utils/clipboardCopy'
 import { dbRefOf, idFilterString } from '../utils/dbRef'
 import { errText } from '../utils/errors'
-import { createResourceRef } from '../utils/resourceRef'
+import { createResourceRef, segmentName } from '../utils/resourceRef'
 import { apiTarget } from '../engines/mongodb/api/payload'
 import { formatCell, guessType } from '../utils/resultGrid'
 
@@ -112,7 +112,7 @@ export function useMongoCellActions({
     // A DBRef without `$db` points into the active tab's own database.
     emit('follow-reference', {
       resource: createResourceRef(tab.target.connectionId, [
-        { kind: 'database', name: reference.db || apiTarget(tab.target).database },
+        { kind: 'database', name: reference.db || segmentName(tab.target, 'database') },
         { kind: 'collection', name: reference.ref },
       ]),
       connectionName: tab.connectionName,
