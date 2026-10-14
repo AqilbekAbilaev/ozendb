@@ -12,6 +12,7 @@ import { collectionStats } from '../engines/mongodb/api/admin'
 import { showToast } from '../stores/toast'
 import { requestIndexAction } from '../stores/menuRequests'
 import { useIndexManager } from './useIndexManager'
+import * as idx from '../stores/indexes'
 
 const ID = { name: '_id_', key: { _id: 1 } }
 const BY_A = { name: 'a_1', key: { a: 1 } }
@@ -115,5 +116,33 @@ describe('native menu and clipboard', () => {
     await m.pasteIndex()
     expect(m.localIndexFormOpen.value).toBe(true)
     expect(m.localIndexFormSeed.value).toEqual({ key: { b: 1 } })
+  })
+})
+
+// #305: the pane writes the shared index target and the store reads it, so the two must
+// agree on its spelling. Driven end to end through the pane, not a hand-written target.
+describe('the shared index target', () => {
+  beforeEach(() => { idx.resetIndexes() })
+
+  it('drops the selected index on the pane\'s collection once confirmed', async () => {
+    const m = manager()
+    await settle()
+    m.selectRow(BY_A)
+    m.handleDropIndex()
+    idx.dropIndexConfirmText.value = 'a_1'
+    api.dropIndex.mockResolvedValue(undefined)
+    await idx.confirmDropIndex()
+    expect(api.dropIndex).toHaveBeenCalledWith(TARGET, 'a_1')
+  })
+
+  it('reads View Details usage from the pane\'s collection', async () => {
+    const m = manager()
+    await settle()
+    vi.clearAllMocks()
+    api.indexStats.mockResolvedValue([{ name: 'a_1', accesses: { ops: 5 } }])
+    m.selectRow(BY_A)
+    await idx.openIndexDetails()
+    expect(api.indexStats).toHaveBeenCalledWith(TARGET)
+    expect(idx.indexDetailsStats.value).toEqual({ name: 'a_1', accesses: { ops: 5 } })
   })
 })
