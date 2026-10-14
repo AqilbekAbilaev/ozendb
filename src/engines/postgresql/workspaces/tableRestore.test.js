@@ -15,7 +15,7 @@ vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }
 const { registerWorkspaceDefinitions } = await import('../../../workspaces/registerDefinitions.js')
 const { restoreWorkspace } = await import('../../../workspaces/lifecycle.js')
 const { getWorkspaceDefinition } = await import('../../../workspaces/registry.js')
-const { toLegacyRecord } = await import('../../../workspaces/sessionMigration.js')
+const { toRestoreRecord } = await import('../../../workspaces/sessionMigration.js')
 const { usePostgresTable } = await import('./usePostgresTable.js')
 registerWorkspaceDefinitions()
 
@@ -27,7 +27,7 @@ const target = {
 const record = (state, id = 't1') => ({ id, type: TYPE, engine: 'postgresql', title: 'users', color: null, target, state })
 
 // The session's own path back from disk: a v2 record, then the tab it restores to.
-const restore = (state, id) => restoreWorkspace(toLegacyRecord(record(state, id), 'local'), { defaults: {} })
+const restore = (state, id) => restoreWorkspace(toRestoreRecord(record(state, id), 'local'), { defaults: {} })
 // What the session saves for a live tab.
 const serialize = (tab) => JSON.parse(JSON.stringify(getWorkspaceDefinition(TYPE).serialize(tab)))
 

@@ -1,11 +1,15 @@
 // Session migration specs. The round-trip tests at the bottom pin the
-// v2 → legacy bridge against every definition's restore hook, so serialize,
+// v2 → restore bridge against every definition's restore hook, so serialize,
 // bridge and restore can never drift from each other.
 import { describe, it, expect } from 'vitest'
-import { migrateSession, toLegacyRecord, sessionRestoreNotice } from './sessionMigration'
+import { migrateSession, toRestoreRecord, sessionRestoreNotice } from './sessionMigration'
 import { restoreWorkspace } from './lifecycle'
 import { registerWorkspaceDefinitions } from './registerDefinitions'
 import { getWorkspaceDefinition } from './registry'
+import { appDefinitions } from './appDefinitions'
+import { queryDefinitions } from '../engines/mongodb/workspaces/queryDefinitions'
+import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
+import { postgresDefinitions } from '../engines/postgresql/workspaces/postgresDefinitions'
 import { legacy, expected, sessions } from './sessionMigration.fixtures'
 import { migrateTableState } from '../engines/postgresql/workspaces/tableState'
 import { isCollectionTab } from '../utils/workspaceTypes'
@@ -252,7 +256,7 @@ describe('serialize hooks', () => {
   })
 })
 
-describe('toLegacyRecord bridge', () => {
+describe('toRestoreRecord bridge', () => {
   const restorable = {
     'mongodb.find': { key: 'find', name: 'Sales' },
     'mongodb.aggregate': { key: 'aggregate', name: 'Sales' },
@@ -288,10 +292,10 @@ describe('toLegacyRecord bridge', () => {
     ? { ...tab, ...tab.state.query, resultView: tab.ui.resultView }
     : tab)
 
-  it('round-trips every persisted type through the legacy restore hooks', () => {
+  it('round-trips every persisted type through the restore hooks', () => {
     for (const [type, conf] of Object.entries(restorable)) {
       const v2 = expected[conf.key]
-      const legacyRecord = toLegacyRecord(v2, conf.name)
+      const legacyRecord = toRestoreRecord(v2, conf.name)
       expect(legacyRecord, type).not.toBe(null)
       expect(legacyRecord.type, type).toBe(type)
       const restored = restoreWorkspace(legacyRecord)
@@ -331,21 +335,21 @@ describe('toLegacyRecord bridge', () => {
   // overwrite it, or the other envelope fields, however that state was written.
   it('never lets the saved state overwrite the record\'s identity', () => {
     const stray = { ...expected.find, state: { ...expected.find.state, target: null, type: 'x', id: 'y', connectionName: 'z' } }
-    expect(toLegacyRecord(stray, 'Sales')).toMatchObject({
+    expect(toRestoreRecord(stray, 'Sales')).toMatchObject({
       id: expected.find.id, type: expected.find.type, target: expected.find.target, connectionName: 'Sales',
     })
   })
 
   // A restored workspace takes its identity as saved; the flat fields are only names.
   it('hands the saved target to the restore hook unchanged', () => {
-    const record = toLegacyRecord(expected.find, 'Sales')
+    const record = toRestoreRecord(expected.find, 'Sales')
     expect(record.target).toEqual(expected.find.target)
     expect(restoreWorkspace({ ...record, dbName: 'stale' }).target).toEqual(expected.find.target)
   })
 
   it('restores identity-only schema and search workspaces through the bridge', () => {
-    const schema = toLegacyRecord(expected.schema, 'Sales')
-    const search = toLegacyRecord(expected.search, 'Sales')
+    const schema = toRestoreRecord(expected.schema, 'Sales')
+    const search = toRestoreRecord(expected.search, 'Sales')
     const schemaTab = restoreWorkspace(schema)
     const searchTab = restoreWorkspace(search)
     expect(schemaTab.target).toEqual(expected.schema.target)
@@ -355,16 +359,16 @@ describe('toLegacyRecord bridge', () => {
   })
 
   it('returns null for types outside the persisted set or unreadable targets', () => {
-    expect(toLegacyRecord({ type: 'app.quickstart', target: null })).toBe(null)
-    expect(toLegacyRecord({ type: 'mongodb.find', target: null })).toBe(null)
-    expect(toLegacyRecord({ type: 'mongodb.find', target: { connectionId: '', segments: [] } })).toBe(null)
-    expect(toLegacyRecord({ type: 'no.such.type' })).toBe(null)
-    expect(toLegacyRecord(null)).toBe(null)
+    expect(toRestoreRecord({ type: 'app.quickstart', target: null })).toBe(null)
+    expect(toRestoreRecord({ type: 'mongodb.find', target: null })).toBe(null)
+    expect(toRestoreRecord({ type: 'mongodb.find', target: { connectionId: '', segments: [] } })).toBe(null)
+    expect(toRestoreRecord({ type: 'no.such.type' })).toBe(null)
+    expect(toRestoreRecord(null)).toBe(null)
   })
 
   it('never throws for unknown types', () => {
-    expect(() => toLegacyRecord({ type: 'no.such.type', id: 'x' })).not.toThrow()
-    expect(() => toLegacyRecord({ id: 'x' })).not.toThrow()
+    expect(() => toRestoreRecord({ type: 'no.such.type', id: 'x' })).not.toThrow()
+    expect(() => toRestoreRecord({ id: 'x' })).not.toThrow()
   })
 })
 
@@ -414,7 +418,7 @@ describe('PostgreSQL tabs across a restart', () => {
 
   it('brings a table tab back on the same table, with its settings to start from', () => {
     const v2 = { id: 't1', type: 'postgresql.table_browse', engine: 'postgresql', title: 'merchants', color: 'green', target: tableTarget, state: { view } }
-    const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
+    const restored = restoreWorkspace(toRestoreRecord(v2, 'Payments PG'))
     expect(restored).toMatchObject({
       id: 't1', type: 'postgresql.table_browse', title: 'merchants', color: 'green', target: tableTarget,
       connectionName: 'Payments PG',
@@ -425,11 +429,35 @@ describe('PostgreSQL tabs across a restart', () => {
   it('brings a SQL tab back with its query text but no result', () => {
     const target = { connectionId: 'p1', segments: [{ kind: 'database', name: 'payments' }] }
     const v2 = { id: 'q1', type: 'postgresql.query', engine: 'postgresql', title: 'SQL: payments', color: null, target, state: { sql: 'SELECT 1' } }
-    const restored = restoreWorkspace(toLegacyRecord(v2, 'Payments PG'))
+    const restored = restoreWorkspace(toRestoreRecord(v2, 'Payments PG'))
     expect(restored).toMatchObject({
       id: 'q1', type: 'postgresql.query', connectionName: 'Payments PG',
       state: { sql: 'SELECT 1' }, runtime: { run: { result: null, connectionId: 'p1', database: 'payments' } }, target,
     })
+  })
+
+  // #313: a search tab was saved but never restored, because the bridge's own list of
+  // restorable types left it out. Run it through the same path the session takes.
+  it('brings a search tab back with its typed search but no result', () => {
+    const target = { connectionId: 'p1', segments: [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }] }
+    const search = getWorkspaceDefinition('postgresql.search')
+    const state = search.serialize({ state: { term: 'Ada', tables: '', matchCase: false, regex: true } })
+    const v2 = { id: 's1', type: 'postgresql.search', engine: 'postgresql', title: 'Search: public', color: null, target, state }
+    const restored = restoreWorkspace(toRestoreRecord(v2, 'Payments PG'))
+    expect(restored).toMatchObject({
+      id: 's1', type: 'postgresql.search', title: 'Search: public', connectionName: 'Payments PG', target,
+      state: { term: 'Ada', regex: true }, runtime: { result: null },
+    })
+  })
+
+  // Every definition that can restore a tab must be reachable through the bridge, so the
+  // two can never disagree again.
+  it('restores every type whose definition has a restore hook', () => {
+    const target = { connectionId: 'p1', segments: [{ kind: 'database', name: 'db' }] }
+    const all = [...appDefinitions, ...queryDefinitions, ...toolDefinitions, ...postgresDefinitions]
+    for (const def of all.filter((d) => d.restore)) {
+      expect(toRestoreRecord({ id: 'x', type: def.type, title: '', color: null, target, state: {} }), def.type).not.toBe(null)
+    }
   })
 
   it('saves what the tabs need, and keeps them through a load', () => {

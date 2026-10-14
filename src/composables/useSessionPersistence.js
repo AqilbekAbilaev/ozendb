@@ -4,7 +4,7 @@ import { getOpenTabs, setOpenTabs } from '../appApi/session'
 import { tabs, activeTabId } from '../stores/tabs'
 import { restoreWorkspace } from '../workspaces/lifecycle'
 import { getWorkspaceDefinition } from '../workspaces/registry'
-import { migrateSession, toLegacyRecord, sessionRestoreNotice } from '../workspaces/sessionMigration'
+import { migrateSession, toRestoreRecord, sessionRestoreNotice } from '../workspaces/sessionMigration'
 import { showToast } from '../stores/toast'
 import { recordFrontendError } from '../appApi/errorLog'
 
@@ -94,7 +94,7 @@ export function useSessionPersistence() {
       const open = new Set(tabs.value.map((t) => t.id))
       const restored = result.session.tabs
         .filter((t) => !open.has(t.id))
-        .map((record) => toLegacyRecord(record, names.get(record.target.connectionId) ?? null))
+        .map((record) => toRestoreRecord(record, names.get(record.target.connectionId) ?? null))
         .map((record) => record && restoreWorkspace(record, { defaults: { queryLimit: 50, resultView: 'table' } }))
         .filter(Boolean)
       if (restored.length) {
