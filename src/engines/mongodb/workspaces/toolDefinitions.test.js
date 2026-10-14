@@ -21,9 +21,9 @@ const COLL_SEGMENT = { kind: 'collection', name: 'orders' }
 const COLLECTION = { resource: createResourceRef('c1', [DB_SEGMENT, COLL_SEGMENT]), connectionName: 'Sales' }
 const DATABASE = { resource: createResourceRef('c1', [DB_SEGMENT]), connectionName: 'Sales' }
 const CONNECTION = { resource: createResourceRef('c1'), connectionName: 'Sales' }
-// The same identity as the nodes above, in the spelling a tool *workspace* carries.
-const COLLECTION_FIELDS = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' }
-const DATABASE_FIELDS = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' }
+// A tool workspace's identity is its target alone (#303); beside it the tab keeps only
+// the connection's display name.
+const NAMED = { connectionName: 'Sales' }
 
 function expectCollectionDepth(created) {
   expect(isResourceRef(created.target)).toBe(true)
@@ -36,7 +36,7 @@ describe('mongodb.indexes', () => {
 
   it('is collection-scoped with the open/focus identity fields', () => {
     expect(created.title).toBe('Index Manager: orders')
-    expect(created.fields).toEqual(COLLECTION_FIELDS)
+    expect(created.fields).toEqual(NAMED)
     expectCollectionDepth(created)
   })
 })
@@ -46,8 +46,7 @@ describe('mongodb.schema', () => {
 
   it('is collection-scoped like indexes', () => {
     expect(created.title).toBe('Schema: orders')
-    expect(created.fields.connectionId).toBe('c1')
-    expect(created.fields.collectionName).toBe('orders')
+    expect(created.fields).toEqual(NAMED)
     expectCollectionDepth(created)
   })
 })
@@ -57,7 +56,7 @@ describe('mongodb.search', () => {
 
   it('is database-scoped (searches every collection in the db)', () => {
     expect(created.title).toBe('Search: shop')
-    expect(created.fields).toEqual(DATABASE_FIELDS)
+    expect(created.fields).toEqual(NAMED)
     expect(isResourceRef(created.target)).toBe(true)
     expect(created.target.segments.map(s => s.name)).toEqual(['shop'])
   })
@@ -147,7 +146,7 @@ describe('mongodb.current_operations', () => {
 
   it('is connection-scoped with the toolbar settings on the tab', () => {
     expect(created.title).toBe('Current Operations: Sales')
-    expect(created.fields.connectionId).toBe('c1')
+    expect(created.fields).not.toHaveProperty('connectionId')
     expect(created.fields.connectionName).toBe('Sales')
     expect(created.fields.frequency).toBe(2000)
     expect(created.fields.retention).toBe(10_000)
@@ -372,18 +371,18 @@ describe('lifecycle — tool restore', () => {
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders',
     })
     expect(tab.type).toBe('mongodb.indexes')
-    expect(tab.connectionId).toBe('c1')
-    expect(tab.collectionName).toBe('orders')
+    expect(tab.connectionName).toBe('Sales')
+    expect(tab).not.toHaveProperty('collectionName')
     expect(tab.target.segments.map(s => s.name)).toEqual(['shop', 'orders'])
   })
 
   it('restores schema and search as identity-only tabs', () => {
     const schema = restoreWorkspace({ id: 's', type: 'mongodb.schema', target: COLLECTION.resource, title: 'Schema: orders', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' })
     expect(schema.type).toBe('mongodb.schema')
-    expect(schema.connectionId).toBe('c1')
+    expect(schema.target).toEqual(COLLECTION.resource)
 
     const search = restoreWorkspace({ id: 'q', type: 'mongodb.search', target: DATABASE.resource, title: 'Search: shop', connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' })
     expect(search.type).toBe('mongodb.search')
-    expect(search.dbName).toBe('shop')
+    expect(search.target).toEqual(DATABASE.resource)
   })
 })

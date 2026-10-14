@@ -7,6 +7,7 @@ import {
   indexSizesFrom, indexUsageFrom, indexSeedFromClipboard,
 } from '../utils/indexSpec'
 import { errText, errMessage } from '../utils/errors'
+import { apiTarget } from '../engines/mongodb/api/payload'
 import { fmtBytes } from '../utils/format'
 import { useIndexPaneLifecycle } from './useIndexPaneLifecycle'
 import { showToast } from '../stores/toast'
@@ -216,11 +217,8 @@ export function useIndexManager(activeTab) {
     localExpanded.value = {}
     closeIndexForm()
     idx.selectedIndex.value = null
-    idx.indexesTarget.value = {
-      connectionId: tab.connectionId,
-      dbName: tab.dbName,
-      collectionName: tab.collectionName,
-    }
+    const { connectionId, database, collection } = apiTarget(tab.target)
+    idx.indexesTarget.value = { connectionId, dbName: database, collectionName: collection }
     loadIndexes(tab)
   }, { immediate: true })
 

@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { useImportPaneLifecycle } from './useImportPaneLifecycle'
+import { createResourceRef } from '../utils/resourceRef'
 
 const tab = (id, connId, sources = []) => ({
   id,
-  connectionId: connId,
+  target: createResourceRef(connId, [{ kind: 'database', name: 'db' }, { kind: 'collection', name: 'orders' }]),
   format: 'json',
   validate: true,
-  dbName: 'db',
-  collectionName: 'orders',
   sources,
 })
 
@@ -41,7 +40,7 @@ describe('import pane run identity', () => {
 
     lifecycle.attach(first)
     const run = lifecycle.beginRun(first)
-    first.connectionId = 'changed'
+    first.target = createResourceRef('changed')
     first.format = 'csv'
     first.sources[1].targetColl = 'changed'
 

@@ -13,10 +13,13 @@ import { showToast } from '../stores/toast'
 import { requestIndexAction } from '../stores/menuRequests'
 import { useIndexManager } from './useIndexManager'
 import * as idx from '../stores/indexes'
+import { createResourceRef } from '../utils/resourceRef'
 
 const ID = { name: '_id_', key: { _id: 1 } }
 const BY_A = { name: 'a_1', key: { a: 1 } }
-const tab = (id, coll = 'orders') => ({ id, connectionId: 'c1', dbName: 'shop', collectionName: coll })
+const tab = (id, coll = 'orders') => ({
+  id, target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: coll }]),
+})
 const TARGET = { connectionId: 'c1', database: 'shop', collection: 'orders' }
 
 // Lets every queued promise and watcher settle.

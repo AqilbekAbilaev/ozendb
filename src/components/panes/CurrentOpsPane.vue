@@ -18,7 +18,7 @@ import FlexSpacer from '../base/FlexSpacer.vue'
 // The list itself, the poll and the retention of finished ops live in useCurrentOps;
 // this renders them.
 const props = defineProps({
-  activeTab: { type: Object, required: true },  // { connectionId, connectionName }
+  activeTab: { type: Object, required: true },  // { target, connectionName, …toolbar settings }
 })
 
 const {
@@ -89,7 +89,7 @@ const collOptions = computed(() => {
 // Reloaded when the pane moves to a tab on another server, for the same reason.
 watch(() => props.activeTab, async (tab) => {
   try {
-    tab.databases = await listDatabases(tab.connectionId)
+    tab.databases = await listDatabases(tab.target.connectionId)
   } catch (_) {
     // The pickers stay on "all" — a missing database list must not stop the ops view.
   }

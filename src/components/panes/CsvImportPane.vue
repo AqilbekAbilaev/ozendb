@@ -174,7 +174,7 @@ function mappingPayload() {
 
 async function run() {
   if (!canRun.value) return
-  const connectionId = t.value.connectionId
+  const connectionId = t.value.target.connectionId
   running.value = true
   error.value = null
   try {

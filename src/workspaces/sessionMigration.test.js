@@ -307,10 +307,11 @@ describe('toLegacyRecord bridge', () => {
       // The pinned v1 records name their tab by `kind`, the old file format; a live
       // workspace names itself by `type` alone (#193), so that one field is not compared.
       const { kind: _kind, ...legacyFields } = legacy[conf.key]
-      // A collection or shell tab's identity is its target alone (#303), so its flat
-      // identity fields are not compared either; the target is compared above.
-      if (isCollectionTab(restored) || restored.type === 'mongodb.shell') {
-        delete legacyFields.connectionId
+      // A MongoDB tab's identity is its target alone (#303), so its flat identity
+      // fields are not compared either; the target is compared above. Current
+      // Operations keeps its dbName/collName, which are filters rather than identity.
+      delete legacyFields.connectionId
+      if (type !== 'mongodb.current_operations') {
         delete legacyFields.dbName
         delete legacyFields.collectionName
       }
@@ -338,13 +339,10 @@ describe('toLegacyRecord bridge', () => {
     const search = toLegacyRecord(expected.search, 'Sales')
     const schemaTab = restoreWorkspace(schema)
     const searchTab = restoreWorkspace(search)
-    expect(schemaTab.connectionId).toBe('c1')
+    expect(schemaTab.target).toEqual(expected.schema.target)
     expect(schemaTab.connectionName).toBe('Sales')
-    expect(schemaTab.dbName).toBe('shop')
-    expect(schemaTab.collectionName).toBe('orders')
-    expect(searchTab.connectionId).toBe('c1')
+    expect(searchTab.target).toEqual(expected.search.target)
     expect(searchTab.connectionName).toBe('Sales')
-    expect(searchTab.dbName).toBe('shop')
   })
 
   it('returns null for types outside the persisted set or unreadable targets', () => {
