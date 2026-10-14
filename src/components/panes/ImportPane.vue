@@ -240,7 +240,7 @@ watch(() => {
           <div class="target-bar">
             <button type="button" class="target-chip" @click="changeTarget">
               <BaseIcon name="connect" :size="15" />
-              {{ t.connName }}
+              {{ t.connectionName }}
             </button>
             <button type="button" class="target-change" @click="changeTarget">
               <BaseIcon name="refresh" :size="13" /> Change target
