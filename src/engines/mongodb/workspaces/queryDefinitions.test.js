@@ -71,11 +71,12 @@ describe('mongodb.find', () => {
     expect(created.fields.runtime.elapsedMs).toBe(null)
   })
 
-  it('carries the flat identity fields and a canonical collection target', () => {
-    expect(created.fields.connectionId).toBe('c1')
+  // Identity is the target alone (#303); only the display name stays a flat field.
+  it('names its collection by its target alone, keeping only the connection\'s display name', () => {
+    expect(created.fields).not.toHaveProperty('connectionId')
+    expect(created.fields).not.toHaveProperty('dbName')
+    expect(created.fields).not.toHaveProperty('collectionName')
     expect(created.fields.connectionName).toBe('Sales')
-    expect(created.fields.dbName).toBe('shop')
-    expect(created.fields.collectionName).toBe('orders')
     expect(created.title).toBe('orders')
     const ref = created.target
     expect(isResourceRef(ref)).toBe(true)

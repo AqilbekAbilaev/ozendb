@@ -12,13 +12,12 @@ vi.mock('../engines/mongodb/api/documents', () => ({
 
 import { insertDocuments } from '../engines/mongodb/api/documents'
 import { useDocumentActions } from './useDocumentActions'
+import { createResourceRef } from '../utils/resourceRef'
 
 const collectionTab = (connectionId, collectionName) => reactive({
   id: collectionName,
   type: 'mongodb.find',
-  connectionId,
-  dbName: 'shop',
-  collectionName,
+  target: createResourceRef(connectionId, [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: collectionName }]),
   state: { query: {} },
   runtime: { results: [], selectedRow: -1, selectedRows: [], selectedField: null, isRunning: false },
 })

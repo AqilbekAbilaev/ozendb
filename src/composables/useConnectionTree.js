@@ -190,10 +190,10 @@ export function useConnectionTree({ emit }) {
   })
   // The connection whose row highlights. Was a startsWith() over the collection key,
   // which prefix-matched an id instead of comparing one, and only ever for MongoDB.
-  const activeConnectionId = computed(() => activeResource.value?.connectionId ?? null)
+  const activeConnectionId = computed(() => activeResource.value?.target?.connectionId ?? null)
   const activeCollectionKey = computed(() => {
     const t = activeResource.value
-    return isCollectionTab(t) ? collectionKey(t.connectionId, t.dbName, t.collectionName) : null
+    return isCollectionTab(t) ? nodeTagKey(t.target) : null
   })
 
   // Keyboard tab switches never click outside the sidebar, so clear the selection here.
@@ -205,13 +205,13 @@ export function useConnectionTree({ emit }) {
   // tree holds the schema state below it and opens itself (PostgresTreeNodes).
   watch(activeResource, async (t) => {
     if (!t) return
-    const conn = connections.value.find(c => c.id === t.connectionId)
+    const conn = connections.value.find(c => c.id === t.target.connectionId)
     if (!conn) return  // not a connection the sidebar currently shows
 
-    if (!expandedConns.value[t.connectionId]) {
+    if (!expandedConns.value[conn.id]) {
       await toggleConnection(conn)
     }
-    if (isCollectionTab(t)) expandedDbs.value[`${t.connectionId}/${t.dbName}`] = true
+    if (isCollectionTab(t)) expandedDbs.value[nodeTagKey(resourceAt(t.target, 'database'))] = true
   })
 
   const filtered = computed(() => {

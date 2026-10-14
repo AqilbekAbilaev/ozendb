@@ -29,6 +29,7 @@ import { useResultsPagination } from '../../composables/useResultsPagination'
 import { PAGE_SIZE_OPTIONS } from '../../constants/pageSizes'
 import FlexSpacer from '../base/FlexSpacer.vue'
 import { isCollectionTab } from '../../utils/workspaceTypes'
+import { resourceName } from '../../utils/resourceRef'
 
 const VIEW_MODES = [
   { value: 'table', label: 'Table View' },
@@ -401,9 +402,9 @@ function toggleReadOnly() {
   <BaseModal v-if="showClearConfirm" title="Clear Collection" @close="showClearConfirm = false">
     <div class="del-body">
       <p>This deletes <strong>every document</strong> in
-        <code>{{ activeTab.collectionName }}</code>. The collection and its indexes remain.
+        <code>{{ resourceName(activeTab.target) }}</code>. The collection and its indexes remain.
         This cannot be undone.</p>
-      <p class="cc-prompt">Type <code>{{ activeTab.collectionName }}</code> to confirm:</p>
+      <p class="cc-prompt">Type <code>{{ resourceName(activeTab.target) }}</code> to confirm:</p>
       <BaseInput class="cc-input" v-model="clearConfirmText" autocomplete="off"
              @enter="onClearConfirm" />
       <FieldError :text="clearError" spaced />
@@ -411,7 +412,7 @@ function toggleReadOnly() {
     <div class="del-footer">
       <FlexSpacer />
       <BaseButton @click="showClearConfirm = false">Cancel</BaseButton>
-      <BaseButton variant="danger" :disabled="clearBusy || clearConfirmText !== activeTab.collectionName"
+      <BaseButton variant="danger" :disabled="clearBusy || clearConfirmText !== resourceName(activeTab.target)"
               @click="onClearConfirm">{{ clearBusy ? 'Clearing…' : 'Clear Collection' }}</BaseButton>
     </div>
   </BaseModal>

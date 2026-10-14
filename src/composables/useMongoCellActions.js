@@ -5,6 +5,7 @@ import { valueToClipboard } from '../utils/clipboardCopy'
 import { dbRefOf, idFilterString } from '../utils/dbRef'
 import { errText } from '../utils/errors'
 import { createResourceRef } from '../utils/resourceRef'
+import { apiTarget } from '../engines/mongodb/api/payload'
 import { formatCell, guessType } from '../utils/resultGrid'
 
 // What a MongoDB grid's cells do beyond being clicked (see useGridCells): drill into a
@@ -110,8 +111,8 @@ export function useMongoCellActions({
     }
     // A DBRef without `$db` points into the active tab's own database.
     emit('follow-reference', {
-      resource: createResourceRef(tab.connectionId, [
-        { kind: 'database', name: reference.db || tab.dbName },
+      resource: createResourceRef(tab.target.connectionId, [
+        { kind: 'database', name: reference.db || apiTarget(tab.target).database },
         { kind: 'collection', name: reference.ref },
       ]),
       connectionName: tab.connectionName,
@@ -161,12 +162,12 @@ export function useMongoCellActions({
 
     try {
       await replaceDocument(
-        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        apiTarget(tab.target),
         filter,
         JSON.stringify(rootDocument),
       )
       const { documents } = await runFind(
-        { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName },
+        apiTarget(tab.target),
         { filter, projection: '{}', sort: '{}', skip: 0, limit: 1 },
       )
       if (documents.length) holder().results.splice(edit.rowIdx, 1, markRaw(documents[0]))

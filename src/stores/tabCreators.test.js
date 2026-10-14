@@ -167,12 +167,11 @@ describe('created tab shapes', () => {
     const tab = lastTab()
     expect(tab.type).toBe('mongodb.find')
     expect(tab.engine).toBe('mongodb')
-    expect(tab.type).toBe('mongodb.find')
     expect(tab.mode).toBe('find')
     expect(tab.state.query.limit).toBe(50)
     expect(tab.ui.resultView).toBe('table')
     expect(tab.title).toBe('orders')
-    expect(tab.connectionId).toBe('c1')
+    expect(tab.target).toEqual(TOOL.resource)
   })
 
   it('opens aggregate tabs in aggregate mode with an empty pipeline', () => {

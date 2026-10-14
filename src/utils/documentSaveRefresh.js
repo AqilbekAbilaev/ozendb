@@ -1,11 +1,13 @@
 import { parseField } from './queryParser'
+import { segmentName } from './resourceRef'
 
 export function refreshFindWorkspacesAfterDocumentSave(workspaces, payload = {}, runQuery) {
   payload = payload || {}
   for (const workspace of workspaces) {
+    const target = workspace.target
     if (workspace.type !== 'mongodb.find' || !workspace.runtime.hasRun
-        || workspace.connectionId !== payload.connId || workspace.dbName !== payload.db
-        || workspace.collectionName !== payload.coll) continue
+        || target?.connectionId !== payload.connId || segmentName(target, 'database') !== payload.db
+        || segmentName(target, 'collection') !== payload.coll) continue
 
     const filter = parseField(workspace.state.query.filter || '')
     const projection = parseField(workspace.state.query.projection || '')

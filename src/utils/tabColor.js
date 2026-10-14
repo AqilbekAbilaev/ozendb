@@ -4,6 +4,7 @@
 // points at an existing theme token (never a raw hex), so the tags stay theme-aware
 // and in step with the rest of the UI — blue is literally the app accent.
 import { isCollectionTab } from './workspaceTypes'
+import { resourceAt } from './resourceRef'
 
 const TAG_COLORS = {
   blue:   'var(--accent)',
@@ -44,18 +45,13 @@ export function colorHex(value) {
 export function tabColorName(tab, tagOverrides) {
   if (!tab) return null
   if (tab.color) return tab.color
-  const keys = []
-  if (isCollectionTab(tab)) {
-    keys.push(`${tab.connectionId}/${tab.dbName}/${tab.collectionName}`)
-    keys.push(`${tab.connectionId}/${tab.dbName}`)
-    keys.push(tab.connectionId)
-  } else if (tab.type === 'mongodb.shell') {
-    keys.push(`${tab.connectionId}/${tab.dbName}`)
-    keys.push(tab.connectionId)
-  } else if (tab.type === 'postgresql.table_browse' || tab.type === 'postgresql.query') {
-    // PostgreSQL nodes below the connection have no colours of their own yet.
-    keys.push(tab.connectionId)
-  }
+  // The levels whose colour the tab can take, deepest first, read off its ref.
+  let levels = []
+  if (isCollectionTab(tab)) levels = ['collection', 'database', 'connection']
+  else if (tab.type === 'mongodb.shell') levels = ['database', 'connection']
+  // PostgreSQL nodes below the connection have no colours of their own yet.
+  else if (tab.type === 'postgresql.table_browse' || tab.type === 'postgresql.query') levels = ['connection']
+  const keys = levels.map((level) => resourceAt(tab.target, level)).filter(Boolean).map(nodeTagKey)
   for (const key of keys) {
     const name = tagOverrides ? tagOverrides[key] : null
     if (name && name !== 'none') return name

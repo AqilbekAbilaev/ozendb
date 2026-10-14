@@ -16,6 +16,7 @@ import MenuItem from '../base/MenuItem.vue'
 import FieldError from '../base/FieldError.vue'
 import FlexSpacer from '../base/FlexSpacer.vue'
 import { isCollectionTab } from '../../utils/workspaceTypes'
+import { apiTarget } from '../../engines/mongodb/api/payload'
 
 const props = defineProps({
   activeTab:      { type: Object,  required: true },
@@ -67,11 +68,7 @@ async function openHistoryMenu() {
   historyLoading.value = true
   historyMenu.value = true
   try {
-    historyEntries.value = await getQueryHistory({
-      connectionId: tab.connectionId,
-      database:     tab.dbName,
-      collection:   tab.collectionName,
-    })
+    historyEntries.value = await getQueryHistory(apiTarget(tab.target))
   } catch (_) {
     historyEntries.value = []
   } finally {
@@ -114,11 +111,7 @@ async function clearHistory() {
   const tab = props.activeTab
   if (!tab) return
   try {
-    await clearQueryHistory({
-      connectionId: tab.connectionId,
-      database:     tab.dbName,
-      collection:   tab.collectionName,
-    })
+    await clearQueryHistory(apiTarget(tab.target))
     historyEntries.value = []
   } catch (_) {}
 }
@@ -128,11 +121,7 @@ async function setStoredDefaultQuery() {
   if (!tab) return
   try {
     await setDefaultQuery(
-      {
-        connectionId: tab.connectionId,
-        database:     tab.dbName,
-        collection:   tab.collectionName,
-      },
+      apiTarget(tab.target),
       {
         mode:       tab.mode       || 'find',
         filter:     tab.state.query.filter     || '',
@@ -154,11 +143,7 @@ async function clearStoredDefaultQuery() {
   const tab = props.activeTab
   if (!tab) return
   try {
-    await clearDefaultQuery({
-      connectionId: tab.connectionId,
-      database:     tab.dbName,
-      collection:   tab.collectionName,
-    })
+    await clearDefaultQuery(apiTarget(tab.target))
     showDefaultMenu.value = false
     showToast('Default query cleared.')
   } catch (e) {

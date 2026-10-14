@@ -4,6 +4,7 @@
 // for a closed or re-run tab is dropped.
 import { explainFind, explainAggregate, loadExplainStorage } from '../../api/queries'
 import { errText } from '../../../../utils/errors'
+import { apiTarget } from '../../api/payload'
 import { parsePipeline } from '../../../../utils/queryParser'
 import { beginWorkspaceRequest } from '../../../../utils/workspaceRequest'
 import { parseFindQuery, findQueryValid, findArgs } from './collectionQuery'
@@ -12,7 +13,7 @@ export async function runExplain(tab, isCurrent) {
   const runtime = tab.runtime
   const request = beginWorkspaceRequest(tab, 'explain')
   const canApply = () => request.isCurrent() && isCurrent(tab)
-  const target = { connectionId: tab.connectionId, database: tab.dbName, collection: tab.collectionName }
+  const target = apiTarget(tab.target)
   // The chosen verbosity stays on the tab so re-runs (pagination, refresh) reuse it.
   const verbosity = runtime.explainVerbosity || 'executionStats'
   runtime.explainVerbosity = verbosity

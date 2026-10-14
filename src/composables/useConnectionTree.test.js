@@ -58,7 +58,7 @@ it('expands the connection of an active PostgreSQL table tab', async () => {
   listSchemas.mockResolvedValue([])
   tree.connections.value = [{ id: 'a', name: 'Connection', engine: 'postgresql' }]
   tabs.value = [{
-    id: 'pg', type: 'postgresql.table_browse',
+    id: 'pg', type: 'postgresql.table_browse', target: createResourceRef('a', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }]),
     connectionId: 'a', database: 'payments', schema: 'public', table: 'merchants',
   }]
   activeTabId.value = 'pg'
@@ -72,7 +72,7 @@ it('expands the connection and database of an active MongoDB collection tab', as
   listDatabases.mockResolvedValue([])
   tabs.value = [{
     id: 'mongo', type: 'mongodb.find',
-    connectionId: 'a', dbName: 'shop', collectionName: 'orders',
+    target: createResourceRef('a', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
   }]
   activeTabId.value = 'mongo'
   await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
@@ -84,8 +84,8 @@ it('expands the connection and database of an active MongoDB collection tab', as
 it('names the connection holding the active tab\'s resource, either engine', async () => {
   listDatabases.mockResolvedValue([])
   tabs.value = [
-    { id: 'm', type: 'mongodb.find', connectionId: 'a', dbName: 'shop', collectionName: 'orders' },
-    { id: 'p', type: 'postgresql.table_browse', connectionId: 'a', schema: 'public', table: 'merchants' },
+    { id: 'm', type: 'mongodb.find', target: createResourceRef('a', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]) },
+    { id: 'p', type: 'postgresql.table_browse', target: createResourceRef('a', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }]), connectionId: 'a', database: 'payments', schema: 'public', table: 'merchants' },
     { id: 'q', type: 'app.quickstart' },
   ]
   activeTabId.value = 'm'

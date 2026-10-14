@@ -14,8 +14,9 @@ describe('nodeTagName', () => {
 describe('tabColorName', () => {
   it('gives a PostgreSQL table or SQL tab its connection\'s colour', () => {
     const overrides = { p1: 'purple' }
-    expect(tabColorName({ type: 'postgresql.table_browse', connectionId: 'p1', schema: 'public', table: 't' }, overrides)).toBe('purple')
-    expect(tabColorName({ type: 'postgresql.query', connectionId: 'p1', database: 'payments' }, overrides)).toBe('purple')
+    const table = createResourceRef('p1', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 't' }])
+    expect(tabColorName({ type: 'postgresql.table_browse', target: table }, overrides)).toBe('purple')
+    expect(tabColorName({ type: 'postgresql.query', target: createResourceRef('p1', [{ kind: 'database', name: 'payments' }]) }, overrides)).toBe('purple')
   })
 
   it('lets a tab\'s own colour win over its connection\'s', () => {
@@ -23,7 +24,7 @@ describe('tabColorName', () => {
   })
 
   it('keeps MongoDB\'s nearest-coloured-ancestor rule', () => {
-    const tab = { type: 'mongodb.find', connectionId: 'c1', dbName: 'shop', collectionName: 'orders' }
+    const tab = { type: 'mongodb.find', target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]) }
     expect(tabColorName(tab, { c1: 'green', 'c1/shop': 'blue' })).toBe('blue')
     expect(tabColorName(tab, { c1: 'green' })).toBe('green')
   })

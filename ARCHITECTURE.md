@@ -140,11 +140,12 @@ Every workspace carries one as `target`, and containment questions are asked of 
 Everything between the sidebar and menus and the code that opens a tab or a modal passes
 `{ resource, connectionName }`: the ref, plus the display name a ref never carries.
 `apiTarget` in `src/engines/mongodb/api/payload.js` is the one place a ref becomes the
-MongoDB API's `{ connectionId, database, collection }`. A tab still keeps flat copies
-of its identity (`connectionId`, `dbName`, `collectionName`; PostgreSQL's `database`,
-`schema`, `table`) for its panes to read. They are written from the ref when the tab is
-created, and moving the panes onto `target` is unfinished work (#303), not a pattern
-to copy. New code takes a ResourceRef.
+MongoDB API's `{ connectionId, database, collection }`. A collection tab (Find,
+Aggregate, SQL) names its resource by `target` alone and keeps only the connection's
+display name beside it. Shell, tool and PostgreSQL tabs still keep flat copies of their
+identity (`connectionId`, `dbName`, `collectionName`; PostgreSQL's `database`, `schema`,
+`table`) for their panes to read; moving those onto `target` is unfinished work (#303),
+not a pattern to copy. New code takes a ResourceRef.
 
 ## PostgreSQL (preview)
 
