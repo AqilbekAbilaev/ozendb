@@ -2,12 +2,13 @@
 // current operations. Same contract as the query definitions. duplicate/restore clone
 // the durable configuration (sources, mapping, ops settings) and reset runtime state.
 import { resourceFromFeatureNode } from '../../../utils/legacyResourceRef'
+import { resourceName } from '../../../utils/resourceRef'
 import { opsDefaults } from '../../../composables/useCurrentOps'
 import { IndexManagerPane, SchemaPane, SearchPane, CurrentOpsPane, ImportPane, CsvImportPane, ExportPane } from './panes'
 
 // A tool workspace's identity fields, in the long spelling collection/shell workspaces
-// use. Reads either spelling: `create` gets a feature node (still short, #193), while
-// `duplicate`/`restore` get a workspace or saved record, which are long.
+// use. `duplicate`/`restore` read it off a workspace or a saved record, which spell the
+// fields either way; `create` no longer goes through here — it is handed a ResourceRef.
 function toolTarget(source) {
   return {
     connectionId: source.connectionId ?? source.connId ?? null,
@@ -36,6 +37,26 @@ function toolConnectionTarget(source) {
 
 function opsTarget(node) {
   return resourceFromFeatureNode(connectionScope(node))
+}
+
+// What every tool's `create` is handed: `{ resource, connectionName }` (#193), the same
+// payload the registry modals take. The tab's own fields stay in the long spelling until
+// the tab shape itself moves, so this spells them out from the reference once.
+function createdFields(ctx) {
+  const { resource, connectionName } = ctx.target
+  const [database, collection] = resource.segments
+  return {
+    connectionId: resource.connectionId,
+    connectionName: connectionName ?? null,
+    dbName: database?.name ?? null,
+    collectionName: collection?.name ?? null,
+  }
+}
+// The connection-scoped half of the same, for Current Operations, whose dbName/collName
+// are filters rather than identity.
+function createdConnectionFields(ctx) {
+  const { connectionId, connectionName } = createdFields(ctx)
+  return { connectionId, connectionName }
 }
 
 // Indexes/Schema/Search tabs are identity-only: the pane reloads its data on mount,
@@ -69,9 +90,9 @@ export const toolDefinitions = [
     canRefresh: () => true,
     create(ctx) {
       return {
-        title: 'Index Manager: ' + ctx.target.collName,
-        target: resourceFromFeatureNode(toolTarget(ctx.target)),
-        fields: { kind: 'indexes', ...toolTarget(ctx.target) },
+        title: 'Index Manager: ' + resourceName(ctx.target.resource),
+        target: ctx.target.resource,
+        fields: { kind: 'indexes', ...createdFields(ctx) },
       }
     },
     serialize: () => ({}),
@@ -84,9 +105,9 @@ export const toolDefinitions = [
     canRefresh: () => true,
     create(ctx) {
       return {
-        title: 'Schema: ' + ctx.target.collName,
-        target: resourceFromFeatureNode(toolTarget(ctx.target)),
-        fields: { kind: 'schema', ...toolTarget(ctx.target) },
+        title: 'Schema: ' + resourceName(ctx.target.resource),
+        target: ctx.target.resource,
+        fields: { kind: 'schema', ...createdFields(ctx) },
       }
     },
     serialize: () => ({}),
@@ -97,14 +118,11 @@ export const toolDefinitions = [
     engine: 'mongodb',
     component: SearchPane,
     create(ctx) {
+      const { connectionId, connectionName, dbName } = createdFields(ctx)
       return {
-        title: 'Search: ' + ctx.target.dbName,
-        target: resourceFromFeatureNode(toolTarget(ctx.target)),
-        fields: {
-          kind: 'search',
-          ...toolConnectionTarget(ctx.target),
-          dbName: ctx.target.dbName,
-        },
+        title: 'Search: ' + resourceName(ctx.target.resource),
+        target: ctx.target.resource,
+        fields: { kind: 'search', connectionId, connectionName, dbName },
       }
     },
     serialize: () => ({}),
@@ -118,7 +136,7 @@ export const toolDefinitions = [
     component: ImportPane,
     componentFor: (workspace) => (workspace.format === 'csv' ? CsvImportPane : ImportPane),
     create(ctx) {
-      const target = toolTarget(ctx.target)
+      const target = createdFields(ctx)
       const format = ctx.options.format || 'json'
       const base = { kind: 'import', ...target, format }
       // CSV is single-source with Source/Target sub-tabs and per-file options; JSON
@@ -130,7 +148,7 @@ export const toolDefinitions = [
             sourceType: 'file',         // 'clipboard' | 'file'
             filePath: '',
             csv: csvOptions(),
-            targetDb: ctx.target.dbName, targetColl: ctx.target.collName, mode: 'insert',
+            targetDb: target.dbName, targetColl: target.collectionName, mode: 'insert',
             fields: [],                 // column → field mapping (Target options)
           }
         : {
@@ -141,7 +159,7 @@ export const toolDefinitions = [
             previewOpen: false,
             runtime: importRuntime(),
           }
-      return { title: 'Import: ' + ctx.target.collName, target: resourceFromFeatureNode(target), fields }
+      return { title: 'Import: ' + resourceName(ctx.target.resource), target: ctx.target.resource, fields }
     },
     serialize(workspace) {
       // The durable configuration mirrors what restore accepts: CSV options with
@@ -240,7 +258,7 @@ export const toolDefinitions = [
     engine: 'mongodb',
     component: ExportPane,
     create(ctx) {
-      const target = toolTarget(ctx.target)
+      const target = createdFields(ctx)
       const source = ctx.options.source || 'collection'
       // The source fixes what gets exported and is frozen onto the tab at open time:
       // a later re-run re-reads the collection, but through the query as it was when
@@ -255,8 +273,8 @@ export const toolDefinitions = [
         : source === 'selected' ? ` (${(ctx.target.selectedIds || []).length} selected)`
         : ''
       return {
-        title: 'Export: ' + ctx.target.collName + suffix,
-        target: resourceFromFeatureNode(target),
+        title: 'Export: ' + resourceName(ctx.target.resource) + suffix,
+        target: ctx.target.resource,
         fields: {
           kind: 'export',
           ...target,
@@ -333,11 +351,11 @@ export const toolDefinitions = [
     canRefresh: () => true,
     create(ctx) {
       return {
-        title: 'Current Operations: ' + ctx.target.connName,
-        target: resourceFromFeatureNode(toolTarget(ctx.target)),
+        title: 'Current Operations: ' + (ctx.target.connectionName ?? ''),
+        target: ctx.target.resource,
         fields: {
           kind: 'currentOps',
-          ...toolConnectionTarget(ctx.target),
+          ...createdConnectionFields(ctx),
           // Toolbar settings and grid state live on the tab so they survive tab
           // switches (the pane unmounts while another tab is active). opsDefaults is
           // a factory: the arrays and column order are per-tab, never shared.

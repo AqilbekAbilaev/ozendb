@@ -9,6 +9,7 @@ vi.mock('./queryRunner', () => ({ runQuery: vi.fn() }))
 // imports evaluate before this module's body, so the store — and everything importing
 // it — is loaded dynamically after the one-time registration.
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
+import { createResourceRef } from '../utils/resourceRef'
 registerWorkspaceDefinitions()
 
 const creators = await import('./tabCreators')
@@ -33,9 +34,17 @@ function harness() {
 }
 
 const COLLECTION = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' }
-const NODE = { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' }
 const DB_NODE = { connId: 'c1', connName: 'Sales', dbName: 'shop' }
-const CONN_NODE = { connId: 'c1', connName: 'Sales' }
+
+// Tool tabs and wizards take `{ resource, connectionName }` (#193); the collection,
+// shell and SQL creators still take the long spelling above.
+const collRef = (connectionId, database, collection) => createResourceRef(connectionId, [
+  { kind: 'database', name: database }, { kind: 'collection', name: collection },
+])
+const dbRef = (connectionId, database) => createResourceRef(connectionId, [{ kind: 'database', name: database }])
+const TOOL = { resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' }
+const DB_TOOL = { resource: dbRef('c1', 'shop'), connectionName: 'Sales' }
+const CONN_TOOL = { resource: createResourceRef('c1'), connectionName: 'Sales' }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -52,12 +61,12 @@ describe('open policies — every open makes its own tab', () => {
     c.openCollectionTab(COLLECTION)
     c.openShellTab(DB_NODE)
     c.openShellTab(DB_NODE)
-    c.openCurrentOpsTab(CONN_NODE)
-    c.openCurrentOpsTab(CONN_NODE)
-    c.openImportTab(NODE, 'csv')
-    c.openImportTab(NODE, 'csv')
-    c.openExportTab({ ...NODE, query: null, selectedIds: [] }, 'collection')
-    c.openExportTab({ ...NODE, query: null, selectedIds: [] }, 'collection')
+    c.openCurrentOpsTab(CONN_TOOL)
+    c.openCurrentOpsTab(CONN_TOOL)
+    c.openImportTab(TOOL, 'csv')
+    c.openImportTab(TOOL, 'csv')
+    c.openExportTab({ ...TOOL, query: null, selectedIds: [] }, 'collection')
+    c.openExportTab({ ...TOOL, query: null, selectedIds: [] }, 'collection')
     expect(tabs.value).toHaveLength(11) // the seeded Quickstart plus ten opens
   })
 
@@ -65,8 +74,8 @@ describe('open policies — every open makes its own tab', () => {
     const c = harness()
     c.openCollectionTab(COLLECTION)
     c.openShellTab(DB_NODE)
-    c.openCurrentOpsTab(CONN_NODE)
-    c.openImportTab(NODE, 'json')
+    c.openCurrentOpsTab(CONN_TOOL)
+    c.openImportTab(TOOL, 'json')
     expect(activeTabId.value).toBe(lastTab().id)
   })
 })
@@ -83,29 +92,59 @@ describe('focus policies — one tab per target', () => {
 
   it('focuses the existing Index Manager tab for the same collection', () => {
     const c = harness()
-    c.openIndexManagerTab(NODE)
+    c.openIndexManagerTab(TOOL)
     const idxTab = lastTab()
-    c.openIndexManagerTab(NODE)
+    c.openIndexManagerTab(TOOL)
     expect(tabs.value).toHaveLength(2)
     expect(activeTabId.value).toBe(idxTab.id)
   })
 
   it('focuses the existing Schema tab for the same collection', () => {
     const c = harness()
-    c.openSchemaTab(NODE)
+    c.openSchemaTab(TOOL)
     const schemaTab = lastTab()
-    c.openSchemaTab(NODE)
+    c.openSchemaTab(TOOL)
     expect(tabs.value).toHaveLength(2)
     expect(activeTabId.value).toBe(schemaTab.id)
   })
 
   it('focuses the existing Search tab for the same database', () => {
     const c = harness()
-    c.openSearchTab(DB_NODE)
+    c.openSearchTab(DB_TOOL)
     const searchTab = lastTab()
-    c.openSearchTab(DB_NODE)
+    c.openSearchTab(DB_TOOL)
     expect(tabs.value).toHaveLength(2)
     expect(activeTabId.value).toBe(searchTab.id)
+  })
+
+  // One tab per *target*, not per connection: a tool matched on the connection alone
+  // would hand the user the tab for whichever collection they opened first.
+  it('tells two collections of one connection apart when focusing', () => {
+    const c = harness()
+    c.openIndexManagerTab(TOOL)
+    const ordersTab = lastTab()
+    const items = { resource: collRef('c1', 'shop', 'items'), connectionName: 'Sales' }
+    c.openIndexManagerTab(items)
+    const itemsTab = lastTab()
+    expect(itemsTab.id).not.toBe(ordersTab.id)
+    expect(tabs.value).toHaveLength(3)
+
+    c.openIndexManagerTab(TOOL)
+    expect(activeTabId.value).toBe(ordersTab.id)
+    c.openIndexManagerTab(items)
+    expect(activeTabId.value).toBe(itemsTab.id)
+    expect(tabs.value).toHaveLength(3)
+  })
+
+  // Search is database-scoped, so two databases on one connection are two tabs.
+  it('tells two databases of one connection apart when focusing Search', () => {
+    const c = harness()
+    c.openSearchTab(DB_TOOL)
+    const shopTab = lastTab()
+    c.openSearchTab({ resource: dbRef('c1', 'warehouse'), connectionName: 'Sales' })
+    expect(tabs.value).toHaveLength(3)
+    c.openSearchTab(DB_TOOL)
+    expect(activeTabId.value).toBe(shopTab.id)
   })
 
   it('focuses the existing Quickstart instead of stacking', () => {
@@ -168,7 +207,7 @@ describe('created tab shapes', () => {
 
   it('opens current-operations tabs with the toolbar defaults on the tab', () => {
     const c = harness()
-    c.openCurrentOpsTab(CONN_NODE)
+    c.openCurrentOpsTab(CONN_TOOL)
     expect(lastTab().kind).toBe('currentOps')
     expect(lastTab().frequency).toBe(2000)
     expect(lastTab().title).toBe('Current Operations: Sales')
@@ -176,17 +215,17 @@ describe('created tab shapes', () => {
 
   it('opens imports with the chosen format', () => {
     const c = harness()
-    c.openImportTab(NODE, 'csv')
+    c.openImportTab(TOOL, 'csv')
     expect(lastTab().format).toBe('csv')
     expect(lastTab().subTab).toBe('source')
-    c.openImportTab(NODE, 'json')
+    c.openImportTab(TOOL, 'json')
     expect(lastTab().format).toBe('json')
     expect(lastTab().sources).toEqual([])
   })
 
   it('opens exports with the source frozen at creation', () => {
     const c = harness()
-    c.openExportTab({ ...NODE, query: '{ "a": 1 }', selectedIds: ['x', 'y'] }, 'query')
+    c.openExportTab({ ...TOOL, query: '{ "a": 1 }', selectedIds: ['x', 'y'] }, 'query')
     const tab = lastTab()
     expect(tab.kind).toBe('export')
     expect(tab.source).toBe('query')
@@ -269,26 +308,23 @@ describe('export source resolution', () => {
   it('starts in the export-source modal with the resolved query and selected ids', () => {
     const c = harness()
     tabs.value = [{
-      id: 't1', kind: 'collection', connectionId: 'c1', dbName: 'shop', collectionName: 'orders',
+      id: 't1', kind: 'collection', target: collRef('c1', 'shop', 'orders'),
       state: { query: { filter: '{ "status": "open" }' } },
       runtime: { results: [{ _id: 'a' }, { _id: 'b' }, { noId: true }], selectedRows: [0, 1, 2] },
     }]
-    c.openExportSource(NODE)
+    c.openExportSource(TOOL)
     expect(openModal).toHaveBeenCalledWith('exportSource', {
-      ...NODE,
-      // Both spellings: the modal reads the long one, openExportTab the short one.
-      connectionId: NODE.connId,
-      connectionName: NODE.connName,
-      collectionName: NODE.collName,
+      resource: TOOL.resource,
+      connectionName: 'Sales',
       query: '{"status":"open"}',
       selectedIds: ['a', 'b'],
     }, expect.objectContaining({ on: expect.any(Object) }))
   })
 
   // #275: two tabs on one collection, the first with an empty query.
-  const SPACED_NODE = { connId: 'c 1', connName: 'Sales ü', dbName: 'shop.eu', collName: 'orders/2026' }
+  const SPACED_TOOL = { resource: collRef('c 1', 'shop.eu', 'orders/2026'), connectionName: 'Sales ü' }
   const collectionTab = (id, filter, results, selectedRows) => ({
-    id, kind: 'collection', connectionId: 'c 1', dbName: 'shop.eu', collectionName: 'orders/2026',
+    id, kind: 'collection', target: collRef('c 1', 'shop.eu', 'orders/2026'),
     state: { query: { filter } }, runtime: { results, selectedRows },
   })
 
@@ -299,7 +335,7 @@ describe('export source resolution', () => {
       collectionTab('t2', '{ "company": "Umbrella Corp." }', [{ _id: 'a' }, { _id: 'b' }], [1]),
     ]
     activeTabId.value = 't2'
-    c.openExportSource(SPACED_NODE)
+    c.openExportSource(SPACED_TOOL)
     const [, target] = openModal.mock.calls[0]
     expect(target.query).toBe('{"company":"Umbrella Corp."}')
     expect(target.selectedIds).toEqual(['b'])
@@ -313,7 +349,7 @@ describe('export source resolution', () => {
       { id: 't3', kind: 'quickstart', title: 'Quickstart' },
     ]
     activeTabId.value = 't3'
-    c.openExportSource(SPACED_NODE)
+    c.openExportSource(SPACED_TOOL)
     const [, target] = openModal.mock.calls[0]
     expect(target.query).toBe('{"company":"Umbrella Corp."}')
     expect(target.selectedIds).toEqual(['a'])
@@ -321,11 +357,11 @@ describe('export source resolution', () => {
 
   it('opens an export tab from the target captured when the picker opened', () => {
     const c = harness()
-    c.openExportSource(NODE)
+    c.openExportSource(TOOL)
     const [, target, options] = openModal.mock.calls[0]
     options.on.choose('query')
     expect(lastTab().source).toBe('query')
-    expect(lastTab().connectionId).toBe(target.connId)
+    expect(lastTab().connectionId).toBe(target.resource.connectionId)
     expect(closeModal).toHaveBeenCalledWith('exportSource')
   })
 })
@@ -347,7 +383,7 @@ describe('ids', () => {
     const c = harness()
     c.openCollectionTab(COLLECTION)
     c.openShellTab(DB_NODE)
-    c.openCurrentOpsTab(CONN_NODE)
+    c.openCurrentOpsTab(CONN_TOOL)
     expect(new Set(ids()).size).toBe(4)
   })
 })

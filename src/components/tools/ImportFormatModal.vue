@@ -15,7 +15,7 @@ const props = defineProps({
   target: { type: Object, required: true },
 })
 
-const destination = computed(() => `${props.target.dbName}.${props.target.collName}`)
+const destination = computed(() => props.target.resource.segments.map(s => s.name).join('.'))
 const emit = defineEmits(['configure', 'close'])
 
 const FORMATS = [

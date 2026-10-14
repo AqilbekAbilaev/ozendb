@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createWorkspace } from './createWorkspace'
 import { registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
+import { createResourceRef } from '../utils/resourceRef'
 
 // The factory is exercised through both a real definition (mongodb.find — the
 // richest legacy shape) and local spy definitions that probe the envelope rules.
@@ -131,22 +132,23 @@ describe('createWorkspace — fresh mutable state', () => {
   })
 
   it('allocates fresh nested import options per workspace', () => {
-    const a = createWorkspace('mongodb.import', {
-      target: { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' },
-      options: { format: 'csv' },
+    const importTarget = () => ({
+      resource: createResourceRef('c1', [
+        { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' },
+      ]),
+      connectionName: 'Sales',
     })
-    const b = createWorkspace('mongodb.import', {
-      target: { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' },
-      options: { format: 'csv' },
-    })
+    const a = createWorkspace('mongodb.import', { target: importTarget(), options: { format: 'csv' } })
+    const b = createWorkspace('mongodb.import', { target: importTarget(), options: { format: 'csv' } })
     expect(a.csv).not.toBe(b.csv)
     a.csv.delimiter = ';'
     expect(b.csv.delimiter).toBe(',')
   })
 
   it('allocates fresh current-operations arrays per workspace', () => {
-    const a = createWorkspace('mongodb.current_operations', { target: { connId: 'c1', connName: 'Sales' } })
-    const b = createWorkspace('mongodb.current_operations', { target: { connId: 'c1', connName: 'Sales' } })
+    const opsTarget = () => ({ resource: createResourceRef('c1'), connectionName: 'Sales' })
+    const a = createWorkspace('mongodb.current_operations', { target: opsTarget() })
+    const b = createWorkspace('mongodb.current_operations', { target: opsTarget() })
     expect(a.ops).not.toBe(b.ops)
     expect(a.results).not.toBe(b.results)
     expect(a.colOrder).not.toBe(b.colOrder)

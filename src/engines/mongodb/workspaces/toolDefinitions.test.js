@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { toolDefinitions } from './toolDefinitions'
-import { isResourceRef } from '../../../utils/resourceRef'
+import { isResourceRef, createResourceRef } from '../../../utils/resourceRef'
 import { duplicateWorkspace, restoreWorkspace } from '../../../workspaces/lifecycle'
 import { registerWorkspaceDefinitions } from '../../../workspaces/registerDefinitions'
 
@@ -14,9 +14,13 @@ const ctx = (target, options = {}) => ({
   ids: { workspace: () => 'w-1', session: () => 'sess-1' },
 })
 
-const COLLECTION = { connId: 'c1', connName: 'Sales', dbName: 'shop', collName: 'orders' }
-const DATABASE = { connId: 'c1', connName: 'Sales', dbName: 'shop' }
-const CONNECTION = { connId: 'c1', connName: 'Sales' }
+// What a tool's `create` is handed: the node's ResourceRef plus the connection's
+// display name, the same payload the registry modals take (#193).
+const DB_SEGMENT = { kind: 'database', name: 'shop' }
+const COLL_SEGMENT = { kind: 'collection', name: 'orders' }
+const COLLECTION = { resource: createResourceRef('c1', [DB_SEGMENT, COLL_SEGMENT]), connectionName: 'Sales' }
+const DATABASE = { resource: createResourceRef('c1', [DB_SEGMENT]), connectionName: 'Sales' }
+const CONNECTION = { resource: createResourceRef('c1'), connectionName: 'Sales' }
 // The same identity as the nodes above, in the spelling a tool *workspace* carries.
 const COLLECTION_FIELDS = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: 'orders' }
 const DATABASE_FIELDS = { connectionId: 'c1', connectionName: 'Sales', dbName: 'shop' }

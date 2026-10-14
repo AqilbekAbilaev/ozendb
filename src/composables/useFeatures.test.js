@@ -262,7 +262,9 @@ describe('feature nodes arrive as a ResourceRef', () => {
   it('gives a connection-scoped tool no database or collection to filter on', () => {
     contextMenu.value = ordersRow
     makeFeatures().handleContextAction('db:current_ops')
-    expect(openCurrentOpsTab).toHaveBeenCalledWith({ connId: 'c1', connName: 'Sales' })
+    expect(openCurrentOpsTab).toHaveBeenCalledWith({
+      resource: createResourceRef('c1'), connectionName: 'Sales',
+    })
   })
 
   it('opens a collection-level modal with the collection\'s ref', () => {
@@ -334,7 +336,9 @@ describe('feature nodes arrive as a ResourceRef', () => {
       connectionId: 'c1', connectionName: 'Sales', dbName: 'shop', collectionName: null, kind: 'database',
     }))
     useFeatures({ menuTarget }).menuNode('file:search')
-    expect(openSearchTab).toHaveBeenCalledWith({ connId: 'c1', connName: 'Sales', dbName: 'shop' })
+    expect(openSearchTab).toHaveBeenCalledWith({
+      resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]), connectionName: 'Sales',
+    })
   })
 
   it('guides the user when the native menu has nothing deep enough', () => {
