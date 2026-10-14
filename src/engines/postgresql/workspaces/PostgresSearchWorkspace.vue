@@ -7,6 +7,7 @@ import { computed } from 'vue'
 import { runSearch, cancelSearch } from './searchRun.js'
 import { openPostgresTable } from '../../../stores/tabCreators'
 import { crumbSegments } from '../../../utils/crumbSegments'
+import { segmentName } from '../../../utils/resourceRef'
 import WorkspaceCrumbs from '../../../components/base/WorkspaceCrumbs.vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseInput from '../../../components/base/BaseInput.vue'
@@ -24,8 +25,12 @@ const run = computed(() => props.activeTab.runtime)
 
 // A match opens its row in a new table tab, filtered by its primary key (#172).
 function openMatch(m) {
-  const { connectionId, connectionName, database, schema } = props.activeTab
-  openPostgresTable({ connectionId, connectionName, database, schema, table: m.table, rowKey: m.primaryKey })
+  const target = props.activeTab.target
+  openPostgresTable({
+    connectionId: target.connectionId, connectionName: props.activeTab.connectionName,
+    database: segmentName(target, 'database'), schema: segmentName(target, 'schema'),
+    table: m.table, rowKey: m.primaryKey,
+  })
 }
 
 function keyText(pk) {

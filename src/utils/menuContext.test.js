@@ -179,7 +179,7 @@ describe('PostgreSQL never reaches the MongoDB gates', () => {
   const pgTableTab = {
     id: 't9', type: 'postgresql.table_browse', engine: 'postgresql',
     target: createResourceRef('p1', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'merchants' }]),
-    connectionId: 'p1', connectionName: 'Payments PG', database: 'payments', schema: 'public', table: 'merchants',
+    connectionName: 'Payments PG',
   }
 
   it('a PostgreSQL connection selected in the sidebar enables no connection item', () => {
@@ -273,8 +273,16 @@ describe('resolveMenuTarget', () => {
 // #145: the PostgreSQL gates are the union of the active tab and the sidebar
 // selection, the same as the Mongo ones above — PostgresTreeNodes feeds its clicked
 // schema/table row into the shared tree-selection store.
-const pgQueryTab = { id: 'p1', type: 'postgresql.query', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public' }
-const pgTableTab = { id: 'p2', type: 'postgresql.table_browse', connectionId: 'c1', connectionName: 'PG', database: 'app', schema: 'public', table: 'widgets' }
+// Tabs as their definitions build them: identity is the ref alone (#303). A query tab
+// is database-scoped; a table tab names its schema and table.
+const pgQueryTab = {
+  id: 'p1', type: 'postgresql.query', connectionName: 'PG',
+  target: createResourceRef('c1', [{ kind: 'database', name: 'app' }]),
+}
+const pgTableTab = {
+  id: 'p2', type: 'postgresql.table_browse', connectionName: 'PG',
+  target: createResourceRef('c1', [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'widgets' }]),
+}
 
 describe('deriveMenuContext (PostgreSQL)', () => {
   it('a query tab enables the schema gate only', () => {
@@ -361,7 +369,7 @@ describe('resolvePgMenuTarget', () => {
   it('resolves a query tab, carrying both alias spellings', () => {
     expect(resolvePgMenuTarget(pgQueryTab)).toEqual({
       connId: 'c1', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
-      database: 'app', schema: 'public', table: null,
+      database: 'app', schema: null, table: null,
     })
   })
 

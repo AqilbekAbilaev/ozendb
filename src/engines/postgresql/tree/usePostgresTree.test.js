@@ -6,6 +6,7 @@ const listForeignKeys = vi.fn()
 vi.mock('../api/resources', () => ({ listTables, listColumns, listForeignKeys }))
 
 const { usePostgresTree, visibleSchemas, isOpenTable, activeTableSchema, isSelectedNode } = await import('./usePostgresTree.js')
+const { createResourceRef } = await import('../../../utils/resourceRef')
 
 beforeEach(() => vi.resetAllMocks())
 
@@ -21,8 +22,13 @@ describe('visibleSchemas', () => {
   })
 })
 
+// A table tab's identity is its ref (#303).
+const usersTable = createResourceRef('c1', [
+  { kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'users' },
+])
+
 describe('isOpenTable', () => {
-  const tab = { type: 'postgresql.table_browse', connectionId: 'c1', schema: 'public', table: 'users' }
+  const tab = { type: 'postgresql.table_browse', target: usersTable }
   it('is the table the active tab is browsing, on this connection', () => {
     expect(isOpenTable(tab, 'c1', 'public', 'users')).toBe(true)
     expect(isOpenTable(tab, 'c2', 'public', 'users')).toBe(false)
@@ -33,7 +39,7 @@ describe('isOpenTable', () => {
 })
 
 describe('activeTableSchema', () => {
-  const tab = { type: 'postgresql.table_browse', connectionId: 'c1', schema: 'public', table: 'users' }
+  const tab = { type: 'postgresql.table_browse', target: usersTable }
   it('is the schema the tree must open for the active tab\'s row to be visible', () => {
     expect(activeTableSchema(tab, 'c1')).toBe('public')
     expect(activeTableSchema(tab, 'c2')).toBeNull()

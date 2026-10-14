@@ -13,7 +13,7 @@
 // be set. That is what keeps Current Operations, which carries dbName/collName as
 // *filters*, from enabling the Database menu. A tab without a target (Quickstart)
 // names no resource and gates everything off.
-import { sameResource } from './resourceRef'
+import { sameResource, segmentName } from './resourceRef'
 import { isCollectionTab } from './workspaceTypes'
 
 // How many segments each gated level needs.
@@ -161,21 +161,21 @@ export function resolvePgMenuTarget(activeTab, treeSelection = null, requiredLev
   const tab = activeTab || null
   const needed = PG_DEPTH[requiredLevel] ?? PG_DEPTH.schema
 
-  if (depth(pgResource(sel, sel?.resource ?? null)) >= needed) return pgTarget(sel)
-  if (PG_TAB_TYPES.includes(tab?.type)) return pgTarget(tab)
+  if (depth(pgResource(sel, sel?.resource ?? null)) >= needed) return pgTarget(sel.resource, sel.connectionName)
+  if (PG_TAB_TYPES.includes(tab?.type)) return pgTarget(tab.target, tab.connectionName)
   return null
 }
 
-// Both PostgreSQL sources already spell their levels the same way (database/schema/
-// table), on a tab and on a tree selection alike, so one projection serves both.
-function pgTarget(source) {
+// A PostgreSQL selection or tab, read off its ref (a tab keeps no flat identity, #303)
+// into the database/schema/table fields every PostgreSQL consumer reads.
+function pgTarget(ref, connectionName) {
   return {
-    connId: source.connectionId,
-    connName: source.connectionName,
-    connectionId: source.connectionId,
-    connectionName: source.connectionName,
-    database: source.database,
-    schema: source.schema ?? null,
-    table: source.table ?? null,
+    connId: ref.connectionId,
+    connName: connectionName,
+    connectionId: ref.connectionId,
+    connectionName: connectionName,
+    database: segmentName(ref, 'database'),
+    schema: segmentName(ref, 'schema'),
+    table: segmentName(ref, 'table'),
   }
 }

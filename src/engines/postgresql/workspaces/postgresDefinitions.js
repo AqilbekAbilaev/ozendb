@@ -3,7 +3,7 @@
 // (tableState.js). A session saves the state; runtime starts fresh and loads again.
 import { defineAsyncComponent } from 'vue'
 import PostgresSearchWorkspace from './PostgresSearchWorkspace.vue'
-import { createResourceRef } from '../../../utils/resourceRef'
+import { createResourceRef, segmentName } from '../../../utils/resourceRef'
 import { createTableState, createTableUi, createTableRuntime, migrateTableState } from './tableState.js'
 import { abandonTransaction, createSqlRun } from './runSql.js'
 import { createSearchState, createSearchRuntime, cancelSearch } from './searchRun.js'
@@ -23,45 +23,54 @@ const PostgresQueryWorkspace = defineAsyncComponent(() => import('./PostgresQuer
 // Tabs are reactive, which structuredClone can't copy; state and ui are JSON-only.
 const copy = (value) => JSON.parse(JSON.stringify(value))
 
-function tableWorkspace({ connectionId, connectionName, database, schema, table }, state = createTableState(), ui = createTableUi()) {
+// The PostgreSQL openers still pass flat fields (connectionId, database, schema, table);
+// this is the one place they become the tab's ref. A tab's identity is that `target`
+// alone (#303): beside it the tab keeps only the connection's display name.
+function openedRef({ connectionId, database, schema, table }) {
+  const segments = [{ kind: 'database', name: database }]
+  if (schema) segments.push({ kind: 'schema', name: schema })
+  if (table) segments.push({ kind: 'table', name: table })
+  return createResourceRef(connectionId, segments)
+}
+
+// What a source hands every builder below: its ref and its display name. A creation
+// context's flat fields become a ref here; a live workspace or a saved record already
+// carries one.
+const fromOpened = (opened) => ({ target: openedRef(opened), connectionName: opened.connectionName })
+
+function tableWorkspace({ target, connectionName }, state = createTableState(), ui = createTableUi()) {
   return {
-    title: table,
-    target: createResourceRef(connectionId, [
-      { kind: 'database', name: database },
-      { kind: 'schema', name: schema },
-      { kind: 'table', name: table },
-    ]),
+    title: segmentName(target, 'table'),
+    target,
     fields: {
-      connectionId, connectionName, database, schema, table,
-      state, ui, runtime: createTableRuntime(connectionId),
+      connectionName: connectionName ?? null,
+      state, ui, runtime: createTableRuntime(target.connectionId),
     },
   }
 }
 
 // The SQL is the tab's state; its runs are runtime, so a duplicate starts without them.
-function queryWorkspace({ connectionId, connectionName, database }, sql = '') {
+function queryWorkspace({ target, connectionName }, sql = '') {
+  const database = segmentName(target, 'database')
   return {
     title: 'SQL: ' + database,
-    target: createResourceRef(connectionId, [{ kind: 'database', name: database }]),
+    target,
     fields: {
-      connectionId, connectionName, database,
+      connectionName: connectionName ?? null,
       state: { sql },
-      runtime: { run: createSqlRun(connectionId, database) },
+      runtime: { run: createSqlRun(target.connectionId, database) },
     },
   }
 }
 
 // The typed search is the tab's state; its result is runtime, so a duplicate or a
 // restored tab starts without one (#180).
-function searchWorkspace({ connectionId, connectionName, database, schema }, state = createSearchState()) {
+function searchWorkspace({ target, connectionName }, state = createSearchState()) {
   return {
-    title: 'Search: ' + schema,
-    target: createResourceRef(connectionId, [
-      { kind: 'database', name: database },
-      { kind: 'schema', name: schema },
-    ]),
+    title: 'Search: ' + segmentName(target, 'schema'),
+    target,
     fields: {
-      connectionId, connectionName, database, schema,
+      connectionName: connectionName ?? null,
       state, runtime: createSearchRuntime(),
     },
   }
@@ -72,7 +81,7 @@ export const postgresDefinitions = [
     type: 'postgresql.table_browse',
     engine: 'postgresql',
     component: PostgresTableWorkspace,
-    create: (ctx) => tableWorkspace(ctx.target, createTableState({ rowKey: ctx.options?.rowKey })),
+    create: (ctx) => tableWorkspace(fromOpened(ctx.target), createTableState({ rowKey: ctx.options?.rowKey })),
     // Filter mode only reads; SQL mode runs whatever SQL the user wrote.
     canRefresh: (workspace) => workspace.state.mode === 'filter',
     // A copy keeps the query and the panel; rows load again.
@@ -85,7 +94,7 @@ export const postgresDefinitions = [
     type: 'postgresql.query',
     engine: 'postgresql',
     component: PostgresQueryWorkspace,
-    create: (ctx) => queryWorkspace(ctx.target),
+    create: (ctx) => queryWorkspace(fromOpened(ctx.target)),
     duplicate: (workspace) => queryWorkspace(workspace, workspace.state.sql),
     serialize: (workspace) => ({ sql: workspace.state.sql }),
     restore: (saved) => queryWorkspace(saved, saved.sql ?? ''),
@@ -95,7 +104,7 @@ export const postgresDefinitions = [
     type: 'postgresql.search',
     engine: 'postgresql',
     component: PostgresSearchWorkspace,
-    create: (ctx) => searchWorkspace(ctx.target),
+    create: (ctx) => searchWorkspace(fromOpened(ctx.target)),
     duplicate: (workspace) => searchWorkspace(workspace, copy(workspace.state)),
     serialize: (workspace) => copy({ state: workspace.state }),
     restore: (saved) => searchWorkspace(saved, { ...createSearchState(), ...saved.state }),

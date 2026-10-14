@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, shallowRef, watch, computed } from 'vue'
+import { segmentName } from '../../../utils/resourceRef'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import CodeEditor from '../../../components/base/CodeEditor.vue'
@@ -35,7 +36,7 @@ const t = shallowRef(null)
 const limitDraft = ref(0)
 const library = ref(null)   // which view of the query library is open, if any
 watch(() => props.activeTab.id, () => {
-  const readOnly = !!openConnections.value.find(c => c.id === props.activeTab.connectionId)?.read_only
+  const readOnly = !!openConnections.value.find(c => c.id === props.activeTab.target.connectionId)?.read_only
   t.value = reactive(usePostgresTable(props.activeTab, { readOnly }))
   limitDraft.value = t.value.limit
   if (props.activeTab.runtime.generation === 0) t.value.load()
@@ -234,7 +235,7 @@ async function saveChanges() {
         <PostgresQueryBuilder
           v-if="t.panel.builderOpen && t.columns.length"
           :style="{ width: t.panel.builderWidth + 'px' }"
-          :table="activeTab.table"
+          :table="segmentName(activeTab.target, 'table')"
           :columns="t.keys"
           :column-info="t.columnInfo"
           :filter-text="t.filterText"
@@ -261,7 +262,7 @@ async function saveChanges() {
       <PostgresTableFooter :t="t" />
       <PostgresQueryLibrary
         v-if="library"
-        :connection-id="activeTab.connectionId"
+        :connection-id="activeTab.target.connectionId"
         :sql="t.currentSql"
         :view="library"
         @load="t.openSql"

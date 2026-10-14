@@ -50,7 +50,7 @@ describe('a PostgreSQL table tab restored from a saved session', () => {
   for (const fixture of SAVED_TABLE_STATES) {
     it(`asks for what it asked for before it was saved: ${fixture.name}`, async () => {
       const tab = restore(fixture.state)
-      expect(tab).toMatchObject({ type: TYPE, connectionId: 'c1', database: 'app', schema: 'public', table: 'users' })
+      expect(tab).toMatchObject({ type: TYPE, target, connectionName: 'local' })
       expect(await load(tab)).toEqual(fixture.tab)
       expect(browseTable).toHaveBeenLastCalledWith({ connectionId: 'c1', database: 'app', schema: 'public', table: 'users' }, fixture.browse)
     })

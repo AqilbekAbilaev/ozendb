@@ -5,6 +5,7 @@
 import { searchTables } from '../api/resources'
 import { cancelQuery } from '../api/queries'
 import { errText, errCode } from '../../../utils/errors'
+import { segmentName } from '../../../utils/resourceRef'
 
 export function createSearchState() {
   return { term: '', tables: '', matchCase: false, regex: false }
@@ -31,7 +32,7 @@ export async function runSearch(tab) {
   runtime.runId = crypto.randomUUID()
   try {
     runtime.result = await searchTables(
-      { connectionId: tab.connectionId, schema: tab.schema, tables: tableList(state.tables) },
+      { connectionId: tab.target.connectionId, schema: segmentName(tab.target, 'schema'), tables: tableList(state.tables) },
       term,
       { matchCase: state.matchCase, regex: state.regex, runId: runtime.runId },
     )
@@ -45,5 +46,5 @@ export async function runSearch(tab) {
 }
 
 export function cancelSearch(tab) {
-  if (tab.runtime.runId) cancelQuery(tab.connectionId, tab.runtime.runId).catch(() => {})
+  if (tab.runtime.runId) cancelQuery(tab.target.connectionId, tab.runtime.runId).catch(() => {})
 }

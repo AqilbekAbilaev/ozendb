@@ -23,8 +23,9 @@ vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
 const { createTableState, createTableUi, createTableRuntime } = await import('./tableState.js')
+const { createResourceRef } = await import('../../../utils/resourceRef')
 
-const target = { connectionId: 'c1', schema: 'public', table: 'users' }
+const target = { connectionId: 'c1', database: 'app', schema: 'public', table: 'users' }
 const COLUMNS = [
   { name: 'id', dataType: 'integer', isPrimaryKey: true },
   { name: 'name', dataType: 'text', isPrimaryKey: false },
@@ -49,9 +50,13 @@ beforeEach(() => {
   })
 })
 
-// A table tab as the workspace holds it, with the state it starts from.
+// A table tab as the workspace holds it, with the state it starts from. Its identity is
+// its ref (#303); `target` above is the same table in the fields the API calls take.
+const tableRef = createResourceRef(target.connectionId, [
+  { kind: 'database', name: target.database }, { kind: 'schema', name: target.schema }, { kind: 'table', name: target.table },
+])
 const tabOf = ({ pageSize, initial } = {}) =>
-  reactive({ ...target, state: initial ?? createTableState({ limit: pageSize }), ui: createTableUi(), runtime: createTableRuntime(target.connectionId) })
+  reactive({ target: tableRef, state: initial ?? createTableState({ limit: pageSize }), ui: createTableUi(), runtime: createTableRuntime(target.connectionId) })
 const table = ({ readOnly, ...start } = {}) => usePostgresTable(tabOf(start), { readOnly })
 
 async function loaded(options) {
@@ -278,7 +283,7 @@ describe('joins', () => {
     listForeignKeys.mockResolvedValue([{ fromSchema: 'public', fromTable: 'users', fromColumns: ['id'], toSchema: 'public', toTable: 'regions', toColumns: ['id'] }])
     const t = await loaded()
     await Promise.resolve()
-    expect(listForeignKeys).toHaveBeenCalledWith(target)
+    expect(listForeignKeys).toHaveBeenCalledWith({ connectionId: 'c1', schema: 'public', table: 'users' })
     expect(t.joinOffers.value.map(o => o.table)).toEqual(['regions'])
   })
 

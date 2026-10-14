@@ -392,7 +392,8 @@ describe('PostgreSQL tables', () => {
     c.openPostgresTable(TABLE)
 
     expect(tabs.value.filter(t => t.type === 'postgresql.table_browse')).toHaveLength(2)
-    expect(lastTab()).toMatchObject({ type: 'postgresql.table_browse', engine: 'postgresql', schema: 'public', table: 'users' })
+    expect(lastTab()).toMatchObject({ type: 'postgresql.table_browse', engine: 'postgresql', title: 'users' })
+    expect(lastTab().target.segments).toEqual([{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'users' }])
     expect(activeTabId.value).toBe(lastTab().id)
   })
 
@@ -410,7 +411,8 @@ describe('PostgreSQL search', () => {
     c.openPostgresSearch(SCHEMA)
     c.openPostgresSearch(SCHEMA)
     expect(tabs.value.filter(t => t.type === 'postgresql.search')).toHaveLength(2)
-    expect(lastTab()).toMatchObject({ type: 'postgresql.search', engine: 'postgresql', title: 'Search: public', schema: 'public' })
+    expect(lastTab()).toMatchObject({ type: 'postgresql.search', engine: 'postgresql', title: 'Search: public' })
+    expect(lastTab().target.segments).toEqual([{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }])
     expect(activeTabId.value).toBe(lastTab().id)
   })
 })
@@ -419,7 +421,8 @@ describe('PostgreSQL queries', () => {
   it('opens a query tab against the connection\'s database, and activates it', () => {
     const c = harness()
     c.openPostgresQuery({ connectionId: 'c9', connectionName: 'pg', database: 'app' })
-    expect(lastTab()).toMatchObject({ type: 'postgresql.query', database: 'app', state: { sql: '' } })
+    expect(lastTab()).toMatchObject({ type: 'postgresql.query', state: { sql: '' } })
+    expect(lastTab().target.segments).toEqual([{ kind: 'database', name: 'app' }])
     expect(activeTabId.value).toBe(lastTab().id)
   })
 })

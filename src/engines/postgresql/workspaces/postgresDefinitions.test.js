@@ -12,7 +12,10 @@ const { createSqlRun } = await import('./runSql.js')
 beforeEach(() => vi.clearAllMocks())
 
 const byType = Object.fromEntries(postgresDefinitions.map(d => [d.type, d]))
+// What the PostgreSQL openers pass: flat fields, which become the tab's ref (#303).
 const target = { connectionId: 'c1', connectionName: 'local', database: 'app', schema: 'public', table: 'users' }
+// A live or saved tab, which carries its ref and display name rather than flat identity.
+const tabOf = (created) => ({ ...created.fields, target: created.target })
 
 describe('postgresql.table_browse', () => {
   const def = byType['postgresql.table_browse']
@@ -28,12 +31,12 @@ describe('postgresql.table_browse', () => {
         { kind: 'table', name: 'users' },
       ],
     })
-    expect(created.fields).toEqual({ ...target, state: createTableState(), ui: createTableUi(), runtime: createTableRuntime('c1') })
+    expect(created.fields).toEqual({ connectionName: 'local', state: createTableState(), ui: createTableUi(), runtime: createTableRuntime('c1') })
   })
 
   // A table tab with a query built, on page 3, a sort paused and the builder open.
   function built() {
-    const tab = { ...def.create({ target }).fields, id: 't1', title: 'users' }
+    const tab = { ...tabOf(def.create({ target })), id: 't1', title: 'users' }
     tab.state.query.filterText = { name: 'ad' }
     tab.state.query.offset = 100
     tab.state.paused.sort = { column: 'id', desc: true }
@@ -56,13 +59,14 @@ describe('postgresql.table_browse', () => {
     const tab = built()
     const saved = JSON.parse(JSON.stringify(def.serialize(tab)))
     expect(saved).toEqual({ state: tab.state, ui: tab.ui })
-    const restored = def.restore({ ...target, ...saved })
+    const restored = def.restore({ target: tab.target, connectionName: 'local', ...saved })
     expect(restored.fields.state).toEqual(tab.state)
     expect(restored.fields.ui).toEqual(tab.ui)
   })
 
   it('opens a tab saved without its panel with the panel closed', () => {
-    expect(def.restore({ ...target, view: {} }).fields.ui).toEqual(createTableUi())
+    const saved = tabOf(def.create({ target }))
+    expect(def.restore({ target: saved.target, connectionName: 'local', view: {} }).fields.ui).toEqual(createTableUi())
   })
 })
 
@@ -74,11 +78,11 @@ describe('postgresql.query', () => {
     const created = def.create({ target: db })
     expect(created.title).toBe('SQL: app')
     expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }] })
-    expect(created.fields).toEqual({ ...db, state: { sql: '' }, runtime: { run: createSqlRun('c1', 'app') } })
+    expect(created.fields).toEqual({ connectionName: 'local', state: { sql: '' }, runtime: { run: createSqlRun('c1', 'app') } })
   })
 
   it('duplicates the SQL but not the result', () => {
-    const tab = def.create({ target: db }).fields
+    const tab = tabOf(def.create({ target: db }))
     tab.state.sql = 'SELECT 1'
     Object.assign(tab.runtime.run, { result: { rows: [[1]] }, error: 'x' })
     expect(def.duplicate(tab).fields).toMatchObject({ state: { sql: 'SELECT 1' }, runtime: { run: createSqlRun('c1', 'app') } })
@@ -96,14 +100,14 @@ describe('postgresql.search', () => {
     expect(created.title).toBe('Search: public')
     expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }] })
     expect(created.fields).toEqual({
-      ...schema,
+      connectionName: 'local',
       state: { term: '', tables: '', matchCase: false, regex: false },
       runtime: { result: null, loading: false, error: null, errorCode: null, runId: null },
     })
   })
 
   it('duplicates the typed search but not the result', () => {
-    const tab = { ...def.create({ target: schema }).fields }
+    const tab = tabOf(def.create({ target: schema }))
     tab.state.term = 'Ada'
     tab.runtime.result = { matches: [] }
     const copy = def.duplicate(tab)
@@ -112,10 +116,10 @@ describe('postgresql.search', () => {
   })
 
   it('saves the typed search and brings it back', () => {
-    const tab = { ...def.create({ target: schema }).fields }
+    const tab = tabOf(def.create({ target: schema }))
     tab.state.term = 'Ada'
     tab.state.regex = true
-    const restored = def.restore({ ...schema, ...def.serialize(tab) })
+    const restored = def.restore({ target: tab.target, connectionName: 'local', ...def.serialize(tab) })
     expect(restored.fields.state).toEqual({ term: 'Ada', tables: '', matchCase: false, regex: true })
     expect(restored.title).toBe('Search: public')
   })
