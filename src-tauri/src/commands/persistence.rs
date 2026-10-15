@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 #[tauri::command(async)]
 pub fn get_settings(settings: State<'_, SettingsStorage>) -> Settings {
-    settings.load()
+    settings.settings()
 }
 
 /// Persist app preferences. Each field is optional and merged over the current
@@ -33,7 +33,7 @@ pub fn update_settings(
     editor_tab_width: Option<i64>,
     ui_zoom: Option<f64>,
 ) -> Result<Settings, AppError> {
-    let current = settings.load();
+    let current = settings.settings();
     let previous_theme = current.theme.clone();
 
     // Only known theme names are accepted; anything else falls back to dark so a
