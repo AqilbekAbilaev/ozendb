@@ -1,4 +1,5 @@
-use super::{Record, RecordList, Stamp};
+use super::{Record, RecordList, RecordMap, Stamp};
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -9,17 +10,11 @@ struct Note {
     stamp: Stamp,
 }
 
+crate::stamped!(Note);
+
 impl Record for Note {
     fn id(&self) -> String {
         self.id.clone()
-    }
-
-    fn stamp(&self) -> &Stamp {
-        &self.stamp
-    }
-
-    fn restamp(&mut self, stamp: Stamp) {
-        self.stamp = stamp;
     }
 
     fn emptied(&self) -> Self {
@@ -154,4 +149,38 @@ fn the_stamp_is_written_alongside_the_record_fields() {
     let json = serde_json::to_value(note("x", "text", 42)).unwrap();
     assert_eq!(json["updated_at"], 42);
     assert_eq!(json["deleted"], false);
+}
+
+fn tagged(color: &str, updated_at: i64) -> Tag {
+    Tag { color: color.to_string(), stamp: Stamp { updated_at, deleted: false } }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+struct Tag {
+    color: String,
+    #[serde(flatten)]
+    stamp: Stamp,
+}
+
+crate::stamped!(Tag);
+
+#[test]
+fn putting_a_keyed_record_stamps_it() {
+    let mut tags = HashMap::new();
+    tags.put("c 1/db.ü", tagged("blue", 7));
+    assert!(tags["c 1/db.ü"].stamp.updated_at > 7);
+}
+
+#[test]
+fn deleting_keyed_records_blanks_and_marks_every_match() {
+    let mut tags = HashMap::from([
+        (String::from("c/a"), tagged("blue", 7)),
+        (String::from("c/b"), tagged("red", 7)),
+        (String::from("d/a"), tagged("green", 7)),
+    ]);
+    tags.delete_where(|key| key.starts_with("c/"));
+    assert!(tags["c/a"].stamp.deleted && tags["c/b"].stamp.deleted);
+    assert_eq!(tags["c/a"].color, "");
+    assert!(!tags["d/a"].stamp.deleted);
+    assert_eq!(tags.live().into_keys().collect::<Vec<_>>(), vec!["d/a"]);
 }

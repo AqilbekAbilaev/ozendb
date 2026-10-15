@@ -1,11 +1,12 @@
 // Records in the stores that sync between devices. Sync merges a store record by
-// record, keyed by id, and the newer `updated_at` wins. So a delete can't simply
+// record, keyed by id (or by map key), and the newer `updated_at` wins. So a delete can't simply
 // remove a record — another device still holding it would bring it back — it marks
 // the record `deleted` instead, and every read hides it. The mark keeps only the id:
 // a deleted record's content leaves the disk as it would have without tombstones.
 
 use crate::time::now_epoch_ms;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// When a record last changed, and whether that change deleted it. Flattened into
 /// each record, so every synced file carries the same two keys.
@@ -29,11 +30,31 @@ impl Stamp {
     }
 }
 
-pub trait Record {
-    /// What identifies the record across devices.
-    fn id(&self) -> String;
+pub trait Stamped {
     fn stamp(&self) -> &Stamp;
     fn restamp(&mut self, stamp: Stamp);
+}
+
+/// Implements `Stamped` for types that keep their stamp in a `stamp` field.
+#[macro_export]
+macro_rules! stamped {
+    ($($type:ty),+) => {
+        $(impl $crate::record::Stamped for $type {
+            fn stamp(&self) -> &$crate::record::Stamp {
+                &self.stamp
+            }
+
+            fn restamp(&mut self, stamp: $crate::record::Stamp) {
+                self.stamp = stamp;
+            }
+        })+
+    };
+}
+
+/// A record in a synced list, which carries its own id.
+pub trait Record: Stamped {
+    /// What identifies the record across devices.
+    fn id(&self) -> String;
     /// The same record with everything but its id blanked.
     fn emptied(&self) -> Self;
 }
@@ -80,6 +101,32 @@ impl<R: Record> RecordList<R> for Vec<R> {
         for record in self.iter_mut().filter(|r| !r.stamp().deleted && doomed(r)) {
             *record = record.emptied();
             record.restamp(Stamp::tombstone());
+        }
+    }
+}
+
+/// `RecordList` for a synced map, whose key is the record's id. A deleted value
+/// blanks to its `Default`.
+pub trait RecordMap<V> {
+    fn live(self) -> HashMap<String, V>;
+    fn put(&mut self, key: &str, value: V);
+    fn delete_where(&mut self, doomed: impl Fn(&str) -> bool);
+}
+
+impl<V: Stamped + Default> RecordMap<V> for HashMap<String, V> {
+    fn live(self) -> HashMap<String, V> {
+        self.into_iter().filter(|(_, v)| !v.stamp().deleted).collect()
+    }
+
+    fn put(&mut self, key: &str, mut value: V) {
+        value.restamp(Stamp::now());
+        self.insert(key.to_string(), value);
+    }
+
+    fn delete_where(&mut self, doomed: impl Fn(&str) -> bool) {
+        for (_, value) in self.iter_mut().filter(|(k, v)| !v.stamp().deleted && doomed(k)) {
+            *value = V::default();
+            value.restamp(Stamp::tombstone());
         }
     }
 }

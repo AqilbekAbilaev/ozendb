@@ -131,19 +131,13 @@ impl Default for ConnectionConfig {
     }
 }
 
+crate::stamped!(ConnectionConfig);
+
 // `open` and `last_accessed` are this device's own state: they change through
 // `edit_device_only`, so they never stamp the record or sync.
 impl Record for ConnectionConfig {
     fn id(&self) -> String {
         self.id.clone()
-    }
-
-    fn stamp(&self) -> &Stamp {
-        &self.stamp
-    }
-
-    fn restamp(&mut self, stamp: Stamp) {
-        self.stamp = stamp;
     }
 
     fn emptied(&self) -> Self {

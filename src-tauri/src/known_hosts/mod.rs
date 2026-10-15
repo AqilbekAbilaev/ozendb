@@ -26,18 +26,12 @@ pub struct KnownHost {
     pub stamp: Stamp,
 }
 
+crate::stamped!(KnownHost);
+
 // Identified by address, so forgetting a host reaches every device that trusts it.
 impl Record for KnownHost {
     fn id(&self) -> String {
         format!("{}:{}", self.host, self.port)
-    }
-
-    fn stamp(&self) -> &Stamp {
-        &self.stamp
-    }
-
-    fn restamp(&mut self, stamp: Stamp) {
-        self.stamp = stamp;
     }
 
     fn emptied(&self) -> Self {

@@ -162,6 +162,7 @@ pub fn set_default_query(
         skip,
         limit,
         pipeline,
+        stamp: Stamp::now(),
     };
     dq.set(&key, entry)
 }
@@ -196,11 +197,11 @@ pub fn set_open_tabs(
 /// connection config and come back with `list_connections`.
 #[tauri::command(async)]
 pub fn get_node_tags(tags: State<'_, NodeTagStorage>) -> HashMap<String, String> {
-    tags.load()
+    tags.colors()
 }
 
 /// Set or clear the colour tag on a database/collection tree node. The colour
-/// "none" clears the tag (removes the entry) rather than storing it.
+/// "none" clears the tag (marks the entry deleted) rather than storing it.
 #[tauri::command(async)]
 pub fn set_node_tag(
     tags:  State<'_, NodeTagStorage>,

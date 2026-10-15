@@ -18,17 +18,11 @@ pub struct Folder {
     pub stamp: Stamp,
 }
 
+crate::stamped!(Folder);
+
 impl Record for Folder {
     fn id(&self) -> String {
         self.id.clone()
-    }
-
-    fn stamp(&self) -> &Stamp {
-        &self.stamp
-    }
-
-    fn restamp(&mut self, stamp: Stamp) {
-        self.stamp = stamp;
     }
 
     fn emptied(&self) -> Self {

@@ -19,17 +19,11 @@ pub struct SavedQueryEntry {
     pub stamp:      Stamp,
 }
 
+crate::stamped!(SavedQueryEntry);
+
 impl Record for SavedQueryEntry {
     fn id(&self) -> String {
         self.id.clone()
-    }
-
-    fn stamp(&self) -> &Stamp {
-        &self.stamp
-    }
-
-    fn restamp(&mut self, stamp: Stamp) {
-        self.stamp = stamp;
     }
 
     fn emptied(&self) -> Self {
