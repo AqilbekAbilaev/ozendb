@@ -11,9 +11,10 @@ use crate::json_store_wrapper;
 // share one bastion and should trust the same key.
 
 use crate::error::AppError;
+use crate::record::{Record, RecordList, Stamp};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct KnownHost {
     pub host: String,
     pub port: u16,
@@ -21,6 +22,27 @@ pub struct KnownHost {
     pub key: String,
     // Milliseconds since the Unix epoch when this key was first trusted.
     pub added: String,
+    #[serde(flatten)]
+    pub stamp: Stamp,
+}
+
+// Identified by address, so forgetting a host reaches every device that trusts it.
+impl Record for KnownHost {
+    fn id(&self) -> String {
+        format!("{}:{}", self.host, self.port)
+    }
+
+    fn stamp(&self) -> &Stamp {
+        &self.stamp
+    }
+
+    fn restamp(&mut self, stamp: Stamp) {
+        self.stamp = stamp;
+    }
+
+    fn emptied(&self) -> Self {
+        KnownHost { host: self.host.clone(), port: self.port, ..KnownHost::default() }
+    }
 }
 
 /// The result of comparing a presented key against what we have on file.
@@ -48,7 +70,7 @@ pub fn classify(stored: Option<&str>, presented: &str) -> HostKeyCheck {
     }
 }
 
-json_store_wrapper!(KnownHostsStore, Vec<KnownHost>);
+json_store_wrapper!(KnownHostsStore, records of KnownHost);
 
 impl KnownHostsStore {
     /// Read-only TOFU comparison — does the presented key match, is this a new
@@ -76,24 +98,21 @@ impl KnownHostsStore {
     /// prompt. Replaces any existing entry for this host:port so a deliberate
     /// re-trust (after a `remove`) can't leave a duplicate.
     pub fn record(&self, host: &str, port: u16, key: &str) -> Result<(), AppError> {
-        self.inner.update(|hosts| {
-            hosts.retain(|h| !(h.host == host && h.port == port));
-            hosts.push(KnownHost {
-                host: host.to_string(),
-                port,
-                key: key.to_string(),
-                added: crate::time::now_ms(),
-            });
-        })
+        let trusted = KnownHost {
+            host: host.to_string(),
+            port,
+            key: key.to_string(),
+            added: crate::time::now_ms(),
+            stamp: Stamp::now(),
+        };
+        self.inner.update(|hosts| hosts.put(hosts.len(), trusted))
     }
 
     /// Drop a host's trusted key ("forget host"), so the next connection is
     /// treated as a fresh first contact. The recovery path after a legitimate
-    /// key rotation.
+    /// key rotation. Marked deleted rather than removed, so other devices forget it too.
     pub fn remove(&self, host: &str, port: u16) -> Result<(), AppError> {
-        self.inner.update(|hosts| {
-            hosts.retain(|h| !(h.host == host && h.port == port));
-        })
+        self.inner.update(|hosts| hosts.delete_where(|h| h.host == host && h.port == port))
     }
 }
 

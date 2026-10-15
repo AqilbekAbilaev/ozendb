@@ -30,7 +30,8 @@ impl Stamp {
 }
 
 pub trait Record {
-    fn id(&self) -> &str;
+    /// What identifies the record across devices.
+    fn id(&self) -> String;
     fn stamp(&self) -> &Stamp;
     fn restamp(&mut self, stamp: Stamp);
     /// The same record with everything but its id blanked.
@@ -56,7 +57,8 @@ impl<R: Record> RecordList<R> for Vec<R> {
     }
 
     fn put(&mut self, index: usize, mut record: R) {
-        self.retain(|r| r.id() != record.id());
+        let id = record.id();
+        self.retain(|r| r.id() != id);
         record.restamp(Stamp::now());
         self.insert(index.min(self.len()), record);
     }

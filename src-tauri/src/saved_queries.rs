@@ -20,8 +20,8 @@ pub struct SavedQueryEntry {
 }
 
 impl Record for SavedQueryEntry {
-    fn id(&self) -> &str {
-        &self.id
+    fn id(&self) -> String {
+        self.id.clone()
     }
 
     fn stamp(&self) -> &Stamp {

@@ -19,8 +19,8 @@ pub struct Folder {
 }
 
 impl Record for Folder {
-    fn id(&self) -> &str {
-        &self.id
+    fn id(&self) -> String {
+        self.id.clone()
     }
 
     fn stamp(&self) -> &Stamp {

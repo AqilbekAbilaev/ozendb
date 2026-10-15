@@ -30,8 +30,8 @@ pub struct SavedSql {
 }
 
 impl Record for SavedSql {
-    fn id(&self) -> &str {
-        &self.id
+    fn id(&self) -> String {
+        self.id.clone()
     }
 
     fn stamp(&self) -> &Stamp {

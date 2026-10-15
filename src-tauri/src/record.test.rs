@@ -10,8 +10,8 @@ struct Note {
 }
 
 impl Record for Note {
-    fn id(&self) -> &str {
-        &self.id
+    fn id(&self) -> String {
+        self.id.clone()
     }
 
     fn stamp(&self) -> &Stamp {
