@@ -106,6 +106,8 @@ chacha20poly1305 = { version = "0.11", features = ["zeroize"] }
 argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
 # Wipes the data key and password-derived keys from memory when they are dropped.
 zeroize = "1"
+# Normalises sync passwords to NFC, so an accent typed precomposed or decomposed derives the same key.
+unicode-normalization = "0.1"
 
 # keyring needs a per-platform backend feature; without one it silently uses an
 # in-memory mock store that loses every password when the app exits (which made

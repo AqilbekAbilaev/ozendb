@@ -145,3 +145,10 @@ fn a_data_key_does_not_print_its_bytes() {
 fn the_interactive_parameters_stay_above_the_owasp_minimum() {
     assert!(INTERACTIVE.m_cost() >= 19 * 1024 && INTERACTIVE.t_cost() >= 2);
 }
+
+// The same password can reach us precomposed on one system and decomposed on another.
+#[test]
+fn a_password_unwraps_whatever_its_unicode_form() {
+    let wrapped = DataKey::generate().unwrap().wrap("caf\u{00e9} au lait", &cheap()).unwrap();
+    assert!(DataKey::unwrap(&wrapped, "cafe\u{0301} au lait").is_ok());
+}

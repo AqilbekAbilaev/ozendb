@@ -10,13 +10,16 @@
 //!   salt (16) ‖ nonce (24) ‖ encrypted key and tag (48)`
 //!
 //! The wrapped key records its own Argon2id parameters, so they can be raised for new
-//! keys without locking out existing ones.
+//! keys without locking out existing ones. The password is normalised to Unicode NFC
+//! before deriving, so the same password typed on systems that compose accents
+//! differently still unwraps the key.
 
 use crate::error::AppError;
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, Generate, Payload};
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use std::fmt;
+use unicode_normalization::UnicodeNormalization;
 use zeroize::Zeroizing;
 
 const FORMAT_VERSION: u8 = 1;
@@ -112,6 +115,7 @@ fn open(key: &[u8; KEY_LEN], sealed: &[u8], header_len: usize) -> Option<Zeroizi
 }
 
 fn derive(password: &str, salt: &[u8], params: Params) -> Result<Zeroizing<[u8; KEY_LEN]>, AppError> {
+    let password = Zeroizing::new(password.nfc().collect::<String>());
     let mut key = Zeroizing::new([0u8; KEY_LEN]);
     Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
         .hash_password_into(password.as_bytes(), salt, key.as_mut_slice())
