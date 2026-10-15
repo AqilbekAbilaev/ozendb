@@ -13,6 +13,10 @@
 //! keys without locking out existing ones. The password is normalised to Unicode NFC
 //! before deriving, so the same password typed on systems that compose accents
 //! differently still unwraps the key.
+//!
+//! Wiping keys from memory on drop is best effort only: the NFC copy of the password can
+//! leave earlier allocations behind while it grows, and the caller's password is never
+//! wiped here.
 
 use crate::error::AppError;
 use argon2::{Algorithm, Argon2, Params, Version};
@@ -79,9 +83,11 @@ impl DataKey {
         let wrapping = derive(password, &header[WRAP_HEADER_LEN - SALT_LEN..], params)?;
         // An authentication failure here cannot tell a wrong password from an altered key;
         // the wrong password is by far the likelier, so that is what the user is told.
-        let key = open(&wrapping, wrapped, WRAP_HEADER_LEN).ok_or(AppError::WrongSyncPassword)?;
-        let key: [u8; KEY_LEN] = key.as_slice().try_into().map_err(|_| damaged("sync key"))?;
-        Ok(Self(Zeroizing::new(key)))
+        let plaintext = open(&wrapping, wrapped, WRAP_HEADER_LEN).ok_or(AppError::WrongSyncPassword)?;
+        // WRAPPED_LEN fixes the plaintext at exactly KEY_LEN bytes.
+        let mut key = Zeroizing::new([0u8; KEY_LEN]);
+        key.copy_from_slice(&plaintext);
+        Ok(Self(key))
     }
 
     pub fn encrypt(&self, blob: &[u8]) -> Result<Vec<u8>, AppError> {

@@ -104,7 +104,7 @@ chacha20poly1305 = { version = "0.11", features = ["zeroize"] }
 # Argon2id turns the user's sync password into the key that wraps the data key. Without
 # the default `password-hash` feature: we derive raw keys, not stored password hashes.
 argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
-# Wipes the data key and password-derived keys from memory when they are dropped.
+# Wipes the data key and password-derived keys from memory when they are dropped (best effort).
 zeroize = "1"
 # Normalises sync passwords to NFC, so an accent typed precomposed or decomposed derives the same key.
 unicode-normalization = "0.1"
