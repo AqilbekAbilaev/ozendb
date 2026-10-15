@@ -1,4 +1,5 @@
 use super::*;
+use crate::record::RecordList;
 use tempfile::tempdir;
 
 fn conn(id: &str, name: &str) -> ConnectionConfig {
@@ -247,3 +248,64 @@ fn config_ssh_auth_method_reads_the_stored_string() {
     assert_eq!(config.ssh_auth_method(), SshAuthMethod::Password);
 }
 
+
+fn updated_at(storage: &Storage, id: &str) -> i64 {
+    storage.find(id).unwrap().stamp.updated_at
+}
+
+fn stored_at(id: &str, updated_at: i64) -> ConnectionConfig {
+    ConnectionConfig { stamp: crate::record::Stamp { updated_at, deleted: false }, ..conn(id, "Prod ü/db") }
+}
+
+#[test]
+fn a_removed_connection_is_hidden_and_kept_on_disk_without_its_settings() {
+    let (storage, dir) = storage_in_tempdir();
+    storage.add(conn("c.1", "Secret prod")).unwrap();
+    storage.add(conn("c 2", "Kept")).unwrap();
+    storage.remove("c.1").unwrap();
+    assert!(storage.find("c.1").is_none());
+    let ids: Vec<String> = storage.load().into_iter().map(|c| c.id).collect();
+    assert_eq!(ids, vec!["c 2"]);
+    let on_disk = std::fs::read_to_string(dir.path().join("connections.json")).unwrap();
+    assert!(on_disk.contains(r#""id": "c.1""#));
+    assert!(!on_disk.contains("Secret prod"));
+}
+
+#[test]
+fn updating_a_connection_stamps_it() {
+    let (storage, _dir) = storage_in_tempdir();
+    storage.save(&[stored_at("c/1", 5)]).unwrap();
+    storage.update(conn("c/1", "Renamed")).unwrap();
+    assert_eq!(storage.find("c/1").unwrap().name, "Renamed");
+    assert!(updated_at(&storage, "c/1") > 5);
+}
+
+#[test]
+fn opening_a_connection_or_using_it_does_not_stamp_it() {
+    let (storage, _dir) = storage_in_tempdir();
+    storage.save(&[stored_at("c/1", 5)]).unwrap();
+    storage.update_with(|connections| {
+        connections.edit_device_only("c/1", |c| c.open = true);
+        connections.edit_device_only("c/1", |c| c.last_accessed = Some(String::from("9")));
+    }).unwrap();
+    let found = storage.find("c/1").unwrap();
+    assert!(found.open);
+    assert_eq!(updated_at(&storage, "c/1"), 5);
+}
+
+#[test]
+fn re_adding_a_removed_id_brings_the_connection_back() {
+    let (storage, _dir) = storage_in_tempdir();
+    storage.add(conn("same", "First")).unwrap();
+    storage.remove("same").unwrap();
+    storage.add(conn("same", "Again")).unwrap();
+    assert_eq!(storage.load().len(), 1);
+    assert_eq!(storage.find("same").unwrap().name, "Again");
+}
+
+#[test]
+fn a_connections_file_written_before_stamps_existed_loads_as_older_than_any_edit() {
+    let (storage, dir) = storage_in_tempdir();
+    std::fs::write(dir.path().join("connections.json"), r#"[{ "id": "old", "name": "Legacy" }]"#).unwrap();
+    assert_eq!(updated_at(&storage, "old"), 0);
+}

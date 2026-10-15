@@ -94,8 +94,38 @@ where
 ///     }
 /// }
 /// ```
+///
+/// A synced store is declared `records of R` (a list) or `keyed records of V` (a
+/// map) instead: its `load` returns only live records, so no read path can show a
+/// deleted one (see `record.rs`).
 #[macro_export]
 macro_rules! json_store_wrapper {
+    ($name:ident, keyed records of $value:ty) => {
+        pub struct $name {
+            pub(crate) inner: $crate::json_store::JsonStore<std::collections::HashMap<String, $value>>,
+        }
+        impl $name {
+            pub fn new(path: std::path::PathBuf) -> Self {
+                Self { inner: $crate::json_store::JsonStore::new(path) }
+            }
+            pub fn load(&self) -> std::collections::HashMap<String, $value> {
+                $crate::record::RecordMap::live(self.inner.load())
+            }
+        }
+    };
+    ($name:ident, records of $record:ty) => {
+        pub struct $name {
+            pub(crate) inner: $crate::json_store::JsonStore<Vec<$record>>,
+        }
+        impl $name {
+            pub fn new(path: std::path::PathBuf) -> Self {
+                Self { inner: $crate::json_store::JsonStore::new(path) }
+            }
+            pub fn load(&self) -> Vec<$record> {
+                $crate::record::RecordList::live(self.inner.load())
+            }
+        }
+    };
     ($name:ident, $type:ty) => {
         pub struct $name {
             pub(crate) inner: $crate::json_store::JsonStore<$type>,

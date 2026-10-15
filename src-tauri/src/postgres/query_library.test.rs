@@ -47,3 +47,37 @@ fn saved_queries_are_listed_for_their_connection_newest_first_and_deleted_by_id(
     assert_eq!(s.saved("c1").len(), 1);
     assert_eq!(s.saved("c2").len(), 1);
 }
+
+#[test]
+fn a_deleted_saved_query_is_hidden_and_kept_without_its_content() {
+    let (_dir, s) = store();
+    s.save("a/1", "Top merchänts", "c1", "SELECT 1", "t1").unwrap();
+    s.delete_saved("a/1").unwrap();
+    assert!(s.saved("c1").is_empty());
+    let tombstone = &s.load().saved[0];
+    assert_eq!((tombstone.id.as_str(), tombstone.stamp.deleted), ("a/1", true));
+    assert_eq!((tombstone.name.as_str(), tombstone.sql.as_str()), ("", ""));
+}
+
+#[test]
+fn removing_a_connection_leaves_none_of_its_saved_sql_on_disk() {
+    let (dir, s) = store();
+    s.save("a", "Gone", "c 1", "SELECT secret_column", "t1").unwrap();
+    s.save("b", "Kept", "c.2", "SELECT 2", "t2").unwrap();
+    s.remove_connection("c 1").unwrap();
+    assert!(s.saved("c 1").is_empty());
+    assert_eq!(s.saved("c.2").len(), 1);
+    let on_disk = std::fs::read_to_string(dir.path().join("pg_queries.json")).unwrap();
+    assert!(!on_disk.contains("secret_column"));
+    assert!(!on_disk.contains("c 1"));
+}
+
+#[test]
+fn a_library_written_before_stamps_existed_still_loads() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("pg_queries.json");
+    std::fs::write(&path, r#"{ "history": {}, "saved": [
+        { "id": "a", "name": "Legacy", "connectionId": "c1", "sql": "SELECT 1", "savedAt": "1" } ] }"#).unwrap();
+    let names: Vec<String> = PgQueryLibraryStore::new(path).saved("c1").into_iter().map(|q| q.name).collect();
+    assert_eq!(names, vec!["Legacy"]);
+}

@@ -1,8 +1,9 @@
 use crate::json_store_wrapper;
 use crate::error::AppError;
+use crate::record::{Record, RecordList, Stamp};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct SavedQueryEntry {
     pub id:         String,
     pub name:       String,
@@ -14,16 +15,34 @@ pub struct SavedQueryEntry {
     pub limit:      i64,
     pub pipeline:   String,
     pub saved_at:   String,
+    #[serde(flatten)]
+    pub stamp:      Stamp,
 }
 
-json_store_wrapper!(SavedQueryStorage, Vec<SavedQueryEntry>);
+crate::stamped!(SavedQueryEntry);
+
+impl Record for SavedQueryEntry {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn emptied(&self) -> Self {
+        SavedQueryEntry { id: self.id.clone(), ..SavedQueryEntry::default() }
+    }
+}
+
+json_store_wrapper!(SavedQueryStorage, records of SavedQueryEntry);
 
 impl SavedQueryStorage {
     pub fn insert(&self, entry: SavedQueryEntry) -> Result<(), AppError> {
-        self.inner.update(|entries| entries.insert(0, entry))
+        self.inner.update(|entries| entries.put(0, entry))
     }
 
     pub fn delete(&self, id: &str) -> Result<(), AppError> {
-        self.inner.update(|entries| entries.retain(|e| e.id != id))
+        self.inner.update(|entries| entries.delete_where(|e| e.id == id))
     }
 }
+
+#[cfg(test)]
+#[path = "saved_queries.test.rs"]
+mod tests;

@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::record::Stamp;
 use crate::storage::{ConnectionConfig, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
 
 /// The connection editor's form, exactly as the frontend sends it. `save_connection`
@@ -112,6 +113,7 @@ impl ConnectionFields {
             folder_id,
             last_accessed,
             open,
+            stamp: Stamp::now(),
         })
     }
 
