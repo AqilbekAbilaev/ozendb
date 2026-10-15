@@ -86,7 +86,7 @@ fn a_blob_of_an_unknown_format_version_is_refused_by_name() {
 fn a_wrapped_key_unwraps_from_its_bytes_with_the_parameters_it_records() {
     let key = DataKey::generate().unwrap();
     let stored: Vec<u8> = key.wrap(PASSWORD, &cheap()).unwrap().to_vec();
-    let unwrapped = DataKey::unwrap(&stored, PASSWORD).unwrap();
+    let unwrapped = DataKey::unwrap_with(&stored, PASSWORD).unwrap();
     assert_eq!(unwrapped.decrypt(&key.encrypt(BLOB).unwrap()).unwrap().as_slice(), BLOB);
 }
 
@@ -99,7 +99,7 @@ fn wrapping_the_same_key_twice_uses_a_fresh_salt_and_nonce() {
 #[test]
 fn a_wrong_password_is_reported_as_one() {
     let wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
-    let error = DataKey::unwrap(&wrapped, "correct horse/battery.staple — unicode").unwrap_err();
+    let error = DataKey::unwrap_with(&wrapped, "correct horse/battery.staple — unicode").unwrap_err();
     assert!(matches!(error, AppError::WrongSyncPassword));
     assert_eq!(error.code(), "wrong_sync_password");
 }
@@ -108,7 +108,7 @@ fn a_wrong_password_is_reported_as_one() {
 fn changing_any_byte_of_a_wrapped_key_is_detected() {
     let wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
     for at in 0..wrapped.len() {
-        assert!(DataKey::unwrap(&flipped(&wrapped, at), PASSWORD).is_err(), "byte {at} was not authenticated");
+        assert!(DataKey::unwrap_with(&flipped(&wrapped, at), PASSWORD).is_err(), "byte {at} was not authenticated");
     }
 }
 
@@ -118,18 +118,18 @@ fn changing_any_byte_of_a_wrapped_key_is_detected() {
 fn a_wrapped_key_of_any_other_length_is_refused_as_damaged() {
     let mut wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
     for len in 0..wrapped.len() {
-        let result = DataKey::unwrap(&wrapped[..len], PASSWORD);
+        let result = DataKey::unwrap_with(&wrapped[..len], PASSWORD);
         assert!(matches!(result, Err(AppError::Crypto(_))), "a key cut to {len} bytes was not refused as damaged");
     }
     wrapped.push(0);
-    assert!(matches!(DataKey::unwrap(&wrapped, PASSWORD), Err(AppError::Crypto(_))));
+    assert!(matches!(DataKey::unwrap_with(&wrapped, PASSWORD), Err(AppError::Crypto(_))));
 }
 
 #[test]
 fn a_wrapped_key_of_an_unknown_format_version_is_refused_by_name() {
     let mut wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
     wrapped[0] = 7;
-    assert!(message(DataKey::unwrap(&wrapped, PASSWORD).err().unwrap()).contains("version 7"));
+    assert!(message(DataKey::unwrap_with(&wrapped, PASSWORD).err().unwrap()).contains("version 7"));
 }
 
 // The wrapped key comes from the server, so its parameters are untrusted: a hostile value
@@ -138,7 +138,7 @@ fn a_wrapped_key_of_an_unknown_format_version_is_refused_by_name() {
 fn a_wrapped_key_demanding_too_much_memory_is_refused_before_deriving() {
     let mut wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
     wrapped[1..5].copy_from_slice(&u32::MAX.to_be_bytes());
-    assert!(matches!(DataKey::unwrap(&wrapped, PASSWORD), Err(AppError::Crypto(_))));
+    assert!(matches!(DataKey::unwrap_with(&wrapped, PASSWORD), Err(AppError::Crypto(_))));
 }
 
 #[test]
@@ -156,5 +156,5 @@ fn the_interactive_parameters_stay_above_the_owasp_minimum() {
 #[test]
 fn a_password_unwraps_whatever_its_unicode_form() {
     let wrapped = DataKey::generate().unwrap().wrap("caf\u{00e9} au lait", &cheap()).unwrap();
-    assert!(DataKey::unwrap(&wrapped, "cafe\u{0301} au lait").is_ok());
+    assert!(DataKey::unwrap_with(&wrapped, "cafe\u{0301} au lait").is_ok());
 }

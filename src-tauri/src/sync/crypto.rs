@@ -64,7 +64,7 @@ impl DataKey {
         seal(&wrapping, header, self.0.as_slice())
     }
 
-    pub fn unwrap(wrapped: &[u8], password: &str) -> Result<Self, AppError> {
+    pub fn unwrap_with(wrapped: &[u8], password: &str) -> Result<Self, AppError> {
         readable(*wrapped.first().ok_or_else(|| damaged("sync key"))?, WRAP_VERSION, "sync key")?;
         if wrapped.len() != WRAPPED_LEN {
             return Err(damaged("sync key"));
