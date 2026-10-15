@@ -105,11 +105,10 @@ fn recreating_a_deleted_id_replaces_its_tombstone_with_a_newer_live_record() {
 }
 
 #[test]
-fn a_record_saved_before_stamps_existed_loads_as_live_and_stamped_at_load_time() {
-    let before = crate::time::now_epoch_ms();
+fn a_record_saved_before_stamps_existed_loads_as_live_and_older_than_any_edit() {
     let loaded: Note = serde_json::from_str(r#"{ "id": "old", "text": "from an old file" }"#).unwrap();
     assert!(!loaded.stamp.deleted);
-    assert!(loaded.stamp.updated_at >= before);
+    assert_eq!(loaded.stamp.updated_at, 0);
 }
 
 #[test]

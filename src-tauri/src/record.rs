@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 /// each record, so every synced file carries the same two keys.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Stamp {
-    // Files written before stamps existed fill these in on load: the record counts
-    // as changed when first read, and as not deleted.
-    #[serde(default = "now_epoch_ms")]
+    // Files written before stamps existed load as 0 and not deleted: older than any
+    // real edit, so an untouched old copy never beats a change made on another device.
+    #[serde(default)]
     pub updated_at: i64,
     #[serde(default)]
     pub deleted: bool,
