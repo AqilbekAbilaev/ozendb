@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use crate::folders::{Folder, FolderStorage};
+use crate::record::Stamp;
 use super::AppContext;
 use tauri::State;
 use uuid::Uuid;
@@ -19,6 +20,7 @@ pub fn create_folder(
         name,
         parent_id: None,
         created_at: crate::time::now_ms(),
+        stamp: Stamp::now(),
     };
     match folders.insert(folder.clone()) {
         Ok(_) => Ok(folder),

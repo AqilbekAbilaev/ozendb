@@ -4,6 +4,7 @@ use crate::time::now_ms;
 use crate::default_queries::{DefaultQuery, DefaultQueryStorage};
 use crate::keybindings::KeybindingStorage;
 use crate::node_tags::NodeTagStorage;
+use crate::record::Stamp;
 use crate::saved_queries::{SavedQueryEntry, SavedQueryStorage};
 use crate::tabs::TabStorage;
 use crate::settings::{Settings, SettingsStorage};
@@ -255,6 +256,7 @@ pub fn save_query(
         limit,
         pipeline,
         saved_at:   now_ms(),
+        stamp:      Stamp::now(),
     };
     match sq.insert(entry) {
         Ok(_)  => Ok(id),

@@ -31,6 +31,7 @@ mod operations;
 mod persist;
 mod postgres;
 mod pool;
+mod record;
 mod saved_queries;
 mod settings;
 mod shell;

@@ -4,6 +4,7 @@
 //! connection is bound to one database.
 use crate::error::AppError;
 use crate::json_store_wrapper;
+use crate::record::{Record, RecordList, Stamp};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -24,6 +25,22 @@ pub struct SavedSql {
     pub connection_id: String,
     pub sql: String,
     pub saved_at: String,
+    #[serde(flatten)]
+    pub stamp: Stamp,
+}
+
+impl Record for SavedSql {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn stamp(&self) -> &Stamp {
+        &self.stamp
+    }
+
+    fn restamp(&mut self, stamp: Stamp) {
+        self.stamp = stamp;
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
@@ -59,7 +76,7 @@ impl PgQueryLibraryStore {
     }
 
     pub fn saved(&self, connection_id: &str) -> Vec<SavedSql> {
-        self.load().saved.into_iter().filter(|q| q.connection_id == connection_id).collect()
+        self.load().saved.live().into_iter().filter(|q| q.connection_id == connection_id).collect()
     }
 
     pub fn save(&self, id: &str, name: &str, connection_id: &str, sql: &str, saved_at: &str) -> Result<(), AppError> {
@@ -69,15 +86,17 @@ impl PgQueryLibraryStore {
             connection_id: connection_id.to_string(),
             sql: sql.to_string(),
             saved_at: saved_at.to_string(),
+            stamp: Stamp::now(),
         };
-        self.inner.update(|lib| lib.saved.insert(0, entry))
+        self.inner.update(|lib| lib.saved.put(0, entry))
     }
 
     pub fn delete_saved(&self, id: &str) -> Result<(), AppError> {
-        self.inner.update(|lib| lib.saved.retain(|q| q.id != id))
+        self.inner.update(|lib| lib.saved.delete_where(|q| q.id == id))
     }
 
     /// Both the run history and the saved SQL: a saved query is bound to its connection.
+    /// Erased, not marked deleted: a deleted connection leaves none of its data on disk.
     pub fn remove_connection(&self, connection_id: &str) -> Result<(), AppError> {
         self.inner.update(|lib| {
             lib.history.remove(connection_id);

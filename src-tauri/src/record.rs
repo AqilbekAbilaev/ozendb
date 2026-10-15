@@ -1,0 +1,75 @@
+// Records in the stores that sync between devices. Sync merges a store record by
+// record, keyed by id, and the newer `updated_at` wins. So a delete can't simply
+// remove a record — another device still holding it would bring it back — it marks
+// the record `deleted` instead, and every read hides it.
+
+use crate::time::now_epoch_ms;
+use serde::{Deserialize, Serialize};
+
+/// When a record last changed, and whether that change deleted it. Flattened into
+/// each record, so every synced file carries the same two keys.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Stamp {
+    // Files written before stamps existed fill these in on load: the record counts
+    // as changed when first read, and as not deleted.
+    #[serde(default = "now_epoch_ms")]
+    pub updated_at: i64,
+    #[serde(default)]
+    pub deleted: bool,
+}
+
+impl Stamp {
+    pub fn now() -> Self {
+        Stamp { updated_at: now_epoch_ms(), deleted: false }
+    }
+
+    fn tombstone() -> Self {
+        Stamp { updated_at: now_epoch_ms(), deleted: true }
+    }
+}
+
+pub trait Record {
+    fn id(&self) -> &str;
+    fn stamp(&self) -> &Stamp;
+    fn restamp(&mut self, stamp: Stamp);
+}
+
+/// The only ways a synced list changes, so no change can skip its stamp.
+pub trait RecordList<R> {
+    /// The records a user can see.
+    fn live(self) -> Vec<R>;
+    /// Adds `record` at `index`, replacing any tombstone with its id: re-creating a
+    /// deleted record is a newer change than the deletion, so it wins the merge.
+    fn put(&mut self, index: usize, record: R);
+    fn edit(&mut self, id: &str, change: impl FnOnce(&mut R));
+    fn delete_where(&mut self, doomed: impl Fn(&R) -> bool);
+}
+
+impl<R: Record> RecordList<R> for Vec<R> {
+    fn live(self) -> Vec<R> {
+        self.into_iter().filter(|r| !r.stamp().deleted).collect()
+    }
+
+    fn put(&mut self, index: usize, mut record: R) {
+        self.retain(|r| r.id() != record.id());
+        record.restamp(Stamp::now());
+        self.insert(index.min(self.len()), record);
+    }
+
+    fn edit(&mut self, id: &str, change: impl FnOnce(&mut R)) {
+        if let Some(record) = self.iter_mut().find(|r| r.id() == id && !r.stamp().deleted) {
+            change(record);
+            record.restamp(Stamp::now());
+        }
+    }
+
+    fn delete_where(&mut self, doomed: impl Fn(&R) -> bool) {
+        for record in self.iter_mut().filter(|r| !r.stamp().deleted && doomed(r)) {
+            record.restamp(Stamp::tombstone());
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "record.test.rs"]
+mod tests;
