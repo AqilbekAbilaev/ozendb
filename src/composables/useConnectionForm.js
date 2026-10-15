@@ -5,6 +5,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { errText } from '../utils/errors'
 import { connectionTargetChanged } from '../utils/connectionTarget.js'
 import { hasLoadedData } from '../stores/connectionData.js'
+import { setTagOverride } from '../stores/nodeTags.js'
 import { ENGINES } from '../engines/index.js'
 import { useMongoFields } from '../engines/mongodb/connection/useMongoFields.js'
 
@@ -198,6 +199,7 @@ export function useConnectionForm(editConn) {
           return null
         }
         const conn = await updateConnection(editConn.id, fields)
+        showTag(conn)
         await emitConnectionUpdated(conn)
         return { event: 'updated', conn: conn }
       }
@@ -234,6 +236,12 @@ export function useConnectionForm(editConn) {
     }
   }
 
+  // The tab bar reads colours only from the shared tags, so a saved colour goes there
+  // too, the same way the sidebar's Choose Color does. Descendants keep their own.
+  function showTag(conn) {
+    setTagOverride(conn.id, conn.tag ?? 'none')
+  }
+
   async function create(fields, copySecretsFrom = null) {
     const id = await saveConnection(fields, copySecretsFrom)
     const conn = {
@@ -248,6 +256,7 @@ export function useConnectionForm(editConn) {
       read_only:       fields.readOnly,
       last_accessed:   null,
     }
+    showTag(conn)
     await emitConnectionSaved(conn)
     return { event: 'saved', conn: conn }
   }
