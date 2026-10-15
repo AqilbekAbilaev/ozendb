@@ -22,7 +22,8 @@ use std::fmt;
 use unicode_normalization::UnicodeNormalization;
 use zeroize::Zeroizing;
 
-const FORMAT_VERSION: u8 = 1;
+const BLOB_VERSION: u8 = 1;
+const WRAP_VERSION: u8 = 1;
 const KEY_LEN: usize = 32;
 const NONCE_LEN: usize = 24;
 const SALT_LEN: usize = 16;
@@ -54,7 +55,7 @@ impl DataKey {
 
     pub fn wrap(&self, password: &str, params: &Params) -> Result<Vec<u8>, AppError> {
         let salt: [u8; SALT_LEN] = random()?;
-        let mut header = vec![FORMAT_VERSION];
+        let mut header = vec![WRAP_VERSION];
         for cost in [params.m_cost(), params.t_cost(), params.p_cost()] {
             header.extend(cost.to_be_bytes());
         }
@@ -64,7 +65,7 @@ impl DataKey {
     }
 
     pub fn unwrap(wrapped: &[u8], password: &str) -> Result<Self, AppError> {
-        readable(*wrapped.first().ok_or_else(|| damaged("sync key"))?, "sync key")?;
+        readable(*wrapped.first().ok_or_else(|| damaged("sync key"))?, WRAP_VERSION, "sync key")?;
         if wrapped.len() != WRAPPED_LEN {
             return Err(damaged("sync key"));
         }
@@ -84,11 +85,11 @@ impl DataKey {
     }
 
     pub fn encrypt(&self, blob: &[u8]) -> Result<Vec<u8>, AppError> {
-        seal(&self.0, vec![FORMAT_VERSION], blob)
+        seal(&self.0, vec![BLOB_VERSION], blob)
     }
 
     pub fn decrypt(&self, sealed: &[u8]) -> Result<Zeroizing<Vec<u8>>, AppError> {
-        readable(*sealed.first().ok_or_else(|| damaged("sync data"))?, "sync data")?;
+        readable(*sealed.first().ok_or_else(|| damaged("sync data"))?, BLOB_VERSION, "sync data")?;
         open(&self.0, sealed, 1).ok_or_else(|| damaged("sync data"))
     }
 }
@@ -133,8 +134,8 @@ fn random<const N: usize>() -> Result<[u8; N], AppError> {
         .map_err(|e| AppError::Crypto(format!("The system's random number generator failed: {e}.")))
 }
 
-fn readable(version: u8, what: &str) -> Result<(), AppError> {
-    if version == FORMAT_VERSION {
+fn readable(version: u8, supported: u8, what: &str) -> Result<(), AppError> {
+    if version == supported {
         return Ok(());
     }
     Err(AppError::Crypto(format!(
