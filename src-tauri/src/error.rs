@@ -38,6 +38,12 @@ pub enum AppError {
     #[error("SQL error: {0}")]
     Sql(String),
 
+    #[error("Encryption error: {0}")]
+    Crypto(String),
+
+    #[error("The sync password is incorrect.")]
+    WrongSyncPassword,
+
     #[error("{0}")]
     Validation(String),
 }
@@ -60,6 +66,8 @@ impl AppError {
             AppError::Shell(_) => "shell",
             AppError::Ssh(_) => "ssh",
             AppError::Sql(_) => "sql",
+            AppError::Crypto(_) => "crypto",
+            AppError::WrongSyncPassword => "wrong_sync_password",
             AppError::Validation(_) => "validation",
         }
     }

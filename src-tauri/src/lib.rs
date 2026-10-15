@@ -37,6 +37,7 @@ mod shell;
 mod ssh;
 mod shell_history;
 mod storage;
+mod sync;
 mod tabs;
 
 mod time;
