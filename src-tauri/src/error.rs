@@ -67,7 +67,7 @@ impl AppError {
             AppError::Ssh(_) => "ssh",
             AppError::Sql(_) => "sql",
             AppError::Crypto(_) => "crypto",
-            AppError::WrongSyncPassword => "wrong_password",
+            AppError::WrongSyncPassword => "wrong_sync_password",
             AppError::Validation(_) => "validation",
         }
     }

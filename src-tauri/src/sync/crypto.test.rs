@@ -101,6 +101,7 @@ fn a_wrong_password_is_reported_as_one() {
     let wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
     let error = DataKey::unwrap(&wrapped, "correct horse/battery.staple — unicode").unwrap_err();
     assert!(matches!(error, AppError::WrongSyncPassword));
+    assert_eq!(error.code(), "wrong_sync_password");
 }
 
 #[test]
