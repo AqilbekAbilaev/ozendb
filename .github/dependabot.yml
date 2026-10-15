@@ -2,10 +2,7 @@ version: 2
 # Weekly, with minor and patch bumps grouped into one PR per ecosystem so the tracker
 # isn't flooded. Majors still come one by one, since those need reading.
 #
-# Each ecosystem waits a few days after a release before proposing it, which gives a
-# broken or compromised release time to be reported and withdrawn; majors wait longest.
-# The wait applies to version updates only: GitHub never delays a security update,
-# which is what we want for a known vulnerability.
+# Releases wait a few days so a broken one can be withdrawn first; security updates never wait.
 updates:
   - package-ecosystem: npm
     directory: /
