@@ -18,10 +18,6 @@ fn flipped(bytes: &[u8], at: usize) -> Vec<u8> {
     copy
 }
 
-fn message(error: AppError) -> String {
-    error.to_string()
-}
-
 #[test]
 fn a_blob_round_trips_through_the_data_key() {
     let key = DataKey::generate().unwrap();
@@ -79,13 +75,13 @@ fn a_blob_of_an_unknown_format_version_is_refused_by_name() {
     let key = DataKey::generate().unwrap();
     let mut sealed = key.encrypt(BLOB).unwrap();
     sealed[0] = 2;
-    assert!(message(key.decrypt(&sealed).unwrap_err()).contains("version 2"));
+    assert!(key.decrypt(&sealed).unwrap_err().to_string().contains("version 2"));
 }
 
 #[test]
 fn a_wrapped_key_unwraps_from_its_bytes_with_the_parameters_it_records() {
     let key = DataKey::generate().unwrap();
-    let stored: Vec<u8> = key.wrap(PASSWORD, &cheap()).unwrap().to_vec();
+    let stored: Vec<u8> = key.wrap(PASSWORD, &cheap()).unwrap();
     let unwrapped = DataKey::unwrap_with(&stored, PASSWORD).unwrap();
     assert_eq!(unwrapped.decrypt(&key.encrypt(BLOB).unwrap()).unwrap().as_slice(), BLOB);
 }
@@ -129,7 +125,7 @@ fn a_wrapped_key_of_any_other_length_is_refused_as_damaged() {
 fn a_wrapped_key_of_an_unknown_format_version_is_refused_by_name() {
     let mut wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
     wrapped[0] = 7;
-    assert!(message(DataKey::unwrap_with(&wrapped, PASSWORD).err().unwrap()).contains("version 7"));
+    assert!(DataKey::unwrap_with(&wrapped, PASSWORD).err().unwrap().to_string().contains("version 7"));
 }
 
 // The wrapped key comes from the server, so its parameters are untrusted: a hostile value
