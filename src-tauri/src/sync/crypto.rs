@@ -26,7 +26,9 @@ const FORMAT_VERSION: u8 = 1;
 const KEY_LEN: usize = 32;
 const NONCE_LEN: usize = 24;
 const SALT_LEN: usize = 16;
+const TAG_LEN: usize = 16;
 const WRAP_HEADER_LEN: usize = 1 + 3 * 4 + SALT_LEN;
+const WRAPPED_LEN: usize = WRAP_HEADER_LEN + NONCE_LEN + KEY_LEN + TAG_LEN;
 
 // RFC 9106 §4's second recommended choice (64 MiB, 3 passes), well above OWASP's 19 MiB
 // minimum: the cost is paid once per device, not per request, so we can afford it. One
@@ -62,8 +64,11 @@ impl DataKey {
     }
 
     pub fn unwrap(wrapped: &[u8], password: &str) -> Result<Self, AppError> {
-        let header = wrapped.get(..WRAP_HEADER_LEN).ok_or_else(|| damaged("sync key"))?;
-        readable(header[0], "sync key")?;
+        readable(*wrapped.first().ok_or_else(|| damaged("sync key"))?, "sync key")?;
+        if wrapped.len() != WRAPPED_LEN {
+            return Err(damaged("sync key"));
+        }
+        let header = &wrapped[..WRAP_HEADER_LEN];
         let cost = |at: usize| u32::from_be_bytes([header[at], header[at + 1], header[at + 2], header[at + 3]]);
         let (memory, passes, lanes) = (cost(1), cost(5), cost(9));
         if memory > MAX_MEMORY_KIB || passes > MAX_PASSES || lanes > MAX_LANES {

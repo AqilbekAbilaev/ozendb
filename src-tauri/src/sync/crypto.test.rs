@@ -111,12 +111,17 @@ fn changing_any_byte_of_a_wrapped_key_is_detected() {
     }
 }
 
+// A wrapped key has exactly one length, so any other is refused as damaged before the
+// expensive derivation, even with the right password.
 #[test]
-fn a_truncated_wrapped_key_is_rejected() {
-    let wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
+fn a_wrapped_key_of_any_other_length_is_refused_as_damaged() {
+    let mut wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
     for len in 0..wrapped.len() {
-        assert!(DataKey::unwrap(&wrapped[..len], PASSWORD).is_err(), "a key cut to {len} bytes was accepted");
+        let result = DataKey::unwrap(&wrapped[..len], PASSWORD);
+        assert!(matches!(result, Err(AppError::Crypto(_))), "a key cut to {len} bytes was not refused as damaged");
     }
+    wrapped.push(0);
+    assert!(matches!(DataKey::unwrap(&wrapped, PASSWORD), Err(AppError::Crypto(_))));
 }
 
 #[test]
