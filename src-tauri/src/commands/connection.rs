@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::record::RecordList;
 use crate::storage::{ConnectionConfig, EngineConfig, MongoConfig};
 use super::AppContext;
 use crate::known_hosts::KnownHostsStore;
@@ -387,11 +388,7 @@ pub fn set_connection_open(
     id: String,
     open: bool,
 ) -> Result<(), AppError> {
-    ctx.storage.update_with(|connections| {
-        if let Some(c) = connections.iter_mut().find(|c| c.id == id) {
-            c.open = open;
-        }
-    })
+    ctx.storage.update_with(|connections| connections.edit_device_only(&id, |c| c.open = open))
 }
 
 /// Persist the colour tag chosen for a connection from the tree's Choose Color
@@ -404,9 +401,7 @@ pub fn set_connection_tag(
     color: String,
 ) -> Result<(), AppError> {
     ctx.storage.update_with(|connections| {
-        if let Some(c) = connections.iter_mut().find(|c| c.id == id) {
-            c.tag = if color == "none" { None } else { Some(color.clone()) };
-        }
+        connections.edit_where(|c| c.id == id, |c| c.tag = if color == "none" { None } else { Some(color.clone()) })
     })
 }
 
@@ -416,11 +411,7 @@ pub fn update_last_accessed(
     id: String,
     timestamp: String,
 ) -> Result<(), AppError> {
-    ctx.storage.update_with(|connections| {
-        if let Some(c) = connections.iter_mut().find(|c| c.id == id) {
-            c.last_accessed = Some(timestamp);
-        }
-    })
+    ctx.storage.update_with(|connections| connections.edit_device_only(&id, |c| c.last_accessed = Some(timestamp)))
 }
 
 #[tauri::command]

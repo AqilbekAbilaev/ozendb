@@ -44,7 +44,9 @@ pub trait RecordList<R> {
     /// Adds `record` at `index`, replacing any tombstone with its id: re-creating a
     /// deleted record is a newer change than the deletion, so it wins the merge.
     fn put(&mut self, index: usize, record: R);
-    fn edit(&mut self, id: &str, change: impl FnOnce(&mut R));
+    fn edit_where(&mut self, which: impl Fn(&R) -> bool, change: impl FnMut(&mut R));
+    /// Changes state that belongs to this device alone, so it never syncs: no stamp.
+    fn edit_device_only(&mut self, id: &str, change: impl FnOnce(&mut R));
     fn delete_where(&mut self, doomed: impl Fn(&R) -> bool);
 }
 
@@ -59,10 +61,16 @@ impl<R: Record> RecordList<R> for Vec<R> {
         self.insert(index.min(self.len()), record);
     }
 
-    fn edit(&mut self, id: &str, change: impl FnOnce(&mut R)) {
-        if let Some(record) = self.iter_mut().find(|r| r.id() == id && !r.stamp().deleted) {
+    fn edit_where(&mut self, which: impl Fn(&R) -> bool, mut change: impl FnMut(&mut R)) {
+        for record in self.iter_mut().filter(|r| !r.stamp().deleted && which(r)) {
             change(record);
             record.restamp(Stamp::now());
+        }
+    }
+
+    fn edit_device_only(&mut self, id: &str, change: impl FnOnce(&mut R)) {
+        if let Some(record) = self.iter_mut().find(|r| r.id() == id && !r.stamp().deleted) {
+            change(record);
         }
     }
 

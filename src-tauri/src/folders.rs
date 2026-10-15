@@ -44,7 +44,7 @@ impl FolderStorage {
     }
 
     pub fn rename(&self, id: &str, name: &str) -> Result<(), AppError> {
-        self.inner.update(|folders| folders.edit(id, |f| f.name = name.to_string()))
+        self.inner.update(|folders| folders.edit_where(|f| f.id == id, |f| f.name = name.to_string()))
     }
 
     pub fn delete(&self, id: &str) -> Result<(), AppError> {

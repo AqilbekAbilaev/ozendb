@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::record::{Record, RecordList, Stamp};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
@@ -68,6 +69,8 @@ pub struct ConnectionConfig {
     // only the connections that were open are re-opened after a restart.
     #[serde(default)]
     pub open: bool,
+    #[serde(flatten)]
+    pub stamp: Stamp,
     /// Everything that is this driver's business and no other's. Flattened, so the
     /// driver's own keys sit alongside the shared ones in `connections.json` exactly
     /// as they did when this was one flat struct — see `EngineConfig`.
@@ -122,8 +125,29 @@ impl Default for ConnectionConfig {
             folder_id: None,
             last_accessed: None,
             open: false,
+            stamp: Stamp::default(),
             engine: EngineConfig::default(),
         }
+    }
+}
+
+// `open` and `last_accessed` are this device's own state: they change through
+// `edit_device_only`, so they never stamp the record or sync.
+impl Record for ConnectionConfig {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn stamp(&self) -> &Stamp {
+        &self.stamp
+    }
+
+    fn restamp(&mut self, stamp: Stamp) {
+        self.stamp = stamp;
+    }
+
+    fn emptied(&self) -> Self {
+        ConnectionConfig { id: self.id.clone(), ..ConnectionConfig::default() }
     }
 }
 
@@ -221,7 +245,7 @@ impl Storage {
     pub fn load(&self) -> Vec<ConnectionConfig> {
         let mut guard = self.lock_cache();
         let connections = guard.get_or_insert_with(|| self.read_from_disk());
-        connections.clone()
+        connections.clone().live()
     }
 
     /// The persisted config for `id`, if any. This is the authoritative source of
@@ -230,7 +254,7 @@ impl Storage {
     pub fn find(&self, id: &str) -> Option<ConnectionConfig> {
         let mut guard = self.lock_cache();
         let connections = guard.get_or_insert_with(|| self.read_from_disk());
-        connections.iter().find(|c| c.id == id).cloned()
+        connections.iter().find(|c| c.id == id && !c.stamp.deleted).cloned()
     }
 
     /// Apply `mutate` to the connection list under the lock, persist, then sync the
@@ -263,19 +287,15 @@ impl Storage {
     }
 
     pub fn add(&self, config: ConnectionConfig) -> Result<(), AppError> {
-        self.update_with(|connections| connections.push(config))
+        self.update_with(|connections| connections.put(connections.len(), config))
     }
 
     pub fn update(&self, config: ConnectionConfig) -> Result<(), AppError> {
-        self.update_with(|connections| {
-            if let Some(c) = connections.iter_mut().find(|c| c.id == config.id) {
-                *c = config;
-            }
-        })
+        self.update_with(|connections| connections.edit_where(|c| c.id == config.id, |c| *c = config.clone()))
     }
 
     pub fn remove(&self, id: &str) -> Result<(), AppError> {
-        self.update_with(|connections| connections.retain(|c| c.id != id))
+        self.update_with(|connections| connections.delete_where(|c| c.id == id))
     }
 
     // Replace the whole list: write to disk, then sync the cache. Only the tests

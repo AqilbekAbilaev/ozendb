@@ -55,9 +55,35 @@ fn put_inserts_at_the_given_position() {
 #[test]
 fn edit_changes_the_record_and_stamps_it() {
     let mut notes = vec![note("ä note.1", "old", 7)];
-    notes.edit("ä note.1", |n| n.text = String::from("new"));
+    notes.edit_where(|n| n.id == "ä note.1", |n| n.text = String::from("new"));
     assert_eq!(notes[0].text, "new");
     assert!(notes[0].stamp.updated_at > 7);
+}
+
+#[test]
+fn edit_where_changes_and_stamps_every_matching_record() {
+    let mut notes = vec![note("a", "draft", 7), note("b", "final", 7), note("c", "draft", 7)];
+    notes.edit_where(|n| n.text == "draft", |n| n.text = String::from("sent"));
+    let texts: Vec<&str> = notes.iter().map(|n| n.text.as_str()).collect();
+    assert_eq!(texts, vec!["sent", "final", "sent"]);
+    assert_eq!(notes[1].stamp.updated_at, 7);
+    assert!(notes[2].stamp.updated_at > 7);
+}
+
+#[test]
+fn a_device_only_edit_changes_the_record_without_stamping_it() {
+    let mut notes = vec![note("ä note.1", "old", 7)];
+    notes.edit_device_only("ä note.1", |n| n.text = String::from("new"));
+    assert_eq!(notes[0].text, "new");
+    assert_eq!(notes[0].stamp.updated_at, 7);
+}
+
+#[test]
+fn a_device_only_edit_leaves_a_deleted_record_alone() {
+    let mut notes = vec![note("gone", "old", 1)];
+    notes.delete_where(|_| true);
+    notes.edit_device_only("gone", |n| n.text = String::from("new"));
+    assert_eq!(notes[0].text, "");
 }
 
 #[test]
@@ -99,7 +125,7 @@ fn edit_leaves_a_deleted_record_alone() {
     let mut notes = vec![note("gone", "old", 1)];
     notes.delete_where(|_| true);
     let deleted_at = notes[0].stamp.updated_at;
-    notes.edit("gone", |n| n.text = String::from("new"));
+    notes.edit_where(|n| n.id == "gone", |n| n.text = String::from("new"));
     assert_eq!(notes[0].text, "");
     assert_eq!(notes[0].stamp.updated_at, deleted_at);
 }
