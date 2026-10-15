@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// are their own entities (persisted in `folders.json`) so an empty folder can
 /// exist before any connection is moved into it. `parent_id` is reserved for a
 /// future nested-folder model; in the current flat model it is always `None`.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Folder {
     pub id: String,
     pub name: String,
@@ -29,6 +29,10 @@ impl Record for Folder {
 
     fn restamp(&mut self, stamp: Stamp) {
         self.stamp = stamp;
+    }
+
+    fn emptied(&self) -> Self {
+        Folder { id: self.id.clone(), ..Folder::default() }
     }
 }
 

@@ -3,7 +3,7 @@ use crate::error::AppError;
 use crate::record::{Record, RecordList, Stamp};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct SavedQueryEntry {
     pub id:         String,
     pub name:       String,
@@ -30,6 +30,10 @@ impl Record for SavedQueryEntry {
 
     fn restamp(&mut self, stamp: Stamp) {
         self.stamp = stamp;
+    }
+
+    fn emptied(&self) -> Self {
+        SavedQueryEntry { id: self.id.clone(), ..SavedQueryEntry::default() }
     }
 }
 

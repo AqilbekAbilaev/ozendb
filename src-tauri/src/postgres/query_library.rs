@@ -17,7 +17,7 @@ pub struct SqlHistoryEntry {
     pub ran_at: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedSql {
     pub id: String,
@@ -40,6 +40,10 @@ impl Record for SavedSql {
 
     fn restamp(&mut self, stamp: Stamp) {
         self.stamp = stamp;
+    }
+
+    fn emptied(&self) -> Self {
+        SavedSql { id: self.id.clone(), ..SavedSql::default() }
     }
 }
 
@@ -96,11 +100,10 @@ impl PgQueryLibraryStore {
     }
 
     /// Both the run history and the saved SQL: a saved query is bound to its connection.
-    /// Erased, not marked deleted: a deleted connection leaves none of its data on disk.
     pub fn remove_connection(&self, connection_id: &str) -> Result<(), AppError> {
         self.inner.update(|lib| {
             lib.history.remove(connection_id);
-            lib.saved.retain(|q| q.connection_id != connection_id);
+            lib.saved.delete_where(|q| q.connection_id == connection_id);
         })
     }
 }

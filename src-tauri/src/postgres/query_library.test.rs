@@ -49,22 +49,27 @@ fn saved_queries_are_listed_for_their_connection_newest_first_and_deleted_by_id(
 }
 
 #[test]
-fn a_deleted_saved_query_is_hidden_but_kept_as_a_tombstone() {
+fn a_deleted_saved_query_is_hidden_and_kept_without_its_content() {
     let (_dir, s) = store();
     s.save("a/1", "Top merchänts", "c1", "SELECT 1", "t1").unwrap();
     s.delete_saved("a/1").unwrap();
     assert!(s.saved("c1").is_empty());
-    assert!(s.load().saved[0].stamp.deleted);
+    let tombstone = &s.load().saved[0];
+    assert_eq!((tombstone.id.as_str(), tombstone.stamp.deleted), ("a/1", true));
+    assert_eq!((tombstone.name.as_str(), tombstone.sql.as_str()), ("", ""));
 }
 
 #[test]
-fn removing_a_connection_erases_its_saved_queries_from_disk() {
-    let (_dir, s) = store();
-    s.save("a", "Gone", "c 1", "SELECT 1", "t1").unwrap();
+fn removing_a_connection_leaves_none_of_its_saved_sql_on_disk() {
+    let (dir, s) = store();
+    s.save("a", "Gone", "c 1", "SELECT secret_column", "t1").unwrap();
     s.save("b", "Kept", "c.2", "SELECT 2", "t2").unwrap();
     s.remove_connection("c 1").unwrap();
-    let on_disk: Vec<String> = s.load().saved.into_iter().map(|q| q.connection_id).collect();
-    assert_eq!(on_disk, vec!["c.2"]);
+    assert!(s.saved("c 1").is_empty());
+    assert_eq!(s.saved("c.2").len(), 1);
+    let on_disk = std::fs::read_to_string(dir.path().join("pg_queries.json")).unwrap();
+    assert!(!on_disk.contains("secret_column"));
+    assert!(!on_disk.contains("c 1"));
 }
 
 #[test]

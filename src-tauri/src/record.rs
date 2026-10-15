@@ -1,14 +1,15 @@
 // Records in the stores that sync between devices. Sync merges a store record by
 // record, keyed by id, and the newer `updated_at` wins. So a delete can't simply
 // remove a record — another device still holding it would bring it back — it marks
-// the record `deleted` instead, and every read hides it.
+// the record `deleted` instead, and every read hides it. The mark keeps only the id:
+// a deleted record's content leaves the disk as it would have without tombstones.
 
 use crate::time::now_epoch_ms;
 use serde::{Deserialize, Serialize};
 
 /// When a record last changed, and whether that change deleted it. Flattened into
 /// each record, so every synced file carries the same two keys.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct Stamp {
     // Files written before stamps existed load as 0 and not deleted: older than any
     // real edit, so an untouched old copy never beats a change made on another device.
@@ -32,6 +33,8 @@ pub trait Record {
     fn id(&self) -> &str;
     fn stamp(&self) -> &Stamp;
     fn restamp(&mut self, stamp: Stamp);
+    /// The same record with everything but its id blanked.
+    fn emptied(&self) -> Self;
 }
 
 /// The only ways a synced list changes, so no change can skip its stamp.
@@ -65,6 +68,7 @@ impl<R: Record> RecordList<R> for Vec<R> {
 
     fn delete_where(&mut self, doomed: impl Fn(&R) -> bool) {
         for record in self.iter_mut().filter(|r| !r.stamp().deleted && doomed(r)) {
+            *record = record.emptied();
             record.restamp(Stamp::tombstone());
         }
     }

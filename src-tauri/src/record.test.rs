@@ -1,7 +1,7 @@
 use super::{Record, RecordList, Stamp};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 struct Note {
     id: String,
     text: String,
@@ -20,6 +20,10 @@ impl Record for Note {
 
     fn restamp(&mut self, stamp: Stamp) {
         self.stamp = stamp;
+    }
+
+    fn emptied(&self) -> Self {
+        Note { id: self.id.clone(), ..Note::default() }
     }
 }
 
@@ -68,6 +72,14 @@ fn delete_marks_the_record_instead_of_removing_it() {
 }
 
 #[test]
+fn delete_keeps_only_the_id_and_the_stamp() {
+    let mut notes = vec![note("ä note.1", "private text", 7)];
+    notes.delete_where(|_| true);
+    assert_eq!(notes[0].id, "ä note.1");
+    assert_eq!(notes[0].text, "");
+}
+
+#[test]
 fn deleting_a_tombstone_again_keeps_its_deletion_time() {
     let mut notes = vec![note("gone", "text", 7)];
     notes[0].stamp.deleted = true;
@@ -88,7 +100,7 @@ fn edit_leaves_a_deleted_record_alone() {
     notes.delete_where(|_| true);
     let deleted_at = notes[0].stamp.updated_at;
     notes.edit("gone", |n| n.text = String::from("new"));
-    assert_eq!(notes[0].text, "old");
+    assert_eq!(notes[0].text, "");
     assert_eq!(notes[0].stamp.updated_at, deleted_at);
 }
 

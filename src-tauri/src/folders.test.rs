@@ -11,7 +11,7 @@ fn names(store: &FolderStorage) -> Vec<String> {
 }
 
 #[test]
-fn a_deleted_folder_is_hidden_but_kept_on_disk_as_a_tombstone() {
+fn a_deleted_folder_is_hidden_and_kept_on_disk_without_its_name() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("folders.json");
     let store = FolderStorage::new(path.clone());
@@ -20,8 +20,9 @@ fn a_deleted_folder_is_hidden_but_kept_on_disk_as_a_tombstone() {
     store.delete("f/1").unwrap();
     assert_eq!(names(&store), vec!["Ünïcode"]);
     let on_disk = std::fs::read_to_string(&path).unwrap();
-    assert!(on_disk.contains("Prod servers"));
+    assert!(on_disk.contains(r#""id": "f/1""#));
     assert!(on_disk.contains(r#""deleted": true"#));
+    assert!(!on_disk.contains("Prod servers"));
 }
 
 #[test]
