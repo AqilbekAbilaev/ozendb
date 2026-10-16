@@ -80,7 +80,7 @@ fn connection(deleted: bool) -> ConnectionConfig {
     ConnectionConfig {
         id: ID.to_string(),
         name: "Prod, primary".to_string(),
-        stamp: Stamp { updated_at: 42, deleted },
+        stamp: Stamp { updated_at: 42, deleted, ..Stamp::default() },
         ..ConnectionConfig::default()
     }
 }
@@ -164,5 +164,5 @@ fn debug_output_hides_every_secret() {
 fn the_record_keeps_its_connection_id_and_stamp() {
     let synced = SyncedConnection::collect(connection(false), &FakeKeychain::default()).unwrap();
     assert_eq!(synced.id(), ID);
-    assert_eq!(crate::record::Stamped::stamp(&synced), &Stamp { updated_at: 42, deleted: false });
+    assert_eq!(crate::record::Stamped::stamp(&synced), &Stamp { updated_at: 42, deleted: false, ..Stamp::default() });
 }
