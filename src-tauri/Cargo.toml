@@ -108,6 +108,10 @@ argon2 = { version = "0.6", default-features = false, features = ["alloc", "zero
 zeroize = "1"
 # Normalises sync passwords to NFC, so an accent typed precomposed or decomposed derives the same key.
 unicode-normalization = "0.1"
+# HKDF-SHA256 turns the recovery key, already 128 random bits, into the key that wraps the data key.
+hkdf = "0.13"
+# SHA-256 for HKDF and the recovery key's two check bits.
+sha2 = "0.11"
 
 # keyring needs a per-platform backend feature; without one it silently uses an
 # in-memory mock store that loses every password when the app exits (which made

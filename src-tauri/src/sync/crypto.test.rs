@@ -1,4 +1,5 @@
 use super::{DataKey, INTERACTIVE};
+use crate::sync::recovery::RecoveryKey;
 use crate::error::AppError;
 use argon2::Params;
 use std::collections::HashSet;
@@ -153,4 +154,65 @@ fn the_interactive_parameters_stay_above_the_owasp_minimum() {
 fn a_password_unwraps_whatever_its_unicode_form() {
     let wrapped = DataKey::generate().unwrap().wrap("caf\u{00e9} au lait", &cheap()).unwrap();
     assert!(DataKey::unwrap_with(&wrapped, "cafe\u{0301} au lait").is_ok());
+}
+
+#[test]
+fn a_recovery_wrapped_key_unwraps_with_the_recovery_key_the_user_types_back() {
+    let (key, recovery) = (DataKey::generate().unwrap(), RecoveryKey::generate().unwrap());
+    let stored = key.wrap_for_recovery(&recovery).unwrap();
+    let typed = RecoveryKey::parse(&recovery.display().to_lowercase()).unwrap();
+    let unwrapped = DataKey::unwrap_with_recovery(&stored, &typed).unwrap();
+    assert_eq!(unwrapped.decrypt(&key.encrypt(BLOB).unwrap()).unwrap().as_slice(), BLOB);
+}
+
+#[test]
+fn wrapping_the_same_key_for_recovery_twice_uses_a_fresh_nonce() {
+    let (key, recovery) = (DataKey::generate().unwrap(), RecoveryKey::generate().unwrap());
+    assert_ne!(key.wrap_for_recovery(&recovery).unwrap(), key.wrap_for_recovery(&recovery).unwrap());
+}
+
+#[test]
+fn a_wrong_recovery_key_is_reported_as_one() {
+    let wrapped = DataKey::generate().unwrap().wrap_for_recovery(&RecoveryKey::generate().unwrap()).unwrap();
+    let error = DataKey::unwrap_with_recovery(&wrapped, &RecoveryKey::generate().unwrap()).unwrap_err();
+    assert!(matches!(error, AppError::WrongRecoveryKey));
+    assert_eq!(error.code(), "wrong_recovery_key");
+}
+
+#[test]
+fn changing_any_byte_of_a_recovery_wrapped_key_is_detected() {
+    let recovery = RecoveryKey::generate().unwrap();
+    let wrapped = DataKey::generate().unwrap().wrap_for_recovery(&recovery).unwrap();
+    for at in 0..wrapped.len() {
+        assert!(DataKey::unwrap_with_recovery(&flipped(&wrapped, at), &recovery).is_err(), "byte {at} was not authenticated");
+    }
+}
+
+#[test]
+fn a_recovery_wrapped_key_of_any_other_length_is_refused_as_damaged() {
+    let recovery = RecoveryKey::generate().unwrap();
+    let mut wrapped = DataKey::generate().unwrap().wrap_for_recovery(&recovery).unwrap();
+    for len in 0..wrapped.len() {
+        let result = DataKey::unwrap_with_recovery(&wrapped[..len], &recovery);
+        assert!(matches!(result, Err(AppError::Crypto(_))), "a key cut to {len} bytes was not refused as damaged");
+    }
+    wrapped.push(0);
+    assert!(matches!(DataKey::unwrap_with_recovery(&wrapped, &recovery), Err(AppError::Crypto(_))));
+}
+
+#[test]
+fn a_recovery_wrapped_key_of_an_unknown_format_version_is_refused_by_name() {
+    let recovery = RecoveryKey::generate().unwrap();
+    let mut wrapped = DataKey::generate().unwrap().wrap_for_recovery(&recovery).unwrap();
+    wrapped[0] = 9;
+    assert!(DataKey::unwrap_with_recovery(&wrapped, &recovery).unwrap_err().to_string().contains("version 9"));
+}
+
+// The two wrapped forms live in separate columns; one pasted into the other's place must
+// be refused, not misread.
+#[test]
+fn a_password_wrapped_key_is_not_accepted_as_a_recovery_wrapped_one() {
+    let recovery = RecoveryKey::generate().unwrap();
+    let wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
+    assert!(matches!(DataKey::unwrap_with_recovery(&wrapped, &recovery), Err(AppError::Crypto(_))));
 }

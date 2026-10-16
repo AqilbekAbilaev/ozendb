@@ -2,12 +2,16 @@
 //! itself is stored on the server wrapped under a key derived from the user's sync
 //! password, so the server holds nothing it can read.
 //!
-//! Both formats are `header ‖ nonce ‖ ciphertext`, and the header and nonce are the
+//! The data key is also wrapped a second time under the user's recovery key (see
+//! recovery.rs), stored separately so either wrapping can be replaced on its own.
+//!
+//! All three formats are `header ‖ nonce ‖ ciphertext`, and the header and nonce are the
 //! XChaCha20-Poly1305 associated data, so no field can be altered or swapped unnoticed:
 //!
 //! - encrypted blob: `version (1) ‖ nonce (24) ‖ ciphertext and tag`
 //! - wrapped key: `version (1) ‖ memory KiB, passes, lanes (u32 big-endian each) ‖
 //!   salt (16) ‖ nonce (24) ‖ encrypted key and tag (48)`
+//! - recovery-wrapped key: `version (1) ‖ nonce (24) ‖ encrypted key and tag (48)`
 //!
 //! The wrapped key records its own Argon2id parameters, so they can be raised for new
 //! keys without locking out existing ones. The password is normalised to Unicode NFC
@@ -18,6 +22,7 @@
 //! leave earlier allocations behind while it grows, and the caller's password is never
 //! wiped here.
 
+use super::recovery::RecoveryKey;
 use crate::error::AppError;
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, Generate, Payload};
@@ -28,12 +33,14 @@ use zeroize::Zeroizing;
 
 const BLOB_VERSION: u8 = 1;
 const WRAP_VERSION: u8 = 1;
-const KEY_LEN: usize = 32;
+const RECOVERY_WRAP_VERSION: u8 = 1;
+pub(super) const KEY_LEN: usize = 32;
 const NONCE_LEN: usize = 24;
 const SALT_LEN: usize = 16;
 const TAG_LEN: usize = 16;
 const WRAP_HEADER_LEN: usize = 1 + 3 * 4 + SALT_LEN;
 const WRAPPED_LEN: usize = WRAP_HEADER_LEN + NONCE_LEN + KEY_LEN + TAG_LEN;
+const RECOVERY_WRAPPED_LEN: usize = 1 + NONCE_LEN + KEY_LEN + TAG_LEN;
 
 // RFC 9106 §4's second recommended choice (64 MiB, 3 passes), well above OWASP's 19 MiB
 // minimum: the cost is paid once per device, not per request, so we can afford it. One
@@ -90,6 +97,25 @@ impl DataKey {
         Ok(Self(key))
     }
 
+    pub fn wrap_for_recovery(&self, recovery: &RecoveryKey) -> Result<Vec<u8>, AppError> {
+        let wrapping = recovery.wrapping_key()?;
+        seal(&wrapping, vec![RECOVERY_WRAP_VERSION], self.0.as_slice())
+    }
+
+    pub fn unwrap_with_recovery(wrapped: &[u8], recovery: &RecoveryKey) -> Result<Self, AppError> {
+        let what = "recovery copy of the sync key";
+        readable(*wrapped.first().ok_or_else(|| damaged(what))?, RECOVERY_WRAP_VERSION, what)?;
+        if wrapped.len() != RECOVERY_WRAPPED_LEN {
+            return Err(damaged(what));
+        }
+        // As with the password, a failure here most likely means the wrong recovery key.
+        let wrapping = recovery.wrapping_key()?;
+        let plaintext = open(&wrapping, wrapped, 1).ok_or(AppError::WrongRecoveryKey)?;
+        let mut key = Zeroizing::new([0u8; KEY_LEN]);
+        key.copy_from_slice(&plaintext);
+        Ok(Self(key))
+    }
+
     pub fn encrypt(&self, blob: &[u8]) -> Result<Vec<u8>, AppError> {
         seal(&self.0, vec![BLOB_VERSION], blob)
     }
@@ -135,7 +161,7 @@ fn derive(password: &str, salt: &[u8], params: Params) -> Result<Zeroizing<[u8; 
     Ok(key)
 }
 
-fn random<const N: usize>() -> Result<[u8; N], AppError> {
+pub(super) fn random<const N: usize>() -> Result<[u8; N], AppError> {
     <[u8; N]>::try_generate()
         .map_err(|e| AppError::Crypto(format!("The system's random number generator failed: {e}.")))
 }
