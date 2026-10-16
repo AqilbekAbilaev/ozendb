@@ -8,6 +8,7 @@ use crate::record::{RecordList, Stamp};
 use crate::saved_queries::SavedQueryEntry;
 use crate::settings::Settings;
 use serde_json::json;
+use std::collections::BTreeMap;
 
 const DAY: i64 = 24 * 60 * 60 * 1000;
 const NOW: i64 = 1_000 * DAY;
@@ -429,6 +430,61 @@ impl Cases {
         }
         folders
     }
+
+    fn pick<T: Copy>(&mut self, choices: &[T]) -> T {
+        choices[self.next(choices.len() as u64) as usize]
+    }
+
+    fn tags(&mut self) -> HashMap<String, NodeTag> {
+        let mut tags = HashMap::new();
+        for key in ["c 1/db", "c 1/db/coll.ü", "d/e f"] {
+            let updated_at = T + self.next(3) as i64;
+            match self.next(3) {
+                0 => {}
+                1 => {
+                    let mut marker = tag("", updated_at, true);
+                    marker.stamp.uploaded_at = self.pick(&[None, Some(T), Some(T + 1)]);
+                    tags.insert(key.to_string(), marker);
+                }
+                _ => {
+                    tags.insert(key.to_string(), tag(self.pick(&["blue", "red"]), updated_at, false));
+                }
+            }
+        }
+        tags
+    }
+
+    fn settings(&mut self) -> StampedSettings {
+        if self.next(4) == 0 {
+            return StampedSettings::default();
+        }
+        let values = Settings {
+            theme: String::from(self.pick(&["dark", "light"])),
+            default_query_limit: self.pick(&[50, 200, 1000]),
+            editor_tab_width: self.pick(&[2, 4, 8]),
+            ui_zoom: self.pick(&[1.0, 1.25]),
+            ..Settings::default()
+        };
+        let mut updated_at = BTreeMap::new();
+        for key in ["theme", "default_query_limit", "editor_tab_width", "ui_zoom"] {
+            updated_at.insert(key.to_string(), self.pick(&[0, T, T + 1]));
+        }
+        StampedSettings { values, updated_at }
+    }
+}
+
+fn by_key(tags: HashMap<String, NodeTag>) -> serde_json::Value {
+    let mut tags: Vec<_> = tags.into_iter().collect();
+    tags.sort_by(|a, b| a.0.cmp(&b.0));
+    serde_json::to_value(tags).unwrap()
+}
+
+/// What of the settings crosses devices: each synced setting's value and stamp.
+fn synced(settings: &StampedSettings) -> Vec<(String, i64, serde_json::Value)> {
+    without_local_only(settings.values.to_map())
+        .into_iter()
+        .map(|(key, value)| (key.clone(), settings.stamp_of(&key), value))
+        .collect()
 }
 
 fn by_id(mut folders: Vec<Folder>) -> serde_json::Value {
@@ -448,5 +504,44 @@ fn merging_is_symmetric_idempotent_and_order_free_for_generated_cases() {
         let ab_c = merge().records(ab, c.clone());
         let a_bc = merge().records(a.clone(), merge().records(b.clone(), c.clone()));
         assert_eq!(by_id(ab_c), by_id(a_bc), "associative for {a:?}, {b:?} and {c:?}");
+    }
+}
+
+#[test]
+fn keyed_merging_is_symmetric_idempotent_and_order_free_for_generated_cases() {
+    let mut cases = Cases(342);
+    for _ in 0..2_000 {
+        let (a, b, c) = (cases.tags(), cases.tags(), cases.tags());
+        let ab = merge().keyed(a.clone(), b.clone());
+        assert_eq!(by_key(ab.clone()), by_key(merge().keyed(b.clone(), a.clone())), "symmetric for {a:?} and {b:?}");
+        assert_eq!(by_key(merge().keyed(ab.clone(), b.clone())), by_key(ab.clone()), "idempotent for {a:?} and {b:?}");
+        assert_eq!(by_key(merge().keyed(ab.clone(), ab.clone())), by_key(ab.clone()), "self merge for {ab:?}");
+        let a_bc = merge().keyed(a.clone(), merge().keyed(b.clone(), c.clone()));
+        assert_eq!(by_key(merge().keyed(ab, c.clone())), by_key(a_bc), "associative for {a:?}, {b:?} and {c:?}");
+    }
+}
+
+#[test]
+fn settings_merging_is_symmetric_idempotent_and_order_free_for_generated_cases() {
+    let mut cases = Cases(316);
+    for _ in 0..2_000 {
+        let (a, b, c) = (cases.settings(), cases.settings(), cases.settings());
+        let ab = merge().settings(a.clone(), b.clone());
+        assert_eq!(ab.values.ui_zoom, a.values.ui_zoom, "local-only kept for {a:?} and {b:?}");
+        assert_eq!(synced(&ab), synced(&merge().settings(b.clone(), a.clone())), "symmetric for {a:?} and {b:?}");
+        assert_eq!(synced(&merge().settings(ab.clone(), b.clone())), synced(&ab), "idempotent for {a:?} and {b:?}");
+        assert_eq!(synced(&merge().settings(ab.clone(), ab.clone())), synced(&ab), "self merge for {ab:?}");
+        let a_bc = merge().settings(a.clone(), merge().settings(b.clone(), c.clone()));
+        assert_eq!(synced(&merge().settings(ab, c.clone())), synced(&a_bc), "associative for {a:?}, {b:?} and {c:?}");
+    }
+}
+
+#[test]
+fn a_fresh_device_keeps_every_customised_setting_it_merges_with() {
+    let mut cases = Cases(7);
+    for _ in 0..500 {
+        let other = cases.settings();
+        let fresh = merge().settings(StampedSettings::default(), other.clone());
+        assert_eq!(synced(&fresh), synced(&merge().settings(other.clone(), other.clone())), "fresh device against {other:?}");
     }
 }
