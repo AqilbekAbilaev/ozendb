@@ -89,7 +89,7 @@ pub fn open_document_window(app: &AppHandle, target: DocumentTarget) {
 
     // Themed from the start, so neither the title bar nor the background flashes in the
     // OS appearance while the webview loads its bundle and paints the document.
-    let theme = app.state::<SettingsStorage>().load().theme;
+    let theme = app.state::<SettingsStorage>().settings().theme;
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
         .title(title)
         .inner_size(720.0, 640.0)
