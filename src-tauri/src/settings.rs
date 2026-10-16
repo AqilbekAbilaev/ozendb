@@ -108,9 +108,15 @@ impl SettingsStorage {
         self.load().values
     }
 
-    pub fn save(&self, settings: &Settings) -> Result<(), AppError> {
+    /// Applies `change` to the stored settings under the store's lock, so a sync that
+    /// writes in between is never undone. Returns the settings before and after.
+    pub fn update(&self, change: impl FnOnce(&Settings) -> Settings) -> Result<(Settings, Settings), AppError> {
         let now = crate::time::now_epoch_ms();
-        self.inner.update(|stored| *stored = stored.changed_to(settings.clone(), now))
+        self.inner.update(|stored| {
+            let before = stored.values.clone();
+            *stored = stored.changed_to(change(&before), now);
+            (before, stored.values.clone())
+        })
     }
 }
 
