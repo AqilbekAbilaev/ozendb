@@ -3,7 +3,9 @@
 //!
 //! It is shown as 26 Crockford base32 characters in groups of four, such as
 //! `00FQ-X055-RFZM-568G-BBKK-SP3B-Y3`. Crockford's alphabet leaves out I, L, O and U, and
-//! parsing reads O as 0 and I or L as 1, so a key copied by hand still reads back. 26
+//! parsing reads O as 0 and I or L as 1, so a key copied by hand still reads back. Parsing
+//! also ignores case, whitespace and dashes, including the en and em dashes that notes
+//! apps and word processors put in place of hyphens. 26
 //! characters hold 130 bits; the 2 left over carry a check (the top bits of the key's
 //! SHA-256), which catches three typos in four as "mistyped" without making the key any
 //! longer. A typo the check misses parses to a different key and is refused as a wrong one.
@@ -35,7 +37,7 @@ impl RecoveryKey {
     pub fn parse(typed: &str) -> Result<Self, AppError> {
         let mut symbols = Zeroizing::new([0u8; SYMBOLS]);
         let mut count = 0;
-        for c in typed.chars().filter(|c| *c != '-' && !c.is_whitespace()) {
+        for c in typed.chars().filter(|c| !matches!(c, '-' | '\u{2013}' | '\u{2014}') && !c.is_whitespace()) {
             let symbol = match c.to_ascii_uppercase() {
                 'O' => b'0',
                 'I' | 'L' => b'1',

@@ -48,6 +48,13 @@ fn parsing_ignores_case_dashes_and_spaces() {
     assert_eq!(RecoveryKey::parse(typed).unwrap().display().as_str(), KNOWN_TEXT);
 }
 
+// Notes apps and word processors turn typed hyphens into en or em dashes.
+#[test]
+fn parsing_ignores_long_dashes_between_groups() {
+    let pasted = "00FQ\u{2013}X055\u{2014}RFZM\u{2013}568G\u{2014}BBKK\u{2013}SP3B\u{2014}Y3";
+    assert_eq!(RecoveryKey::parse(pasted).unwrap().display().as_str(), KNOWN_TEXT);
+}
+
 // Crockford base32 reads the letters people confuse with digits as those digits.
 #[test]
 fn parsing_reads_o_as_zero_and_i_or_l_as_one() {
