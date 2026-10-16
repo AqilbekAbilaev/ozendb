@@ -30,7 +30,7 @@ fn renaming_a_folder_stamps_it() {
     let dir = tempdir().unwrap();
     let store = FolderStorage::new(dir.path().join("folders.json"));
     let mut old = folder("f 1", "Old name");
-    old.stamp = Stamp { updated_at: 5, deleted: false };
+    old.stamp = Stamp { updated_at: 5, ..Stamp::default() };
     store.inner.save(&vec![old]).unwrap();
     store.rename("f 1", "New name").unwrap();
     let renamed = &store.load()[0];

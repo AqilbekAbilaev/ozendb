@@ -86,11 +86,11 @@ where
 /// # Example
 ///
 /// ```ignore
-/// crate::json_store_wrapper!(SettingsStorage, Settings);
+/// crate::json_store_wrapper!(SettingsStorage, StampedSettings);
 ///
 /// impl SettingsStorage {
-///     pub fn save(&self, settings: &Settings) -> Result<(), AppError> {
-///         self.inner.save(settings)
+///     pub fn settings(&self) -> Settings {
+///         self.load().values
 ///     }
 /// }
 /// ```

@@ -23,7 +23,7 @@ impl Record for Note {
 }
 
 fn note(id: &str, text: &str, updated_at: i64) -> Note {
-    Note { id: id.to_string(), text: text.to_string(), stamp: Stamp { updated_at, deleted: false } }
+    Note { id: id.to_string(), text: text.to_string(), stamp: Stamp { updated_at, ..Stamp::default() } }
 }
 
 fn ids(notes: &[Note]) -> Vec<&str> {
@@ -152,7 +152,7 @@ fn the_stamp_is_written_alongside_the_record_fields() {
 }
 
 fn tagged(color: &str, updated_at: i64) -> Tag {
-    Tag { color: color.to_string(), stamp: Stamp { updated_at, deleted: false } }
+    Tag { color: color.to_string(), stamp: Stamp { updated_at, ..Stamp::default() } }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -183,4 +183,18 @@ fn deleting_keyed_records_blanks_and_marks_every_match() {
     assert_eq!(tags["c/a"].color, "");
     assert!(!tags["d/a"].stamp.deleted);
     assert_eq!(tags.live().into_keys().collect::<Vec<_>>(), vec!["d/a"]);
+}
+
+#[test]
+fn a_marker_saved_before_upload_times_existed_loads_as_never_uploaded() {
+    let loaded: Note = serde_json::from_str(r#"{ "id": "gone", "text": "", "updated_at": 5, "deleted": true }"#).unwrap();
+    assert_eq!(loaded.stamp.uploaded_at, None);
+}
+
+#[test]
+fn an_upload_time_is_written_only_once_there_is_one() {
+    let mut marker = note("gone", "", 5);
+    assert!(serde_json::to_value(&marker).unwrap().get("uploaded_at").is_none());
+    marker.stamp.uploaded_at = Some(9);
+    assert_eq!(serde_json::to_value(&marker).unwrap()["uploaded_at"], 9);
 }

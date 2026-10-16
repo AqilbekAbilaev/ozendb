@@ -143,7 +143,7 @@ pub fn run() {
                 };
             // Themed from the first frame; the app-wide call also covers native dialogs
             // and, on Windows, the menu (#274).
-            let theme = window_theme::window_theme(&app.state::<SettingsStorage>().load().theme);
+            let theme = window_theme::window_theme(&app.state::<SettingsStorage>().settings().theme);
             match main_builder.enable_clipboard_access().theme(Some(theme)).build() {
                 Ok(_val) => {}
                 Err(e) => return Err(e.into()),
