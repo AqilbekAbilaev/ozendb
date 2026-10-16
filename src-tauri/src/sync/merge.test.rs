@@ -19,7 +19,17 @@ fn merge() -> Merge {
 }
 
 fn stamp(updated_at: i64, deleted: bool) -> Stamp {
-    Stamp { updated_at, deleted }
+    Stamp { updated_at, deleted, uploaded_at: None }
+}
+
+/// The marker as the server holds it, first uploaded at `uploaded_at`.
+fn sent(mut marker: Folder, uploaded_at: Option<i64>) -> Folder {
+    marker.stamp.uploaded_at = uploaded_at;
+    marker
+}
+
+fn uploaded_at(folders: &[Folder]) -> Vec<Option<i64>> {
+    folders.iter().map(|f| f.stamp.uploaded_at).collect()
 }
 
 fn folder(id: &str, name: &str, updated_at: i64) -> Folder {
@@ -90,15 +100,62 @@ fn local_order_is_kept_and_new_remote_records_follow_in_remote_order() {
 }
 
 #[test]
-fn a_deleted_marker_older_than_ninety_days_is_erased() {
-    let merged = merge().records(vec![deleted("old", NOW - 91 * DAY)], vec![deleted("older", NOW - 200 * DAY)]);
-    assert!(merged.is_empty());
+fn a_marker_first_uploaded_over_ninety_days_ago_is_erased() {
+    let local = vec![sent(deleted("old", NOW - 200 * DAY), Some(NOW - 91 * DAY))];
+    let remote = vec![sent(deleted("older", NOW - 300 * DAY), Some(NOW - 200 * DAY))];
+    assert!(merge().records(local, remote).is_empty());
 }
 
 #[test]
-fn a_deleted_marker_from_the_last_ninety_days_is_kept() {
-    let merged = merge().records(vec![deleted("recent", NOW - 89 * DAY)], vec![]);
-    assert_eq!(names(&merged), vec!["recent (deleted)"]);
+fn a_marker_counts_its_ninety_days_from_its_first_upload_not_its_deletion() {
+    let merged = merge().records(vec![sent(deleted("deleted long ago", NOW - 200 * DAY), Some(NOW - 89 * DAY))], vec![]);
+    assert_eq!(names(&merged), vec!["deleted long ago (deleted)"]);
+}
+
+#[test]
+fn a_marker_never_uploaded_is_never_erased_and_starts_its_ninety_days_now() {
+    let merged = merge().records(vec![deleted("offline delete", NOW - 200 * DAY)], vec![]);
+    assert_eq!(names(&merged), vec!["offline delete (deleted)"]);
+    assert_eq!(uploaded_at(&merged), vec![Some(NOW)]);
+}
+
+#[test]
+fn a_marker_already_on_the_server_keeps_its_upload_time() {
+    let merged = merge().records(vec![], vec![sent(deleted("r", T), Some(T + 5))]);
+    assert_eq!(uploaded_at(&merged), vec![Some(T + 5)]);
+}
+
+#[test]
+fn two_copies_of_one_marker_keep_the_earliest_upload_time() {
+    let early = vec![sent(deleted("r", T), Some(T + 5))];
+    let late = vec![sent(deleted("r", T), Some(T + 9))];
+    assert_eq!(uploaded_at(&merge().records(early.clone(), late.clone())), vec![Some(T + 5)]);
+    assert_eq!(uploaded_at(&merge().records(late, early)), vec![Some(T + 5)]);
+}
+
+#[test]
+fn a_newer_marker_starts_its_own_ninety_days() {
+    let merged = merge().records(vec![sent(deleted("r", T), Some(T + 5))], vec![deleted("r", T + 1)]);
+    assert_eq!(merged[0].stamp.updated_at, T + 1);
+    assert_eq!(uploaded_at(&merged), vec![Some(NOW)]);
+}
+
+#[test]
+fn the_upload_time_never_decides_which_copy_wins() {
+    let merged = merge().records(vec![sent(deleted("r", T), Some(T - 9 * DAY))], vec![folder("r", "edited", T + 1)]);
+    assert_eq!(names(&merged), vec!["edited"]);
+    assert_eq!(uploaded_at(&merged), vec![None]);
+}
+
+#[test]
+fn a_marker_uploaded_late_still_reaches_a_device_that_synced_before_the_upload() {
+    let day = |n: i64| NOW + n * DAY;
+    let on_a = vec![deleted("r", day(0))];
+    let on_c = vec![folder("r", "only on C", day(0) - 1)];
+    let server = Merge::new(day(50), Some(day(-1))).records(on_a, vec![]);
+    let server = Merge::new(day(95), Some(day(50))).records(server.clone(), server);
+    let on_c = Merge::new(day(96), Some(day(10))).records(on_c, server);
+    assert_eq!(names(&on_c), vec!["r (deleted)"]);
 }
 
 #[test]
@@ -111,14 +168,14 @@ fn an_old_live_record_is_never_erased() {
 fn a_device_that_last_synced_over_ninety_days_ago_takes_the_remote_copy() {
     let stale = Merge::new(NOW, Some(NOW - 91 * DAY));
     let local = vec![folder("purged elsewhere", "would come back", 9), folder("shared", "newer here", NOW)];
-    let remote = vec![folder("shared", "remote", 5), deleted("gone", NOW - DAY)];
+    let remote = vec![folder("shared", "remote", 5), sent(deleted("gone", NOW - DAY), Some(NOW - DAY))];
     assert_eq!(names(&stale.records(local, remote)), vec!["remote", "gone (deleted)"]);
 }
 
 #[test]
 fn a_stale_device_still_erases_old_markers_from_the_remote_copy() {
     let stale = Merge::new(NOW, Some(NOW - 91 * DAY));
-    assert!(stale.records(vec![], vec![deleted("old", NOW - 91 * DAY)]).is_empty());
+    assert!(stale.records(vec![], vec![sent(deleted("old", NOW - 92 * DAY), Some(NOW - 91 * DAY))]).is_empty());
 }
 
 #[test]
@@ -202,9 +259,11 @@ fn keyed_records_merge_key_by_key_with_the_same_rules() {
 }
 
 #[test]
-fn old_keyed_markers_are_erased() {
-    let merged = merge().keyed(tags(&[("c/old", tag("", NOW - 91 * DAY, true))]), HashMap::new());
-    assert!(merged.is_empty());
+fn keyed_markers_are_erased_ninety_days_after_their_first_upload() {
+    let mut old = tag("", NOW - 200 * DAY, true);
+    old.stamp.uploaded_at = Some(NOW - 91 * DAY);
+    let merged = merge().keyed(tags(&[("c/old", old), ("c/never sent", tag("", NOW - 200 * DAY, true))]), HashMap::new());
+    assert_eq!(merged.into_iter().map(|(key, tag)| (key, tag.stamp.uploaded_at)).collect::<Vec<_>>(), vec![(String::from("c/never sent"), Some(NOW))]);
 }
 
 #[test]
@@ -364,7 +423,7 @@ impl Cases {
             let updated_at = T + self.next(3) as i64;
             match self.next(3) {
                 0 => {}
-                1 => folders.push(deleted(id, updated_at)),
+                1 => folders.push(sent(deleted(id, updated_at), [None, Some(T), Some(T + 1)][self.next(3) as usize])),
                 _ => folders.push(folder(id, ["x", "y"][self.next(2) as usize], updated_at)),
             }
         }
