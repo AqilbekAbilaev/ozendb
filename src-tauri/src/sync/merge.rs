@@ -3,10 +3,11 @@
 // data loss: each rule has its test in merge.test.rs.
 
 use crate::record::{Record, Stamp, Stamped};
-use crate::settings::StampedSettings;
+use crate::settings::{Settings, StampedSettings};
 use crate::storage::ConnectionConfig;
 use crate::sync::local_only::without_local_only;
 use serde::Serialize;
+use serde_json::Value;
 use std::collections::HashMap;
 
 /// How long a deleted marker is kept. Every device that syncs within this time sees it;
@@ -76,12 +77,13 @@ impl Merge {
     pub fn settings(&self, local: StampedSettings, remote: StampedSettings) -> StampedSettings {
         let mut values = local.values.to_map();
         let mut updated_at = local.updated_at.clone();
+        let defaults = Settings::default().to_map();
         for (key, theirs) in without_local_only(remote.values.to_map()) {
             let their_stamp = remote.stamp_of(&key);
-            let wins = match values.get(&key) {
-                Some(mine) => rank(&live(their_stamp), &theirs) > rank(&live(local.stamp_of(&key)), mine),
-                None => true,
-            };
+            let default = defaults.get(&key);
+            let wins = values.get(&key).is_none_or(|mine| {
+                setting_rank(their_stamp, &theirs, default) > setting_rank(local.stamp_of(&key), mine, default)
+            });
             if self.stale() || wins {
                 values.insert(key.clone(), theirs);
                 updated_at.insert(key, their_stamp);
@@ -105,19 +107,28 @@ impl Merge {
 }
 
 fn outranks<T: Stamped + Serialize>(theirs: &T, mine: &T) -> bool {
-    rank(theirs.stamp(), theirs) > rank(mine.stamp(), mine)
-}
-
-fn live(updated_at: i64) -> Stamp {
-    Stamp { updated_at, deleted: false }
+    rank(theirs) > rank(mine)
 }
 
 /// Newer wins; on a tie, a deletion wins, so a tie never brings back a deleted record.
 /// Two different values stamped alike — typically both saved before stamps existed —
 /// are decided by their content, so every device picks the same one.
-fn rank<T: Serialize>(stamp: &Stamp, value: &T) -> (i64, bool, String) {
+fn rank<T: Stamped + Serialize>(record: &T) -> (i64, bool, String) {
+    (record.stamp().updated_at, record.stamp().deleted, content(record))
+}
+
+/// Newer wins. A setting never changed since stamps existed is at 0 on every device,
+/// fresh installs included; there a customised value beats the default, so a new
+/// device can't reset another's settings. Two customised values fall to content.
+fn setting_rank(updated_at: i64, value: &Value, default: Option<&Value>) -> (i64, bool, String) {
+    (updated_at, updated_at == 0 && Some(value) != default, content(value))
+}
+
+// The same answer on every device only while no synced type holds a `HashMap`, whose
+// key order changes between runs.
+fn content<T: Serialize>(value: &T) -> String {
     match serde_json::to_string(value) {
-        Ok(content) => (stamp.updated_at, stamp.deleted, content),
+        Ok(content) => content,
         Err(error) => unreachable!("a synced value always serializes: {error}"),
     }
 }

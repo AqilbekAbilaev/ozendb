@@ -329,6 +329,16 @@ fn settings_files_from_before_stamps_agree_on_both_devices() {
 }
 
 #[test]
+fn a_fresh_device_never_resets_customised_settings_from_an_old_file() {
+    let customised: StampedSettings = serde_json::from_value(json!({ "default_query_limit": 200, "editor_tab_width": 2 })).unwrap();
+    let fresh = StampedSettings::default();
+    for merged in [merge().settings(customised.clone(), fresh.clone()), merge().settings(fresh, customised)] {
+        assert_eq!(merged.values.default_query_limit, 200);
+        assert_eq!(merged.values.editor_tab_width, 2);
+    }
+}
+
+#[test]
 fn merging_settings_twice_changes_nothing() {
     let local = settings(Settings { theme: String::from("light"), ..Settings::default() }, &[("theme", 9)]);
     let remote = settings(Settings { editor_tab_width: 2, ..Settings::default() }, &[("editor_tab_width", 3)]);
