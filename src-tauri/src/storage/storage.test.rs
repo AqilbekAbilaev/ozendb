@@ -254,7 +254,7 @@ fn updated_at(storage: &Storage, id: &str) -> i64 {
 }
 
 fn stored_at(id: &str, updated_at: i64) -> ConnectionConfig {
-    ConnectionConfig { stamp: crate::record::Stamp { updated_at, deleted: false }, ..conn(id, "Prod ü/db") }
+    ConnectionConfig { stamp: crate::record::Stamp { updated_at, ..Default::default() }, ..conn(id, "Prod ü/db") }
 }
 
 #[test]

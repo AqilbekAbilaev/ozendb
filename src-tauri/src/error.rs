@@ -44,6 +44,9 @@ pub enum AppError {
     #[error("The sync password is incorrect.")]
     WrongSyncPassword,
 
+    #[error("The recovery key is incorrect.")]
+    WrongRecoveryKey,
+
     #[error("{0}")]
     Validation(String),
 }
@@ -68,6 +71,7 @@ impl AppError {
             AppError::Sql(_) => "sql",
             AppError::Crypto(_) => "crypto",
             AppError::WrongSyncPassword => "wrong_sync_password",
+            AppError::WrongRecoveryKey => "wrong_recovery_key",
             AppError::Validation(_) => "validation",
         }
     }

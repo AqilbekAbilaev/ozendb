@@ -18,15 +18,19 @@ pub struct Stamp {
     pub updated_at: i64,
     #[serde(default)]
     pub deleted: bool,
+    /// When a deleted marker first reached the server. Its 90 days count from here, not
+    /// from the deletion, so a delete uploaded late still reaches every device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uploaded_at: Option<i64>,
 }
 
 impl Stamp {
     pub fn now() -> Self {
-        Stamp { updated_at: now_epoch_ms(), deleted: false }
+        Stamp { updated_at: now_epoch_ms(), deleted: false, uploaded_at: None }
     }
 
     fn tombstone() -> Self {
-        Stamp { updated_at: now_epoch_ms(), deleted: true }
+        Stamp { updated_at: now_epoch_ms(), deleted: true, uploaded_at: None }
     }
 }
 
