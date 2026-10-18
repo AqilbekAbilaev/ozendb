@@ -8,6 +8,9 @@ use crate::json_store_wrapper;
 use serde::{Deserialize, Serialize};
 
 pub const GRACE_MS: i64 = 7 * 24 * 60 * 60 * 1000;
+// An automatic clock correction must not flip Premium to expired, but turning the clock
+// back can't extend it: Premium still ends at the same time.
+pub const CLOCK_DRIFT_MS: i64 = 5 * 60 * 1000;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Subscription {
@@ -54,9 +57,9 @@ impl Answer {
             return Entitlement::Free;
         }
         let until = self.premium_until();
-        // A clock reading earlier than the answer cannot measure the grace period, so it
+        // A clock reading well before the answer cannot measure the grace period, so it
         // grants none rather than stretching it.
-        if (self.received_at..until).contains(&now) {
+        if (self.received_at - CLOCK_DRIFT_MS..until).contains(&now) {
             Entitlement::Premium { until }
         } else {
             Entitlement::Expired

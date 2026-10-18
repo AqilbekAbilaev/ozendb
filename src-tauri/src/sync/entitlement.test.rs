@@ -1,4 +1,4 @@
-use super::{Account, Entitlement, EntitlementStorage, Subscription, GRACE_MS};
+use super::{Account, Entitlement, EntitlementStorage, Subscription, CLOCK_DRIFT_MS, GRACE_MS};
 use tempfile::tempdir;
 
 const RECEIVED_AT: i64 = 1_760_000_000_000;
@@ -82,9 +82,20 @@ fn no_recorded_answer_means_the_entitlement_is_unknown() {
 }
 
 #[test]
-fn a_clock_reading_earlier_than_the_answer_grants_no_premium() {
+fn the_tolerated_clock_drift_is_five_minutes() {
+    assert_eq!(CLOCK_DRIFT_MS, 5 * 60 * 1000);
+}
+
+#[test]
+fn a_clock_just_inside_the_drift_behind_the_answer_keeps_premium_to_the_same_end() {
     let (_dir, store) = recorded(account(true, None));
-    assert_eq!(store.entitlement(RECEIVED_AT - 1), Entitlement::Expired);
+    assert_eq!(store.entitlement(RECEIVED_AT - CLOCK_DRIFT_MS), Entitlement::Premium { until: RECEIVED_AT + GRACE_MS });
+}
+
+#[test]
+fn a_clock_further_behind_the_answer_than_the_drift_grants_no_premium() {
+    let (_dir, store) = recorded(account(true, None));
+    assert_eq!(store.entitlement(RECEIVED_AT - CLOCK_DRIFT_MS - 1), Entitlement::Expired);
 }
 
 #[test]
