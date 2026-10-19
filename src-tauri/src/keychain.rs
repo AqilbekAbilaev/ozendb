@@ -66,3 +66,63 @@ impl Keychain for OsKeychain {
 fn entry(key: &str) -> Result<keyring::Entry, AppError> {
     keyring::Entry::new(SERVICE, key).map_err(|e| AppError::Keychain(e.to_string()))
 }
+
+#[cfg(test)]
+pub(crate) mod fake {
+    use super::Keychain;
+    use crate::error::AppError;
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use zeroize::Zeroizing;
+
+    /// The keychain as a map, so no test touches the real one.
+    #[derive(Default)]
+    pub struct FakeKeychain(RefCell<HashMap<String, String>>);
+
+    impl FakeKeychain {
+        pub fn holding(entries: &[(&str, &str)]) -> Self {
+            let keychain = FakeKeychain::default();
+            for (key, secret) in entries {
+                keychain.0.borrow_mut().insert(key.to_string(), secret.to_string());
+            }
+            keychain
+        }
+
+        pub fn entries(&self) -> HashMap<String, String> {
+            self.0.borrow().clone()
+        }
+    }
+
+    impl Keychain for FakeKeychain {
+        fn read(&self, key: &str) -> Result<Option<Zeroizing<String>>, AppError> {
+            Ok(self.0.borrow().get(key).cloned().map(Zeroizing::new))
+        }
+
+        fn write(&self, key: &str, secret: &str) -> Result<(), AppError> {
+            self.0.borrow_mut().insert(key.to_string(), secret.to_string());
+            Ok(())
+        }
+
+        fn remove(&self, key: &str) -> Result<(), AppError> {
+            self.0.borrow_mut().remove(key);
+            Ok(())
+        }
+    }
+
+    /// A keychain that is locked or unreachable.
+    pub struct LockedKeychain;
+
+    impl Keychain for LockedKeychain {
+        fn read(&self, _: &str) -> Result<Option<Zeroizing<String>>, AppError> {
+            Err(AppError::Keychain("The keychain is locked.".into()))
+        }
+
+        fn write(&self, _: &str, _: &str) -> Result<(), AppError> {
+            Err(AppError::Keychain("The keychain is locked.".into()))
+        }
+
+        fn remove(&self, _: &str) -> Result<(), AppError> {
+            Err(AppError::Keychain("The keychain is locked.".into()))
+        }
+    }
+}
