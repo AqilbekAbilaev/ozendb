@@ -5,4 +5,11 @@ ignore = [
     # release exists, and dropping russh's `rsa` feature would lock out every RSA key.
     # Revisit when rsa ships a fix.
     "RUSTSEC-2023-0071",
+    # zip 8, through docx-rs, and zip 4, through tauri-plugin-updater: extraction can follow
+    # symbolic links out of the destination and keep SUID/SGID bits. docx-rs only writes
+    # archives. The updater extracts only on Windows, after checking the update's signature.
+    # Revisit when both move to zip 9 (bokuweb/docx-rs#943; tracked here in #350).
+    "RUSTSEC-2026-0367",
+    "RUSTSEC-2026-0368",
+    "RUSTSEC-2026-0369",
 ]
