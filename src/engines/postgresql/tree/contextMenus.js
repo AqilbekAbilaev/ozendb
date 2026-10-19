@@ -28,17 +28,17 @@ export const PG_MENUS = {
     { value: 'conn:disconnect_others', label: 'Disconnect Others' },
     { value: 'conn:disconnect_all', label: 'Disconnect All' },
   ],
-  database: [NEW_SQL, ROUTINES, { sep: true }, { value: 'pg:create_schema', label: 'Create Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH],
+  database: [NEW_SQL, ROUTINES, { sep: true }, { value: 'pg:create_schema', label: 'Create Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH, { sep: true }, { label: 'Choose Color', icon: 'brush', sub: 'color' }],
   schema: [
     ROUTINES, { value: 'pg:search_schema', label: 'Search in Schema…', icon: 'search' },
     { sep: true }, { value: 'pg:create_table', label: 'Create Table…', icon: 'table' }, { value: 'pg:drop_schema', label: 'Drop Schema…' },
-    { sep: true }, COPY_NAME, { sep: true }, REFRESH,
+    { sep: true }, COPY_NAME, { sep: true }, REFRESH, { sep: true }, { label: 'Choose Color', icon: 'brush', sub: 'color' },
   ],
   table: [
     { value: 'pg:open_table', label: 'Open Table', icon: 'table', shortcut: '↵' }, NEW_SQL,
     { sep: true }, { value: 'pg:export_table', label: 'Export Table…', icon: 'export' }, { value: 'pg:import_csv', label: 'Import CSV…', icon: 'import' },
     { sep: true }, { value: 'pg:rename_table', label: 'Rename Table…' }, { value: 'pg:drop_table', label: 'Drop Table…' },
-    { sep: true }, COPY_NAME,
+    { sep: true }, COPY_NAME, { sep: true }, REFRESH, { sep: true }, { label: 'Choose Color', icon: 'brush', sub: 'color' },
   ],
 }
 
