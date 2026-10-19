@@ -1,64 +1,10 @@
 use super::SyncedConnection;
 use crate::error::AppError;
-use crate::keychain::Keychain;
+use crate::keychain::fake::{FakeKeychain, LockedKeychain};
 use crate::record::{Record, Stamp};
 use crate::storage::ConnectionConfig;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use zeroize::Zeroizing;
 
 const ID: &str = "prod db/ä.1";
-
-/// The keychain as a map, so no test touches the real one.
-#[derive(Default)]
-struct FakeKeychain(RefCell<HashMap<String, String>>);
-
-impl FakeKeychain {
-    fn holding(entries: &[(&str, &str)]) -> Self {
-        let keychain = FakeKeychain::default();
-        for (key, secret) in entries {
-            keychain.0.borrow_mut().insert(key.to_string(), secret.to_string());
-        }
-        keychain
-    }
-
-    fn entries(&self) -> HashMap<String, String> {
-        self.0.borrow().clone()
-    }
-}
-
-impl Keychain for FakeKeychain {
-    fn read(&self, key: &str) -> Result<Option<Zeroizing<String>>, AppError> {
-        Ok(self.0.borrow().get(key).cloned().map(Zeroizing::new))
-    }
-
-    fn write(&self, key: &str, secret: &str) -> Result<(), AppError> {
-        self.0.borrow_mut().insert(key.to_string(), secret.to_string());
-        Ok(())
-    }
-
-    fn remove(&self, key: &str) -> Result<(), AppError> {
-        self.0.borrow_mut().remove(key);
-        Ok(())
-    }
-}
-
-/// A keychain that is locked or unreachable.
-struct LockedKeychain;
-
-impl Keychain for LockedKeychain {
-    fn read(&self, _: &str) -> Result<Option<Zeroizing<String>>, AppError> {
-        Err(AppError::Keychain("The keychain is locked.".into()))
-    }
-
-    fn write(&self, _: &str, _: &str) -> Result<(), AppError> {
-        Err(AppError::Keychain("The keychain is locked.".into()))
-    }
-
-    fn remove(&self, _: &str) -> Result<(), AppError> {
-        Err(AppError::Keychain("The keychain is locked.".into()))
-    }
-}
 
 fn every_secret() -> [(String, &'static str); 3] {
     [
