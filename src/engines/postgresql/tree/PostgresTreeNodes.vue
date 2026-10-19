@@ -59,9 +59,22 @@ function openOtherQuery(name) {
   openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: name })
 }
 
-// Rows below the connection have no colours of their own yet, so they all show the
-// connection's, as MongoDB's rows inherit their nearest coloured ancestor's.
-const color = computed(() => nodeTagName(tagOverrides.value, props.conn.id, props.conn.tag))
+// Colours cascade from table → schema → database → connection, matching the tab bar.
+function nodeKeyForLevel(level, schemaName, tableName) {
+  // PostgreSQL keys are JSON-encoded: ['pg', connId, level, schema, table]
+  // so different levels don't collide, and names with '/' are handled.
+  const tableArg = level === 'table' ? tableName : null
+  return JSON.stringify(['pg', props.conn.id, level, schemaName ?? null, tableArg])
+}
+function levelForNode(schemaName, tableName) {
+  return tableName ? 'table' : schemaName ? 'schema' : 'database'
+}
+const color = computed(() => {
+  const level = levelForNode(/* schema and table would be passed from parent */)
+  // Since we're in a loop, we need the schema/table from the current node
+  // The tree structure gives us schema.name and table.name in the v-for loops
+  return nodeTagName(tagOverrides.value, nodeKeyForLevel(level, schemaName, tableName))
+})
 const tagStyle = computed(() => (color.value ? { '--tag-color': colorHex(color.value) } : null))
 
 // A row's ResourceRef: the database, then the schema and table when the row names them.

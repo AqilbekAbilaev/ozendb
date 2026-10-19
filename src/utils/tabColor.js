@@ -52,6 +52,8 @@ export function tabColorName(tab, tagOverrides) {
   // PostgreSQL nodes below the connection can have their own colours, cascading
   // table → schema → database → connection, using the same nodeTagKey format.
   else if (tab.type === 'postgresql.table_browse' || tab.type === 'postgresql.query') levels = ['table', 'schema', 'database', 'connection']
+  // PostgreSQL search tab takes its database's colour
+  else if (tab.type === 'postgresql.search') levels = ['database', 'connection']
   const keys = levels.map((level) => resourceAt(tab.target, level)).filter(Boolean).map(nodeTagKey)
   for (const key of keys) {
     const name = tagOverrides ? tagOverrides[key] : null
