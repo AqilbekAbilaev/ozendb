@@ -62,6 +62,18 @@ where
         }
     }
 
+    /// Replaces the value with `after` only if it still equals `before`, so a write made
+    /// since `before` was read is never lost. Returns whether it replaced it.
+    pub fn replace_if_unchanged(&self, before: &T, after: &T) -> Result<bool, AppError> {
+        let _guard = self.guard();
+        let current: T = crate::persist::read_json(&self.path).unwrap_or_default();
+        if serde_json::to_value(&current)? != serde_json::to_value(before)? {
+            return Ok(false);
+        }
+        self.write(after)?;
+        Ok(true)
+    }
+
     fn write(&self, value: &T) -> Result<(), AppError> {
         let content = match serde_json::to_string_pretty(value) {
             Ok(val) => val,

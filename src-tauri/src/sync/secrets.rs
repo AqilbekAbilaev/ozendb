@@ -63,6 +63,30 @@ impl SyncedConnection {
         Ok(())
     }
 
+    pub fn config(&self) -> &ConnectionConfig {
+        &self.config
+    }
+
+    /// These secrets on `config`, which a merge may have changed. A deleted record
+    /// carries none.
+    pub fn with_config(self, config: ConnectionConfig) -> Self {
+        let secrets = if config.stamp.deleted { ConnectionSecrets::default() } else { self.secrets };
+        Self { config, secrets }
+    }
+
+    /// Whether this record's secrets differ from what `previous` held, or from none.
+    pub fn secrets_differ(&self, previous: Option<&SyncedConnection>) -> bool {
+        let none = ConnectionSecrets::default();
+        let previous = previous.map_or(&none, |p| &p.secrets);
+        let same = |a: &Option<Secret>, b: &Option<Secret>| match (a, b) {
+            (Some(Secret(a)), Some(Secret(b))) => a.as_str() == b.as_str(),
+            (a, b) => a.is_none() && b.is_none(),
+        };
+        !(same(&self.secrets.password, &previous.password)
+            && same(&self.secrets.ssh_password, &previous.ssh_password)
+            && same(&self.secrets.ssh_passphrase, &previous.ssh_passphrase))
+    }
+
     /// The record without its secrets, as the connection store keeps it.
     pub fn into_config(self) -> ConnectionConfig {
         self.config

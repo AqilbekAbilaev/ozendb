@@ -47,6 +47,12 @@ pub enum AppError {
     #[error("The recovery key is incorrect.")]
     WrongRecoveryKey,
 
+    #[error("The sync data was saved by a newer version of OzenDB. Update OzenDB to keep syncing.")]
+    NewerSyncFormat,
+
+    #[error("The downloaded sync data could not be read.")]
+    UnreadableSyncData,
+
     #[error("{0}")]
     Validation(String),
 }
@@ -72,6 +78,8 @@ impl AppError {
             AppError::Crypto(_) => "crypto",
             AppError::WrongSyncPassword => "wrong_sync_password",
             AppError::WrongRecoveryKey => "wrong_recovery_key",
+            AppError::NewerSyncFormat => "newer_sync_format",
+            AppError::UnreadableSyncData => "unreadable_sync_data",
             AppError::Validation(_) => "validation",
         }
     }

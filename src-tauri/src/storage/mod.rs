@@ -152,6 +152,12 @@ impl ConnectionConfig {
         self.engine.engine()
     }
 
+    /// The record without this device's own state (`open`, `last_accessed`): the part
+    /// that syncs.
+    pub fn shared_part(&self) -> ConnectionConfig {
+        ConnectionConfig { open: false, last_accessed: None, ..self.clone() }
+    }
+
     /// The SSH auth method as an exhaustively-matchable enum. Derived from the
     /// stored `ssh_auth` string; see `SshAuthMethod`.
     pub fn ssh_auth_method(&self) -> SshAuthMethod {
@@ -278,6 +284,36 @@ impl Storage {
                 Err(e)
             }
         }
+    }
+
+    /// Every record, deleted markers included: what sync sends.
+    pub fn records(&self) -> Vec<ConnectionConfig> {
+        let mut guard = self.lock_cache();
+        guard.get_or_insert_with(|| self.read_from_disk()).clone()
+    }
+
+    /// Replaces the list with `after` only if its shared part still equals `before`'s.
+    /// Opening or using a connection meanwhile doesn't count as a change, and keeps its
+    /// newer `open` and `last_accessed`. Returns whether it replaced the list.
+    pub fn replace_synced_if_unchanged(&self, before: &[ConnectionConfig], after: Vec<ConnectionConfig>) -> Result<bool, AppError> {
+        let synced = |list: &[ConnectionConfig]| serde_json::to_value(list.iter().map(ConnectionConfig::shared_part).collect::<Vec<_>>());
+        let before = synced(before)?;
+        let mut replaced = false;
+        self.update_with(|current| {
+            if synced(current).ok() != Some(before) {
+                return;
+            }
+            let mut after = after;
+            for config in after.iter_mut() {
+                if let Some(now) = current.iter().find(|c| c.id == config.id) {
+                    config.open = now.open;
+                    config.last_accessed = now.last_accessed.clone();
+                }
+            }
+            *current = after;
+            replaced = true;
+        })?;
+        Ok(replaced)
     }
 
     pub fn add(&self, config: ConnectionConfig) -> Result<(), AppError> {
