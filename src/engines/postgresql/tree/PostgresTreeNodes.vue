@@ -60,11 +60,10 @@ function openOtherQuery(name) {
 }
 
 // A row shows its own colour, else its nearest coloured parent's, as MongoDB's rows do.
-const rowColor = (schemaName = null, tableName = null) =>
-  pgRowColorName(tagOverrides.value, rowResource(schemaName, tableName), props.conn.tag)
-function rowStyle(schemaName = null, tableName = null) {
-  const color = rowColor(schemaName, tableName)
-  return color ? { '--tag-color': colorHex(color) } : null
+// Returned as the row's attributes, so the colour is looked up once per row.
+function rowTag(schemaName = null, tableName = null) {
+  const color = pgRowColorName(tagOverrides.value, rowResource(schemaName, tableName), props.conn.tag)
+  return color ? { class: 'tagged', style: { '--tag-color': colorHex(color) } } : {}
 }
 
 // A row's ResourceRef: the database, then the schema and table when the row names them.
@@ -122,8 +121,8 @@ function openTable(schema, table) {
   <!-- A connection is bound to one database; it's the only one there is to browse. -->
   <div
     class="tnode"
-    :class="{ 'ctx-sel': ctxSel('database'), sel: isSelected('database'), tagged: !!rowColor() }"
-    :style="rowStyle()"
+    :class="{ 'ctx-sel': ctxSel('database'), sel: isSelected('database') }"
+    v-bind="rowTag()"
     style="padding-left: 21px"
     @click="toggleDatabase(); select('database')"
     @contextmenu.prevent="onContext($event, 'database', database)"
@@ -150,8 +149,8 @@ function openTable(schema, table) {
     <template v-for="schema in shown" :key="schema.name">
       <div
         class="tnode"
-        :class="{ 'ctx-sel': ctxSel('schema', schema.name), sel: isSelected('schema', schema.name), tagged: !!rowColor(schema.name) }"
-        :style="rowStyle(schema.name)"
+        :class="{ 'ctx-sel': ctxSel('schema', schema.name), sel: isSelected('schema', schema.name) }"
+        v-bind="rowTag(schema.name)"
         style="padding-left: 36px"
         @click="toggleSchema(schema.name); select('schema', schema.name)"
         @contextmenu.prevent="onContext($event, 'schema', schema.name, { schema: schema.name })"
@@ -183,9 +182,8 @@ function openTable(schema, table) {
               'ctx-sel': ctxSel('table', schema.name, table.name),
               sel: isOpenTable(activeTab, conn.id, schema.name, table.name)
                 || isSelected('table', schema.name, table.name),
-              tagged: !!rowColor(schema.name, table.name),
             }"
-            :style="rowStyle(schema.name, table.name)"
+            v-bind="rowTag(schema.name, table.name)"
             style="padding-left: 66px"
             @click="select('table', schema.name, table.name)"
             @dblclick="openTable(schema.name, table.name)"
