@@ -130,7 +130,7 @@ impl Snapshot {
     }
 
     pub fn merged(self, remote: Snapshot, merge: &Merge) -> Snapshot {
-        let configs = |list: &[SyncedConnection]| list.iter().map(|c| c.config().clone()).collect();
+        let configs = |list: &[SyncedConnection]| list.iter().cloned().map(SyncedConnection::into_config).collect();
         let connections = merge
             .connections(configs(&self.connections), configs(&remote.connections))
             .into_iter()
@@ -173,7 +173,7 @@ impl Snapshot {
 
     // The connection half of `write_if_unchanged`.
     fn write_connections(&self, before: &Snapshot, stores: &SyncedStores, keychain: &impl Keychain) -> Result<Written, AppError> {
-        let configs = |snapshot: &Snapshot| snapshot.connections.iter().map(|c| c.config().clone()).collect::<Vec<_>>();
+        let configs = |snapshot: &Snapshot| snapshot.connections.iter().cloned().map(SyncedConnection::into_config).collect::<Vec<_>>();
         let mut changed_connections = Vec::new();
         let mut keychain_error = None;
         let complete = stores.connections.replace_synced_if_unchanged(&configs(before), configs(self))?;
@@ -206,7 +206,7 @@ impl Snapshot {
     fn secrets_match(&self, other: &Snapshot) -> bool {
         self.connections.len() == other.connections.len()
             && self.connections.iter().all(|mine| {
-                let theirs = other.connections.iter().find(|c| c.config().id == mine.config().id);
+                let theirs = other.connections.iter().find(|c| c.id() == mine.id());
                 theirs.is_some() && !mine.secrets_differ(theirs)
             })
     }
@@ -214,7 +214,7 @@ impl Snapshot {
     // Everything but the secrets, with each list keyed by id so its order doesn't count.
     fn comparable(&self) -> Result<Value, AppError> {
         Ok(json!({
-            "connections": by_id(self.connections.iter().map(|c| c.config().shared_part()))?,
+            "connections": by_id(self.connections.iter().map(SyncedConnection::shared_part))?,
             "folders": by_id(self.folders.iter().cloned())?,
             "saved_queries": by_id(self.saved_queries.iter().cloned())?,
             "pg_saved": by_id(self.pg_saved.iter().cloned())?,
@@ -229,11 +229,11 @@ impl Snapshot {
 /// The merged record with the secrets of the side it came from. When both sides hold the
 /// same record, the server's secrets win, so every device settles on one copy.
 fn with_winning_secrets(config: ConnectionConfig, local: &[SyncedConnection], remote: &[SyncedConnection]) -> SyncedConnection {
-    let shared = serde_json::to_value(config.shared_part()).ok();
-    let same_id = |c: &&SyncedConnection| c.config().id == config.id;
+    let shared = config.shared_part();
+    let same_id = |c: &&SyncedConnection| c.id() == config.id;
     let from = remote
         .iter()
-        .find(|c| same_id(c) && serde_json::to_value(c.config().shared_part()).ok() == shared)
+        .find(|c| same_id(c) && c.shared_part() == shared)
         .or_else(|| local.iter().find(same_id))
         .or_else(|| remote.iter().find(same_id));
     match from {

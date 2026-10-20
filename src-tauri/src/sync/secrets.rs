@@ -63,8 +63,9 @@ impl SyncedConnection {
         Ok(())
     }
 
-    pub fn config(&self) -> &ConnectionConfig {
-        &self.config
+    /// The record without this device's own state: the part every device agrees on.
+    pub fn shared_part(&self) -> ConnectionConfig {
+        self.config.shared_part()
     }
 
     /// These secrets on `config`, which a merge may have changed. A deleted record
