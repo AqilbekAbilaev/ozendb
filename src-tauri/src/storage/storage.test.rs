@@ -322,3 +322,33 @@ fn a_replace_that_finds_the_list_changed_writes_nothing() {
     std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
     assert!(!replaced.unwrap());
 }
+
+#[test]
+fn record_and_secret_changes_never_interleave() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{mpsc, Arc};
+    let (storage, _dir) = storage_in_tempdir();
+    let storage = Arc::new(storage);
+    let (started, wait_started) = mpsc::channel();
+    let (release, wait_release) = mpsc::channel::<()>();
+    let first = {
+        let storage = Arc::clone(&storage);
+        std::thread::spawn(move || storage.with_secrets_locked(|| {
+            started.send(()).unwrap();
+            wait_release.recv().unwrap();
+        }))
+    };
+    wait_started.recv().unwrap();
+    let entered = Arc::new(AtomicBool::new(false));
+    let second = {
+        let (storage, entered) = (Arc::clone(&storage), Arc::clone(&entered));
+        std::thread::spawn(move || storage.with_secrets_locked(|| entered.store(true, Ordering::SeqCst)))
+    };
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    assert!(!entered.load(Ordering::SeqCst));
+    release.send(()).unwrap();
+    first.join().unwrap();
+    second.join().unwrap();
+    assert!(entered.load(Ordering::SeqCst));
+}
