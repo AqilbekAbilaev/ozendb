@@ -11,6 +11,7 @@ use crate::saved_queries::SavedQueryStorage;
 use crate::settings::SettingsStorage;
 use crate::storage::{ConnectionConfig, Storage};
 use crate::sync::snapshot::{Snapshot, SyncedStores, Written};
+use crate::sync::state::SyncStateStorage;
 use tempfile::TempDir;
 
 /// Every synced store, in a temporary directory.
@@ -25,6 +26,7 @@ pub(crate) struct Device {
     pub(crate) settings: SettingsStorage,
     pub(crate) known_hosts: KnownHostsStore,
     pub(crate) keychain: FakeKeychain,
+    pub(crate) state: SyncStateStorage,
 }
 
 impl Device {
@@ -41,6 +43,7 @@ impl Device {
             settings: SettingsStorage::new(at("settings.json")),
             known_hosts: KnownHostsStore::new(at("known_hosts.json")),
             keychain: FakeKeychain::default(),
+            state: SyncStateStorage::new(at("sync_state.json")),
             _dir: dir,
         }
     }

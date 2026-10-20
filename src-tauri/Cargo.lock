@@ -4288,6 +4288,7 @@ name = "ozendb"
 version = "0.2.1"
 dependencies = [
  "argon2",
+ "base64 0.22.1",
  "boa_engine",
  "boa_gc",
  "chacha20poly1305",

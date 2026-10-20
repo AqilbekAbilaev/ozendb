@@ -41,6 +41,8 @@ tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 serde_json = { version = "1", features = ["raw_value"] }
+# The sync server sends and takes its binary fields as base64 text.
+base64 = "0.22"
 # Global allocator. Query results are deserialized into serde_json::Value (many tiny
 # allocations per document); glibc's per-thread arenas fragment badly under that churn
 # and never return the freed pages, ratcheting RSS up on repeated queries. mimalloc

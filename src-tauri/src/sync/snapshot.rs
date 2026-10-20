@@ -39,7 +39,7 @@ pub struct SyncedStores<'a> {
 
 /// Every synced record, deleted markers included, and each connection's secrets. The
 /// stores are grouped by how they merge; in the blob each is a key of its own.
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, Default)]
 pub struct Snapshot {
     connections: Vec<SyncedConnection>,
     #[serde(flatten)]
@@ -50,7 +50,7 @@ pub struct Snapshot {
 }
 
 /// The stores that merge as lists of records.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 struct Records {
     folders: Vec<Folder>,
     saved_queries: Vec<SavedQueryEntry>,
@@ -59,7 +59,7 @@ struct Records {
 }
 
 /// The stores that merge as maps, key by key.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 struct Keyed {
     default_queries: HashMap<String, DefaultQuery>,
     node_tags: HashMap<String, NodeTag>,
