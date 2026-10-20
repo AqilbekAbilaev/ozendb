@@ -1,15 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../appApi/account', () => ({ getEntitlement: vi.fn() }))
 
 import { getEntitlement } from '../appApi/account'
 import { entitlement, isPremium, refreshPremium, resetPremium } from './premium'
 
-const PREMIUM = { state: 'premium', until: 1760604800000 }
+const NOW = 1760000000000
+const HOUR = 60 * 60 * 1000
+const PREMIUM = { state: 'premium', until: NOW + 2 * HOUR }
 
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.useFakeTimers({ now: NOW })
   resetPremium()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('premium store', () => {
@@ -31,11 +38,27 @@ describe('premium store', () => {
     expect(isPremium.value).toBe(false)
   })
 
-  it('keeps the last known entitlement when the backend cannot be asked', async () => {
+  it('keeps the last known entitlement and passes on the error when the backend cannot be asked', async () => {
     getEntitlement.mockResolvedValue(PREMIUM)
     await refreshPremium()
     getEntitlement.mockRejectedValue(new Error('offline'))
-    await refreshPremium()
+    await expect(refreshPremium()).rejects.toThrow('offline')
     expect(entitlement.value).toEqual(PREMIUM)
+  })
+
+  it('asks again when a Premium answer runs out', async () => {
+    getEntitlement.mockResolvedValueOnce(PREMIUM).mockResolvedValueOnce({ state: 'expired' })
+    await refreshPremium()
+    await vi.advanceTimersByTimeAsync(2 * HOUR - 1)
+    expect(isPremium.value).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(entitlement.value).toEqual({ state: 'expired' })
+  })
+
+  it('does not ask again after an answer that is not Premium', async () => {
+    getEntitlement.mockResolvedValue({ state: 'free' })
+    await refreshPremium()
+    await vi.advanceTimersByTimeAsync(30 * 24 * HOUR)
+    expect(getEntitlement).toHaveBeenCalledTimes(1)
   })
 })

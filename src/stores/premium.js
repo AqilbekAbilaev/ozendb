@@ -9,15 +9,19 @@ const UNKNOWN = { state: 'unknown' }
 export const entitlement = ref(UNKNOWN)
 export const isPremium = computed(() => entitlement.value.state === 'premium')
 
+let expiry = null
+
+// A failed read rejects, so the error reaches the error log, and the last known answer
+// stays. The backend judges Premium at the moment it is asked, so a Premium answer is
+// asked again once it runs out.
 export async function refreshPremium() {
-  try {
-    entitlement.value = await getEntitlement()
-  } catch (_) {
-    // The last known answer is still the best one; a failed read is no reason to drop it.
-  }
+  entitlement.value = await getEntitlement()
+  clearTimeout(expiry)
+  if (isPremium.value) expiry = setTimeout(refreshPremium, entitlement.value.until - Date.now())
 }
 
 // Module-scope state persists through HMR; tests use this to start each case clean.
 export function resetPremium() {
+  clearTimeout(expiry)
   entitlement.value = UNKNOWN
 }
