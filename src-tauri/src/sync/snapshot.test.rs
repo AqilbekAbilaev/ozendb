@@ -96,8 +96,8 @@ fn reading_includes_deleted_markers() {
     device.folders.delete("f2").unwrap();
 
     let snapshot = device.read();
-    assert_eq!(snapshot.folders.len(), 2);
-    assert!(snapshot.folders.iter().any(|f| f.id == "f2" && f.stamp.deleted));
+    assert_eq!(snapshot.records.folders.len(), 2);
+    assert!(snapshot.records.folders.iter().any(|f| f.id == "f2" && f.stamp.deleted));
 }
 
 #[test]
@@ -341,4 +341,15 @@ fn a_refused_secret_still_writes_the_rest_and_reports_them() {
     assert_eq!(written.changed_connections, vec!["c1".to_string(), "c2".to_string()]);
     assert_eq!(keychain.0.read("c2").unwrap().as_deref().map(String::as_str), Some("new two"));
     assert_eq!(device.folders.load()[0].name, "from elsewhere");
+}
+
+#[test]
+fn the_upload_holds_one_key_per_store() {
+    let blob: serde_json::Value = serde_json::from_str(&text(&Device::new().read())).unwrap();
+    let mut keys: Vec<&String> = blob.as_object().unwrap().keys().collect();
+    keys.sort();
+    let expected = [
+        "connections", "default_queries", "folders", "format", "known_hosts", "node_tags", "pg_saved", "saved_queries", "settings",
+    ];
+    assert_eq!(keys, expected);
 }
