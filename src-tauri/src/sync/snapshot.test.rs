@@ -1,5 +1,5 @@
 use super::*;
-use crate::keychain::fake::{FakeKeychain, LockedKeychain};
+use crate::keychain::fake::{FakeKeychain, LockedKeychain, RefusingKeychain};
 use crate::record::Stamp;
 use crate::settings::Settings;
 use tempfile::TempDir;
@@ -215,7 +215,8 @@ fn writing_back_saves_every_store_and_the_won_passwords() {
     let merged = before.clone().merged(decoded(&other.read()), &merge());
     let written = device.write(&merged, &before);
 
-    assert_eq!(written, Written { complete: true, secrets_changed: vec!["c1".into()] });
+    assert!(written.complete);
+    assert_eq!(written.changed_connections, vec!["c1".to_string()]);
     assert_eq!(device.keychain.read("c1").unwrap().as_deref().map(String::as_str), Some("new"));
     assert_eq!(device.folders.load()[0].name, "from elsewhere");
 }
@@ -268,4 +269,76 @@ fn writing_back_keeps_postgres_run_history() {
 
     assert_eq!(device.pg_queries.saved("c1").len(), 1);
     assert_eq!(device.pg_queries.history("c1").len(), 1);
+}
+
+#[test]
+fn a_connection_deleted_elsewhere_keeps_none_of_this_devices_state() {
+    let device = Device::new();
+    device.hold(ConnectionConfig { open: true, last_accessed: Some("yesterday".into()), ..connection("c1", "prod", 1) });
+    let other = Device::new();
+    other.hold(connection("c1", "prod", 1));
+    other.connections.remove("c1").unwrap();
+
+    let before = device.read();
+    let merged = before.clone().merged(decoded(&other.read()), &merge());
+    device.write(&merged, &before);
+
+    let saved = &device.connections.records()[0];
+    assert!(saved.stamp.deleted);
+    assert_eq!((saved.open, saved.last_accessed.clone()), (false, None));
+}
+
+#[test]
+fn a_connection_the_merge_drops_leaves_no_secrets_behind() {
+    let device = Device::new();
+    device.hold(connection("c1", "prod", 1));
+    device.keychain.write("c1", "s3cret").unwrap();
+    device.keychain.write("c1::ssh-pass", "tunnel").unwrap();
+    let stale = Merge::new(NOW, Some(NOW - 100 * DAY));
+
+    let before = device.read();
+    let merged = before.clone().merged(decoded(&Device::new().read()), &stale);
+    let written = device.write(&merged, &before);
+
+    assert!(device.keychain.entries().is_empty());
+    assert_eq!(written.changed_connections, vec!["c1".to_string()]);
+}
+
+#[test]
+fn every_connection_the_merge_changed_is_reported_and_no_other() {
+    let device = Device::new();
+    device.hold(connection("c1", "prod", 1));
+    device.hold(connection("c2", "same", 1));
+    let other = Device::new();
+    other.hold(connection("c1", "prod moved", 9));
+    other.hold(connection("c2", "same", 1));
+
+    let before = device.read();
+    let merged = before.clone().merged(decoded(&other.read()), &merge());
+    let written = device.write(&merged, &before);
+
+    assert_eq!(written.changed_connections, vec!["c1".to_string()]);
+}
+
+#[test]
+fn a_refused_secret_still_writes_the_rest_and_reports_them() {
+    let device = Device::new();
+    device.hold(connection("c1", "one", 1));
+    device.hold(connection("c2", "two", 1));
+    let other = Device::new();
+    other.hold(connection("c1", "one", 9));
+    other.hold(connection("c2", "two", 9));
+    other.keychain.write("c1", "new one").unwrap();
+    other.keychain.write("c2", "new two").unwrap();
+    other.folders.insert(folder("f1", "from elsewhere", 9)).unwrap();
+    let keychain = RefusingKeychain(FakeKeychain::default(), "c1");
+
+    let before = device.read();
+    let merged = before.clone().merged(decoded(&other.read()), &merge());
+    let written = merged.write_if_unchanged(&before, &device.stores(), &keychain).unwrap();
+
+    assert_eq!(written.keychain_error.map(|e| e.code()), Some("keychain"));
+    assert_eq!(written.changed_connections, vec!["c1".to_string(), "c2".to_string()]);
+    assert_eq!(keychain.0.read("c2").unwrap().as_deref().map(String::as_str), Some("new two"));
+    assert_eq!(device.folders.load()[0].name, "from elsewhere");
 }

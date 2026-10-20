@@ -86,7 +86,7 @@ impl PgQueryLibraryStore {
     /// history doesn't sync and is left alone. Returns whether it replaced them.
     pub fn replace_saved_if_unchanged(&self, before: &[SavedSql], after: Vec<SavedSql>) -> Result<bool, AppError> {
         let before = serde_json::to_value(before)?;
-        self.inner.update(|lib| {
+        self.inner.update_if(|lib| {
             if serde_json::to_value(&lib.saved).ok() != Some(before) {
                 return false;
             }

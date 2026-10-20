@@ -87,6 +87,11 @@ impl SyncedConnection {
             && same(&self.secrets.ssh_passphrase, &previous.ssh_passphrase))
     }
 
+    /// Whether this record's shared part or secrets differ from `previous`, or from none.
+    pub fn differs_from(&self, previous: Option<&SyncedConnection>) -> bool {
+        previous.is_none_or(|p| p.config.shared_part() != self.config.shared_part()) || self.secrets_differ(previous)
+    }
+
     /// The record without its secrets, as the connection store keeps it.
     pub fn into_config(self) -> ConnectionConfig {
         self.config

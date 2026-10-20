@@ -62,6 +62,18 @@ where
         }
     }
 
+    /// `update`, except that when `mutate` returns false nothing is written: it must then
+    /// have left the value as it found it. Returns what `mutate` returned.
+    pub fn update_if(&self, mutate: impl FnOnce(&mut T) -> bool) -> Result<bool, AppError> {
+        let _guard = self.guard();
+        let mut value: T = crate::persist::read_json(&self.path).unwrap_or_default();
+        if !mutate(&mut value) {
+            return Ok(false);
+        }
+        self.write(&value)?;
+        Ok(true)
+    }
+
     /// Replaces the value with `after` only if it still equals `before`, so a write made
     /// since `before` was read is never lost. Returns whether it replaced it.
     pub fn replace_if_unchanged(&self, before: &T, after: &T) -> Result<bool, AppError> {

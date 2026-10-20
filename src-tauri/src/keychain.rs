@@ -93,6 +93,31 @@ pub(crate) mod fake {
         }
     }
 
+    /// A `FakeKeychain` that refuses to change one key, as when the user denies access to one item.
+    pub struct RefusingKeychain(pub FakeKeychain, pub &'static str);
+
+    impl RefusingKeychain {
+        fn check(&self, key: &str) -> Result<(), AppError> {
+            if key == self.1 { Err(AppError::Keychain("access denied".into())) } else { Ok(()) }
+        }
+    }
+
+    impl Keychain for RefusingKeychain {
+        fn read(&self, key: &str) -> Result<Option<Zeroizing<String>>, AppError> {
+            self.0.read(key)
+        }
+
+        fn write(&self, key: &str, secret: &str) -> Result<(), AppError> {
+            self.check(key)?;
+            self.0.write(key, secret)
+        }
+
+        fn remove(&self, key: &str) -> Result<(), AppError> {
+            self.check(key)?;
+            self.0.remove(key)
+        }
+    }
+
     impl Keychain for FakeKeychain {
         fn read(&self, key: &str) -> Result<Option<Zeroizing<String>>, AppError> {
             Ok(self.0.borrow().get(key).cloned().map(Zeroizing::new))
