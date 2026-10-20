@@ -30,6 +30,19 @@ describe('PostgreSQL right-click menus', () => {
     })
   })
 
+  it('offers Choose Color on every level, in a group after a separator', () => {
+    for (const level of ['connection', 'database', 'schema', 'table']) {
+      const items = PG_MENUS[level]
+      const i = items.findIndex((item) => item.sub === 'color')
+      expect(items[i]).toEqual({ label: 'Choose Color', icon: 'brush', sub: 'color' })
+      expect(items.slice(0, i).some((item) => item.sep)).toBe(true)
+    }
+  })
+
+  it('keeps Refresh off the table menu', () => {
+    expect(PG_MENUS.table.map((item) => item.value)).not.toContain('node:refresh')
+  })
+
   it('offers no MongoDB-only action', () => {
     const ids = Object.values(PG_MENUS).flat().map(i => i.value).filter(Boolean)
     // Server Info was on this list until PostgreSQL grew diagnostics of its own; the
