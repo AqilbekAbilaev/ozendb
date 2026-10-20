@@ -55,6 +55,15 @@ describe('premium store', () => {
     expect(entitlement.value).toEqual({ state: 'expired' })
   })
 
+  it('asks again within a minute of waking when the computer slept past the end', async () => {
+    getEntitlement.mockResolvedValueOnce(PREMIUM).mockResolvedValueOnce({ state: 'expired' })
+    await refreshPremium()
+    // Asleep: the clock moves on, but timers do not run.
+    vi.setSystemTime(NOW + 10 * HOUR)
+    await vi.advanceTimersByTimeAsync(60 * 1000)
+    expect(entitlement.value).toEqual({ state: 'expired' })
+  })
+
   it('does not ask again after an answer that is not Premium', async () => {
     getEntitlement.mockResolvedValue({ state: 'free' })
     await refreshPremium()
