@@ -11,6 +11,7 @@ import { recordFrontendError } from "./appApi/errorLog";
 import { prePaintTheme } from "./utils/themeMirror";
 import { installInputUndo } from "./utils/inputUndo";
 import { checkOnLaunch } from "./stores/updater";
+import { refreshPremium } from "./stores/premium";
 import { loadSettings, restoreSessionEnabled, editorTabWidth } from "./stores/settings";
 import { EDITOR_TAB_WIDTH } from "./constants/injectionKeys";
 import { useSessionPersistence } from "./composables/useSessionPersistence";
@@ -51,3 +52,5 @@ const { initializeSession, startAutoSave } = useSessionPersistence();
 loadSettings()
   .then(() => initializeSession({ restore: restoreSessionEnabled.value }))
   .then(() => { startAutoSave(); checkOnLaunch(); });
+// Premium depends on nothing above, so it is read alongside rather than queued behind it.
+refreshPremium();

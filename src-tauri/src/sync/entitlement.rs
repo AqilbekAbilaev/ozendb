@@ -33,7 +33,9 @@ pub struct Answer {
     received_at: i64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Sent to the frontend as `{ "state": "premium", "until": … }`, or the state alone.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
 pub enum Entitlement {
     /// No answer from the server is recorded on this device.
     Unknown,

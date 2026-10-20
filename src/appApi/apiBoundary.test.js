@@ -33,6 +33,8 @@ const APP_COMMANDS = [
   'stage_import_text', 'read_shell_script', 'write_shell_script',
   // updater.js
   'can_self_update',
+  // account.js
+  'get_entitlement',
 ]
 
 // Roots where custom commands and the Tauri transport are allowed: the application
