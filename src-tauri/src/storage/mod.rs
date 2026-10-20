@@ -266,16 +266,29 @@ impl Storage {
     where
         F: FnOnce(&mut Vec<ConnectionConfig>),
     {
+        self.update_if(|connections| {
+            mutate(connections);
+            true
+        })
+        .map(|_| ())
+    }
+
+    /// `update_with`, except that when `mutate` returns false nothing is written: it
+    /// must then have left the list as it found it. Returns what `mutate` returned.
+    fn update_if(&self, mutate: impl FnOnce(&mut Vec<ConnectionConfig>) -> bool) -> Result<bool, AppError> {
         let mut guard = self.lock_cache();
         let mut connections = match guard.take() {
             Some(connections) => connections,
             None => self.read_from_disk(),
         };
-        mutate(&mut connections);
+        if !mutate(&mut connections) {
+            *guard = Some(connections);
+            return Ok(false);
+        }
         match self.write_disk(&connections) {
             Ok(()) => {
                 *guard = Some(connections);
-                Ok(())
+                Ok(true)
             }
             // Persist failed: don't cache the unpersisted change. Leaving the cache
             // empty forces the next read to reload the last good state from disk.
@@ -298,22 +311,21 @@ impl Storage {
     pub fn replace_synced_if_unchanged(&self, before: &[ConnectionConfig], after: Vec<ConnectionConfig>) -> Result<bool, AppError> {
         let synced = |list: &[ConnectionConfig]| serde_json::to_value(list.iter().map(ConnectionConfig::shared_part).collect::<Vec<_>>());
         let before = synced(before)?;
-        let mut replaced = false;
-        self.update_with(|current| {
+        self.update_if(|current| {
             if synced(current).ok() != Some(before) {
-                return;
+                return false;
             }
             let mut after = after;
-            for config in after.iter_mut() {
+            // A deleted marker keeps only its id, so it takes none of this device's state.
+            for config in after.iter_mut().filter(|c| !c.stamp.deleted) {
                 if let Some(now) = current.iter().find(|c| c.id == config.id) {
                     config.open = now.open;
                     config.last_accessed = now.last_accessed.clone();
                 }
             }
             *current = after;
-            replaced = true;
-        })?;
-        Ok(replaced)
+            true
+        })
     }
 
     pub fn add(&self, config: ConnectionConfig) -> Result<(), AppError> {

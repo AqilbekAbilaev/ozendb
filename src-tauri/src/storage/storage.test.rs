@@ -309,3 +309,16 @@ fn a_connections_file_written_before_stamps_existed_loads_as_older_than_any_edit
     std::fs::write(dir.path().join("connections.json"), r#"[{ "id": "old", "name": "Legacy" }]"#).unwrap();
     assert_eq!(updated_at(&storage, "old"), 0);
 }
+
+#[test]
+fn a_replace_that_finds_the_list_changed_writes_nothing() {
+    use std::os::unix::fs::PermissionsExt;
+    let (storage, dir) = storage_in_tempdir();
+    storage.add(conn("1", "typed meanwhile")).unwrap();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o555)).unwrap();
+
+    let replaced = storage.replace_synced_if_unchanged(&[], vec![conn("2", "from sync")]);
+
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(!replaced.unwrap());
+}

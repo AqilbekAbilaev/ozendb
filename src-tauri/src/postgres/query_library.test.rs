@@ -81,3 +81,16 @@ fn a_library_written_before_stamps_existed_still_loads() {
     let names: Vec<String> = PgQueryLibraryStore::new(path).saved("c1").into_iter().map(|q| q.name).collect();
     assert_eq!(names, vec!["Legacy"]);
 }
+
+#[test]
+fn a_replace_that_finds_the_saved_sql_changed_writes_nothing() {
+    use std::os::unix::fs::PermissionsExt;
+    let (dir, s) = store();
+    s.save("q1", "typed meanwhile", "c1", "select 1", "now").unwrap();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o555)).unwrap();
+
+    let replaced = s.replace_saved_if_unchanged(&[], Vec::new());
+
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(!replaced.unwrap());
+}

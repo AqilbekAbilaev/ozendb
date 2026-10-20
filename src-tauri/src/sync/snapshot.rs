@@ -65,12 +65,16 @@ struct Blob<'a> {
 }
 
 /// What writing a merged snapshot back did.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Written {
     /// False when a store changed after it was read and was left alone: sync again.
     pub complete: bool,
-    /// Connections whose secrets changed, so their pooled clients must be dropped.
-    pub secrets_changed: Vec<String>,
+    /// Connections whose record or secrets changed, deleted or dropped ones included, so
+    /// their pooled clients must be dropped.
+    pub changed_connections: Vec<String>,
+    /// A secret the keychain refused to change. Everything else was still written, and
+    /// the next sync writes that secret again.
+    pub keychain_error: Option<AppError>,
 }
 
 impl Snapshot {
@@ -155,17 +159,30 @@ impl Snapshot {
     /// during the sync is never lost; it goes up on the next sync.
     pub fn write_if_unchanged(&self, before: &Snapshot, stores: &SyncedStores, keychain: &impl Keychain) -> Result<Written, AppError> {
         let configs = |snapshot: &Snapshot| snapshot.connections.iter().map(|c| c.config().clone()).collect::<Vec<_>>();
-        let mut secrets_changed = Vec::new();
+        let mut changed_connections = Vec::new();
+        let mut keychain_error = None;
         let mut complete = stores.connections.replace_synced_if_unchanged(&configs(before), configs(self))?;
         if complete {
-            // After the records, so a failure here leaves the newer record, whose secrets
-            // the next sync takes from the server again.
-            for connection in &self.connections {
-                let id = connection.config().id.clone();
-                if connection.secrets_differ(before.connections.iter().find(|b| b.config().id == id)) {
-                    connection.save_secrets(keychain)?;
-                    secrets_changed.push(id);
+            // A connection the merge dropped altogether leaves as one with nothing stored.
+            let dropped: Vec<SyncedConnection> = before
+                .connections
+                .iter()
+                .filter(|b| !self.connections.iter().any(|c| c.id() == b.id()))
+                .map(Record::emptied)
+                .collect();
+            for connection in self.connections.iter().chain(&dropped) {
+                let previous = before.connections.iter().find(|b| b.id() == connection.id());
+                if !connection.differs_from(previous) {
+                    continue;
                 }
+                // After the records, so a refused secret leaves the newer record, whose
+                // secrets the next sync takes from the server again.
+                if connection.secrets_differ(previous) {
+                    if let Err(e) = connection.save_secrets(keychain) {
+                        keychain_error.get_or_insert(e);
+                    }
+                }
+                changed_connections.push(connection.id());
             }
         }
         complete &= stores.folders.inner.replace_if_unchanged(&before.folders, &self.folders)?;
@@ -175,7 +192,7 @@ impl Snapshot {
         complete &= stores.node_tags.inner.replace_if_unchanged(&before.node_tags, &self.node_tags)?;
         complete &= stores.settings.inner.replace_if_unchanged(&before.settings, &self.settings)?;
         complete &= stores.known_hosts.inner.replace_if_unchanged(&before.known_hosts, &self.known_hosts)?;
-        Ok(Written { complete, secrets_changed })
+        Ok(Written { complete, changed_connections, keychain_error })
     }
 
     fn secrets_match(&self, other: &Snapshot) -> bool {
