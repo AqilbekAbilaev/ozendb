@@ -4,3 +4,4 @@ pub mod local_only;
 pub mod merge;
 pub mod recovery;
 pub mod secrets;
+pub mod snapshot;

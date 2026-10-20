@@ -77,6 +77,24 @@ impl PgQueryLibraryStore {
         self.load().saved.live().into_iter().filter(|q| q.connection_id == connection_id).collect()
     }
 
+    /// Every saved query, deleted markers included: what sync sends.
+    pub fn saved_records(&self) -> Vec<SavedSql> {
+        self.load().saved
+    }
+
+    /// Replaces the saved queries with `after` only if they still equal `before`. The run
+    /// history doesn't sync and is left alone. Returns whether it replaced them.
+    pub fn replace_saved_if_unchanged(&self, before: &[SavedSql], after: Vec<SavedSql>) -> Result<bool, AppError> {
+        let before = serde_json::to_value(before)?;
+        self.inner.update(|lib| {
+            if serde_json::to_value(&lib.saved).ok() != Some(before) {
+                return false;
+            }
+            lib.saved = after;
+            true
+        })
+    }
+
     pub fn save(&self, id: &str, name: &str, connection_id: &str, sql: &str, saved_at: &str) -> Result<(), AppError> {
         let entry = SavedSql {
             id: id.to_string(),
