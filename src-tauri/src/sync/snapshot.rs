@@ -37,17 +37,32 @@ pub struct SyncedStores<'a> {
     pub known_hosts: &'a KnownHostsStore,
 }
 
-/// Every synced record, deleted markers included, and each connection's secrets.
+/// Every synced record, deleted markers included, and each connection's secrets. The
+/// stores are grouped by how they merge; in the blob each is a key of its own.
 #[derive(Deserialize, Clone, Debug)]
 pub struct Snapshot {
     connections: Vec<SyncedConnection>,
+    #[serde(flatten)]
+    records: Records,
+    #[serde(flatten)]
+    keyed: Keyed,
+    settings: StampedSettings,
+}
+
+/// The stores that merge as lists of records.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct Records {
     folders: Vec<Folder>,
     saved_queries: Vec<SavedQueryEntry>,
     pg_saved: Vec<SavedSql>,
+    known_hosts: Vec<KnownHost>,
+}
+
+/// The stores that merge as maps, key by key.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct Keyed {
     default_queries: HashMap<String, DefaultQuery>,
     node_tags: HashMap<String, NodeTag>,
-    settings: StampedSettings,
-    known_hosts: Vec<KnownHost>,
 }
 
 /// The blob as it is uploaded: the snapshot without this device's local-only settings.
@@ -55,13 +70,11 @@ pub struct Snapshot {
 struct Blob<'a> {
     format: u32,
     connections: &'a [SyncedConnection],
-    folders: &'a [Folder],
-    saved_queries: &'a [SavedQueryEntry],
-    pg_saved: &'a [SavedSql],
-    default_queries: &'a HashMap<String, DefaultQuery>,
-    node_tags: &'a HashMap<String, NodeTag>,
+    #[serde(flatten)]
+    records: &'a Records,
+    #[serde(flatten)]
+    keyed: &'a Keyed,
     settings: Value,
-    known_hosts: &'a [KnownHost],
 }
 
 /// What writing a merged snapshot back did.
@@ -87,16 +100,7 @@ impl Snapshot {
             .into_iter()
             .map(|config| SyncedConnection::collect(config, keychain))
             .collect::<Result<_, _>>()?;
-        Ok(Snapshot {
-            connections,
-            folders: stores.folders.inner.load(),
-            saved_queries: stores.saved_queries.inner.load(),
-            pg_saved: stores.pg_queries.saved_records(),
-            default_queries: stores.default_queries.inner.load(),
-            node_tags: stores.node_tags.inner.load(),
-            settings: stores.settings.load(),
-            known_hosts: stores.known_hosts.inner.load(),
-        })
+        Ok(Snapshot { connections, records: Records::read(stores), keyed: Keyed::read(stores), settings: stores.settings.load() })
     }
 
     /// The bytes to encrypt and upload.
@@ -104,13 +108,9 @@ impl Snapshot {
         let blob = Blob {
             format: FORMAT,
             connections: &self.connections,
-            folders: &self.folders,
-            saved_queries: &self.saved_queries,
-            pg_saved: &self.pg_saved,
-            default_queries: &self.default_queries,
-            node_tags: &self.node_tags,
+            records: &self.records,
+            keyed: &self.keyed,
             settings: shared_settings(&self.settings)?,
-            known_hosts: &self.known_hosts,
         };
         Ok(Zeroizing::new(serde_json::to_vec(&blob)?))
     }
@@ -138,13 +138,9 @@ impl Snapshot {
             .collect();
         Snapshot {
             connections,
-            folders: merge.records(self.folders, remote.folders),
-            saved_queries: merge.records(self.saved_queries, remote.saved_queries),
-            pg_saved: merge.records(self.pg_saved, remote.pg_saved),
-            default_queries: merge.keyed(self.default_queries, remote.default_queries),
-            node_tags: merge.keyed(self.node_tags, remote.node_tags),
+            records: self.records.merged(remote.records, merge),
+            keyed: self.keyed.merged(remote.keyed, merge),
             settings: merge.settings(self.settings, remote.settings),
-            known_hosts: merge.records(self.known_hosts, remote.known_hosts),
         }
     }
 
@@ -161,13 +157,9 @@ impl Snapshot {
         // The records and their secrets are written together, so an edit can't slip in
         // between and have its typed secrets overwritten.
         let mut written = stores.connections.with_secrets_locked(|| self.write_connections(before, stores, keychain))?;
-        written.complete &= stores.folders.inner.replace_if_unchanged(&before.folders, &self.folders)?;
-        written.complete &= stores.saved_queries.inner.replace_if_unchanged(&before.saved_queries, &self.saved_queries)?;
-        written.complete &= stores.pg_queries.replace_saved_if_unchanged(&before.pg_saved, self.pg_saved.clone())?;
-        written.complete &= stores.default_queries.inner.replace_if_unchanged(&before.default_queries, &self.default_queries)?;
-        written.complete &= stores.node_tags.inner.replace_if_unchanged(&before.node_tags, &self.node_tags)?;
+        written.complete &= self.records.write_if_unchanged(&before.records, stores)?;
+        written.complete &= self.keyed.write_if_unchanged(&before.keyed, stores)?;
         written.complete &= stores.settings.inner.replace_if_unchanged(&before.settings, &self.settings)?;
-        written.complete &= stores.known_hosts.inner.replace_if_unchanged(&before.known_hosts, &self.known_hosts)?;
         Ok(written)
     }
 
@@ -215,14 +207,69 @@ impl Snapshot {
     fn comparable(&self) -> Result<Value, AppError> {
         Ok(json!({
             "connections": by_id(self.connections.iter().map(SyncedConnection::shared_part))?,
+            "records": self.records.comparable()?,
+            "keyed": serde_json::to_value(&self.keyed)?,
+            "settings": shared_settings(&self.settings)?,
+        }))
+    }
+}
+
+impl Records {
+    fn read(stores: &SyncedStores) -> Self {
+        Records {
+            folders: stores.folders.inner.load(),
+            saved_queries: stores.saved_queries.inner.load(),
+            pg_saved: stores.pg_queries.saved_records(),
+            known_hosts: stores.known_hosts.inner.load(),
+        }
+    }
+
+    fn merged(self, remote: Records, merge: &Merge) -> Self {
+        Records {
+            folders: merge.records(self.folders, remote.folders),
+            saved_queries: merge.records(self.saved_queries, remote.saved_queries),
+            pg_saved: merge.records(self.pg_saved, remote.pg_saved),
+            known_hosts: merge.records(self.known_hosts, remote.known_hosts),
+        }
+    }
+
+    // Each list keyed by id, so its order doesn't count.
+    fn comparable(&self) -> Result<Value, AppError> {
+        Ok(json!({
             "folders": by_id(self.folders.iter().cloned())?,
             "saved_queries": by_id(self.saved_queries.iter().cloned())?,
             "pg_saved": by_id(self.pg_saved.iter().cloned())?,
-            "default_queries": serde_json::to_value(&self.default_queries)?,
-            "node_tags": serde_json::to_value(&self.node_tags)?,
-            "settings": shared_settings(&self.settings)?,
             "known_hosts": by_id(self.known_hosts.iter().cloned())?,
         }))
+    }
+
+    // Whether every store still held what `before` read, and so was replaced.
+    fn write_if_unchanged(&self, before: &Records, stores: &SyncedStores) -> Result<bool, AppError> {
+        let mut complete = stores.folders.inner.replace_if_unchanged(&before.folders, &self.folders)?;
+        complete &= stores.saved_queries.inner.replace_if_unchanged(&before.saved_queries, &self.saved_queries)?;
+        complete &= stores.pg_queries.replace_saved_if_unchanged(&before.pg_saved, self.pg_saved.clone())?;
+        complete &= stores.known_hosts.inner.replace_if_unchanged(&before.known_hosts, &self.known_hosts)?;
+        Ok(complete)
+    }
+}
+
+impl Keyed {
+    fn read(stores: &SyncedStores) -> Self {
+        Keyed { default_queries: stores.default_queries.inner.load(), node_tags: stores.node_tags.inner.load() }
+    }
+
+    fn merged(self, remote: Keyed, merge: &Merge) -> Self {
+        Keyed {
+            default_queries: merge.keyed(self.default_queries, remote.default_queries),
+            node_tags: merge.keyed(self.node_tags, remote.node_tags),
+        }
+    }
+
+    // Whether every store still held what `before` read, and so was replaced.
+    fn write_if_unchanged(&self, before: &Keyed, stores: &SyncedStores) -> Result<bool, AppError> {
+        let mut complete = stores.default_queries.inner.replace_if_unchanged(&before.default_queries, &self.default_queries)?;
+        complete &= stores.node_tags.inner.replace_if_unchanged(&before.node_tags, &self.node_tags)?;
+        Ok(complete)
     }
 }
 
