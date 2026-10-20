@@ -64,6 +64,7 @@ use settings::SettingsStorage;
 use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;
 use storage::Storage;
+use sync::entitlement::EntitlementStorage;
 use tabs::TabStorage;
 
 use tauri::Manager;
@@ -100,6 +101,7 @@ pub fn run() {
             app.manage(ExportWatermarkStorage::new(data_dir.join("export_watermarks.json")));
             app.manage(CollectionHistoryStore::new(data_dir.join("collection_history.json")));
             app.manage(PgRowHistoryStore::new(data_dir.join("pg_row_history.json")));
+            app.manage(EntitlementStorage::new(data_dir.join("entitlement.json")));
             // The host-key trust store is shared between the pool (real connect)
             // and Test Connection's temporary tunnel, so both honor the same TOFU
             // record. Managed as an Arc so the pool can own a clone.
@@ -272,6 +274,7 @@ pub fn run() {
             update_settings,
             get_keybindings,
             update_keybindings,
+            get_entitlement,
             insert_document,
             insert_documents,
             replace_document,

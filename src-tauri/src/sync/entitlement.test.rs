@@ -122,3 +122,12 @@ fn the_server_answer_reads_straight_from_the_me_response() {
         Account { email: String::from("a@b.c"), premium: true, subscription: Some(subscription("cancelled", Some(RECEIVED_AT))) },
     );
 }
+
+#[test]
+fn the_frontend_tells_each_entitlement_apart_by_its_state() {
+    let json = |entitlement: Entitlement| serde_json::to_value(entitlement).unwrap();
+    assert_eq!(json(Entitlement::Unknown), serde_json::json!({ "state": "unknown" }));
+    assert_eq!(json(Entitlement::Free), serde_json::json!({ "state": "free" }));
+    assert_eq!(json(Entitlement::Premium { until: RECEIVED_AT }), serde_json::json!({ "state": "premium", "until": RECEIVED_AT }));
+    assert_eq!(json(Entitlement::Expired), serde_json::json!({ "state": "expired" }));
+}

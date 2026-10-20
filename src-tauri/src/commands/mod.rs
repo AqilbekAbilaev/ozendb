@@ -9,6 +9,7 @@ use serde::Serialize;
 use std::time::Duration;
 
 mod access;
+pub mod account;
 pub mod connection;
 pub mod mongo;
 pub mod postgres;
@@ -18,6 +19,7 @@ pub mod operations;
 pub mod error_log;
 pub mod updater;
 
+pub use account::*;
 pub use connection::*;
 pub use mongo::*;
 pub use postgres::*;
