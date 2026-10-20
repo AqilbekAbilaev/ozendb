@@ -78,4 +78,30 @@ describe('applyColorTag', () => {
     expect(tagsApi.setConnectionTag.mock.calls.map(([, color]) => color)).toEqual(['red', 'blue'])
     expect(tagOverrides.value.c1).toBe('blue')
   })
+
+  const pg = (...names) => createResourceRef('p1', names.map((name, i) => ({ kind: ['database', 'schema', 'table'][i], name })))
+
+  it('saves a PostgreSQL table\'s colour under its own key and leaves its siblings', async () => {
+    const tags = useNodeTags()
+    tagOverrides.value = { 'p1/db/public/other': 'green' }
+
+    await tags.applyColorTag({ type: 'pg:table', nodeData: { resource: pg('db', 'public', 'a/b') }, color: 'red' })
+
+    expect(tagsApi.setNodeTag).toHaveBeenCalledWith('p1/db/public/a%2Fb', 'red')
+    expect(tagsApi.clearNodeTagsUnder).not.toHaveBeenCalled()
+    expect(tagOverrides.value).toEqual({ 'p1/db/public/other': 'green', 'p1/db/public/a%2Fb': 'red' })
+  })
+
+  it('resets the colours under a PostgreSQL schema or database, and only those', async () => {
+    const tags = useNodeTags()
+    tagOverrides.value = { 'p1/db/public/t': 'green', 'p1/db/public2/t': 'blue' }
+
+    await tags.applyColorTag({ type: 'pg:schema', nodeData: { resource: pg('db', 'public') }, color: 'red' })
+    expect(tagsApi.clearNodeTagsUnder).toHaveBeenLastCalledWith('p1/db/public/')
+    expect(tagOverrides.value).toEqual({ 'p1/db/public': 'red', 'p1/db/public2/t': 'blue' })
+
+    await tags.applyColorTag({ type: 'pg:database', nodeData: { resource: pg('db') }, color: 'purple' })
+    expect(tagsApi.clearNodeTagsUnder).toHaveBeenLastCalledWith('p1/db/')
+    expect(tagOverrides.value).toEqual({ 'p1/db': 'purple' })
+  })
 })

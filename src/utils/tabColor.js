@@ -47,19 +47,37 @@ export function tabColorName(tab, tagOverrides) {
   if (tab.color) return tab.color
   // The levels whose colour the tab can take, deepest first, read off its ref.
   let levels = []
+  let keyOf = nodeTagKey
   if (isCollectionTab(tab)) levels = ['collection', 'database', 'connection']
   else if (tab.type === 'mongodb.shell') levels = ['database', 'connection']
-  // PostgreSQL nodes below the connection can have their own colours, cascading
-  // table → schema → database → connection, using the same nodeTagKey format.
-  else if (tab.type === 'postgresql.table_browse' || tab.type === 'postgresql.query') levels = ['table', 'schema', 'database', 'connection']
-  // PostgreSQL search tab takes its database's colour
-  else if (tab.type === 'postgresql.search') levels = ['database', 'connection']
-  const keys = levels.map((level) => resourceAt(tab.target, level)).filter(Boolean).map(nodeTagKey)
+  else if (tab.type.startsWith('postgresql.')) {
+    levels = ['table', 'schema', 'database', 'connection']
+    keyOf = pgTagKey
+  }
+  const keys = levels.map((level) => resourceAt(tab.target, level)).filter(Boolean).map(keyOf)
   for (const key of keys) {
     const name = tagOverrides ? tagOverrides[key] : null
     if (name && name !== 'none') return name
   }
   return null
+}
+
+// A PostgreSQL row's key in the tag store: the connection id, then each name below it
+// percent-encoded and joined by `/` (`p1/pay/a%2Fb/users`), so a `/` inside a name can't
+// make two rows share a key, and a parent's key plus `/` is a prefix of exactly its
+// descendants'. This is the persisted format, so it never changes.
+export function pgTagKey(resource) {
+  return [resource.connectionId, ...resource.segments.map((s) => encodeURIComponent(s.name))].join('/')
+}
+
+// The colour a PostgreSQL sidebar row shows: its own, else its nearest coloured parent's,
+// ending with the connection's (`connTag`, its stored tag, until an override replaces it).
+export function pgRowColorName(tagOverrides, resource, connTag = null) {
+  for (let depth = resource.segments.length; depth > 0; depth--) {
+    const name = nodeTagName(tagOverrides, pgTagKey({ ...resource, segments: resource.segments.slice(0, depth) }))
+    if (name) return name
+  }
+  return nodeTagName(tagOverrides, resource.connectionId, connTag)
 }
 
 // A MongoDB tree node's key in the tag store: the connection id, then each name below

@@ -8,7 +8,7 @@ import { contextMenu, contextActiveNodeKey, pgNodeKey } from '../../../stores/co
 import { treeSelection, setTreeSelection } from '../../../stores/connectionNavigation'
 import { PG_MENUS } from './contextMenus.js'
 import { tagOverrides } from '../../../stores/nodeTags'
-import { colorHex, nodeTagName } from '../../../utils/tabColor.js'
+import { colorHex, pgRowColorName } from '../../../utils/tabColor.js'
 import { createResourceRef } from '../../../utils/resourceRef'
 import { formatCompact, fmtBytes } from '../../../utils/format'
 
@@ -59,23 +59,13 @@ function openOtherQuery(name) {
   openPostgresQuery({ connectionId: props.conn.id, connectionName: props.conn.name, database: name })
 }
 
-// Colours cascade from table → schema → database → connection, matching the tab bar.
-function nodeKeyForLevel(level, schemaName, tableName) {
-  // PostgreSQL keys are JSON-encoded: ['pg', connId, level, schema, table]
-  // so different levels don't collide, and names with '/' are handled.
-  const tableArg = level === 'table' ? tableName : null
-  return JSON.stringify(['pg', props.conn.id, level, schemaName ?? null, tableArg])
+// A row shows its own colour, else its nearest coloured parent's, as MongoDB's rows do.
+const rowColor = (schemaName = null, tableName = null) =>
+  pgRowColorName(tagOverrides.value, rowResource(schemaName, tableName), props.conn.tag)
+function rowStyle(schemaName = null, tableName = null) {
+  const color = rowColor(schemaName, tableName)
+  return color ? { '--tag-color': colorHex(color) } : null
 }
-function levelForNode(schemaName, tableName) {
-  return tableName ? 'table' : schemaName ? 'schema' : 'database'
-}
-const color = computed(() => {
-  const level = levelForNode(/* schema and table would be passed from parent */)
-  // Since we're in a loop, we need the schema/table from the current node
-  // The tree structure gives us schema.name and table.name in the v-for loops
-  return nodeTagName(tagOverrides.value, nodeKeyForLevel(level, schemaName, tableName))
-})
-const tagStyle = computed(() => (color.value ? { '--tag-color': colorHex(color.value) } : null))
 
 // A row's ResourceRef: the database, then the schema and table when the row names them.
 function rowResource(schemaName, tableName) {
@@ -132,8 +122,8 @@ function openTable(schema, table) {
   <!-- A connection is bound to one database; it's the only one there is to browse. -->
   <div
     class="tnode"
-    :class="{ 'ctx-sel': ctxSel('database'), sel: isSelected('database'), tagged: !!color }"
-    :style="tagStyle"
+    :class="{ 'ctx-sel': ctxSel('database'), sel: isSelected('database'), tagged: !!rowColor() }"
+    :style="rowStyle()"
     style="padding-left: 21px"
     @click="toggleDatabase(); select('database')"
     @contextmenu.prevent="onContext($event, 'database', database)"
@@ -160,8 +150,8 @@ function openTable(schema, table) {
     <template v-for="schema in shown" :key="schema.name">
       <div
         class="tnode"
-        :class="{ 'ctx-sel': ctxSel('schema', schema.name), sel: isSelected('schema', schema.name), tagged: !!color }"
-        :style="tagStyle"
+        :class="{ 'ctx-sel': ctxSel('schema', schema.name), sel: isSelected('schema', schema.name), tagged: !!rowColor(schema.name) }"
+        :style="rowStyle(schema.name)"
         style="padding-left: 36px"
         @click="toggleSchema(schema.name); select('schema', schema.name)"
         @contextmenu.prevent="onContext($event, 'schema', schema.name, { schema: schema.name })"
@@ -193,9 +183,9 @@ function openTable(schema, table) {
               'ctx-sel': ctxSel('table', schema.name, table.name),
               sel: isOpenTable(activeTab, conn.id, schema.name, table.name)
                 || isSelected('table', schema.name, table.name),
-              tagged: !!color,
+              tagged: !!rowColor(schema.name, table.name),
             }"
-            :style="tagStyle"
+            :style="rowStyle(schema.name, table.name)"
             style="padding-left: 66px"
             @click="select('table', schema.name, table.name)"
             @dblclick="openTable(schema.name, table.name)"

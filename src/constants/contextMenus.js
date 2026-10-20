@@ -12,7 +12,7 @@
 export const COLOR_ACTION = 'node:color:'
 
 const COPY_NAME = { value: 'node:copy_name', label: 'Copy Name', shortcut: '⌥⌘C' }
-const CHOOSE_COLOR = { label: 'Choose Color', icon: 'brush', sub: 'color' }
+export const CHOOSE_COLOR = { label: 'Choose Color', icon: 'brush', sub: 'color' }
 const REFRESH = { value: 'node:refresh', label: 'Refresh', shortcut: '⌘R' }
 const INTELLISHELL = { value: 'file:intellishell', label: 'Open IntelliShell', icon: 'shell' }
 const SEARCH = { value: 'file:search', label: 'Search in…', icon: 'search' }
