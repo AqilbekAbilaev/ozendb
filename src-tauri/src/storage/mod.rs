@@ -181,11 +181,22 @@ pub struct Storage {
     // are not observed until the next mutation or an app restart. Live external
     // edits are unsupported, so this is acceptable.
     cache: Mutex<Option<Vec<ConnectionConfig>>>,
+    // Held by `with_secrets_locked`.
+    secrets: Mutex<()>,
 }
 
 impl Storage {
     pub fn new(path: PathBuf) -> Self {
-        Self { path, cache: Mutex::new(None) }
+        Self { path, cache: Mutex::new(None), secrets: Mutex::new(()) }
+    }
+
+    /// Runs `change` while no other change to a connection's record and secrets runs, so
+    /// a sync writing merged secrets and an edit writing typed ones never interleave and
+    /// neither overwrites the other's unseen. Takes its own lock, not the cache's, so a
+    /// slow keychain prompt doesn't hold up opening or closing connections.
+    pub fn with_secrets_locked<R>(&self, change: impl FnOnce() -> R) -> R {
+        let _guard = self.secrets.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        change()
     }
 
     // The poison-tolerant cache guard. A panic in another thread while the lock is

@@ -158,10 +158,25 @@ impl Snapshot {
     /// Each store is replaced only if it still holds what `before` read, so an edit made
     /// during the sync is never lost; it goes up on the next sync.
     pub fn write_if_unchanged(&self, before: &Snapshot, stores: &SyncedStores, keychain: &impl Keychain) -> Result<Written, AppError> {
+        // The records and their secrets are written together, so an edit can't slip in
+        // between and have its typed secrets overwritten.
+        let mut written = stores.connections.with_secrets_locked(|| self.write_connections(before, stores, keychain))?;
+        written.complete &= stores.folders.inner.replace_if_unchanged(&before.folders, &self.folders)?;
+        written.complete &= stores.saved_queries.inner.replace_if_unchanged(&before.saved_queries, &self.saved_queries)?;
+        written.complete &= stores.pg_queries.replace_saved_if_unchanged(&before.pg_saved, self.pg_saved.clone())?;
+        written.complete &= stores.default_queries.inner.replace_if_unchanged(&before.default_queries, &self.default_queries)?;
+        written.complete &= stores.node_tags.inner.replace_if_unchanged(&before.node_tags, &self.node_tags)?;
+        written.complete &= stores.settings.inner.replace_if_unchanged(&before.settings, &self.settings)?;
+        written.complete &= stores.known_hosts.inner.replace_if_unchanged(&before.known_hosts, &self.known_hosts)?;
+        Ok(written)
+    }
+
+    // The connection half of `write_if_unchanged`.
+    fn write_connections(&self, before: &Snapshot, stores: &SyncedStores, keychain: &impl Keychain) -> Result<Written, AppError> {
         let configs = |snapshot: &Snapshot| snapshot.connections.iter().map(|c| c.config().clone()).collect::<Vec<_>>();
         let mut changed_connections = Vec::new();
         let mut keychain_error = None;
-        let mut complete = stores.connections.replace_synced_if_unchanged(&configs(before), configs(self))?;
+        let complete = stores.connections.replace_synced_if_unchanged(&configs(before), configs(self))?;
         if complete {
             // A connection the merge dropped altogether leaves as one with nothing stored.
             let dropped: Vec<SyncedConnection> = before
@@ -185,13 +200,6 @@ impl Snapshot {
                 changed_connections.push(connection.id());
             }
         }
-        complete &= stores.folders.inner.replace_if_unchanged(&before.folders, &self.folders)?;
-        complete &= stores.saved_queries.inner.replace_if_unchanged(&before.saved_queries, &self.saved_queries)?;
-        complete &= stores.pg_queries.replace_saved_if_unchanged(&before.pg_saved, self.pg_saved.clone())?;
-        complete &= stores.default_queries.inner.replace_if_unchanged(&before.default_queries, &self.default_queries)?;
-        complete &= stores.node_tags.inner.replace_if_unchanged(&before.node_tags, &self.node_tags)?;
-        complete &= stores.settings.inner.replace_if_unchanged(&before.settings, &self.settings)?;
-        complete &= stores.known_hosts.inner.replace_if_unchanged(&before.known_hosts, &self.known_hosts)?;
         Ok(Written { complete, changed_connections, keychain_error })
     }
 

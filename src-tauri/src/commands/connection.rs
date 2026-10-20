@@ -306,46 +306,46 @@ pub async fn update_connection(
     let (password, ssh_password, ssh_passphrase) = fields.secrets();
     let config = fields.into_config(id.clone(), existing.as_ref(), folder_id, last_accessed, open)?;
 
-    // Update keychain only when a new secret is supplied; empty = keep existing.
-    let pw_ref = password.as_deref().filter(|s| !s.is_empty());
-    if let Some(pw) = pw_ref {
-        match crate::keychain::set(&id, pw) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-    }
-    if let Some(sp) = ssh_password.as_deref().filter(|s| !s.is_empty()) {
-        match crate::keychain::set(&format!("{}::ssh-pass", id), sp) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-    }
-    if let Some(pp) = ssh_passphrase.as_deref().filter(|s| !s.is_empty()) {
-        match crate::keychain::set(&format!("{}::ssh-key-pass", id), pp) {
-            Ok(val) => val,
-            Err(e) => return Err(e),
-        };
-    }
+    // The secrets and the record change together, so a sync can't slip in between.
+    ctx.storage.with_secrets_locked(|| {
+        // Update keychain only when a new secret is supplied; empty = keep existing.
+        let pw_ref = password.as_deref().filter(|s| !s.is_empty());
+        if let Some(pw) = pw_ref {
+            match crate::keychain::set(&id, pw) {
+                Ok(val) => val,
+                Err(e) => return Err(e),
+            };
+        }
+        if let Some(sp) = ssh_password.as_deref().filter(|s| !s.is_empty()) {
+            match crate::keychain::set(&format!("{}::ssh-pass", id), sp) {
+                Ok(val) => val,
+                Err(e) => return Err(e),
+            };
+        }
+        if let Some(pp) = ssh_passphrase.as_deref().filter(|s| !s.is_empty()) {
+            match crate::keychain::set(&format!("{}::ssh-key-pass", id), pp) {
+                Ok(val) => val,
+                Err(e) => return Err(e),
+            };
+        }
 
-    // Drop secrets the updated config can no longer use, so a credential doesn't
-    // outlive the setting that needed it. "Leave blank to keep existing" only holds
-    // while the field still applies — clearing the username, turning SSH off, or
-    // switching SSH auth retires the corresponding secret.
-    let (keep_password, keep_ssh_password, keep_ssh_passphrase) = usable_secrets(&config);
-    if !keep_password {
-        crate::keychain::delete(&id);
-    }
-    if !keep_ssh_password {
-        crate::keychain::delete(&format!("{}::ssh-pass", id));
-    }
-    if !keep_ssh_passphrase {
-        crate::keychain::delete(&format!("{}::ssh-key-pass", id));
-    }
+        // Drop secrets the updated config can no longer use, so a credential doesn't
+        // outlive the setting that needed it. "Leave blank to keep existing" only holds
+        // while the field still applies — clearing the username, turning SSH off, or
+        // switching SSH auth retires the corresponding secret.
+        let (keep_password, keep_ssh_password, keep_ssh_passphrase) = usable_secrets(&config);
+        if !keep_password {
+            crate::keychain::delete(&id);
+        }
+        if !keep_ssh_password {
+            crate::keychain::delete(&format!("{}::ssh-pass", id));
+        }
+        if !keep_ssh_passphrase {
+            crate::keychain::delete(&format!("{}::ssh-key-pass", id));
+        }
 
-    match ctx.storage.update(config.clone()) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+        ctx.storage.update(config.clone())
+    })?;
 
     // Evict cached client so the next operation reconnects with updated credentials.
     ctx.pool.remove(&id).await;
@@ -361,14 +361,15 @@ pub async fn delete_connection(
     app: tauri::AppHandle,
     id: String,
 ) -> Result<(), AppError> {
-    match ctx.storage.remove(&id) {
-        Ok(val) => val,
-        Err(e) => return Err(e),
-    };
+    // The record and its secrets go together, so a sync can't write them back between.
+    ctx.storage.with_secrets_locked(|| {
+        ctx.storage.remove(&id)?;
+        crate::keychain::delete(&id);
+        crate::keychain::delete(&format!("{}::ssh-pass", id));
+        crate::keychain::delete(&format!("{}::ssh-key-pass", id));
+        Ok::<_, AppError>(())
+    })?;
     ctx.pool.remove(&id).await;
-    crate::keychain::delete(&id);
-    crate::keychain::delete(&format!("{}::ssh-pass", id));
-    crate::keychain::delete(&format!("{}::ssh-key-pass", id));
     ConnectionData::from_app(&app).purge(&id);
     Ok(())
 }
