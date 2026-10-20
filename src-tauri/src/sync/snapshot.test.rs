@@ -1,80 +1,10 @@
 use super::*;
 use crate::keychain::fake::{FakeKeychain, LockedKeychain, RefusingKeychain};
-use crate::record::Stamp;
 use crate::settings::Settings;
-use tempfile::TempDir;
+use crate::sync::test_device::{connection, folder, Device};
 
 const DAY: i64 = 24 * 60 * 60 * 1000;
 const NOW: i64 = 1_000 * DAY;
-
-/// Every synced store, in a temporary directory.
-struct Device {
-    _dir: TempDir,
-    connections: Storage,
-    folders: FolderStorage,
-    saved_queries: SavedQueryStorage,
-    pg_queries: PgQueryLibraryStore,
-    default_queries: DefaultQueryStorage,
-    node_tags: NodeTagStorage,
-    settings: SettingsStorage,
-    known_hosts: KnownHostsStore,
-    keychain: FakeKeychain,
-}
-
-impl Device {
-    fn new() -> Self {
-        let dir = tempfile::tempdir().unwrap();
-        let at = |name: &str| dir.path().join(name);
-        Device {
-            connections: Storage::new(at("connections.json")),
-            folders: FolderStorage::new(at("folders.json")),
-            saved_queries: SavedQueryStorage::new(at("saved_queries.json")),
-            pg_queries: PgQueryLibraryStore::new(at("pg_queries.json")),
-            default_queries: DefaultQueryStorage::new(at("default_queries.json")),
-            node_tags: NodeTagStorage::new(at("node_tags.json")),
-            settings: SettingsStorage::new(at("settings.json")),
-            known_hosts: KnownHostsStore::new(at("known_hosts.json")),
-            keychain: FakeKeychain::default(),
-            _dir: dir,
-        }
-    }
-
-    fn stores(&self) -> SyncedStores<'_> {
-        SyncedStores {
-            connections: &self.connections,
-            folders: &self.folders,
-            saved_queries: &self.saved_queries,
-            pg_queries: &self.pg_queries,
-            default_queries: &self.default_queries,
-            node_tags: &self.node_tags,
-            settings: &self.settings,
-            known_hosts: &self.known_hosts,
-        }
-    }
-
-    /// Stores the connection with its own stamp, as another device or an older save left it.
-    fn hold(&self, config: ConnectionConfig) {
-        self.connections.update_with(|list| list.push(config)).unwrap();
-    }
-
-    fn read(&self) -> Snapshot {
-        Snapshot::read(&self.stores(), &self.keychain).unwrap()
-    }
-
-    fn write(&self, merged: &Snapshot, before: &Snapshot) -> Written {
-        merged.write_if_unchanged(before, &self.stores(), &self.keychain).unwrap()
-    }
-}
-
-fn connection(id: &str, name: &str, updated_at: i64) -> ConnectionConfig {
-    let stamp = Stamp { updated_at, deleted: false, uploaded_at: None };
-    ConnectionConfig { id: id.into(), name: name.into(), stamp, ..ConnectionConfig::default() }
-}
-
-fn folder(id: &str, name: &str, updated_at: i64) -> Folder {
-    let stamp = Stamp { updated_at, deleted: false, uploaded_at: None };
-    Folder { id: id.into(), name: name.into(), stamp, ..Folder::default() }
-}
 
 fn merge() -> Merge {
     Merge::new(NOW, Some(NOW - DAY))
