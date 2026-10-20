@@ -12,6 +12,8 @@ import { invalidateConnectionResources } from '../../../stores/connectionData'
 import { closeWhere } from '../../../stores/tabs'
 import { clearTreeSelectionUnder } from '../../../stores/connectionNavigation'
 import { affectedByResource } from '../../../workspaces/lifecycle'
+import { useNodeTags } from '../../../composables/useNodeTags'
+import { pgTagKey } from '../../../utils/tabColor'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Schema or table → Drop…: the node's depth says which. Dropping closes every tab
@@ -20,6 +22,7 @@ const props = defineProps({
   target: { type: Object, required: true },   // { connId, database, schema, table? }
 })
 const emit = defineEmits(['close'])
+const { forgetColorTags } = useNodeTags()
 
 const isTable = computed(() => props.target.table != null)
 const name = computed(() => isTable.value ? props.target.table : props.target.schema)
@@ -39,6 +42,8 @@ async function confirm() {
     const dropped = pgNodeRef(props.target)
     closeWhere(affectedByResource(dropped))
     clearTreeSelectionUnder(dropped)
+    // The node is dropped either way, so a failed colour clear is reported, not retried.
+    forgetColorTags(pgTagKey(dropped)).catch((e) => showToast(errText(e)))
     showToast(`${isTable.value ? 'Table' : 'Schema'} "${name.value}" dropped`)
     emit('close')
   } catch (e) {

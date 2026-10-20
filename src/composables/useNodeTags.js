@@ -1,5 +1,5 @@
 import { setConnectionTag, setNodeTag, clearNodeTagsUnder } from '../appApi/tags'
-import { setTagOverride } from '../stores/nodeTags'
+import { setTagOverride, tagOverrides } from '../stores/nodeTags'
 import { nodeTagKey, pgTagKey } from '../utils/tabColor'
 
 // Writes a colour tag and mirrors it into the store's tagOverrides once persisted.
@@ -11,7 +11,34 @@ export function useNodeTags() {
   // node, which carries the row's `resource`. Colouring a parent resets its descendants
   // (drop their own tags so they inherit the parent's new colour).
   function applyColorTag(request) {
-    const write = tagWrite.then(() => persistColorTag(request))
+    return queued(() => persistColorTag(request))
+  }
+
+  // A renamed node keeps its own colour: move it from the old key to the new one.
+  function moveColorTag(fromKey, toKey) {
+    return queued(async () => {
+      const color = tagOverrides.value[fromKey]
+      if (!color || color === 'none') return
+      await setNodeTag(toKey, color)
+      await setNodeTag(fromKey, 'none')
+      setTagOverride(toKey, color)
+      setTagOverride(fromKey, 'none')
+    })
+  }
+
+  // A dropped node's colour, and its descendants', go with it, so nothing created later
+  // under the same name picks them up.
+  function forgetColorTags(key) {
+    return queued(async () => {
+      await setNodeTag(key, 'none')
+      await clearNodeTagsUnder(key + '/')
+      setTagOverride(key, 'none', key + '/')
+    })
+  }
+
+  // Runs one write after the previous one settles, so rapid changes land in order.
+  function queued(persist) {
+    const write = tagWrite.then(persist)
     tagWrite = write.catch(() => {})
     return write
   }
@@ -47,5 +74,5 @@ export function useNodeTags() {
     setTagOverride(key, color, clearPrefix)
   }
 
-  return { applyColorTag: applyColorTag }
+  return { applyColorTag: applyColorTag, moveColorTag: moveColorTag, forgetColorTags: forgetColorTags }
 }

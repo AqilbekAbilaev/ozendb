@@ -105,3 +105,38 @@ describe('applyColorTag', () => {
     expect(tagOverrides.value).toEqual({ 'p1/db': 'purple' })
   })
 })
+
+describe('moveColorTag', () => {
+  it('moves a node\'s own colour to its new key', async () => {
+    const tags = useNodeTags()
+    tagOverrides.value = { 'p1/db/public/orders': 'red', 'p1/db/public/orders_old': 'blue' }
+
+    await tags.moveColorTag('p1/db/public/orders', 'p1/db/public/orders_old')
+
+    expect(tagsApi.setNodeTag.mock.calls).toEqual([['p1/db/public/orders_old', 'red'], ['p1/db/public/orders', 'none']])
+    expect(tagOverrides.value).toEqual({ 'p1/db/public/orders': 'none', 'p1/db/public/orders_old': 'red' })
+  })
+
+  it('does nothing for a node without its own colour', async () => {
+    const tags = useNodeTags()
+    tagOverrides.value = { 'p1/db/public/orders': 'none' }
+
+    await tags.moveColorTag('p1/db/public/orders', 'p1/db/public/orders_old')
+
+    expect(tagsApi.setNodeTag).not.toHaveBeenCalled()
+    expect(tagOverrides.value).toEqual({ 'p1/db/public/orders': 'none' })
+  })
+})
+
+describe('forgetColorTags', () => {
+  it('drops a node\'s colour and its descendants\', and leaves look-alike siblings', async () => {
+    const tags = useNodeTags()
+    tagOverrides.value = { 'p1/db/public': 'red', 'p1/db/public/t': 'green', 'p1/db/public2': 'blue' }
+
+    await tags.forgetColorTags('p1/db/public')
+
+    expect(tagsApi.setNodeTag).toHaveBeenCalledWith('p1/db/public', 'none')
+    expect(tagsApi.clearNodeTagsUnder).toHaveBeenCalledWith('p1/db/public/')
+    expect(tagOverrides.value).toEqual({ 'p1/db/public': 'none', 'p1/db/public2': 'blue' })
+  })
+})

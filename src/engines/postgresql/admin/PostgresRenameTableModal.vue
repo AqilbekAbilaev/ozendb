@@ -11,6 +11,8 @@ import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
 import { tabs } from '../../../stores/tabs'
 import { retargetResource } from '../../../workspaces/lifecycle'
+import { useNodeTags } from '../../../composables/useNodeTags'
+import { pgTagKey } from '../../../utils/tabColor'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Table → Rename Table…: open tabs on the table follow it rather than close, so the
@@ -19,6 +21,7 @@ const props = defineProps({
   target: { type: Object, required: true },   // { connId, database, schema, table }
 })
 const emit = defineEmits(['close'])
+const { moveColorTag } = useNodeTags()
 
 const name = ref(props.target.table)
 const error = ref(null)
@@ -37,7 +40,10 @@ async function confirm() {
   const { connId, schema, table } = props.target
   try {
     await renameTable({ connectionId: connId, schema, table }, newName)
-    tabs.value.forEach(retargetResource(pgNodeRef(props.target), pgNodeRef({ ...props.target, table: newName })))
+    const renamed = pgNodeRef({ ...props.target, table: newName })
+    tabs.value.forEach(retargetResource(pgNodeRef(props.target), renamed))
+    // The table is renamed either way, so a failed colour move is reported, not retried.
+    moveColorTag(pgTagKey(pgNodeRef(props.target)), pgTagKey(renamed)).catch((e) => showToast(errText(e)))
     invalidateConnectionResources(connId)
     showToast(`Table renamed to "${newName}"`)
     emit('close')
