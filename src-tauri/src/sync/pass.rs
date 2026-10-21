@@ -6,27 +6,11 @@ use crate::keychain::Keychain;
 use crate::sync::crypto::DataKey;
 use crate::sync::merge::Merge;
 use crate::sync::snapshot::{Snapshot, SyncedStores, Written};
-use crate::sync::state::{SyncState, SyncStateStorage};
+use crate::sync::state::{Contents, ServerCopy, SyncState, SyncStateStorage};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use serde::{Deserialize, Serialize};
 
 pub const MAX_PASSES: usize = 5;
-
-/// What the server stores, as it sends and takes it: base64 text.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Contents {
-    pub blob: String,
-    pub wrapped_key: String,
-    pub recovery_wrapped_key: Option<String>,
-}
-
-/// The server's copy and the version that names it.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct ServerCopy {
-    pub version: String,
-    pub contents: Contents,
-}
 
 pub enum Download {
     /// The server holds nothing yet.
