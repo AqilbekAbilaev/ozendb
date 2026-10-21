@@ -12,6 +12,7 @@ pub mod recovery;
 pub mod run;
 pub mod schedule;
 pub mod secrets;
+pub mod setup;
 pub mod snapshot;
 pub mod state;
 #[cfg(test)]
