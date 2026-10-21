@@ -96,8 +96,9 @@ pub async fn sync(local: &Local<'_, impl Keychain>, server: &impl SyncServer, ke
 // changed while it ran.
 async fn pass(local: &Local<'_, impl Keychain>, server: &impl SyncServer, keys: &Keys<'_>, now: i64, synced: &mut Synced) -> Result<bool, AppError> {
     let state = local.state.load();
-    let before = Snapshot::read(local.stores, local.keychain)?;
     let (copy, remote) = download(server, &state, keys.data_key).await?.unzip();
+    // After the download, so a failed one costs no keychain reads.
+    let before = Snapshot::read(local.stores, local.keychain)?;
     let (merged, upload) = match remote {
         Some(remote) => {
             let merged = before.clone().merged(remote.clone(), &Merge::new(now, state.last_sync));
