@@ -9,6 +9,7 @@
 //! and where its result goes is the `Report`'s; both are traits so this can be tested
 //! with paused time and a fake.
 use crate::error::AppError;
+use crate::sync::pass::Synced;
 use std::future::Future;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -20,28 +21,19 @@ pub const RATE_LIMIT_HOLD: Duration = Duration::from_secs(2 * 60);
 /// The longest quitting waits for a last sync.
 pub const CLOSE_WAIT: Duration = Duration::from_secs(5);
 
-/// How a sync that ran went.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Ran {
-    Synced,
-    /// The server refused the upload, as it does once Premium lapses: what came down
-    /// was saved, but this device's edits stay here.
-    ReceivedOnly,
-}
-
 /// One sync, and what it needs first.
 pub trait Job: Send + 'static {
     /// Runs once, when the app starts, before the first sync.
     fn prepare(&self) -> impl Future<Output = ()> + Send;
     /// Why no sync can run now (signed out, no Premium, not set up), if none can.
     fn ready(&self) -> Result<(), AppError>;
-    fn run(&self) -> impl Future<Output = Result<Ran, AppError>> + Send;
+    fn run(&self) -> impl Future<Output = Result<Synced, AppError>> + Send;
 }
 
 /// Where the syncs' progress goes.
 pub trait Report: Send + 'static {
     fn started(&self);
-    fn finished(&self, result: &Result<Ran, AppError>);
+    fn finished(&self, result: &Result<Synced, AppError>);
 }
 
 enum Trigger {
@@ -181,17 +173,19 @@ impl<J: Job, R: Report> Schedule<J, R> {
         self.report.finished(&result);
     }
 
-    fn plan_after(&mut self, result: &Result<Ran, AppError>, edits: u64) {
+    fn plan_after(&mut self, result: &Result<Synced, AppError>, edits: u64) {
         let latest = *self.edits.borrow();
         let plan = &mut self.plan;
         let unsent = latest > plan.sent;
         match result {
-            // An edit made during the sync has not woken the schedule yet, and starts
-            // its own wait once it does.
-            Ok(Ran::Synced) => *plan = Plan { sent: edits, ..Plan::default() },
-            Ok(Ran::ReceivedOnly) | Err(AppError::NotPremium | AppError::NewerSyncFormat) => {
+            // What came down was saved, but the server refuses uploads, as it does once
+            // Premium lapses, so this device's edits stay here.
+            Ok(Synced { received_only: true, .. }) | Err(AppError::NotPremium | AppError::NewerSyncFormat) => {
                 *plan = Plan { sent: plan.sent, off: true, ..Plan::default() };
             }
+            // An edit made during the sync has not woken the schedule yet, and starts
+            // its own wait once it does.
+            Ok(_) => *plan = Plan { sent: edits, ..Plan::default() },
             Err(AppError::SyncRateLimited) => {
                 let until = Instant::now() + RATE_LIMIT_HOLD;
                 plan.held_until = Some(until);
