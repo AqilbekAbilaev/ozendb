@@ -1,7 +1,30 @@
 use super::*;
 use crate::sync::fake_server::FakeServer;
 use crate::sync::http::{client, HttpServer};
+use crate::sync::test_device::{folder, Device};
 use crate::sync::test_server::{received, reply, serving};
+
+const NOW: i64 = 1_000_000_000_000;
+const PASSWORD: &str = "correct horse/battery.staple — ünïcödé";
+
+fn cheap() -> Params {
+    Params::new(64, 1, 1, None).unwrap()
+}
+
+fn new_keys() -> SyncKeys {
+    create(PASSWORD, &cheap()).unwrap().0
+}
+
+async fn upload_from(device: &Device, server: &FakeServer<'_>, keys: &SyncKeys) -> Result<Synced, AppError> {
+    let stores = device.stores();
+    let local = Local { stores: &stores, keychain: &device.keychain, state: &device.state };
+    first_upload(&local, server, keys, NOW).await
+}
+
+/// Whether `a` decrypts what `b` encrypts: the same data key.
+fn same_key(a: &DataKey, b: &DataKey) -> bool {
+    a.decrypt(&b.encrypt("blob é/1".as_bytes()).unwrap()).is_ok()
+}
 
 /// What another device left on the server: its blob and wrapped keys, as base64.
 fn held(recovery_wrapped_key: Option<&str>) -> Contents {
@@ -51,4 +74,105 @@ async fn the_status_downloads_the_whole_copy_over_https() {
     assert_eq!(server_status(&server).await.unwrap(), SetupStatus::Existing { recovery: true });
     let requests = received(requests).await;
     assert!(requests.iter().all(|r| r.starts_with("get /sync") && !r.contains("if-none-match")), "{requests:?}");
+}
+
+#[test]
+fn a_password_shorter_than_twelve_characters_as_composed_is_refused() {
+    // Twelve code points, but six characters once each accent joins its letter.
+    let short = "e\u{301}".repeat(6);
+
+    assert!(matches!(check_password(&short), Err(AppError::Validation(_))));
+}
+
+#[test]
+fn a_password_of_twelve_characters_with_spaces_and_accents_is_accepted() {
+    assert!(check_password("pässwörd 12/").is_ok());
+}
+
+#[test]
+fn a_password_longer_than_the_limit_is_refused() {
+    assert!(matches!(check_password(&"ü".repeat(MAX_PASSWORD_CHARS + 1)), Err(AppError::Validation(_))));
+}
+
+#[test]
+fn new_keys_are_refused_for_a_short_password() {
+    assert!(matches!(create("short pw", &cheap()), Err(AppError::Validation(_))));
+}
+
+#[test]
+fn new_keys_unwrap_with_the_password_and_with_the_recovery_key_shown() {
+    let (keys, shown) = create(PASSWORD, &cheap()).unwrap();
+    let keys = keys.keys();
+
+    let by_password = DataKey::unwrap_with(keys.wrapped_key, PASSWORD).unwrap();
+    let recovery = RecoveryKey::parse(&shown).unwrap();
+    let by_recovery = DataKey::unwrap_with_recovery(keys.recovery_wrapped_key.unwrap(), &recovery).unwrap();
+
+    assert!(same_key(keys.data_key, &by_password) && same_key(keys.data_key, &by_recovery));
+}
+
+#[tokio::test]
+async fn the_first_upload_sends_this_devices_data_with_its_wrapped_keys() {
+    let (device, server, keys) = (Device::new(), FakeServer::default(), new_keys());
+    device.folders.insert(folder("f/1 é", "mine. ü", 1)).unwrap();
+
+    upload_from(&device, &server, &keys).await.unwrap();
+
+    let contents = server.stored.borrow().clone().unwrap().contents;
+    assert_eq!(BASE64.decode(&contents.wrapped_key).unwrap(), keys.keys().wrapped_key);
+    assert_eq!(contents.recovery_wrapped_key.map(|k| BASE64.decode(k).unwrap()).as_deref(), keys.keys().recovery_wrapped_key);
+    assert_eq!(device.state.load().last_sync, Some(NOW));
+}
+
+#[tokio::test]
+async fn a_first_upload_refused_for_want_of_premium_fails_and_saves_nothing() {
+    let (device, server, keys) = (Device::new(), FakeServer::default(), new_keys());
+    server.lapsed.set(true);
+
+    let result = upload_from(&device, &server, &keys).await;
+
+    assert!(matches!(result, Err(AppError::NotPremium)), "{result:?}");
+    assert!(device.state.load().server.is_none());
+}
+
+#[tokio::test]
+async fn another_device_setting_up_first_asks_for_its_password_and_leaves_both_sides_alone() {
+    let (device, server) = (Device::new(), FakeServer::default());
+    upload_from(&Device::new(), &server, &new_keys()).await.unwrap();
+    let theirs = server.stored.borrow().clone();
+
+    let result = upload_from(&device, &server, &new_keys()).await;
+
+    assert!(matches!(result, Err(AppError::SyncSetUpElsewhere)), "{result:?}");
+    assert_eq!(*server.stored.borrow(), theirs);
+    assert!(device.state.load().server.is_none());
+}
+
+#[tokio::test]
+async fn a_first_upload_that_cannot_reach_the_server_reports_why() {
+    let (device, server, keys) = (Device::new(), FakeServer::default(), new_keys());
+    server.offline.set(true);
+
+    let result = upload_from(&device, &server, &keys).await;
+
+    assert!(matches!(result, Err(AppError::Io(_))), "{result:?}");
+    assert!(device.state.load().server.is_none());
+}
+
+#[test]
+fn held_keys_are_handed_back_under_the_session_they_were_made_in() {
+    let pending = PendingSetup::default();
+    pending.hold(Zeroizing::new("s3ss.ion/1 é".to_string()), new_keys());
+
+    assert!(pending.take("s3ss.ion/1 é").is_some());
+    assert!(pending.take("s3ss.ion/1 é").is_none());
+}
+
+#[test]
+fn held_keys_are_dropped_once_another_session_asks_for_them() {
+    let pending = PendingSetup::default();
+    pending.hold(Zeroizing::new("s3ss.ion/1 é".to_string()), new_keys());
+
+    assert!(pending.take("another s3ss.ion").is_none());
+    assert!(pending.take("s3ss.ion/1 é").is_none());
 }
