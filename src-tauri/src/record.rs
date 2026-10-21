@@ -63,7 +63,8 @@ pub trait Record: Stamped {
     fn emptied(&self) -> Self;
 }
 
-/// The only ways a synced list changes, so no change can skip its stamp.
+/// The only ways a synced list changes, so no change can skip its stamp, nor the edit
+/// signal that schedules a sync (edits.rs).
 pub trait RecordList<R> {
     /// The records a user can see.
     fn live(self) -> Vec<R>;
@@ -86,12 +87,14 @@ impl<R: Record> RecordList<R> for Vec<R> {
         self.retain(|r| r.id() != id);
         record.restamp(Stamp::now());
         self.insert(index.min(self.len()), record);
+        crate::edits::note();
     }
 
     fn edit_where(&mut self, which: impl Fn(&R) -> bool, mut change: impl FnMut(&mut R)) {
         for record in self.iter_mut().filter(|r| !r.stamp().deleted && which(r)) {
             change(record);
             record.restamp(Stamp::now());
+            crate::edits::note();
         }
     }
 
@@ -105,6 +108,7 @@ impl<R: Record> RecordList<R> for Vec<R> {
         for record in self.iter_mut().filter(|r| !r.stamp().deleted && doomed(r)) {
             *record = record.emptied();
             record.restamp(Stamp::tombstone());
+            crate::edits::note();
         }
     }
 }
@@ -125,12 +129,14 @@ impl<V: Stamped + Default> RecordMap<V> for HashMap<String, V> {
     fn put(&mut self, key: &str, mut value: V) {
         value.restamp(Stamp::now());
         self.insert(key.to_string(), value);
+        crate::edits::note();
     }
 
     fn delete_where(&mut self, doomed: impl Fn(&str) -> bool) {
         for (_, value) in self.iter_mut().filter(|(k, v)| !v.stamp().deleted && doomed(k)) {
             *value = V::default();
             value.restamp(Stamp::tombstone());
+            crate::edits::note();
         }
     }
 }

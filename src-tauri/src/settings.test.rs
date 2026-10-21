@@ -75,3 +75,25 @@ fn an_update_starts_from_the_stored_settings_so_a_sync_written_meanwhile_survive
     assert_eq!(saved.stamp_of("editor_tab_width"), 42);
     assert_eq!(saved.values.theme, "light");
 }
+
+#[test]
+fn a_changed_shared_setting_differs_where_shared() {
+    let changed = Settings { theme: String::from("light ü"), ..Settings::default() };
+    assert!(changed.differs_where_shared(&Settings::default()));
+}
+
+#[test]
+fn a_changed_zoom_alone_does_not_differ_where_shared() {
+    let zoomed = Settings { ui_zoom: 1.25, ..Settings::default() };
+    assert!(!zoomed.differs_where_shared(&Settings::default()));
+}
+
+#[test]
+fn changing_a_shared_setting_notes_an_edit() {
+    let dir = tempdir().unwrap();
+    let storage = SettingsStorage::new(dir.path().join("settings dir é.json"));
+    let mut edits = crate::edits::subscribe();
+    edits.borrow_and_update();
+    storage.update(|current| Settings { editor_tab_width: 2, ..current.clone() }).unwrap();
+    assert!(edits.has_changed().unwrap());
+}
