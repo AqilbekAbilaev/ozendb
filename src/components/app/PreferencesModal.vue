@@ -19,6 +19,7 @@ import TabStrip from '../base/TabStrip.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
 import ShortcutsPane from '../panes/ShortcutsPane.vue'
+import AccountPane from './AccountPane.vue'
 import { PAGE_SIZE_OPTIONS } from '../../constants/pageSizes'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
@@ -33,6 +34,7 @@ const TABS = [
   { value: 'general', label: 'General' },
   { value: 'appearance', label: 'Appearance' },
   { value: 'keyboard', label: 'Keyboard' },
+  { value: 'account', label: 'Account' },
 ]
 const THEME_OPTIONS = [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]
 const VIEW_OPTIONS = [
@@ -132,6 +134,11 @@ async function save() {
       <!-- Keyboard: the shortcut editor, kept mounted so edits survive tab switches. -->
       <div v-show="activeTab === 'keyboard'" class="pf-panel">
         <ShortcutsPane ref="shortcutsPane" :bindings="keyBindings" />
+      </div>
+
+      <!-- Account: acts at once, outside Save and Cancel. -->
+      <div v-show="activeTab === 'account'" class="pf-panel">
+        <AccountPane />
       </div>
 
       <FieldError :text="error" />
