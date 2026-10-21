@@ -1,7 +1,9 @@
 use super::*;
 use crate::keychain::fake::{FakeKeychain, LockedKeychain};
 use crate::sync::entitlement::{Entitlement, GRACE_MS};
+use crate::sync::crypto::DataKey;
 use crate::sync::http::client;
+use crate::sync::keys::{SyncKeys, DATA_KEY};
 use crate::sync::state::{Contents, ServerCopy, SyncState};
 use crate::sync::test_server::{nobody_listening, received, reply, serving};
 use std::time::Duration;
@@ -18,16 +20,19 @@ struct Files {
     _dir: TempDir,
     entitlement: EntitlementStorage,
     state: SyncStateStorage,
+    keys: SyncKeysStorage,
 }
 
 fn files() -> Files {
     let dir = tempfile::tempdir().unwrap();
     let entitlement = EntitlementStorage::new(dir.path().join("entitlement.json"));
     let state = SyncStateStorage::new(dir.path().join("sync state.json"));
-    Files { _dir: dir, entitlement, state }
+    let keys = SyncKeysStorage::new(dir.path().join("sync keys.json"));
+    Files { _dir: dir, entitlement, state, keys }
 }
 
-/// Files as another account left them: a Premium answer, a kept server copy and a sync time.
+/// Files as another account left them: a Premium answer, a kept server copy, a sync time
+/// and the wrapped copies of its sync key.
 fn files_of_another_account() -> Files {
     let files = files();
     let account = Account { email: "ånother@exämple.com".to_string(), premium: true, subscription: None };
@@ -35,11 +40,12 @@ fn files_of_another_account() -> Files {
     let contents = Contents { blob: "YmxvYg==".to_string(), wrapped_key: "a2V5".to_string(), recovery_wrapped_key: None };
     let server = ServerCopy { version: "\"3\"".to_string(), contents };
     files.state.inner.save(&SyncState { last_sync: Some(NOW - 1), server: Some(server) }).unwrap();
+    files.keys.save(&FakeKeychain::default(), &SyncKeys::new(DataKey::generate().unwrap(), vec![1, 2], None)).unwrap();
     files
 }
 
 fn device<'a, K: Keychain>(keychain: &'a K, files: &'a Files) -> Device<'a, K> {
-    Device { keychain, entitlement: &files.entitlement, state: &files.state }
+    Device { keychain, entitlement: &files.entitlement, state: &files.state, keys: &files.keys }
 }
 
 fn signed_in() -> FakeKeychain {
@@ -60,6 +66,7 @@ fn assert_nothing_kept(keychain: &FakeKeychain, files: &Files) {
     assert_eq!(files.entitlement.entitlement(NOW), Entitlement::Unknown);
     let state = files.state.load();
     assert_eq!((state.last_sync, state.server), (None, None));
+    assert!(files.keys.load().is_none());
 }
 
 #[tokio::test]
@@ -276,4 +283,13 @@ fn the_frontend_reads_the_account_as_email_and_subscription() {
         serde_json::to_value(account).unwrap(),
         serde_json::json!({ "email": EMAIL, "subscription": { "status": "cancelled", "renews_at": null, "ends_at": NOW } }),
     );
+}
+
+#[test]
+fn forgetting_the_account_drops_its_sync_key_from_the_keychain() {
+    let (keychain, files) = (FakeKeychain::holding(&[(SESSION_KEY, SESSION), (DATA_KEY, "a2V5 kept")]), files_of_another_account());
+
+    device(&keychain, &files).forget().unwrap();
+
+    assert_nothing_kept(&keychain, &files);
 }
