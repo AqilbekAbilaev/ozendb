@@ -71,6 +71,15 @@ pub enum AppError {
     #[error("The sync server answered with an error ({0}); it will try again.")]
     SyncServer(u16),
 
+    #[error("This sign-in request has expired. Start signing in again.")]
+    SignInExpired,
+
+    #[error("Too many requests to the OzenDB server. Try again in a minute.")]
+    AccountRateLimited,
+
+    #[error("The OzenDB server answered with an error ({0}).")]
+    AccountServer(u16),
+
     #[error("{0}")]
     Validation(String),
 }
@@ -104,6 +113,9 @@ impl AppError {
             AppError::SyncDataTooLarge => "sync_data_too_large",
             AppError::SyncRateLimited => "sync_rate_limited",
             AppError::SyncServer(_) => "sync_server",
+            AppError::SignInExpired => "sign_in_expired",
+            AppError::AccountRateLimited => "account_rate_limited",
+            AppError::AccountServer(_) => "account_server",
             AppError::Validation(_) => "validation",
         }
     }

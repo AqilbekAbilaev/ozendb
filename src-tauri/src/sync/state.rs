@@ -28,3 +28,11 @@ pub struct ServerCopy {
 }
 
 json_store_wrapper!(SyncStateStorage, SyncState);
+
+impl SyncStateStorage {
+    /// Forgets the server's copy and the last sync time, which belong to the account
+    /// that was signed in.
+    pub fn clear(&self) -> Result<(), crate::error::AppError> {
+        self.inner.save(&SyncState::default())
+    }
+}
