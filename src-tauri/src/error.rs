@@ -53,6 +53,9 @@ pub enum AppError {
     #[error("The downloaded sync data could not be read.")]
     UnreadableSyncData,
 
+    #[error("The sync data kept changing while it synced; it will try again.")]
+    SyncKeptChanging,
+
     #[error("{0}")]
     Validation(String),
 }
@@ -80,6 +83,7 @@ impl AppError {
             AppError::WrongRecoveryKey => "wrong_recovery_key",
             AppError::NewerSyncFormat => "newer_sync_format",
             AppError::UnreadableSyncData => "unreadable_sync_data",
+            AppError::SyncKeptChanging => "sync_kept_changing",
             AppError::Validation(_) => "validation",
         }
     }
