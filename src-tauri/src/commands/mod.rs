@@ -16,6 +16,7 @@ pub mod postgres;
 pub mod persistence;
 pub mod folders;
 pub mod operations;
+pub mod sync;
 pub mod error_log;
 pub mod updater;
 
@@ -26,6 +27,7 @@ pub use postgres::*;
 pub use persistence::*;
 pub use folders::*;
 pub use operations::*;
+pub use sync::*;
 pub use error_log::*;
 pub use updater::*;
 

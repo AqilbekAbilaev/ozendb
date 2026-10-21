@@ -22,8 +22,10 @@ use crate::sync::snapshot::SyncedStores;
 use crate::sync::state::SyncStateStorage;
 use crate::time::now_epoch_ms;
 use serde::Serialize;
+use crate::sync::schedule::SyncLoop;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, ExitRequestApi, Manager};
 
 /// Whether a sync can run: signed in, with Premium or a lapsed subscription (the server
 /// still lets those download), and sync set up on this device.
@@ -199,6 +201,21 @@ impl Report for StatusEvents {
     fn finished(&self, result: &Result<Synced, AppError>) {
         self.announce(SyncStatus::finished(result, now_epoch_ms(), self.last_synced()));
     }
+}
+
+/// Holds the first request to quit until unsent edits have gone up, for at most
+/// `CLOSE_WAIT`, then quits. The quit that follows passes straight through.
+pub fn before_quitting(app: &AppHandle, api: &ExitRequestApi) {
+    static QUITTING: AtomicBool = AtomicBool::new(false);
+    if QUITTING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    api.prevent_exit();
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        app.state::<SyncLoop>().close().await;
+        app.exit(0);
+    });
 }
 
 #[cfg(test)]

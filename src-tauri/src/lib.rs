@@ -67,6 +67,7 @@ use shell_history::ShellHistoryStorage;
 use storage::Storage;
 use sync::entitlement::EntitlementStorage;
 use sync::keys::SyncKeysStorage;
+use sync::run::{AppSync, LastSync, StatusEvents};
 use sync::state::SyncStateStorage;
 use tabs::TabStorage;
 
@@ -183,6 +184,13 @@ pub fn run() {
             })));
             app.on_menu_event(menu::handle_event);
 
+            // Last, once every store it syncs is managed.
+            app.manage(LastSync::default());
+            let (sync, schedule) = sync::schedule::sync_loop(AppSync(app.handle().clone()), StatusEvents(app.handle().clone()), edits::subscribe());
+            tauri::async_runtime::spawn(schedule);
+            sync.start();
+            app.manage(sync);
+
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -281,6 +289,8 @@ pub fn run() {
             update_keybindings,
             get_entitlement,
             get_account,
+            sync_now,
+            sync_status,
             start_sign_in,
             poll_sign_in,
             sign_out,
@@ -370,6 +380,11 @@ pub fn run() {
             clear_operations,
             menu::set_menu_context,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = &event {
+                sync::run::before_quitting(app, api);
+            }
+        });
 }
