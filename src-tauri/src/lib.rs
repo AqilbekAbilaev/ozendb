@@ -66,6 +66,7 @@ use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;
 use storage::Storage;
 use sync::entitlement::EntitlementStorage;
+use sync::keys::SyncKeysStorage;
 use sync::state::SyncStateStorage;
 use tabs::TabStorage;
 
@@ -105,6 +106,7 @@ pub fn run() {
             app.manage(PgRowHistoryStore::new(data_dir.join("pg_row_history.json")));
             app.manage(EntitlementStorage::new(data_dir.join("entitlement.json")));
             app.manage(SyncStateStorage::new(data_dir.join("sync_state.json")));
+            app.manage(SyncKeysStorage::new(data_dir.join("sync_keys.json")));
             // The host-key trust store is shared between the pool (real connect)
             // and Test Connection's temporary tunnel, so both honor the same TOFU
             // record. Managed as an Arc so the pool can own a clone.

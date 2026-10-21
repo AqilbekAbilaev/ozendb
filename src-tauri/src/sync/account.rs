@@ -5,6 +5,7 @@ use crate::error::AppError;
 use crate::keychain::Keychain;
 use crate::sync::entitlement::{Account, EntitlementStorage, Subscription};
 use crate::sync::http::{bearer, unreachable};
+use crate::sync::keys::SyncKeysStorage;
 use crate::sync::state::SyncStateStorage;
 use reqwest::header::AUTHORIZATION;
 use reqwest::{RequestBuilder, Response, StatusCode};
@@ -114,11 +115,13 @@ impl AccountServer {
 }
 
 /// What this device keeps about the signed-in account: the session in the keychain, and
-/// in files the Premium answer and what it knows of that account's sync data.
+/// in files the Premium answer and what it knows of that account's sync data, and the
+/// keys that unlock that data.
 pub struct Device<'a, K: Keychain> {
     pub keychain: &'a K,
     pub entitlement: &'a EntitlementStorage,
     pub state: &'a SyncStateStorage,
+    pub keys: &'a SyncKeysStorage,
 }
 
 impl<K: Keychain> Device<'_, K> {
@@ -176,9 +179,11 @@ impl<K: Keychain> Device<'_, K> {
     /// server answers that the session is gone.
     pub fn forget(&self) -> Result<(), AppError> {
         let removed = self.keychain.remove(SESSION_KEY);
+        // Another account must never inherit this one's keys.
+        let keys_forgotten = self.keys.forget(self.keychain);
         self.entitlement.clear()?;
         self.state.clear()?;
-        removed
+        removed.and(keys_forgotten)
     }
 
     async fn record_account(&self, server: &AccountServer, session: &str, now: i64) -> Result<(), AppError> {

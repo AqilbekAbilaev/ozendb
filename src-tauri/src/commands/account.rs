@@ -3,6 +3,7 @@ use crate::keychain::OsKeychain;
 use crate::sync::account::{AccountServer, Device, SignIn, SignInStarted, SignedInAccount};
 use crate::sync::entitlement::{Entitlement, EntitlementStorage};
 use crate::sync::http::{client, PRODUCTION_URL};
+use crate::sync::keys::SyncKeysStorage;
 use crate::sync::state::SyncStateStorage;
 use crate::time::now_epoch_ms;
 use tauri::State;
@@ -18,8 +19,9 @@ pub fn get_entitlement(entitlement: State<'_, EntitlementStorage>) -> Entitlemen
 pub fn get_account(
     entitlement: State<'_, EntitlementStorage>,
     state: State<'_, SyncStateStorage>,
+    keys: State<'_, SyncKeysStorage>,
 ) -> Result<Option<SignedInAccount>, AppError> {
-    Device { keychain: &OsKeychain, entitlement: &entitlement, state: &state }.account()
+    Device { keychain: &OsKeychain, entitlement: &entitlement, state: &state, keys: &keys }.account()
 }
 
 /// Emails a sign-in link to `email`, and returns the request to poll and the code to show.
@@ -34,14 +36,19 @@ pub async fn poll_sign_in(
     request: String,
     entitlement: State<'_, EntitlementStorage>,
     state: State<'_, SyncStateStorage>,
+    keys: State<'_, SyncKeysStorage>,
 ) -> Result<SignIn, AppError> {
-    let device = Device { keychain: &OsKeychain, entitlement: &entitlement, state: &state };
+    let device = Device { keychain: &OsKeychain, entitlement: &entitlement, state: &state, keys: &keys };
     device.finish_sign_in(&server()?, &request, now_epoch_ms()).await
 }
 
 #[tauri::command]
-pub async fn sign_out(entitlement: State<'_, EntitlementStorage>, state: State<'_, SyncStateStorage>) -> Result<(), AppError> {
-    let device = Device { keychain: &OsKeychain, entitlement: &entitlement, state: &state };
+pub async fn sign_out(
+    entitlement: State<'_, EntitlementStorage>,
+    state: State<'_, SyncStateStorage>,
+    keys: State<'_, SyncKeysStorage>,
+) -> Result<(), AppError> {
+    let device = Device { keychain: &OsKeychain, entitlement: &entitlement, state: &state, keys: &keys };
     device.sign_out(&server()?).await
 }
 
