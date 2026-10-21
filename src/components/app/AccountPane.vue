@@ -10,6 +10,7 @@ import BaseInput from '../base/BaseInput.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
+import SyncSetupSection from './SyncSetupSection.vue'
 
 // The OzenDB account in Preferences. Signing in and out take effect at once, apart
 // from the dialog's Save and Cancel.
@@ -33,6 +34,7 @@ function manageSubscription() {
         <BaseButton v-if="account.subscription" @click="manageSubscription">Manage subscription</BaseButton>
         <BaseButton :disabled="signingOut" @click="signOut">Sign out</BaseButton>
       </div>
+      <SyncSetupSection />
     </template>
 
     <template v-else-if="step === 'waiting'">
