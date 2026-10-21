@@ -17,6 +17,7 @@ pub mod persistence;
 pub mod folders;
 pub mod operations;
 pub mod sync;
+pub mod sync_setup;
 pub mod error_log;
 pub mod updater;
 
@@ -28,6 +29,7 @@ pub use persistence::*;
 pub use folders::*;
 pub use operations::*;
 pub use sync::*;
+pub use sync_setup::*;
 pub use error_log::*;
 pub use updater::*;
 

@@ -291,6 +291,7 @@ pub fn run() {
             get_account,
             sync_now,
             sync_status,
+            sync_setup_status,
             start_sign_in,
             poll_sign_in,
             sign_out,
