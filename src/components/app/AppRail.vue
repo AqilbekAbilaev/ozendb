@@ -1,6 +1,9 @@
 <script setup>
 // The narrow left rail: vertical toggles for the connections sidebar and the
-// operations dock. Both panes are owned by App.vue, so the rail only flips them.
+// operations dock, and the sync status at its foot. Both panes are owned by App.vue,
+// so the rail only flips them.
+import SyncIndicator from './SyncIndicator.vue'
+
 defineProps({
   sidebarOpen:    { type: Boolean, default: true },
   operationsOpen: { type: Boolean, default: false },
@@ -21,9 +24,8 @@ const emit = defineEmits(['update:sidebarOpen', 'update:operationsOpen'])
       <span class="rail-label">{{ sidebarOpen ? 'Hide connections' : 'Show connections' }}</span>
     </button>
     <button
-      class="rail-toggle"
+      class="rail-toggle rail-bottom"
       :class="{ active: operationsOpen }"
-      style="margin-top:auto"
       type="button"
       :title="operationsOpen ? 'Hide operations' : 'Show operations'"
       @click="emit('update:operationsOpen', !operationsOpen)"
@@ -31,6 +33,7 @@ const emit = defineEmits(['update:sidebarOpen', 'update:operationsOpen'])
       <span class="rail-label">Operations</span>
       <span v-if="runningCount" class="rail-badge">{{ runningCount }}</span>
     </button>
+    <SyncIndicator />
   </div>
 </template>
 
@@ -64,6 +67,7 @@ const emit = defineEmits(['update:sidebarOpen', 'update:operationsOpen'])
   gap: 5px;
   border-radius: 5px;
 }
+.rail-bottom { margin-top: auto; }
 .rail-toggle:hover { background: var(--bg-hover); }
 .rail-toggle:hover .rail-label { color: var(--text); }
 .rail-toggle.active .rail-label { color: var(--accent); }
