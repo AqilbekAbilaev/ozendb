@@ -402,3 +402,39 @@ describe('applyParsed for PostgreSQL', () => {
     expect(fields).toMatchObject({ username: 'app', password: 'pw', hosts: [{ host: 'db', port: 5433 }], tls: true, tlsAllowInvalidCertificates: true })
   })
 })
+
+const { tagOverrides } = await import('../stores/nodeTags.js')
+
+describe('the colour shown on tabs', () => {
+  beforeEach(() => {
+    tagOverrides.value = {}
+    invoke.mockReset()
+    // The backend hands back the stored connection, tag included.
+    invoke.mockImplementation((cmd, args) => Promise.resolve(
+      cmd === 'save_connection' ? 'new-id' : stored({ tag: args.fields.tag })))
+  })
+
+  it('takes the colour chosen when editing a connection', async () => {
+    // The tab bar reads colours only from tagOverrides, so without this a tab keeps
+    // its old colour until the app restarts.
+    const f = useConnectionForm(stored())
+    f.selectedTag.value = 'red'
+    await f.save()
+    expect(tagOverrides.value.c1).toBe('red')
+  })
+
+  it('drops the colour when the edit sets it to none', async () => {
+    tagOverrides.value = { c1: 'red' }
+    const f = useConnectionForm(stored({ tag: 'red' }))
+    f.selectedTag.value = 'none'
+    await f.save()
+    expect(tagOverrides.value.c1).toBe('none')
+  })
+
+  it('takes the colour of a new connection', async () => {
+    const f = useConnectionForm(null)
+    f.selectedTag.value = 'blue'
+    await f.save()
+    expect(tagOverrides.value['new-id']).toBe('blue')
+  })
+})

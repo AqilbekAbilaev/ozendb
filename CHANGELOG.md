@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.2.2
+
+- **Exports write plain values** — CSV and XLSX now write dates as readable
+  dates (real date cells in XLSX), ObjectIds as hex and decimals as numbers,
+  instead of Extended JSON. JSON export lets you pick plain JSON, now the
+  default, or Extended JSON, which keeps the types so the file can be
+  imported back.
+- **Faster startup** — the code editor and its languages load the first
+  time you need them, not when the app opens.
+- **The window stays responsive** while settings, tabs, histories and saved
+  queries are read or written — that work now runs off the window's own
+  thread.
+- **Edit history stays small** — it is capped by size as well as count, so
+  editing large documents no longer rewrites a huge history file.
+- **Security** — the app now sets a Content Security Policy and gives its
+  windows only the permissions they need. Deleting a connection removes all
+  of its stored data, including edit history that held copies of documents.
+  On a read-only connection, the shell allows only operations known to be
+  reads. Dependencies are updated past their published security advisories.
+- **Fixed** — Current Operations loads again, and Kill Operation works.
+- **Fixed** — creating an index with the name left blank works on MongoDB 7.
+- **Fixed** — Drop Index works, and View Details shows the index's usage.
+- **Fixed** — a CSV import reaches the server, and the JSON import shows its
+  target connection.
+- **Fixed** — the GridFS menu's file actions act on the file selected in the
+  GridFS dialog.
+- **Fixed** — a terminated PostgreSQL session leaves the Activity list
+  straight away.
+- **Fixed** — Export uses the query of the tab you are on, not the first open
+  tab of that collection, and its tab scrolls when the content is taller than
+  the window.
+- **Fixed** — document windows follow the app's theme instead of the OS
+  appearance.
+- **Fixed** — actions started from a database's right-click menu show the
+  connection's name.
+- **Fixed** — long names in the sidebar's stats popover are cut off instead
+  of pushing the values off the card.
+- **Fixed** — PostgreSQL search tabs come back after a restart.
+
 ## v0.2.1
 
 - **PostgreSQL tables are fully editable now** — edit, insert and delete rows

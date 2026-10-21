@@ -1,6 +1,6 @@
 [package]
 name = "ozendb"
-version = "0.2.1"
+version = "0.2.2"
 description = "An open-source, free desktop GUI for managing MongoDB — a community alternative to Studio 3T."
 authors = ["Akhilbek Abilaev <abilaevaqil@gmail.com>"]
 edition = "2021"
@@ -76,7 +76,7 @@ struson = { version = "0.7", features = ["serde"] }
 # Pure-Rust .xlsx writer for the "Export to Excel" format. No C deps; the workbook
 # is assembled in memory then saved, so xlsx exports are bounded by the row limit
 # (CSV/JSON remain the streaming path for very large collections).
-rust_xlsxwriter = "0.99"
+rust_xlsxwriter = "0.100"
 # Pure-Rust .docx writer for "export schema documentation" as a Word document
 # (alongside the CSV form). Small reports, so the doc is built in memory then packed.
 docx-rs = "0.4"
