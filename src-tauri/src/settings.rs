@@ -1,6 +1,9 @@
 use crate::json_store_wrapper;
 use crate::error::AppError;
+use crate::sync::local_only::without_local_only;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use std::collections::BTreeMap;
 
 /// Application-wide preferences. A single JSON object (not keyed), persisted to
 /// `settings.json`. New fields should carry `#[serde(default)]` so older files
@@ -59,10 +62,75 @@ impl Default for Settings {
     }
 }
 
-json_store_wrapper!(SettingsStorage, Settings);
+impl Settings {
+    /// The settings by name, the shape sync merges them in.
+    pub fn to_map(&self) -> Map<String, Value> {
+        match serde_json::to_value(self) {
+            Ok(Value::Object(map)) => map,
+            _ => unreachable!("settings always serialize to a JSON object"),
+        }
+    }
 
-impl SettingsStorage {
-    pub fn save(&self, settings: &Settings) -> Result<(), AppError> {
-        self.inner.save(settings)
+    /// Whether these settings differ from `other` in any that leave this device.
+    pub fn differs_where_shared(&self, other: &Settings) -> bool {
+        without_local_only(self.to_map()) != without_local_only(other.to_map())
     }
 }
+
+/// The settings as stored: each setting's value, and when it last changed, so sync
+/// can merge them one by one. Files written before the stamps existed have no
+/// `updated_at`, so every setting counts as changed at 0, older than any real edit.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct StampedSettings {
+    #[serde(flatten)]
+    pub values: Settings,
+    #[serde(default)]
+    pub updated_at: BTreeMap<String, i64>,
+}
+
+impl StampedSettings {
+    pub fn stamp_of(&self, key: &str) -> i64 {
+        self.updated_at.get(key).copied().unwrap_or(0)
+    }
+
+    /// These settings once they change to `values` at `now`: only the settings whose
+    /// value differs take the new stamp, so one change can't win a merge for the rest.
+    pub fn changed_to(&self, values: Settings, now: i64) -> StampedSettings {
+        let before = self.values.to_map();
+        let mut updated_at = self.updated_at.clone();
+        for (key, value) in values.to_map() {
+            if before.get(&key) != Some(&value) {
+                updated_at.insert(key, now);
+            }
+        }
+        StampedSettings { values, updated_at }
+    }
+}
+
+json_store_wrapper!(SettingsStorage, StampedSettings);
+
+impl SettingsStorage {
+    pub fn settings(&self) -> Settings {
+        self.load().values
+    }
+
+    /// Applies `change` to the stored settings under the store's lock, so a sync that
+    /// writes in between is never undone. Returns the settings before and after.
+    pub fn update(&self, change: impl FnOnce(&Settings) -> Settings) -> Result<(Settings, Settings), AppError> {
+        let now = crate::time::now_epoch_ms();
+        let (before, after) = self.inner.update(|stored| {
+            let before = stored.values.clone();
+            *stored = stored.changed_to(change(&before), now);
+            (before, stored.values.clone())
+        })?;
+        // A local-only setting such as the zoom has nothing to sync.
+        if after.differs_where_shared(&before) {
+            crate::edits::note();
+        }
+        Ok((before, after))
+    }
+}
+
+#[cfg(test)]
+#[path = "settings.test.rs"]
+mod tests;

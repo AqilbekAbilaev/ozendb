@@ -9,21 +9,27 @@ use serde::Serialize;
 use std::time::Duration;
 
 mod access;
+pub mod account;
 pub mod connection;
 pub mod mongo;
 pub mod postgres;
 pub mod persistence;
 pub mod folders;
 pub mod operations;
+pub mod sync;
+pub mod sync_setup;
 pub mod error_log;
 pub mod updater;
 
+pub use account::*;
 pub use connection::*;
 pub use mongo::*;
 pub use postgres::*;
 pub use persistence::*;
 pub use folders::*;
 pub use operations::*;
+pub use sync::*;
+pub use sync_setup::*;
 pub use error_log::*;
 pub use updater::*;
 

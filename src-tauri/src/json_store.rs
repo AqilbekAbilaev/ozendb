@@ -62,6 +62,30 @@ where
         }
     }
 
+    /// `update`, except that when `mutate` returns false nothing is written: it must then
+    /// have left the value as it found it. Returns what `mutate` returned.
+    pub fn update_if(&self, mutate: impl FnOnce(&mut T) -> bool) -> Result<bool, AppError> {
+        let _guard = self.guard();
+        let mut value: T = crate::persist::read_json(&self.path).unwrap_or_default();
+        if !mutate(&mut value) {
+            return Ok(false);
+        }
+        self.write(&value)?;
+        Ok(true)
+    }
+
+    /// Replaces the value with `after` only if it still equals `before`, so a write made
+    /// since `before` was read is never lost. Returns whether it replaced it.
+    pub fn replace_if_unchanged(&self, before: &T, after: &T) -> Result<bool, AppError> {
+        let _guard = self.guard();
+        let current: T = crate::persist::read_json(&self.path).unwrap_or_default();
+        if serde_json::to_value(&current)? != serde_json::to_value(before)? {
+            return Ok(false);
+        }
+        self.write(after)?;
+        Ok(true)
+    }
+
     fn write(&self, value: &T) -> Result<(), AppError> {
         let content = match serde_json::to_string_pretty(value) {
             Ok(val) => val,
@@ -86,16 +110,46 @@ where
 /// # Example
 ///
 /// ```ignore
-/// crate::json_store_wrapper!(SettingsStorage, Settings);
+/// crate::json_store_wrapper!(SettingsStorage, StampedSettings);
 ///
 /// impl SettingsStorage {
-///     pub fn save(&self, settings: &Settings) -> Result<(), AppError> {
-///         self.inner.save(settings)
+///     pub fn settings(&self) -> Settings {
+///         self.load().values
 ///     }
 /// }
 /// ```
+///
+/// A synced store is declared `records of R` (a list) or `keyed records of V` (a
+/// map) instead: its `load` returns only live records, so no read path can show a
+/// deleted one (see `record.rs`).
 #[macro_export]
 macro_rules! json_store_wrapper {
+    ($name:ident, keyed records of $value:ty) => {
+        pub struct $name {
+            pub(crate) inner: $crate::json_store::JsonStore<std::collections::HashMap<String, $value>>,
+        }
+        impl $name {
+            pub fn new(path: std::path::PathBuf) -> Self {
+                Self { inner: $crate::json_store::JsonStore::new(path) }
+            }
+            pub fn load(&self) -> std::collections::HashMap<String, $value> {
+                $crate::record::RecordMap::live(self.inner.load())
+            }
+        }
+    };
+    ($name:ident, records of $record:ty) => {
+        pub struct $name {
+            pub(crate) inner: $crate::json_store::JsonStore<Vec<$record>>,
+        }
+        impl $name {
+            pub fn new(path: std::path::PathBuf) -> Self {
+                Self { inner: $crate::json_store::JsonStore::new(path) }
+            }
+            pub fn load(&self) -> Vec<$record> {
+                $crate::record::RecordList::live(self.inner.load())
+            }
+        }
+    };
     ($name:ident, $type:ty) => {
         pub struct $name {
             pub(crate) inner: $crate::json_store::JsonStore<$type>,

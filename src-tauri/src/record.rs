@@ -1,0 +1,146 @@
+// Records in the stores that sync between devices. Sync merges a store record by
+// record, keyed by id (or by map key), and the newer `updated_at` wins. So a delete can't simply
+// remove a record — another device still holding it would bring it back — it marks
+// the record `deleted` instead, and every read hides it. The mark keeps only the id:
+// a deleted record's content leaves the disk as it would have without tombstones.
+
+use crate::time::now_epoch_ms;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// When a record last changed, and whether that change deleted it. Flattened into
+/// each record, so every synced file carries the same two keys.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct Stamp {
+    // Files written before stamps existed load as 0 and not deleted: older than any
+    // real edit, so an untouched old copy never beats a change made on another device.
+    #[serde(default)]
+    pub updated_at: i64,
+    #[serde(default)]
+    pub deleted: bool,
+    /// When a deleted marker first reached the server. Its 90 days count from here, not
+    /// from the deletion, so a delete uploaded late still reaches every device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uploaded_at: Option<i64>,
+}
+
+impl Stamp {
+    pub fn now() -> Self {
+        Stamp { updated_at: now_epoch_ms(), deleted: false, uploaded_at: None }
+    }
+
+    fn tombstone() -> Self {
+        Stamp { updated_at: now_epoch_ms(), deleted: true, uploaded_at: None }
+    }
+}
+
+pub trait Stamped {
+    fn stamp(&self) -> &Stamp;
+    fn restamp(&mut self, stamp: Stamp);
+}
+
+/// Implements `Stamped` for types that keep their stamp in a `stamp` field.
+#[macro_export]
+macro_rules! stamped {
+    ($($type:ty),+) => {
+        $(impl $crate::record::Stamped for $type {
+            fn stamp(&self) -> &$crate::record::Stamp {
+                &self.stamp
+            }
+
+            fn restamp(&mut self, stamp: $crate::record::Stamp) {
+                self.stamp = stamp;
+            }
+        })+
+    };
+}
+
+/// A record in a synced list, which carries its own id.
+pub trait Record: Stamped {
+    /// What identifies the record across devices.
+    fn id(&self) -> String;
+    /// The same record with everything but its id blanked.
+    fn emptied(&self) -> Self;
+}
+
+/// The only ways a synced list changes, so no change can skip its stamp, nor the edit
+/// signal that schedules a sync (edits.rs).
+pub trait RecordList<R> {
+    /// The records a user can see.
+    fn live(self) -> Vec<R>;
+    /// Adds `record` at `index`, replacing any tombstone with its id: re-creating a
+    /// deleted record is a newer change than the deletion, so it wins the merge.
+    fn put(&mut self, index: usize, record: R);
+    fn edit_where(&mut self, which: impl Fn(&R) -> bool, change: impl FnMut(&mut R));
+    /// Changes state that belongs to this device alone, so it never syncs: no stamp.
+    fn edit_device_only(&mut self, id: &str, change: impl FnOnce(&mut R));
+    fn delete_where(&mut self, doomed: impl Fn(&R) -> bool);
+}
+
+impl<R: Record> RecordList<R> for Vec<R> {
+    fn live(self) -> Vec<R> {
+        self.into_iter().filter(|r| !r.stamp().deleted).collect()
+    }
+
+    fn put(&mut self, index: usize, mut record: R) {
+        let id = record.id();
+        self.retain(|r| r.id() != id);
+        record.restamp(Stamp::now());
+        self.insert(index.min(self.len()), record);
+        crate::edits::note();
+    }
+
+    fn edit_where(&mut self, which: impl Fn(&R) -> bool, mut change: impl FnMut(&mut R)) {
+        for record in self.iter_mut().filter(|r| !r.stamp().deleted && which(r)) {
+            change(record);
+            record.restamp(Stamp::now());
+            crate::edits::note();
+        }
+    }
+
+    fn edit_device_only(&mut self, id: &str, change: impl FnOnce(&mut R)) {
+        if let Some(record) = self.iter_mut().find(|r| r.id() == id && !r.stamp().deleted) {
+            change(record);
+        }
+    }
+
+    fn delete_where(&mut self, doomed: impl Fn(&R) -> bool) {
+        for record in self.iter_mut().filter(|r| !r.stamp().deleted && doomed(r)) {
+            *record = record.emptied();
+            record.restamp(Stamp::tombstone());
+            crate::edits::note();
+        }
+    }
+}
+
+/// `RecordList` for a synced map, whose key is the record's id. A deleted value
+/// blanks to its `Default`.
+pub trait RecordMap<V> {
+    fn live(self) -> HashMap<String, V>;
+    fn put(&mut self, key: &str, value: V);
+    fn delete_where(&mut self, doomed: impl Fn(&str) -> bool);
+}
+
+impl<V: Stamped + Default> RecordMap<V> for HashMap<String, V> {
+    fn live(self) -> HashMap<String, V> {
+        self.into_iter().filter(|(_, v)| !v.stamp().deleted).collect()
+    }
+
+    fn put(&mut self, key: &str, mut value: V) {
+        value.restamp(Stamp::now());
+        self.insert(key.to_string(), value);
+        crate::edits::note();
+    }
+
+    fn delete_where(&mut self, doomed: impl Fn(&str) -> bool) {
+        for (_, value) in self.iter_mut().filter(|(k, v)| !v.stamp().deleted && doomed(k)) {
+            *value = V::default();
+            value.restamp(Stamp::tombstone());
+            crate::edits::note();
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "record.test.rs"]
+mod tests;

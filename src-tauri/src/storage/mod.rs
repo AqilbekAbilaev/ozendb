@@ -1,16 +1,13 @@
 use crate::error::AppError;
+use crate::record::{Record, RecordList, Stamp};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
-fn default_connection_type() -> String { String::from("standalone") }
-fn default_ssh_port() -> u16 { 22 }
+mod engine;
+pub use engine::*;
 
-/// The persisted spelling of each driver — the `engine` key in `connections.json`
-/// and the value `EngineConfig`'s tag is read from and written as.
-const MONGODB: &str = "mongodb";
-const POSTGRESQL: &str = "postgresql";
+fn default_ssh_port() -> u16 { 22 }
 
 /// One host of a (possibly multi-host) seed list. SRV connections use a single
 /// entry and ignore the port.
@@ -72,6 +69,8 @@ pub struct ConnectionConfig {
     // only the connections that were open are re-opened after a restart.
     #[serde(default)]
     pub open: bool,
+    #[serde(flatten)]
+    pub stamp: Stamp,
     /// Everything that is this driver's business and no other's. Flattened, so the
     /// driver's own keys sit alongside the shared ones in `connections.json` exactly
     /// as they did when this was one flat struct — see `EngineConfig`.
@@ -79,197 +78,6 @@ pub struct ConnectionConfig {
     pub engine: EngineConfig,
 }
 
-/// The driver-specific half of a connection: one variant per driver, each owning
-/// only the settings that driver actually reads.
-///
-/// Splitting these out is what stops a setting from being silently ignored. While
-/// this was one flat struct, a Postgres connection still carried `options`,
-/// `auth_mechanism` and `tls_cert_key_file` — fields the Postgres path never looks
-/// at, so anything the user put there was dropped without a word. Now they don't
-/// exist on a Postgres connection at all, and giving Postgres client certificates
-/// later means adding a field to `PostgresConfig`, not teaching a shared field to
-/// mean two things.
-///
-/// Persisted flat and tagged by `engine` rather than nested, so the four-key-deep
-/// shape of an existing `connections.json` is unchanged and no migration runs.
-#[derive(Clone, Debug, PartialEq)]
-pub enum EngineConfig {
-    Mongo(MongoConfig),
-    Postgres(PostgresConfig),
-}
-
-/// MongoDB's own settings. `options` and `tls_cert_key_file` live here rather than
-/// on the shared struct because they are MongoDB URI concepts: the first is spliced
-/// verbatim into the connection string, the second is a `tlsCertificateKeyFile`
-/// parameter. PostgreSQL expresses both differently and would need its own fields.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct MongoConfig {
-    #[serde(default = "default_connection_type")]
-    pub connection_type: String,
-    #[serde(default)]
-    pub replica_set_name: Option<String>,
-    #[serde(default)]
-    pub auth_db: Option<String>,
-    #[serde(default)]
-    pub auth_mechanism: Option<String>,
-    // Passthrough connection-string options the dedicated fields don't model
-    // (e.g. retryWrites, socketTimeoutMS, readPreference). Appended verbatim to
-    // the built URI so any driver-accepted parameter round-trips.
-    #[serde(default)]
-    pub options: BTreeMap<String, String>,
-    #[serde(default)]
-    pub tls_cert_key_file: Option<String>,
-}
-
-/// PostgreSQL's own settings.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
-pub struct PostgresConfig {
-    /// A Postgres connection must name one database up front, unlike MongoDB, which
-    /// connects at the server level and picks a database per query.
-    #[serde(default)]
-    pub database: Option<String>,
-}
-
-impl Default for MongoConfig {
-    fn default() -> Self {
-        MongoConfig {
-            connection_type: default_connection_type(),
-            replica_set_name: None,
-            auth_db: None,
-            auth_mechanism: None,
-            options: BTreeMap::new(),
-            tls_cert_key_file: None,
-        }
-    }
-}
-
-impl Default for EngineConfig {
-    /// MongoDB, matching what a record with no `engine` key deserializes to.
-    fn default() -> Self {
-        EngineConfig::Mongo(MongoConfig::default())
-    }
-}
-
-// Hand-written rather than `#[serde(tag = "engine")]` for one reason: serde's
-// internally-tagged derive *requires* the tag to be present, and every
-// `connections.json` written before the `engine` field existed has no such key.
-// The derive would fail to load them; this reads the tag with a MongoDB default,
-// which is the only driver those files could describe.
-impl<'de> Deserialize<'de> for EngineConfig {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use serde::de::Error;
-        let map = serde_json::Map::deserialize(deserializer)?;
-        // `"postgres"` is accepted alongside the canonical `"postgresql"` — it is
-        // the spelling sqlx, libpq and the URI scheme all use, so a hand-edited
-        // file may well carry it, and guessing the wrong driver is far worse than
-        // accepting a synonym. Anything else is an error rather than a guess.
-        let engine = map.get("engine").and_then(|v| v.as_str()).unwrap_or(MONGODB);
-        let variant = match engine {
-            MONGODB => serde_json::from_value(serde_json::Value::Object(map.clone()))
-                .map(EngineConfig::Mongo),
-            POSTGRESQL | "postgres" => {
-                serde_json::from_value(serde_json::Value::Object(map.clone()))
-                    .map(EngineConfig::Postgres)
-            }
-            other => return Err(D::Error::custom(format!("unknown connection engine \"{other}\""))),
-        };
-        variant.map_err(D::Error::custom)
-    }
-}
-
-// The mirror of the above: writes the driver's own keys flat, plus the `engine`
-// tag that `Deserialize` reads back.
-impl Serialize for EngineConfig {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::Error;
-        let (tag, value) = match self {
-            EngineConfig::Mongo(config) => (MONGODB, serde_json::to_value(config)),
-            EngineConfig::Postgres(config) => (POSTGRESQL, serde_json::to_value(config)),
-        };
-        let mut map = match value.map_err(S::Error::custom)? {
-            serde_json::Value::Object(map) => map,
-            _ => return Err(S::Error::custom("engine config must serialize to an object")),
-        };
-        map.insert(String::from("engine"), serde_json::Value::String(String::from(tag)));
-        serde_json::Value::Object(map).serialize(serializer)
-    }
-}
-
-/// The database driver, as an exhaustively-matchable view of the stored `engine`
-/// string. As with `ConnectionKind` below, the string stays the persisted/wire
-/// form and this is only the internal view — matched on wherever code needs to
-/// pick a driver-specific path (pool connect, URI building, command dispatch).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Engine {
-    Mongo,
-    Postgres,
-}
-
-impl EngineConfig {
-    /// Which driver this is, without the caller having to match the whole variant.
-    pub fn engine(&self) -> Engine {
-        match self {
-            EngineConfig::Mongo(_) => Engine::Mongo,
-            EngineConfig::Postgres(_) => Engine::Postgres,
-        }
-    }
-
-    /// The MongoDB settings, or `None` on a Postgres connection. Callers that have
-    /// already established the driver (the Mongo URI builder, reached only from the
-    /// Mongo arm of the pool) still go through this rather than unwrapping, so a
-    /// mismatch surfaces as a handled error instead of a panic.
-    pub fn as_mongo(&self) -> Option<&MongoConfig> {
-        match self {
-            EngineConfig::Mongo(config) => Some(config),
-            EngineConfig::Postgres(_) => None,
-        }
-    }
-
-    /// The PostgreSQL settings, or `None` on a MongoDB connection.
-    pub fn as_postgres(&self) -> Option<&PostgresConfig> {
-        match self {
-            EngineConfig::Postgres(config) => Some(config),
-            EngineConfig::Mongo(_) => None,
-        }
-    }
-}
-
-impl MongoConfig {
-    /// The connection scheme as an exhaustively-matchable enum. Derived from the
-    /// stored `connection_type` string; see `ConnectionKind`.
-    pub fn kind(&self) -> ConnectionKind {
-        ConnectionKind::from_str(&self.connection_type)
-    }
-}
-
-/// The connection scheme, as an exhaustively-matchable view of the stored
-/// `connection_type` string. The string remains the persisted/wire form (the
-/// frontend sends it and it round-trips through `connections.json` untouched);
-/// this enum exists only so internal code can `match` on the meaning without
-/// re-testing string literals in several places.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConnectionKind {
-    /// Direct or multi-host seed list — `mongodb://`.
-    Standalone,
-    /// DNS SRV record — `mongodb+srv://` (single hostname, no port).
-    Srv,
-    /// Replica set (still `mongodb://` today; distinguished for completeness).
-    Replica,
-}
-
-impl ConnectionKind {
-    /// Maps a stored `connection_type` string to a kind. Any unknown or legacy
-    /// value falls back to `Standalone` — the non-SRV path, which is exactly how
-    /// `uri.rs` behaved before this enum existed (only `"srv"` was special-cased,
-    /// everything else took the plain `mongodb://` branch).
-    pub fn from_str(value: &str) -> ConnectionKind {
-        match value {
-            "srv" => ConnectionKind::Srv,
-            "replica" => ConnectionKind::Replica,
-            _ => ConnectionKind::Standalone,
-        }
-    }
-}
 
 /// How an SSH tunnel authenticates, as an exhaustively-matchable view of the
 /// stored `ssh_auth` string. As with `ConnectionKind`, the string stays the
@@ -317,8 +125,23 @@ impl Default for ConnectionConfig {
             folder_id: None,
             last_accessed: None,
             open: false,
+            stamp: Stamp::default(),
             engine: EngineConfig::default(),
         }
+    }
+}
+
+crate::stamped!(ConnectionConfig);
+
+// `open` and `last_accessed` are this device's own state: they change through
+// `edit_device_only`, so they never stamp the record or sync.
+impl Record for ConnectionConfig {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn emptied(&self) -> Self {
+        ConnectionConfig { id: self.id.clone(), ..ConnectionConfig::default() }
     }
 }
 
@@ -327,6 +150,12 @@ impl ConnectionConfig {
     /// than from a string, so it can no longer disagree with the settings it carries.
     pub fn engine_kind(&self) -> Engine {
         self.engine.engine()
+    }
+
+    /// The record without this device's own state (`open`, `last_accessed`): the part
+    /// that syncs.
+    pub fn shared_part(&self) -> ConnectionConfig {
+        ConnectionConfig { open: false, last_accessed: None, ..self.clone() }
     }
 
     /// The SSH auth method as an exhaustively-matchable enum. Derived from the
@@ -352,11 +181,22 @@ pub struct Storage {
     // are not observed until the next mutation or an app restart. Live external
     // edits are unsupported, so this is acceptable.
     cache: Mutex<Option<Vec<ConnectionConfig>>>,
+    // Held by `with_secrets_locked`.
+    secrets: Mutex<()>,
 }
 
 impl Storage {
     pub fn new(path: PathBuf) -> Self {
-        Self { path, cache: Mutex::new(None) }
+        Self { path, cache: Mutex::new(None), secrets: Mutex::new(()) }
+    }
+
+    /// Runs `change` while no other change to a connection's record and secrets runs, so
+    /// a sync writing merged secrets and an edit writing typed ones never interleave and
+    /// neither overwrites the other's unseen. Takes its own lock, not the cache's, so a
+    /// slow keychain prompt doesn't hold up opening or closing connections.
+    pub fn with_secrets_locked<R>(&self, change: impl FnOnce() -> R) -> R {
+        let _guard = self.secrets.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        change()
     }
 
     // The poison-tolerant cache guard. A panic in another thread while the lock is
@@ -416,7 +256,7 @@ impl Storage {
     pub fn load(&self) -> Vec<ConnectionConfig> {
         let mut guard = self.lock_cache();
         let connections = guard.get_or_insert_with(|| self.read_from_disk());
-        connections.clone()
+        connections.clone().live()
     }
 
     /// The persisted config for `id`, if any. This is the authoritative source of
@@ -425,7 +265,7 @@ impl Storage {
     pub fn find(&self, id: &str) -> Option<ConnectionConfig> {
         let mut guard = self.lock_cache();
         let connections = guard.get_or_insert_with(|| self.read_from_disk());
-        connections.iter().find(|c| c.id == id).cloned()
+        connections.iter().find(|c| c.id == id && !c.stamp.deleted).cloned()
     }
 
     /// Apply `mutate` to the connection list under the lock, persist, then sync the
@@ -437,16 +277,29 @@ impl Storage {
     where
         F: FnOnce(&mut Vec<ConnectionConfig>),
     {
+        self.update_if(|connections| {
+            mutate(connections);
+            true
+        })
+        .map(|_| ())
+    }
+
+    /// `update_with`, except that when `mutate` returns false nothing is written: it
+    /// must then have left the list as it found it. Returns what `mutate` returned.
+    fn update_if(&self, mutate: impl FnOnce(&mut Vec<ConnectionConfig>) -> bool) -> Result<bool, AppError> {
         let mut guard = self.lock_cache();
         let mut connections = match guard.take() {
             Some(connections) => connections,
             None => self.read_from_disk(),
         };
-        mutate(&mut connections);
+        if !mutate(&mut connections) {
+            *guard = Some(connections);
+            return Ok(false);
+        }
         match self.write_disk(&connections) {
             Ok(()) => {
                 *guard = Some(connections);
-                Ok(())
+                Ok(true)
             }
             // Persist failed: don't cache the unpersisted change. Leaving the cache
             // empty forces the next read to reload the last good state from disk.
@@ -457,20 +310,45 @@ impl Storage {
         }
     }
 
-    pub fn add(&self, config: ConnectionConfig) -> Result<(), AppError> {
-        self.update_with(|connections| connections.push(config))
+    /// Every record, deleted markers included: what sync sends.
+    pub fn records(&self) -> Vec<ConnectionConfig> {
+        let mut guard = self.lock_cache();
+        guard.get_or_insert_with(|| self.read_from_disk()).clone()
     }
 
-    pub fn update(&self, config: ConnectionConfig) -> Result<(), AppError> {
-        self.update_with(|connections| {
-            if let Some(c) = connections.iter_mut().find(|c| c.id == config.id) {
-                *c = config;
+    /// Replaces the list with `after` only if its shared part still equals `before`'s.
+    /// Opening or using a connection meanwhile doesn't count as a change, and keeps its
+    /// newer `open` and `last_accessed`. Returns whether it replaced the list.
+    pub fn replace_synced_if_unchanged(&self, before: &[ConnectionConfig], after: Vec<ConnectionConfig>) -> Result<bool, AppError> {
+        let synced = |list: &[ConnectionConfig]| serde_json::to_value(list.iter().map(ConnectionConfig::shared_part).collect::<Vec<_>>());
+        let before = synced(before)?;
+        self.update_if(|current| {
+            if synced(current).ok() != Some(before) {
+                return false;
             }
+            let mut after = after;
+            // A deleted marker keeps only its id, so it takes none of this device's state.
+            for config in after.iter_mut().filter(|c| !c.stamp.deleted) {
+                if let Some(now) = current.iter().find(|c| c.id == config.id) {
+                    config.open = now.open;
+                    config.last_accessed = now.last_accessed.clone();
+                }
+            }
+            *current = after;
+            true
         })
     }
 
+    pub fn add(&self, config: ConnectionConfig) -> Result<(), AppError> {
+        self.update_with(|connections| connections.put(connections.len(), config))
+    }
+
+    pub fn update(&self, config: ConnectionConfig) -> Result<(), AppError> {
+        self.update_with(|connections| connections.edit_where(|c| c.id == config.id, |c| *c = config.clone()))
+    }
+
     pub fn remove(&self, id: &str) -> Result<(), AppError> {
-        self.update_with(|connections| connections.retain(|c| c.id != id))
+        self.update_with(|connections| connections.delete_where(|c| c.id == id))
     }
 
     // Replace the whole list: write to disk, then sync the cache. Only the tests

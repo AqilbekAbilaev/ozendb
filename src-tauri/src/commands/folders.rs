@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use crate::folders::{Folder, FolderStorage};
+use crate::record::{RecordList, Stamp};
 use super::AppContext;
 use tauri::State;
 use uuid::Uuid;
@@ -19,6 +20,7 @@ pub fn create_folder(
         name,
         parent_id: None,
         created_at: crate::time::now_ms(),
+        stamp: Stamp::now(),
     };
     match folders.insert(folder.clone()) {
         Ok(_) => Ok(folder),
@@ -45,11 +47,7 @@ pub fn delete_folder(
 ) -> Result<(), AppError> {
     // Detach any connections that were in this folder, under the storage lock.
     match ctx.storage.update_with(|connections| {
-        for c in connections.iter_mut() {
-            if c.folder_id.as_deref() == Some(id.as_str()) {
-                c.folder_id = None;
-            }
-        }
+        connections.edit_where(|c| c.folder_id.as_deref() == Some(id.as_str()), |c| c.folder_id = None)
     }) {
         Ok(_) => {}
         Err(e) => return Err(e),
@@ -65,9 +63,5 @@ pub fn move_connection_to_folder(
     id: String,
     folder_id: Option<String>,
 ) -> Result<(), AppError> {
-    ctx.storage.update_with(|connections| {
-        if let Some(c) = connections.iter_mut().find(|c| c.id == id) {
-            c.folder_id = folder_id;
-        }
-    })
+    ctx.storage.update_with(|connections| connections.edit_where(|c| c.id == id, |c| c.folder_id = folder_id.clone()))
 }

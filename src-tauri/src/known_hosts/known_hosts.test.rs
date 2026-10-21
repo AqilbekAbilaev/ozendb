@@ -95,3 +95,35 @@ fn different_port_is_a_separate_host() {
     store.record("bastion.example.com", 2222, "ssh-ed25519 BBBB").unwrap();
     assert_eq!(store.load().len(), 2);
 }
+
+#[test]
+fn forgetting_a_host_keeps_only_its_address_on_disk() {
+    let (store, dir) = store_in_tempdir();
+    store.record("bastion ü.example.com", 2222, "ssh-ed25519 AAAA").unwrap();
+    store.remove("bastion ü.example.com", 2222).unwrap();
+    assert_eq!(store.stored_key("bastion ü.example.com", 2222), None);
+    let on_disk = std::fs::read_to_string(dir.path().join("known_hosts.json")).unwrap();
+    assert!(on_disk.contains("bastion ü.example.com"));
+    assert!(on_disk.contains(r#""deleted": true"#));
+    assert!(!on_disk.contains("AAAA"));
+}
+
+#[test]
+fn a_forgotten_host_can_be_trusted_again() {
+    let (store, _dir) = store_in_tempdir();
+    store.record("bastion.example.com", 22, "ssh-ed25519 AAAA").unwrap();
+    store.remove("bastion.example.com", 22).unwrap();
+    store.record("bastion.example.com", 22, "ssh-ed25519 BBBB").unwrap();
+    assert_eq!(store.check("bastion.example.com", 22, "ssh-ed25519 BBBB"), HostKeyCheck::Match);
+    assert_eq!(store.inner.load().len(), 1);
+}
+
+#[test]
+fn a_known_hosts_file_written_before_stamps_existed_still_loads() {
+    let (store, dir) = store_in_tempdir();
+    std::fs::write(
+        dir.path().join("known_hosts.json"),
+        r#"[{ "host": "old.example.com", "port": 22, "key": "ssh-ed25519 AAAA", "added": "1" }]"#,
+    ).unwrap();
+    assert_eq!(store.check("old.example.com", 22, "ssh-ed25519 AAAA"), HostKeyCheck::Match);
+}

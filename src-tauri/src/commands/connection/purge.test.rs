@@ -121,6 +121,7 @@ fn default_query() -> DefaultQuery {
         skip: 0,
         limit: 20,
         pipeline: String::from("[]"),
+        stamp: crate::record::Stamp::now(),
     }
 }
 

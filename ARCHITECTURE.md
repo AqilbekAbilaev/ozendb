@@ -34,7 +34,7 @@ Four rings, outermost first. A ring may import inwards, never outwards — **enf
 |---|---|
 | `src/components/` | Rendering and event wiring only. Grouped by area: `admin/`, `app/`, `base/`, `connection/`, `panes/`, `query/`, `results/`, `tools/`, `workspace/`. |
 | `src/composables/` | Stateful slices that need a component's lifetime or a caller's wiring (`useFeatures`, `useMenu`, `useConnectionTree`, `useDbActions`, …). Anything that is really app-wide state belongs in `stores/` instead — most of what used to live here has moved. |
-| `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (every "open a tab" entry point) · `queryRunner.js` · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `indexes.js` · `updater.js` · `toast.js` · `dbClipboard.js` · `queryClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
+| `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (every "open a tab" entry point) · `queryRunner.js` · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `indexes.js` · `updater.js` · `premium.js` · `toast.js` · `dbClipboard.js` · `queryClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
 | `src/utils/` | Pure functions. No Vue, no I/O. |
 
 The rest of `src/` sits around those rings, with its own lint rule where a direction holds:
@@ -70,7 +70,7 @@ APIs (`plugin-dialog`, `plugin-opener`, `plugin-updater`, `plugin-process`) are 
 typed calls with no wire shape, so they are imported directly wherever they are needed.
 
 - **`src/appApi/`** — engine-neutral commands: `settings`, `session`, `menu`, `folders`,
-  `tags`, `operations`, `errorLog`, `files`, `sshTrust`, `updater`, `connectionState`,
+  `tags`, `operations`, `errorLog`, `files`, `sshTrust`, `updater`, `connectionState`, `account`,
   and `events`. Nothing here knows what a collection is.
 - **`src/engines/mongodb/api/`** — everything MongoDB-shaped: `queries`, `documents`,
   `admin`, `indexes`, `schema`, `resources`, `gridfs`, `shell`, `transfer`,

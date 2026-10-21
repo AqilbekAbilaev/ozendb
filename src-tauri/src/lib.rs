@@ -13,6 +13,7 @@
 mod commands;
 mod collection_history;
 mod default_queries;
+mod edits;
 mod error;
 mod error_log;
 mod events;
@@ -31,12 +32,14 @@ mod operations;
 mod persist;
 mod postgres;
 mod pool;
+mod record;
 mod saved_queries;
 mod settings;
 mod shell;
 mod ssh;
 mod shell_history;
 mod storage;
+mod sync;
 mod tabs;
 
 mod time;
@@ -62,6 +65,11 @@ use settings::SettingsStorage;
 use shell::ShellEngine;
 use shell_history::ShellHistoryStorage;
 use storage::Storage;
+use sync::entitlement::EntitlementStorage;
+use sync::keys::SyncKeysStorage;
+use sync::run::{AppSync, LastSync, StatusEvents};
+use sync::setup::PendingSetup;
+use sync::state::SyncStateStorage;
 use tabs::TabStorage;
 
 use tauri::Manager;
@@ -98,6 +106,10 @@ pub fn run() {
             app.manage(ExportWatermarkStorage::new(data_dir.join("export_watermarks.json")));
             app.manage(CollectionHistoryStore::new(data_dir.join("collection_history.json")));
             app.manage(PgRowHistoryStore::new(data_dir.join("pg_row_history.json")));
+            app.manage(EntitlementStorage::new(data_dir.join("entitlement.json")));
+            app.manage(SyncStateStorage::new(data_dir.join("sync_state.json")));
+            app.manage(SyncKeysStorage::new(data_dir.join("sync_keys.json")));
+            app.manage(PendingSetup::default());
             // The host-key trust store is shared between the pool (real connect)
             // and Test Connection's temporary tunnel, so both honor the same TOFU
             // record. Managed as an Arc so the pool can own a clone.
@@ -141,7 +153,7 @@ pub fn run() {
                 };
             // Themed from the first frame; the app-wide call also covers native dialogs
             // and, on Windows, the menu (#274).
-            let theme = window_theme::window_theme(&app.state::<SettingsStorage>().load().theme);
+            let theme = window_theme::window_theme(&app.state::<SettingsStorage>().settings().theme);
             match main_builder.enable_clipboard_access().theme(Some(theme)).build() {
                 Ok(_val) => {}
                 Err(e) => return Err(e.into()),
@@ -173,6 +185,13 @@ pub fn run() {
                 accelerated: built.accelerated,
             })));
             app.on_menu_event(menu::handle_event);
+
+            // Last, once every store it syncs is managed.
+            app.manage(LastSync::default());
+            let (sync, schedule) = sync::schedule::sync_loop(AppSync(app.handle().clone()), StatusEvents(app.handle().clone()), edits::subscribe());
+            tauri::async_runtime::spawn(schedule);
+            sync.start();
+            app.manage(sync);
 
             Ok(())
         })
@@ -270,6 +289,18 @@ pub fn run() {
             update_settings,
             get_keybindings,
             update_keybindings,
+            get_entitlement,
+            get_account,
+            sync_now,
+            sync_status,
+            sync_setup_status,
+            create_sync_keys,
+            finish_sync_setup,
+            unlock_sync_with_password,
+            unlock_sync_with_recovery_key,
+            start_sign_in,
+            poll_sign_in,
+            sign_out,
             insert_document,
             insert_documents,
             replace_document,
@@ -356,6 +387,11 @@ pub fn run() {
             clear_operations,
             menu::set_menu_context,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = &event {
+                sync::run::before_quitting(app, api);
+            }
+        });
 }

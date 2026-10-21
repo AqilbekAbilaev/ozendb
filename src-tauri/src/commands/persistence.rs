@@ -4,6 +4,7 @@ use crate::time::now_ms;
 use crate::default_queries::{DefaultQuery, DefaultQueryStorage};
 use crate::keybindings::KeybindingStorage;
 use crate::node_tags::NodeTagStorage;
+use crate::record::Stamp;
 use crate::saved_queries::{SavedQueryEntry, SavedQueryStorage};
 use crate::tabs::TabStorage;
 use crate::settings::{Settings, SettingsStorage};
@@ -15,7 +16,7 @@ use uuid::Uuid;
 
 #[tauri::command(async)]
 pub fn get_settings(settings: State<'_, SettingsStorage>) -> Settings {
-    settings.load()
+    settings.settings()
 }
 
 /// Persist app preferences. Each field is optional and merged over the current
@@ -32,71 +33,35 @@ pub fn update_settings(
     editor_tab_width: Option<i64>,
     ui_zoom: Option<f64>,
 ) -> Result<Settings, AppError> {
-    let current = settings.load();
-    let previous_theme = current.theme.clone();
-
-    // Only known theme names are accepted; anything else falls back to dark so a
-    // bad value from the frontend can't leave the UI in an undefined state.
-    let merged_theme = match theme {
-        Some(value) => value,
-        None => current.theme,
-    };
-    let validated_theme = match merged_theme.as_str() {
-        "light" => "light".to_string(),
-        _ => "dark".to_string(),
-    };
-
-    // Result view is one of the three known modes; anything else falls back to table.
-    let merged_view = match default_result_view {
-        Some(value) => value,
-        None => current.default_result_view,
-    };
-    let validated_view = match merged_view.as_str() {
-        "json" => "json".to_string(),
-        "tree" => "tree".to_string(),
-        _ => "table".to_string(),
-    };
-
-    let merged_limit = match default_query_limit {
-        Some(value) => value,
-        None => current.default_query_limit,
-    };
-    let merged_restore = match restore_session {
-        Some(value) => value,
-        None => current.restore_session,
-    };
-    let merged_tab_width = match editor_tab_width {
-        Some(value) => value,
-        None => current.editor_tab_width,
-    };
-    // The frontend snaps to its zoom ladder; clamping here too keeps a hand-edited
-    // settings.json (or a NaN) from shrinking the UI to nothing on next launch.
-    let merged_zoom = match ui_zoom {
-        Some(value) if value.is_finite() => value,
-        Some(_) => current.ui_zoom,
-        None => current.ui_zoom,
-    };
-
-    let new_settings = Settings {
-        default_query_limit: merged_limit.clamp(1, 1000),
-        theme: validated_theme,
-        default_result_view: validated_view,
-        restore_session: merged_restore,
-        editor_tab_width: merged_tab_width.clamp(1, 8),
-        ui_zoom: merged_zoom.clamp(0.5, 2.0),
-    };
-    match settings.save(&new_settings) {
-        Ok(_) => {
-            // The open document windows repaint from the event; the app call re-themes
-            // every window's title bar.
-            if new_settings.theme != previous_theme {
-                app.set_theme(Some(window_theme(&new_settings.theme)));
-                app.emit(THEME_CHANGED, &new_settings.theme).ok();
-            }
-            Ok(new_settings)
-        }
-        Err(e) => Err(e),
+    // Each change applies to the settings as stored when the store's lock is held, so
+    // a sync that wrote meanwhile isn't undone.
+    let (before, after) = settings.update(|current| Settings {
+        default_query_limit: default_query_limit.unwrap_or(current.default_query_limit).clamp(1, 1000),
+        // Only known theme names are accepted; anything else falls back to dark so a
+        // bad value from the frontend can't leave the UI in an undefined state.
+        theme: match theme.as_deref().unwrap_or(&current.theme) {
+            "light" => String::from("light"),
+            _ => String::from("dark"),
+        },
+        // Result view is one of the three known modes; anything else falls back to table.
+        default_result_view: match default_result_view.as_deref().unwrap_or(&current.default_result_view) {
+            "json" => String::from("json"),
+            "tree" => String::from("tree"),
+            _ => String::from("table"),
+        },
+        restore_session: restore_session.unwrap_or(current.restore_session),
+        editor_tab_width: editor_tab_width.unwrap_or(current.editor_tab_width).clamp(1, 8),
+        // The frontend snaps to its zoom ladder; clamping here too keeps a hand-edited
+        // settings.json (or a NaN) from shrinking the UI to nothing on next launch.
+        ui_zoom: ui_zoom.filter(|zoom| zoom.is_finite()).unwrap_or(current.ui_zoom).clamp(0.5, 2.0),
+    })?;
+    // The open document windows repaint from the event; the app call re-themes
+    // every window's title bar.
+    if after.theme != before.theme {
+        app.set_theme(Some(window_theme(&after.theme)));
+        app.emit(THEME_CHANGED, &after.theme).ok();
     }
+    Ok(after)
 }
 
 /// Current keyboard-shortcut bindings (menu-action id -> accelerator string).
@@ -161,6 +126,7 @@ pub fn set_default_query(
         skip,
         limit,
         pipeline,
+        stamp: Stamp::now(),
     };
     dq.set(&key, entry)
 }
@@ -195,11 +161,11 @@ pub fn set_open_tabs(
 /// connection config and come back with `list_connections`.
 #[tauri::command(async)]
 pub fn get_node_tags(tags: State<'_, NodeTagStorage>) -> HashMap<String, String> {
-    tags.load()
+    tags.colors()
 }
 
 /// Set or clear the colour tag on a database/collection tree node. The colour
-/// "none" clears the tag (removes the entry) rather than storing it.
+/// "none" clears the tag (marks the entry deleted) rather than storing it.
 #[tauri::command(async)]
 pub fn set_node_tag(
     tags:  State<'_, NodeTagStorage>,
@@ -255,6 +221,7 @@ pub fn save_query(
         limit,
         pipeline,
         saved_at:   now_ms(),
+        stamp:      Stamp::now(),
     };
     match sq.insert(entry) {
         Ok(_)  => Ok(id),

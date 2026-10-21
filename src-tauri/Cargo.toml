@@ -41,6 +41,8 @@ tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 serde_json = { version = "1", features = ["raw_value"] }
+# The sync server sends and takes its binary fields as base64 text.
+base64 = "0.22"
 # Global allocator. Query results are deserialized into serde_json::Value (many tiny
 # allocations per document); glibc's per-thread arenas fragment badly under that churn
 # and never return the freed pages, ratcheting RSS up on repeated queries. mimalloc
@@ -97,6 +99,29 @@ regex = "1"
 # the unused `macros` feature and its `sqlx-macros` dependency just to reach).
 sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring", "json"] }
 
+# End-to-end encryption for sync (sync/crypto.rs). XChaCha20-Poly1305 encrypts the sync
+# blob and wraps its data key; its random 192-bit nonces are safe to pick at random, and
+# it brings the OS random number generator through `aead`, so no separate `rand`.
+chacha20poly1305 = { version = "0.11", features = ["zeroize"] }
+# Argon2id turns the user's sync password into the key that wraps the data key. Without
+# the default `password-hash` feature: we derive raw keys, not stored password hashes.
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
+# Wipes the data key and password-derived keys from memory when they are dropped (best effort).
+zeroize = "1"
+# Normalises sync passwords to NFC, so an accent typed precomposed or decomposed derives the same key.
+unicode-normalization = "0.1"
+# HKDF-SHA256 turns the recovery key, already 128 random bits, into the key that wraps the data key.
+hkdf = "0.13"
+# SHA-256 for HKDF and the recovery key's two check bits.
+sha2 = "0.11"
+# The HTTPS client for the sync server (sync/http.rs). The updater already builds it with
+# these features, so it adds nothing to the build: no default features, so no aws-lc-rs and
+# no native-tls/OpenSSL; rustls on the ring backend that mongodb, sqlx and russh use.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json"] }
+# Named directly only to install ring as rustls's provider, which `rustls-no-provider`
+# leaves to the app (see `sync::http::client`).
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+
 # keyring needs a per-platform backend feature; without one it silently uses an
 # in-memory mock store that loses every password when the app exits (which made
 # saved connections fail with "no password supplied" after a restart).
@@ -114,6 +139,8 @@ version = "3.2.1"
 
 [dev-dependencies]
 tempfile = "3"
+# Paused time, so the sync schedule's minutes-long waits are tested without waiting.
+tokio = { version = "1.32.0", features = ["test-util"] }
 # The mock runtime, so the SSH tunnel (which raises its host-key prompt through an
 # AppHandle) can be exercised by a live test without launching the app.
 tauri = { version = "2", features = ["test"] }
