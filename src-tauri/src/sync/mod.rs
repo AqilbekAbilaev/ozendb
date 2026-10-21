@@ -1,5 +1,6 @@
 pub mod crypto;
 pub mod entitlement;
+pub mod http;
 pub mod local_only;
 pub mod merge;
 pub mod pass;

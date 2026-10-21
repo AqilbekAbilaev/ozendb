@@ -114,6 +114,13 @@ unicode-normalization = "0.1"
 hkdf = "0.13"
 # SHA-256 for HKDF and the recovery key's two check bits.
 sha2 = "0.11"
+# The HTTPS client for the sync server (sync/http.rs). The updater already builds it with
+# these features, so it adds nothing to the build: no default features, so no aws-lc-rs and
+# no native-tls/OpenSSL; rustls on the ring backend that mongodb, sqlx and russh use.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json"] }
+# Named directly only to install ring as rustls's provider, which `rustls-no-provider`
+# leaves to the app (see `sync::http::client`).
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 # keyring needs a per-platform backend feature; without one it silently uses an
 # in-memory mock store that loses every password when the app exits (which made
