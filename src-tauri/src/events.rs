@@ -8,6 +8,7 @@ pub const DOCUMENT_TARGET: &str = "document-target";
 pub const SSH_HOST_KEY_PROMPT: &str = "ssh-host-key-prompt";
 pub const SSH_HOST_KEY_CHANGED: &str = "ssh-host-key-changed";
 pub const THEME_CHANGED: &str = "theme-changed";
+pub const SYNC_STATUS: &str = "sync-status";
 
 #[cfg(test)]
 #[path = "events.test.rs"]

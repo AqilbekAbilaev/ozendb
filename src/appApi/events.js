@@ -14,6 +14,7 @@ export const onDocumentTarget    = subscribe('document-target')
 export const onSshHostKeyPrompt  = subscribe('ssh-host-key-prompt')
 export const onSshHostKeyChanged = subscribe('ssh-host-key-changed')
 export const onThemeChanged      = subscribe('theme-changed')
+export const onSyncStatus        = subscribe('sync-status')
 
 // Raised by the frontend for its other window and its other components.
 export const onDocumentSaved     = subscribe('document-saved')
