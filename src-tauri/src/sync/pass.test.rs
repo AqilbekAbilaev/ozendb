@@ -19,6 +19,9 @@ struct FakeServer<'a> {
     /// Another device always uploads first: the stored copy gets a new version as each
     /// upload arrives.
     always_beaten: Cell<bool>,
+    /// The next download answers "not modified" whatever version it names, as a cache in
+    /// between might.
+    not_modified_once: Cell<bool>,
     /// Runs as the next upload arrives: what another device, or this one, does meanwhile.
     meanwhile: RefCell<Option<Box<dyn FnOnce(&FakeServer) + 'a>>>,
 }
@@ -42,6 +45,9 @@ impl<'a> FakeServer<'a> {
 
 impl SyncServer for FakeServer<'_> {
     async fn download(&self, known: Option<&str>) -> Result<Download, AppError> {
+        if self.not_modified_once.replace(false) {
+            return Ok(Download::Unchanged);
+        }
         Ok(match self.stored.borrow().clone() {
             None => Download::Nothing,
             Some(copy) if Some(copy.version.as_str()) == known => Download::Unchanged,
@@ -250,6 +256,60 @@ async fn a_long_offline_device_keeps_its_data_when_the_server_holds_none() {
     let device = Device::new();
     device.folders.insert(folder("f1", "kept", 1)).unwrap();
     device.state.inner.save(&SyncState { last_sync: Some(NOW - 100 * DAY), server: None }).unwrap();
+
+    sync_on(&device, &server, &key).await.unwrap();
+
+    assert_eq!(received(&server, &key).await, vec!["kept"]);
+}
+
+#[tokio::test]
+async fn an_unreadable_kept_copy_is_downloaded_again() {
+    let (server, key) = (FakeServer::default(), data_key());
+    let device = Device::new();
+    device.folders.insert(folder("f1", "first", 1)).unwrap();
+    sync_on(&device, &server, &key).await.unwrap();
+    let mut state = device.state.load();
+    state.server.as_mut().unwrap().contents.blob = BASE64.encode(b"damaged");
+    device.state.inner.save(&state).unwrap();
+    device.folders.insert(folder("f2", "second", 1)).unwrap();
+
+    sync_on(&device, &server, &key).await.unwrap();
+
+    assert_eq!(server.full_downloads.get(), 1);
+    assert_eq!(received(&server, &key).await, vec!["first", "second"]);
+}
+
+#[tokio::test]
+async fn not_modified_without_a_kept_copy_downloads_in_full() {
+    let (server, key) = (FakeServer::default(), data_key());
+    let other = Device::new();
+    other.folders.insert(folder("fo", "from elsewhere", 1)).unwrap();
+    sync_on(&other, &server, &key).await.unwrap();
+    let device = Device::new();
+    device.folders.insert(folder("fm", "mine", 1)).unwrap();
+    server.not_modified_once.set(true);
+
+    sync_on(&device, &server, &key).await.unwrap();
+
+    // One upload each: this device never mistook the server for an empty one.
+    assert_eq!(server.uploads.get(), 2);
+    assert_eq!(folder_names(&device), vec!["from elsewhere", "mine"]);
+    assert_eq!(received(&server, &key).await, vec!["from elsewhere", "mine"]);
+}
+
+#[tokio::test]
+async fn a_pass_that_leaves_a_store_alone_keeps_a_long_offline_device_stale() {
+    let device = Device::new();
+    let (server, key) = (FakeServer::default(), data_key());
+    let other = Device::new();
+    other.folders.insert(folder("fk", "kept", 1)).unwrap();
+    sync_on(&other, &server, &key).await.unwrap();
+    // Deleted elsewhere long ago; the server has forgotten the deletion.
+    device.folders.insert(folder("fg", "gone", 1)).unwrap();
+    device.state.inner.save(&SyncState { last_sync: Some(NOW - 100 * DAY), server: None }).unwrap();
+    server.meanwhile(|_| {
+        device.folders.insert(folder("fe", "typed meanwhile", 1)).unwrap();
+    });
 
     sync_on(&device, &server, &key).await.unwrap();
 

@@ -96,12 +96,7 @@ pub async fn sync(local: &Local<'_, impl Keychain>, server: &impl SyncServer, ke
 async fn pass(local: &Local<'_, impl Keychain>, server: &impl SyncServer, keys: &Keys<'_>, now: i64, synced: &mut Synced) -> Result<bool, AppError> {
     let state = local.state.load();
     let before = Snapshot::read(local.stores, local.keychain)?;
-    let copy = match server.download(state.server.as_ref().map(|copy| copy.version.as_str())).await? {
-        Download::Nothing => None,
-        Download::Unchanged => state.server,
-        Download::Copy(copy) => Some(copy),
-    };
-    let remote = copy.as_ref().map(|copy| decrypt(&copy.contents.blob, keys.data_key)).transpose()?;
+    let (copy, remote) = download(server, &state, keys.data_key).await?.unzip();
     let (merged, upload) = match remote {
         Some(remote) => {
             let merged = before.clone().merged(remote.clone(), &Merge::new(now, state.last_sync));
@@ -129,10 +124,35 @@ async fn pass(local: &Local<'_, impl Keychain>, server: &impl SyncServer, keys: 
     };
     // Only now that the server holds the result is it saved here.
     let written = merged.write_if_unchanged(&before, local.stores, local.keychain)?;
-    local.state.inner.save(&SyncState { last_sync: Some(now), server: Some(copy) })?;
     let complete = written.complete;
+    // A store left alone is not synced yet: keeping the old time keeps a long-offline
+    // device's next pass from merging that store's records back in.
+    let last_sync = if complete { Some(now) } else { state.last_sync };
+    local.state.inner.save(&SyncState { last_sync, server: Some(copy) })?;
     synced.add(written);
     Ok(complete)
+}
+
+// The server's copy and what it holds. "Not modified" is answered from the copy kept
+// here; when that copy is missing or no longer reads, the pass downloads in full.
+async fn download(server: &impl SyncServer, state: &SyncState, data_key: &DataKey) -> Result<Option<(ServerCopy, Snapshot)>, AppError> {
+    let mut answer = server.download(state.server.as_ref().map(|copy| copy.version.as_str())).await?;
+    if let Download::Unchanged = answer {
+        let kept = state.server.clone().and_then(|copy| decrypt(&copy.contents.blob, data_key).ok().map(|remote| (copy, remote)));
+        if kept.is_some() {
+            return Ok(kept);
+        }
+        answer = server.download(None).await?;
+    }
+    match answer {
+        Download::Nothing => Ok(None),
+        Download::Copy(copy) => {
+            let remote = decrypt(&copy.contents.blob, data_key)?;
+            Ok(Some((copy, remote)))
+        }
+        // Named no version, so "not modified" can't be about one this device knows.
+        Download::Unchanged => Err(AppError::UnreadableSyncData),
+    }
 }
 
 fn decrypt(blob: &str, data_key: &DataKey) -> Result<Snapshot, AppError> {
