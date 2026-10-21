@@ -25,6 +25,8 @@
 use super::recovery::RecoveryKey;
 use crate::error::AppError;
 use argon2::{Algorithm, Argon2, Params, Version};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use chacha20poly1305::aead::{Aead, Generate, Payload};
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use std::fmt;
@@ -113,6 +115,22 @@ impl DataKey {
         let plaintext = open(&wrapping, wrapped, 1).ok_or(AppError::WrongRecoveryKey)?;
         let mut key = Zeroizing::new([0u8; KEY_LEN]);
         key.copy_from_slice(&plaintext);
+        Ok(Self(key))
+    }
+
+    /// The key as text, to keep in this device's keychain between launches.
+    pub fn to_text(&self) -> Zeroizing<String> {
+        Zeroizing::new(BASE64.encode(self.0.as_slice()))
+    }
+
+    /// The key kept as `to_text` wrote it.
+    pub fn from_text(text: &str) -> Result<Self, AppError> {
+        let bytes = Zeroizing::new(BASE64.decode(text).map_err(|_| damaged("kept sync key"))?);
+        if bytes.len() != KEY_LEN {
+            return Err(damaged("kept sync key"));
+        }
+        let mut key = Zeroizing::new([0u8; KEY_LEN]);
+        key.copy_from_slice(&bytes);
         Ok(Self(key))
     }
 

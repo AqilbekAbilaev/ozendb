@@ -216,3 +216,22 @@ fn a_password_wrapped_key_is_not_accepted_as_a_recovery_wrapped_one() {
     let wrapped = DataKey::generate().unwrap().wrap(PASSWORD, &cheap()).unwrap();
     assert!(matches!(DataKey::unwrap_with_recovery(&wrapped, &recovery), Err(AppError::Crypto(_))));
 }
+
+#[test]
+fn a_data_key_kept_as_text_still_decrypts_what_it_encrypted() {
+    let key = DataKey::generate().unwrap();
+    let sealed = key.encrypt(BLOB).unwrap();
+    let kept = DataKey::from_text(&key.to_text()).unwrap();
+    assert_eq!(kept.decrypt(&sealed).unwrap().as_slice(), BLOB);
+}
+
+#[test]
+fn kept_text_of_the_wrong_length_is_refused_as_damaged() {
+    let short = "AAAA";
+    assert!(matches!(DataKey::from_text(short), Err(AppError::Crypto(_))));
+}
+
+#[test]
+fn kept_text_that_is_not_base64_is_refused_as_damaged() {
+    assert!(matches!(DataKey::from_text("not base64 — ü"), Err(AppError::Crypto(_))));
+}
