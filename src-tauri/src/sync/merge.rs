@@ -20,11 +20,20 @@ const MARKER_LIFETIME_MS: i64 = 90 * 24 * 60 * 60 * 1000;
 pub struct Merge {
     now: i64,
     last_sync: Option<i64>,
+    /// False when the result is only saved here, not uploaded (see `receiving`).
+    uploads: bool,
 }
 
 impl Merge {
     pub fn new(now: i64, last_sync: Option<i64>) -> Self {
-        Merge { now, last_sync }
+        Merge { now, last_sync, uploads: true }
+    }
+
+    /// A merge whose result is saved on this device but never uploaded, as when the
+    /// server refuses this account's uploads. A marker the server hasn't had yet does not
+    /// start its 90 days: the merge that finally uploads it does.
+    pub fn receiving(now: i64, last_sync: Option<i64>) -> Self {
+        Merge { now, last_sync, uploads: false }
     }
 
     /// The two lists merged record by record. Local order is kept; records new to this
@@ -105,7 +114,9 @@ impl Merge {
         if !stamp.deleted {
             return Some(value);
         }
-        let uploaded_at = stamp.uploaded_at.unwrap_or(self.now);
+        let Some(uploaded_at) = stamp.uploaded_at.or(self.uploads.then_some(self.now)) else {
+            return Some(value);
+        };
         if self.now - uploaded_at > MARKER_LIFETIME_MS {
             return None;
         }

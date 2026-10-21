@@ -1,4 +1,5 @@
 use super::*;
+use crate::folders::Folder;
 use crate::sync::state::SyncState;
 use crate::sync::test_device::{connection, folder, Device};
 use crate::keychain::fake::FakeKeychain;
@@ -18,6 +19,8 @@ struct FakeServer<'a> {
     full_downloads: Cell<u32>,
     uploads: Cell<u32>,
     offline: Cell<bool>,
+    /// The account's Premium has lapsed: downloads still work, uploads are refused.
+    lapsed: Cell<bool>,
     /// Another device always uploads first: the stored copy gets a new version as each
     /// upload arrives.
     always_beaten: Cell<bool>,
@@ -62,6 +65,9 @@ impl SyncServer for FakeServer<'_> {
 
     async fn upload(&self, replacing: Option<&str>, contents: &Contents) -> Result<Option<String>, AppError> {
         self.uploads.set(self.uploads.get() + 1);
+        if self.lapsed.get() {
+            return Err(AppError::NotPremium);
+        }
         let meanwhile = self.meanwhile.borrow_mut().take();
         if let Some(then) = meanwhile {
             then(self);
@@ -207,6 +213,78 @@ async fn nothing_is_saved_here_when_the_upload_fails() {
 
     assert_eq!(folder_names(&device), vec!["mine"]);
     assert_eq!(device.state.load().last_sync, None);
+}
+
+#[tokio::test]
+async fn a_lapsed_device_still_receives_other_devices_changes() {
+    let (server, key) = (FakeServer::default(), data_key());
+    let other = Device::new();
+    other.folders.insert(folder("fo", "from elsewhere", 1)).unwrap();
+    sync_on(&other, &server, &key).await.unwrap();
+    let device = Device::new();
+    device.folders.insert(folder("fm", "mine", 1)).unwrap();
+    server.lapsed.set(true);
+
+    let synced = sync_on(&device, &server, &key).await.unwrap();
+
+    assert!(synced.received_only);
+    assert_eq!(folder_names(&device), vec!["from elsewhere", "mine"]);
+    let state = device.state.load();
+    assert_eq!((state.last_sync, state.server.map(|s| s.version)), (Some(NOW), server.version()));
+    server.lapsed.set(false);
+    assert_eq!(received(&server, &key).await, vec!["from elsewhere"]);
+}
+
+#[tokio::test]
+async fn a_deletion_made_while_lapsed_starts_its_ninety_days_only_when_uploaded() {
+    let (server, key) = (FakeServer::default(), data_key());
+    let (device, other) = (Device::new(), Device::new());
+    device.folders.insert(folder("fd", "deleted while lapsed", 1)).unwrap();
+    sync_on(&device, &server, &key).await.unwrap();
+    other.folders.insert(folder("fo", "from elsewhere", 1)).unwrap();
+    sync_on(&other, &server, &key).await.unwrap();
+    device.folders.delete("fd").unwrap();
+    server.lapsed.set(true);
+
+    sync_on(&device, &server, &key).await.unwrap();
+
+    let marker = |folders: Vec<Folder>| folders.into_iter().find(|f| f.id == "fd").unwrap().stamp;
+    assert_eq!(marker(device.folders.inner.load()).uploaded_at, None);
+    server.lapsed.set(false);
+    sync_on(&device, &server, &key).await.unwrap();
+    assert_eq!(marker(device.folders.inner.load()).uploaded_at, Some(NOW));
+    assert_eq!(received(&server, &key).await, vec!["from elsewhere"]);
+}
+
+#[tokio::test]
+async fn a_lapsed_device_with_nothing_to_upload_syncs_as_usual() {
+    let (server, key) = (FakeServer::default(), data_key());
+    let other = Device::new();
+    other.folders.insert(folder("fo", "from elsewhere", 1)).unwrap();
+    sync_on(&other, &server, &key).await.unwrap();
+    server.lapsed.set(true);
+    let device = Device::new();
+
+    let synced = sync_on(&device, &server, &key).await.unwrap();
+
+    assert!(!synced.received_only);
+    assert_eq!(server.uploads.get(), 1);
+    assert_eq!(folder_names(&device), vec!["from elsewhere"]);
+}
+
+#[tokio::test]
+async fn a_refused_first_upload_saves_nothing() {
+    let (server, key) = (FakeServer::default(), data_key());
+    let device = Device::new();
+    device.folders.insert(folder("fm", "mine", 1)).unwrap();
+    server.lapsed.set(true);
+
+    let synced = sync_on(&device, &server, &key).await.unwrap();
+
+    assert!(synced.received_only);
+    assert_eq!(folder_names(&device), vec!["mine"]);
+    let state = device.state.load();
+    assert_eq!((state.last_sync, state.server), (None, None));
 }
 
 #[tokio::test]

@@ -121,6 +121,19 @@ fn a_marker_never_uploaded_is_never_erased_and_starts_its_ninety_days_now() {
 }
 
 #[test]
+fn a_merge_that_is_not_uploaded_leaves_a_new_marker_waiting_for_its_upload() {
+    let receiving = Merge::receiving(NOW, Some(NOW - DAY));
+    let merged = receiving.records(vec![deleted("deleted while lapsed", T)], vec![sent(deleted("from the server", T), Some(T + 5))]);
+    assert_eq!(uploaded_at(&merged), vec![None, Some(T + 5)]);
+}
+
+#[test]
+fn a_merge_that_is_not_uploaded_still_erases_old_markers() {
+    let receiving = Merge::receiving(NOW, Some(NOW - DAY));
+    assert!(receiving.records(vec![], vec![sent(deleted("old", NOW - 92 * DAY), Some(NOW - 91 * DAY))]).is_empty());
+}
+
+#[test]
 fn a_marker_already_on_the_server_keeps_its_upload_time() {
     let merged = merge().records(vec![], vec![sent(deleted("r", T), Some(T + 5))]);
     assert_eq!(uploaded_at(&merged), vec![Some(T + 5)]);

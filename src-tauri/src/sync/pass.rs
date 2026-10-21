@@ -45,6 +45,9 @@ pub struct Synced {
     pub changed_connections: Vec<String>,
     /// A secret the keychain refused to change; the next sync writes it again.
     pub keychain_error: Option<AppError>,
+    /// The server refused the upload, as it does once Premium lapses: what came down was
+    /// saved here, but this device's edits have not gone up.
+    pub received_only: bool,
 }
 
 impl Synced {
@@ -83,10 +86,10 @@ async fn pass(local: &Local<'_, impl Keychain>, server: &impl SyncServer, keys: 
     let (copy, remote) = download(server, &state, keys.data_key).await?.unzip();
     // After the download, so a failed one costs no keychain reads.
     let before = Snapshot::read(local.stores, local.keychain)?;
-    let (merged, upload) = match remote {
+    let (merged, upload) = match &remote {
         Some(remote) => {
             let merged = before.clone().merged(remote.clone(), &Merge::new(now, state.last_sync));
-            let upload = !merged.same_as(&remote)?;
+            let upload = !merged.same_as(remote)?;
             (merged, upload)
         }
         // Nothing on the server to take this device's data's place, however long it was away.
@@ -102,17 +105,43 @@ async fn pass(local: &Local<'_, impl Keychain>, server: &impl SyncServer, keys: 
                 Some(copy) => Contents { blob, ..copy.contents.clone() },
                 None => keys.contents(blob),
             };
-            match server.upload(copy.as_ref().map(|copy| copy.version.as_str()), &contents).await? {
-                Some(version) => ServerCopy { version, contents },
-                None => return Ok(false),
+            match server.upload(copy.as_ref().map(|copy| copy.version.as_str()), &contents).await {
+                Ok(Some(version)) => ServerCopy { version, contents },
+                Ok(None) => return Ok(false),
+                // Premium has lapsed. Downloads still work only while the server keeps
+                // GET /sync open to lapsed accounts (ozendb-api src/sync.ts).
+                Err(AppError::NotPremium) => return receive_only(local, &before, remote.zip(copy), &state, now, synced),
+                Err(error) => return Err(error),
             }
         }
     };
+    synced.received_only = false;
     // Only now that the server holds the result is it saved here.
-    let written = merged.write_if_unchanged(&before, local.stores, local.keychain)?;
+    save(local, &merged, &before, copy, &state, now, synced)
+}
+
+// A pass whose upload the server refused still saves what it downloaded, merged so that
+// no new marker starts its 90 days before the server has it.
+fn receive_only(local: &Local<'_, impl Keychain>, before: &Snapshot, downloaded: Option<(Snapshot, ServerCopy)>, state: &SyncState, now: i64, synced: &mut Synced) -> Result<bool, AppError> {
+    synced.received_only = true;
+    // The server holds nothing, so there is nothing to receive.
+    let Some((remote, copy)) = downloaded else {
+        return Ok(true);
+    };
+    let merged = before.clone().merged(remote, &Merge::receiving(now, state.last_sync));
+    save(local, &merged, before, copy, state, now, synced)
+}
+
+// Writes `merged` over `before` where no store changed meanwhile, and keeps `copy`, the
+// server's copy it was merged with. False when a store was left alone.
+fn save(local: &Local<'_, impl Keychain>, merged: &Snapshot, before: &Snapshot, copy: ServerCopy, state: &SyncState, now: i64, synced: &mut Synced) -> Result<bool, AppError> {
+    let written = merged.write_if_unchanged(before, local.stores, local.keychain)?;
     let complete = written.complete;
     // A store left alone is not synced yet: keeping the old time keeps a long-offline
-    // device's next pass from merging that store's records back in.
+    // device's next pass from merging that store's records back in. A pass that only
+    // received still moves the time on: it marks when this device last took in the
+    // server's copy, and holding it back through a long lapse would have the next pass
+    // take the server's copy outright, dropping every edit made only here.
     let last_sync = if complete { Some(now) } else { state.last_sync };
     local.state.inner.save(&SyncState { last_sync, server: Some(copy) })?;
     synced.add(written);
