@@ -321,15 +321,24 @@ async fn a_lapsed_account_whose_upload_goes_through_again_syncs_on_edits_again()
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_device_that_cannot_sync_stays_quiet_until_asked() {
+async fn a_device_that_cannot_sync_says_why_when_the_app_starts() {
+    let job = FakeJob::default();
+    job.0.lock().unwrap().signed_out = true;
+    let running = started(job).await;
+    assert_eq!(running.job.runs(), 0);
+    assert_eq!(running.report.finished(), vec!["signed_out"]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_device_that_cannot_sync_stays_quiet_after_edits_until_asked() {
     let job = FakeJob::default();
     job.0.lock().unwrap().signed_out = true;
     let running = started(job).await;
     running.edit();
     sleep(EDIT_WAIT + MINUTE).await;
     assert_eq!(running.job.runs(), 0);
-    assert!(running.report.finished().is_empty());
+    assert_eq!(running.report.finished(), vec!["signed_out"]);
     running.sync.sync_now();
     settle().await;
-    assert_eq!(running.report.finished(), vec!["signed_out"]);
+    assert_eq!(running.report.finished(), vec!["signed_out", "signed_out"]);
 }

@@ -140,7 +140,8 @@ impl<J: Job, R: Report> Schedule<J, R> {
             self.job.prepare().await;
         }
         if starting || asked {
-            self.sync(asked).await;
+            // At start too, so the app can tell "not set up" from "not run yet".
+            self.sync(true).await;
         } else if !self.plan.off && self.unsent() {
             self.sync(false).await;
         }
@@ -151,16 +152,17 @@ impl<J: Job, R: Report> Schedule<J, R> {
         }
     }
 
-    // `asked`: the user asked for this sync, so a reason it can't run is reported too.
-    async fn sync(&mut self, asked: bool) {
+    // `explain`: a reason the sync can't run is reported too, as it is when the app starts
+    // or the user asks; a sync that comes due by itself fails quietly.
+    async fn sync(&mut self, explain: bool) {
         if self.plan.held_until.is_some_and(|until| Instant::now() < until) {
-            if asked {
+            if explain {
                 self.report.finished(&Err(AppError::SyncRateLimited));
             }
             return;
         }
         if let Err(e) = self.job.ready() {
-            if asked {
+            if explain {
                 self.report.finished(&Err(e));
             }
             return;
