@@ -56,6 +56,9 @@ pub enum AppError {
     #[error("The sync data kept changing while it synced; it will try again.")]
     SyncKeptChanging,
 
+    #[error("Sync is not set up on this device yet.")]
+    SyncNotSetUp,
+
     #[error("You were signed out. Sign in again to keep syncing.")]
     SignedOut,
 
@@ -108,6 +111,7 @@ impl AppError {
             AppError::NewerSyncFormat => "newer_sync_format",
             AppError::UnreadableSyncData => "unreadable_sync_data",
             AppError::SyncKeptChanging => "sync_kept_changing",
+            AppError::SyncNotSetUp => "sync_not_set_up",
             AppError::SignedOut => "signed_out",
             AppError::NotPremium => "not_premium",
             AppError::SyncDataTooLarge => "sync_data_too_large",
