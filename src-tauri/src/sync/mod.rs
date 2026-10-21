@@ -1,3 +1,4 @@
+pub mod account;
 pub mod crypto;
 pub mod entitlement;
 pub mod http;

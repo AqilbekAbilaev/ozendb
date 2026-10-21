@@ -51,10 +51,7 @@ impl HttpServer {
     // Sends `request` with the session, and turns the answers either call can get into
     // errors.
     async fn send(&self, request: RequestBuilder) -> Result<Response, AppError> {
-        // A session that can't be a header value can't be a live one either.
-        let mut session = HeaderValue::try_from(format!("Bearer {}", self.session)).map_err(|_| AppError::SignedOut)?;
-        session.set_sensitive(true);
-        let response = request.header(AUTHORIZATION, session).send().await.map_err(|e| self.unreachable(&e))?;
+        let response = request.header(AUTHORIZATION, bearer(&self.session)?).send().await.map_err(|e| self.unreachable(&e))?;
         match response.status() {
             StatusCode::UNAUTHORIZED => Err(AppError::SignedOut),
             StatusCode::PAYMENT_REQUIRED => Err(AppError::NotPremium),
@@ -71,17 +68,30 @@ impl HttpServer {
     }
 
     fn unreachable(&self, error: &reqwest::Error) -> AppError {
-        let reason = if error.is_timeout() {
-            "timed out"
-        } else if error.is_connect() {
-            "could not connect"
-        } else {
-            "the connection failed"
-        };
-        AppError::Unreachable {
-            address: error.url().and_then(|url| url.host_str()).unwrap_or(&self.url).to_string(),
-            reason: reason.to_string(),
-        }
+        unreachable(error, &self.url)
+    }
+}
+
+/// The `Authorization` value that sends `session`.
+pub(super) fn bearer(session: &str) -> Result<HeaderValue, AppError> {
+    // A session that can't be a header value can't be a live one either.
+    let mut value = HeaderValue::try_from(format!("Bearer {session}")).map_err(|_| AppError::SignedOut)?;
+    value.set_sensitive(true);
+    Ok(value)
+}
+
+/// A request to `url` that failed before an answer came back.
+pub(super) fn unreachable(error: &reqwest::Error, url: &str) -> AppError {
+    let reason = if error.is_timeout() {
+        "timed out"
+    } else if error.is_connect() {
+        "could not connect"
+    } else {
+        "the connection failed"
+    };
+    AppError::Unreachable {
+        address: error.url().and_then(|url| url.host_str()).unwrap_or(url).to_string(),
+        reason: reason.to_string(),
     }
 }
 
