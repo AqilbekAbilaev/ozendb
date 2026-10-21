@@ -176,3 +176,91 @@ fn held_keys_are_dropped_once_another_session_asks_for_them() {
     assert!(pending.take("another s3ss.ion").is_none());
     assert!(pending.take("s3ss.ion/1 é").is_none());
 }
+
+/// The server's keys as the account's first device left them, and its recovery key.
+fn held_by_first_device() -> (ServerKeys, SyncKeys, Zeroizing<String>) {
+    let (keys, shown) = create(PASSWORD, &cheap()).unwrap();
+    let held = ServerKeys {
+        wrapped_key: keys.keys().wrapped_key.to_vec(),
+        recovery_wrapped_key: keys.keys().recovery_wrapped_key.map(<[u8]>::to_vec),
+    };
+    (held, keys, shown)
+}
+
+fn password(text: &str) -> Secret {
+    Secret::Password(Zeroizing::new(text.to_string()))
+}
+
+fn recovery(text: &str) -> Secret {
+    Secret::RecoveryKey(Zeroizing::new(text.to_string()))
+}
+
+#[test]
+fn the_right_password_unlocks_the_accounts_key_and_keeps_the_servers_wrapped_copies() {
+    let (held, theirs, _) = held_by_first_device();
+
+    let mine = held.unlock(&password(PASSWORD)).unwrap();
+
+    assert!(same_key(mine.keys().data_key, theirs.keys().data_key));
+    assert_eq!(mine.keys().wrapped_key, theirs.keys().wrapped_key);
+    assert_eq!(mine.keys().recovery_wrapped_key, theirs.keys().recovery_wrapped_key);
+}
+
+#[test]
+fn a_wrong_password_is_refused_as_wrong() {
+    let (held, _, _) = held_by_first_device();
+
+    assert!(matches!(held.unlock(&password("correct horse/battery.staple — unicode")), Err(AppError::WrongSyncPassword)));
+}
+
+#[test]
+fn the_recovery_key_unlocks_the_accounts_key_however_it_is_typed() {
+    let (held, theirs, shown) = held_by_first_device();
+    let typed = format!("  {}  ", shown.to_lowercase().replace('-', " \u{2013} "));
+
+    let mine = held.unlock(&recovery(&typed)).unwrap();
+
+    assert!(same_key(mine.keys().data_key, theirs.keys().data_key));
+}
+
+#[test]
+fn another_accounts_recovery_key_is_refused_as_wrong() {
+    let (held, _, _) = held_by_first_device();
+    let (_, _, another) = held_by_first_device();
+
+    assert!(matches!(held.unlock(&recovery(&another)), Err(AppError::WrongRecoveryKey)));
+}
+
+#[test]
+fn a_mistyped_recovery_key_is_refused_as_mistyped() {
+    let (held, _, _) = held_by_first_device();
+
+    assert!(matches!(held.unlock(&recovery("00FQ-X055-RFZM")), Err(AppError::Validation(_))));
+}
+
+#[test]
+fn a_recovery_key_cannot_unlock_an_account_that_has_none() {
+    let (held, _, shown) = held_by_first_device();
+    let held = ServerKeys { recovery_wrapped_key: None, ..held };
+
+    let error = held.unlock(&recovery(&shown)).err().unwrap();
+
+    assert!(matches!(&error, AppError::Validation(message) if message.contains("no recovery key")), "{error:?}");
+}
+
+#[tokio::test]
+async fn a_device_that_joins_merges_its_data_with_the_accounts() {
+    let (first, joining, server) = (Device::new(), Device::new(), FakeServer::default());
+    first.folders.insert(folder("f/1", "from the first. é", 1)).unwrap();
+    upload_from(&first, &server, &new_keys()).await.unwrap();
+    joining.folders.insert(folder("f/2", "from the joining one", 1)).unwrap();
+    let keys = ServerKeys::fetch(&server).await.unwrap().unwrap().unlock(&password(PASSWORD)).unwrap();
+
+    let stores = joining.stores();
+    let local = Local { stores: &stores, keychain: &joining.keychain, state: &joining.state };
+    sync(&local, &server, &keys.keys(), NOW).await.unwrap();
+
+    let mut names: Vec<String> = joining.folders.load().into_iter().map(|f| f.name).collect();
+    names.sort();
+    assert_eq!(names, vec!["from the first. é", "from the joining one"]);
+}

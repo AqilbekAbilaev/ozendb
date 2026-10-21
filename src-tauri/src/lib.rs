@@ -296,6 +296,8 @@ pub fn run() {
             sync_setup_status,
             create_sync_keys,
             finish_sync_setup,
+            unlock_sync_with_password,
+            unlock_sync_with_recovery_key,
             start_sign_in,
             poll_sign_in,
             sign_out,

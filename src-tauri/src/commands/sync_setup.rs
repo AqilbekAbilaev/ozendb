@@ -6,7 +6,7 @@ use crate::sync::http::{client, HttpServer, PRODUCTION_URL};
 use crate::sync::pass::Local;
 use crate::sync::run::AppSync;
 use crate::sync::schedule::SyncLoop;
-use crate::sync::setup::{create, first_upload, server_status, PendingSetup, SetupStatus};
+use crate::sync::setup::{create, first_upload, server_status, PendingSetup, Secret, ServerKeys, SetupStatus};
 use crate::time::now_epoch_ms;
 use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroizing;
@@ -63,6 +63,35 @@ pub async fn finish_sync_setup(app: AppHandle, pending: State<'_, PendingSetup>)
             Err(error)
         }
     }
+}
+
+/// Sets sync up on a device that joins an account already syncing, with its password.
+#[tauri::command]
+pub async fn unlock_sync_with_password(app: AppHandle, password: String) -> Result<(), AppError> {
+    unlock(app, Secret::Password(Zeroizing::new(password))).await
+}
+
+/// Sets sync up on a device that joins an account already syncing, with its recovery key.
+#[tauri::command]
+pub async fn unlock_sync_with_recovery_key(app: AppHandle, recovery_key: String) -> Result<(), AppError> {
+    unlock(app, Secret::RecoveryKey(Zeroizing::new(recovery_key))).await
+}
+
+// Unlocks the server's keys with `secret` and keeps them, then leaves the first sync,
+// which merges this device's data with the account's, to the schedule.
+async fn unlock(app: AppHandle, secret: Secret) -> Result<(), AppError> {
+    let sync = AppSync(app.clone());
+    let device = sync.device();
+    let held = ServerKeys::fetch(&server(&device)?).await?.ok_or_else(|| {
+        AppError::Validation("This account holds no sync data yet, so there is nothing to unlock. Set sync up as its first device.".into())
+    })?;
+    // Argon2id takes most of a second, too long to hold up an async worker.
+    let keys = tokio::task::spawn_blocking(move || held.unlock(&secret))
+        .await
+        .map_err(|e| AppError::Crypto(format!("Unlocking the sync key failed: {e}.")))??;
+    device.keys.save(&OsKeychain, &keys)?;
+    app.state::<SyncLoop>().sync_now();
+    Ok(())
 }
 
 // The sync server, called as the signed-in account.
