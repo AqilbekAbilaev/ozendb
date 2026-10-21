@@ -35,6 +35,8 @@ const APP_COMMANDS = [
   'can_self_update',
   // account.js
   'get_entitlement', 'get_account', 'start_sign_in', 'poll_sign_in', 'sign_out',
+  // sync.js
+  'sync_now', 'sync_status',
 ]
 
 // Roots where custom commands and the Tauri transport are allowed: the application
