@@ -46,7 +46,7 @@ pub fn readiness(signed_in: bool, entitlement: Entitlement, set_up: bool) -> Res
 pub struct AppSync(pub AppHandle);
 
 impl AppSync {
-    fn device(&self) -> Device<'_, OsKeychain> {
+    pub fn device(&self) -> Device<'_, OsKeychain> {
         Device {
             keychain: &OsKeychain,
             entitlement: self.0.state::<EntitlementStorage>().inner(),
@@ -75,9 +75,19 @@ impl Job for AppSync {
         let session = device.session()?.ok_or(AppError::SignedOut)?;
         let keys = device.keys.keys(&OsKeychain)?.ok_or(AppError::SyncNotSetUp)?;
         let server = HttpServer::new(client()?, PRODUCTION_URL, session.to_string());
-        let ctx = self.0.state::<AppContext>();
-        let stores = SyncedStores {
-            connections: &ctx.storage,
+        let stores = self.stores();
+        let local = Local { stores: &stores, keychain: &OsKeychain, state: device.state };
+        let result = sync(&local, &server, &keys.keys(), now_epoch_ms()).await;
+        self.settle(&result).await;
+        result
+    }
+}
+
+impl AppSync {
+    /// Every store that syncs, as this app manages them.
+    pub fn stores(&self) -> SyncedStores<'_> {
+        SyncedStores {
+            connections: &self.0.state::<AppContext>().inner().storage,
             folders: self.0.state::<FolderStorage>().inner(),
             saved_queries: self.0.state::<SavedQueryStorage>().inner(),
             pg_queries: self.0.state::<PgQueryLibraryStore>().inner(),
@@ -85,21 +95,24 @@ impl Job for AppSync {
             node_tags: self.0.state::<NodeTagStorage>().inner(),
             settings: self.0.state::<SettingsStorage>().inner(),
             known_hosts: self.0.state::<Arc<KnownHostsStore>>().inner(),
-        };
-        let local = Local { stores: &stores, keychain: &OsKeychain, state: device.state };
-        let result = sync(&local, &server, &keys.keys(), now_epoch_ms()).await;
-        match &result {
+        }
+    }
+
+    /// Acts on a finished sync: drops the pooled clients of changed connections, and
+    /// forgets the account once the server says the session is gone.
+    pub async fn settle(&self, result: &Result<Synced, AppError>) {
+        match result {
             Ok(synced) => {
+                let pool = &self.0.state::<AppContext>().inner().pool;
                 for id in &synced.changed_connections {
-                    ctx.pool.remove(id).await;
+                    pool.remove(id).await;
                 }
             }
             Err(AppError::SignedOut) => {
-                let _ = device.forget();
+                let _ = self.device().forget();
             }
             Err(_) => {}
         }
-        result
     }
 }
 
