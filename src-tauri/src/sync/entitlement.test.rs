@@ -38,7 +38,7 @@ fn the_grace_period_is_seven_days() {
 #[test]
 fn premium_holds_just_inside_seven_days_after_the_answer() {
     let (_dir, store) = recorded(account(true, None));
-    assert!(store.entitlement(RECEIVED_AT + GRACE_MS - 1).has_premium());
+    assert!(matches!(store.entitlement(RECEIVED_AT + GRACE_MS - 1), Entitlement::Premium { .. }));
 }
 
 #[test]

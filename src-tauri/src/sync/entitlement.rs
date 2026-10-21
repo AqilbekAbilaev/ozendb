@@ -47,12 +47,6 @@ pub enum Entitlement {
     Expired,
 }
 
-impl Entitlement {
-    pub fn has_premium(&self) -> bool {
-        matches!(self, Entitlement::Premium { .. })
-    }
-}
-
 impl Answer {
     pub fn entitlement(&self, now: i64) -> Entitlement {
         if !self.account.premium {
