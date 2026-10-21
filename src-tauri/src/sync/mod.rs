@@ -10,3 +10,5 @@ pub mod snapshot;
 pub mod state;
 #[cfg(test)]
 pub(crate) mod test_device;
+#[cfg(test)]
+pub(crate) mod test_server;
