@@ -277,6 +277,7 @@ pub fn run() {
             get_keybindings,
             update_keybindings,
             get_entitlement,
+            get_account,
             start_sign_in,
             poll_sign_in,
             sign_out,

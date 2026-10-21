@@ -1,6 +1,8 @@
 // The OzenDB account on this device. `getEntitlement` reports what the server last said
 // about Premium: `{ state: 'unknown' | 'free' | 'expired' }` or
-// `{ state: 'premium', until }`, with `until` in epoch milliseconds.
+// `{ state: 'premium', until }`, with `until` in epoch milliseconds. `getAccount` answers
+// `null` when signed out, else `{ email, subscription: { status, renews_at, ends_at } }`
+// as the server last described it (both null until it has; times in epoch milliseconds).
 //
 // Signing in: `startSignIn(email)` emails a link and answers `{ request, code }`. Show the
 // code, then call `pollSignIn(request)` 3 seconds after each answer (setTimeout, never two
@@ -13,6 +15,10 @@ import { invoke } from '@tauri-apps/api/core'
 
 export function getEntitlement() {
   return invoke('get_entitlement')
+}
+
+export function getAccount() {
+  return invoke('get_account')
 }
 
 export function startSignIn(email) {

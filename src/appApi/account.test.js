@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { getEntitlement, startSignIn, pollSignIn, signOut } from './account'
+import { getEntitlement, getAccount, startSignIn, pollSignIn, signOut } from './account'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -14,6 +14,14 @@ describe('getEntitlement', () => {
     invoke.mockResolvedValue({ state: 'free' })
     await getEntitlement()
     expect(invoke).toHaveBeenCalledWith('get_entitlement')
+  })
+})
+
+describe('getAccount', () => {
+  it('invokes get_account without arguments', async () => {
+    invoke.mockResolvedValue(null)
+    await getAccount()
+    expect(invoke).toHaveBeenCalledWith('get_account')
   })
 })
 

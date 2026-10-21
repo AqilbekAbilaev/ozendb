@@ -237,3 +237,43 @@ async fn signing_out_without_a_session_asks_nothing_of_the_server() {
     assert!(timeout(Duration::from_millis(200), requests).await.is_err(), "expected no request");
     assert_nothing_kept(&keychain, &files);
 }
+
+#[test]
+fn a_device_without_a_session_has_no_account() {
+    let (keychain, files) = (FakeKeychain::default(), files());
+    assert_eq!(device(&keychain, &files).account().unwrap(), None);
+}
+
+#[test]
+fn a_signed_in_device_reports_the_email_and_subscription_the_server_last_gave() {
+    let (keychain, files) = (signed_in(), files());
+    files.entitlement.record(serde_json::from_str(PREMIUM).unwrap(), NOW).unwrap();
+
+    let subscription = Subscription { status: "active".to_string(), renews_at: Some(NOW + 1), ends_at: None };
+    assert_eq!(
+        device(&keychain, &files).account().unwrap(),
+        Some(SignedInAccount { email: Some(EMAIL.to_string()), subscription: Some(subscription) }),
+    );
+}
+
+#[test]
+fn a_device_signed_in_before_the_server_described_the_account_is_signed_in_without_details() {
+    let (keychain, files) = (signed_in(), files());
+    assert_eq!(device(&keychain, &files).account().unwrap(), Some(SignedInAccount { email: None, subscription: None }));
+}
+
+#[test]
+fn a_keychain_that_cannot_be_read_fails_with_the_keychain_error() {
+    let files = files();
+    assert!(matches!(device(&LockedKeychain, &files).account(), Err(AppError::Keychain(_))));
+}
+
+#[test]
+fn the_frontend_reads_the_account_as_email_and_subscription() {
+    let subscription = Subscription { status: "cancelled".to_string(), renews_at: None, ends_at: Some(NOW) };
+    let account = SignedInAccount { email: Some(EMAIL.to_string()), subscription: Some(subscription) };
+    assert_eq!(
+        serde_json::to_value(account).unwrap(),
+        serde_json::json!({ "email": EMAIL, "subscription": { "status": "cancelled", "renews_at": null, "ends_at": NOW } }),
+    );
+}

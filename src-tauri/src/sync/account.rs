@@ -3,7 +3,7 @@
 //! OS keychain, never in a file. `GET /me` then tells the entitlement cache about Premium.
 use crate::error::AppError;
 use crate::keychain::Keychain;
-use crate::sync::entitlement::{Account, EntitlementStorage};
+use crate::sync::entitlement::{Account, EntitlementStorage, Subscription};
 use crate::sync::http::{bearer, unreachable};
 use crate::sync::state::SyncStateStorage;
 use reqwest::header::AUTHORIZATION;
@@ -30,6 +30,14 @@ pub enum SignIn {
     /// Nobody has approved the request yet.
     Waiting,
     SignedIn,
+}
+
+/// Who this device is signed in as. `email` and `subscription` stay `None` until `/me`
+/// has answered, which can fail at sign-in without signing out.
+#[derive(Debug, PartialEq, Serialize)]
+pub struct SignedInAccount {
+    pub email: Option<String>,
+    pub subscription: Option<Subscription>,
 }
 
 #[derive(Deserialize)]
@@ -117,6 +125,17 @@ impl<K: Keychain> Device<'_, K> {
     /// The session sync calls the server with; `None` when signed out.
     pub fn session(&self) -> Result<Option<Zeroizing<String>>, AppError> {
         self.keychain.read(SESSION_KEY)
+    }
+
+    /// The signed-in account as last heard from the server; `None` when signed out.
+    pub fn account(&self) -> Result<Option<SignedInAccount>, AppError> {
+        if self.session()?.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(match self.entitlement.account() {
+            Some(Account { email, subscription, .. }) => SignedInAccount { email: Some(email), subscription },
+            None => SignedInAccount { email: None, subscription: None },
+        }))
     }
 
     /// Picks up the session for `request` once approved, keeps it and records Premium.
