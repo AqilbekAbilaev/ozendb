@@ -7,6 +7,7 @@ pub mod local_only;
 pub mod merge;
 pub mod pass;
 pub mod recovery;
+pub mod schedule;
 pub mod secrets;
 pub mod snapshot;
 pub mod state;
