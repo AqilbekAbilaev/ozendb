@@ -132,14 +132,16 @@ pub struct SyncStatus {
     keychain_error: Option<Problem>,
     /// Epoch milliseconds.
     time: i64,
+    /// When this device last finished a sync, kept across restarts; `None` if never.
+    last_synced: Option<i64>,
 }
 
 impl SyncStatus {
-    pub fn running(time: i64) -> Self {
-        SyncStatus { status: Stage::Running, error: None, received_only: false, keychain_error: None, time }
+    pub fn running(time: i64, last_synced: Option<i64>) -> Self {
+        SyncStatus { status: Stage::Running, error: None, received_only: false, keychain_error: None, time, last_synced }
     }
 
-    pub fn finished(result: &Result<Synced, AppError>, time: i64) -> Self {
+    pub fn finished(result: &Result<Synced, AppError>, time: i64, last_synced: Option<i64>) -> Self {
         match result {
             Ok(synced) => SyncStatus {
                 status: Stage::Synced,
@@ -147,8 +149,16 @@ impl SyncStatus {
                 received_only: synced.received_only,
                 keychain_error: synced.keychain_error.as_ref().map(Problem::from),
                 time,
+                last_synced,
             },
-            Err(e) => SyncStatus { status: Stage::Failed, error: Some(Problem::from(e)), received_only: false, keychain_error: None, time },
+            Err(e) => SyncStatus {
+                status: Stage::Failed,
+                error: Some(Problem::from(e)),
+                received_only: false,
+                keychain_error: None,
+                time,
+                last_synced,
+            },
         }
     }
 }
@@ -171,6 +181,10 @@ impl LastSync {
 pub struct StatusEvents(pub AppHandle);
 
 impl StatusEvents {
+    fn last_synced(&self) -> Option<i64> {
+        self.0.state::<SyncStateStorage>().load().last_sync
+    }
+
     fn announce(&self, status: SyncStatus) {
         self.0.state::<LastSync>().keep(status.clone());
         let _ = self.0.emit(SYNC_STATUS, status);
@@ -179,11 +193,11 @@ impl StatusEvents {
 
 impl Report for StatusEvents {
     fn started(&self) {
-        self.announce(SyncStatus::running(now_epoch_ms()));
+        self.announce(SyncStatus::running(now_epoch_ms(), self.last_synced()));
     }
 
     fn finished(&self, result: &Result<Synced, AppError>) {
-        self.announce(SyncStatus::finished(result, now_epoch_ms()));
+        self.announce(SyncStatus::finished(result, now_epoch_ms(), self.last_synced()));
     }
 }
 
