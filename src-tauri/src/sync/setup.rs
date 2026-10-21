@@ -2,11 +2,22 @@
 //! a sync password and is shown a recovery key; on any later one they unlock the key the
 //! server already holds with either of them.
 use crate::error::AppError;
-use crate::sync::pass::{Download, SyncServer};
+use crate::keychain::Keychain;
+use crate::sync::crypto::DataKey;
+use crate::sync::keys::SyncKeys;
+use crate::sync::pass::{sync, Download, Local, SyncServer, Synced};
+use crate::sync::recovery::RecoveryKey;
 use crate::sync::state::Contents;
+use argon2::Params;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use serde::Serialize;
+use std::sync::Mutex;
+use unicode_normalization::UnicodeNormalization;
+use zeroize::Zeroizing;
+
+pub const MIN_PASSWORD_CHARS: usize = 12;
+pub const MAX_PASSWORD_CHARS: usize = 256;
 
 /// Sent to the frontend as `{ "state": "set_up" }`, `{ "state": "new" }` or
 /// `{ "state": "existing", "recovery": true }`.
@@ -38,6 +49,11 @@ impl ServerKeys {
         }
     }
 
+    // Whether these are the wrapped keys `keys` carries, as on the device that made them.
+    fn same_as(&self, keys: &SyncKeys) -> bool {
+        self.wrapped_key == keys.keys().wrapped_key
+    }
+
     fn decode(contents: &Contents) -> Result<Self, AppError> {
         let decode = |text: &str| BASE64.decode(text).map_err(|_| AppError::UnreadableSyncData);
         Ok(Self {
@@ -53,6 +69,73 @@ pub async fn server_status(server: &impl SyncServer) -> Result<SetupStatus, AppE
         None => SetupStatus::New,
         Some(held) => SetupStatus::Existing { recovery: held.recovery_wrapped_key.is_some() },
     })
+}
+
+/// Refuses a sync password shorter than `MIN_PASSWORD_CHARS` or longer than
+/// `MAX_PASSWORD_CHARS`, counted as the key derivation reads it (NFC).
+pub fn check_password(password: &str) -> Result<(), AppError> {
+    let length = password.nfc().count();
+    if length < MIN_PASSWORD_CHARS {
+        return Err(AppError::Validation(format!("A sync password needs at least {MIN_PASSWORD_CHARS} characters.")));
+    }
+    if length > MAX_PASSWORD_CHARS {
+        return Err(AppError::Validation(format!("A sync password can have at most {MAX_PASSWORD_CHARS} characters.")));
+    }
+    Ok(())
+}
+
+/// New keys for an account's first device: a data key wrapped by `password` and by a new
+/// recovery key, which is returned as text to show the user once.
+pub fn create(password: &str, params: &Params) -> Result<(SyncKeys, Zeroizing<String>), AppError> {
+    check_password(password)?;
+    let (data_key, recovery) = (DataKey::generate()?, RecoveryKey::generate()?);
+    let wrapped_key = data_key.wrap(password, params)?;
+    let recovery_wrapped_key = data_key.wrap_for_recovery(&recovery)?;
+    Ok((SyncKeys::new(data_key, wrapped_key, Some(recovery_wrapped_key)), recovery.display()))
+}
+
+/// The first sync of an account's first device, which uploads its data with `keys`. It
+/// fails when the upload was refused for want of Premium, or when another device set
+/// sync up meanwhile, whose keys this device must then unlock instead.
+pub async fn first_upload(local: &Local<'_, impl Keychain>, server: &impl SyncServer, keys: &SyncKeys, now: i64) -> Result<Synced, AppError> {
+    match sync(local, server, &keys.keys(), now).await {
+        // Nothing was downloaded, so nothing was saved here either.
+        Ok(synced) if synced.received_only => Err(AppError::NotPremium),
+        Ok(synced) => Ok(synced),
+        // Another device's copy can't be decrypted with these keys, so the pass fails
+        // before it uploads anything; its wrapped keys tell the two failures apart.
+        Err(error) => match ServerKeys::fetch(server).await {
+            Ok(Some(held)) if !held.same_as(keys) => Err(AppError::SyncSetUpElsewhere),
+            _ => Err(error),
+        },
+    }
+}
+
+/// The keys made by the first step of a first device's setup, held in memory until the
+/// user has saved the recovery key and the first upload has gone through.
+#[derive(Default)]
+pub struct PendingSetup(Mutex<Option<Pending>>);
+
+struct Pending {
+    session: Zeroizing<String>,
+    keys: SyncKeys,
+}
+
+impl PendingSetup {
+    /// Holds `keys`, made while signed in with `session`, in place of any held before.
+    pub fn hold(&self, session: Zeroizing<String>, keys: SyncKeys) {
+        *self.lock() = Some(Pending { session, keys });
+    }
+
+    /// Takes the held keys if they were made under `session`. Keys made under another
+    /// session are dropped, so a sign-out never hands them to the next account.
+    pub fn take(&self, session: &str) -> Option<SyncKeys> {
+        self.lock().take().filter(|pending| pending.session.as_str() == session).map(|pending| pending.keys)
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, Option<Pending>> {
+        self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
 }
 
 #[cfg(test)]

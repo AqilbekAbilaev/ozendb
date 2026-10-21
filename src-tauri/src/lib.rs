@@ -68,6 +68,7 @@ use storage::Storage;
 use sync::entitlement::EntitlementStorage;
 use sync::keys::SyncKeysStorage;
 use sync::run::{AppSync, LastSync, StatusEvents};
+use sync::setup::PendingSetup;
 use sync::state::SyncStateStorage;
 use tabs::TabStorage;
 
@@ -108,6 +109,7 @@ pub fn run() {
             app.manage(EntitlementStorage::new(data_dir.join("entitlement.json")));
             app.manage(SyncStateStorage::new(data_dir.join("sync_state.json")));
             app.manage(SyncKeysStorage::new(data_dir.join("sync_keys.json")));
+            app.manage(PendingSetup::default());
             // The host-key trust store is shared between the pool (real connect)
             // and Test Connection's temporary tunnel, so both honor the same TOFU
             // record. Managed as an Arc so the pool can own a clone.
@@ -292,6 +294,8 @@ pub fn run() {
             sync_now,
             sync_status,
             sync_setup_status,
+            create_sync_keys,
+            finish_sync_setup,
             start_sign_in,
             poll_sign_in,
             sign_out,
