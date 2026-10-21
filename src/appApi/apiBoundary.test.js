@@ -37,6 +37,9 @@ const APP_COMMANDS = [
   'get_entitlement', 'get_account', 'start_sign_in', 'poll_sign_in', 'sign_out',
   // sync.js
   'sync_now', 'sync_status',
+  // syncSetup.js
+  'sync_setup_status', 'create_sync_keys', 'finish_sync_setup',
+  'unlock_sync_with_password', 'unlock_sync_with_recovery_key',
 ]
 
 // Roots where custom commands and the Tauri transport are allowed: the application
