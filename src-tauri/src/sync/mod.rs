@@ -1,6 +1,8 @@
 pub mod account;
 pub mod crypto;
 pub mod entitlement;
+#[cfg(test)]
+pub(crate) mod fake_server;
 pub mod http;
 pub mod keys;
 pub mod local_only;
