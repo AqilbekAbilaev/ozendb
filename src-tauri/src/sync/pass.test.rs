@@ -1,7 +1,9 @@
 use super::*;
 use crate::sync::state::SyncState;
 use crate::sync::test_device::{connection, folder, Device};
+use crate::keychain::fake::FakeKeychain;
 use std::cell::{Cell, RefCell};
+use zeroize::Zeroizing;
 
 const DAY: i64 = 24 * 60 * 60 * 1000;
 const NOW: i64 = 1_000 * DAY;
@@ -314,4 +316,48 @@ async fn a_pass_that_leaves_a_store_alone_keeps_a_long_offline_device_stale() {
     sync_on(&device, &server, &key).await.unwrap();
 
     assert_eq!(received(&server, &key).await, vec!["kept"]);
+}
+
+/// Refuses its first write, as when the user dismisses one keychain prompt.
+struct RefusesOnce<'a>(&'a FakeKeychain, Cell<bool>);
+
+impl Keychain for RefusesOnce<'_> {
+    fn read(&self, key: &str) -> Result<Option<Zeroizing<String>>, AppError> {
+        self.0.read(key)
+    }
+
+    fn write(&self, key: &str, secret: &str) -> Result<(), AppError> {
+        if self.1.replace(false) {
+            return Err(AppError::Keychain("access denied".into()));
+        }
+        self.0.write(key, secret)
+    }
+
+    fn remove(&self, key: &str) -> Result<(), AppError> {
+        self.0.remove(key)
+    }
+}
+
+#[tokio::test]
+async fn a_secret_a_later_pass_writes_is_not_reported_as_refused() {
+    let device = Device::new();
+    let (server, key) = (FakeServer::default(), data_key());
+    let other = Device::new();
+    other.hold(connection("c1", "prod", 9));
+    other.keychain.write("c1", "from elsewhere").unwrap();
+    sync_on(&other, &server, &key).await.unwrap();
+    device.hold(connection("c1", "prod", 1));
+    device.folders.insert(folder("f1", "mine", 1)).unwrap();
+    server.meanwhile(|_| {
+        device.folders.insert(folder("f2", "typed meanwhile", 1)).unwrap();
+    });
+    let keychain = RefusesOnce(&device.keychain, Cell::new(true));
+    let stores = device.stores();
+    let local = Local { stores: &stores, keychain: &keychain, state: &device.state };
+    let keys = Keys { data_key: &key, wrapped_key: b"wrapped", recovery_wrapped_key: None };
+
+    let synced = sync(&local, &server, &keys, NOW).await.unwrap();
+
+    assert!(synced.keychain_error.is_none());
+    assert_eq!(device.keychain.read("c1").unwrap().as_deref().map(String::as_str), Some("from elsewhere"));
 }

@@ -70,7 +70,8 @@ impl Synced {
                 self.changed_connections.push(id);
             }
         }
-        self.keychain_error = self.keychain_error.take().or(written.keychain_error);
+        // A later pass writes a refused secret again, so only its answer still holds.
+        self.keychain_error = written.keychain_error;
     }
 }
 
