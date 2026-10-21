@@ -1,4 +1,5 @@
 use super::*;
+use crate::sync::pass::Synced;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tokio::time::sleep;
@@ -16,10 +17,10 @@ enum Answer {
 }
 
 impl Answer {
-    fn result(self) -> Result<Ran, AppError> {
+    fn result(self) -> Result<Synced, AppError> {
         match self {
-            Answer::Synced => Ok(Ran::Synced),
-            Answer::ReceivedOnly => Ok(Ran::ReceivedOnly),
+            Answer::Synced => Ok(Synced::default()),
+            Answer::ReceivedOnly => Ok(Synced { received_only: true, ..Synced::default() }),
             Answer::Unreachable => Err(AppError::Unreachable { address: "api.ozendb.test".into(), reason: "could not connect".into() }),
             Answer::ServerDown => Err(AppError::SyncServer(503)),
             Answer::RateLimited => Err(AppError::SyncRateLimited),
@@ -64,7 +65,7 @@ impl Job for FakeJob {
         if self.0.lock().unwrap().signed_out { Err(AppError::SignedOut) } else { Ok(()) }
     }
 
-    async fn run(&self) -> Result<Ran, AppError> {
+    async fn run(&self) -> Result<Synced, AppError> {
         let takes = {
             let mut script = self.0.lock().unwrap();
             script.runs += 1;
@@ -93,10 +94,10 @@ impl Report for FakeReport {
         self.0.lock().unwrap().push("started".into());
     }
 
-    fn finished(&self, result: &Result<Ran, AppError>) {
+    fn finished(&self, result: &Result<Synced, AppError>) {
         let line = match result {
-            Ok(Ran::Synced) => "synced".to_string(),
-            Ok(Ran::ReceivedOnly) => "received_only".to_string(),
+            Ok(Synced { received_only: true, .. }) => "received_only".to_string(),
+            Ok(_) => "synced".to_string(),
             Err(e) => e.code().to_string(),
         };
         self.0.lock().unwrap().push(line);
