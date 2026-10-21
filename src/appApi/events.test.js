@@ -18,6 +18,7 @@ const SUBSCRIBERS = [
   ['onSshHostKeyPrompt', 'ssh-host-key-prompt'],
   ['onSshHostKeyChanged', 'ssh-host-key-changed'],
   ['onThemeChanged', 'theme-changed'],
+  ['onSyncStatus', 'sync-status'],
   ['onDocumentSaved', 'document-saved'],
   ['onConnectionSaved', 'connection-saved'],
   ['onConnectionUpdated', 'connection-updated'],
