@@ -32,6 +32,12 @@ pub enum SetupStatus {
     Existing { recovery: bool },
 }
 
+/// What the user unlocks the server's keys with.
+pub enum Secret {
+    Password(Zeroizing<String>),
+    RecoveryKey(Zeroizing<String>),
+}
+
 /// The wrapped copies of the data key the server holds.
 pub struct ServerKeys {
     wrapped_key: Vec<u8>,
@@ -47,6 +53,21 @@ impl ServerKeys {
             // Named no version, so "not modified" can't be about one this device knows.
             Download::Unchanged => Err(AppError::UnreadableSyncData),
         }
+    }
+
+    /// The keys, unlocked with `secret`. They keep the server's wrapped copies, so this
+    /// device uploads the same ones should the server ever hold nothing again.
+    pub fn unlock(self, secret: &Secret) -> Result<SyncKeys, AppError> {
+        let data_key = match secret {
+            Secret::Password(password) => DataKey::unwrap_with(&self.wrapped_key, password)?,
+            Secret::RecoveryKey(typed) => {
+                let wrapped = self.recovery_wrapped_key.as_deref().ok_or_else(|| {
+                    AppError::Validation("This account has no recovery key. Enter its sync password instead.".into())
+                })?;
+                DataKey::unwrap_with_recovery(wrapped, &RecoveryKey::parse(typed)?)?
+            }
+        };
+        Ok(SyncKeys::new(data_key, self.wrapped_key, self.recovery_wrapped_key))
     }
 
     // Whether these are the wrapped keys `keys` carries, as on the device that made them.
