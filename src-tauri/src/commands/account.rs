@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::keychain::OsKeychain;
-use crate::sync::account::{AccountServer, Device, SignIn, SignInStarted};
+use crate::sync::account::{AccountServer, Device, SignIn, SignInStarted, SignedInAccount};
 use crate::sync::entitlement::{Entitlement, EntitlementStorage};
 use crate::sync::http::{client, PRODUCTION_URL};
 use crate::sync::state::SyncStateStorage;
@@ -11,6 +11,15 @@ use tauri::State;
 #[tauri::command(async)]
 pub fn get_entitlement(entitlement: State<'_, EntitlementStorage>) -> Entitlement {
     entitlement.entitlement(now_epoch_ms())
+}
+
+/// Who this device is signed in as, or `null` when signed out.
+#[tauri::command(async)]
+pub fn get_account(
+    entitlement: State<'_, EntitlementStorage>,
+    state: State<'_, SyncStateStorage>,
+) -> Result<Option<SignedInAccount>, AppError> {
+    Device { keychain: &OsKeychain, entitlement: &entitlement, state: &state }.account()
 }
 
 /// Emails a sign-in link to `email`, and returns the request to poll and the code to show.

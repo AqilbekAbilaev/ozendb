@@ -92,6 +92,11 @@ impl EntitlementStorage {
         }
     }
 
+    /// The account the last answer described; `None` before any answer.
+    pub fn account(&self) -> Option<Account> {
+        self.load().map(|answer| answer.account)
+    }
+
     pub fn clear(&self) -> Result<(), AppError> {
         self.inner.save(&None)
     }
