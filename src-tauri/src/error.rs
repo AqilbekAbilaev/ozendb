@@ -56,6 +56,21 @@ pub enum AppError {
     #[error("The sync data kept changing while it synced; it will try again.")]
     SyncKeptChanging,
 
+    #[error("You were signed out. Sign in again to keep syncing.")]
+    SignedOut,
+
+    #[error("Uploading sync data needs OzenDB Premium.")]
+    NotPremium,
+
+    #[error("The sync data is too large for the sync server to store.")]
+    SyncDataTooLarge,
+
+    #[error("The sync server is busy; it will try again later.")]
+    SyncRateLimited,
+
+    #[error("The sync server answered with an error ({0}); it will try again.")]
+    SyncServer(u16),
+
     #[error("{0}")]
     Validation(String),
 }
@@ -84,6 +99,11 @@ impl AppError {
             AppError::NewerSyncFormat => "newer_sync_format",
             AppError::UnreadableSyncData => "unreadable_sync_data",
             AppError::SyncKeptChanging => "sync_kept_changing",
+            AppError::SignedOut => "signed_out",
+            AppError::NotPremium => "not_premium",
+            AppError::SyncDataTooLarge => "sync_data_too_large",
+            AppError::SyncRateLimited => "sync_rate_limited",
+            AppError::SyncServer(_) => "sync_server",
             AppError::Validation(_) => "validation",
         }
     }
