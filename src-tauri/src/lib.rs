@@ -13,6 +13,7 @@
 mod commands;
 mod collection_history;
 mod default_queries;
+mod edits;
 mod error;
 mod error_log;
 mod events;

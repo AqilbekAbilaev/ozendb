@@ -198,3 +198,42 @@ fn an_upload_time_is_written_only_once_there_is_one() {
     marker.stamp.uploaded_at = Some(9);
     assert_eq!(serde_json::to_value(&marker).unwrap()["uploaded_at"], 9);
 }
+
+// Whether `change` noted an edit. Other tests may note edits meanwhile, so this can only
+// prove that a change does raise the signal, never that it doesn't.
+fn notes_an_edit(change: impl FnOnce()) -> bool {
+    let mut edits = crate::edits::subscribe();
+    edits.borrow_and_update();
+    change();
+    edits.has_changed().unwrap()
+}
+
+#[test]
+fn putting_a_record_in_a_list_notes_an_edit() {
+    let mut notes = vec![note("a/1 é", "old", 7)];
+    assert!(notes_an_edit(|| notes.put(0, note("b.2 ü", "new", 7))));
+}
+
+#[test]
+fn editing_a_record_in_a_list_notes_an_edit() {
+    let mut notes = vec![note("a/1 é", "old", 7)];
+    assert!(notes_an_edit(|| notes.edit_where(|n| n.id == "a/1 é", |n| n.text = String::from("new"))));
+}
+
+#[test]
+fn deleting_a_record_from_a_list_notes_an_edit() {
+    let mut notes = vec![note("a/1 é", "old", 7)];
+    assert!(notes_an_edit(|| notes.delete_where(|n| n.id == "a/1 é")));
+}
+
+#[test]
+fn putting_a_keyed_record_notes_an_edit() {
+    let mut tags = HashMap::from([(String::from("c 1/db.ü"), tagged("blue", 7))]);
+    assert!(notes_an_edit(|| tags.put("d/a b", tagged("red", 7))));
+}
+
+#[test]
+fn deleting_a_keyed_record_notes_an_edit() {
+    let mut tags = HashMap::from([(String::from("c 1/db.ü"), tagged("blue", 7))]);
+    assert!(notes_an_edit(|| tags.delete_where(|key| key == "c 1/db.ü")));
+}

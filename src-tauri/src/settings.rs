@@ -1,5 +1,6 @@
 use crate::json_store_wrapper;
 use crate::error::AppError;
+use crate::sync::local_only::without_local_only;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -69,6 +70,11 @@ impl Settings {
             _ => unreachable!("settings always serialize to a JSON object"),
         }
     }
+
+    /// Whether these settings differ from `other` in any that leave this device.
+    pub fn differs_where_shared(&self, other: &Settings) -> bool {
+        without_local_only(self.to_map()) != without_local_only(other.to_map())
+    }
 }
 
 /// The settings as stored: each setting's value, and when it last changed, so sync
@@ -112,11 +118,16 @@ impl SettingsStorage {
     /// writes in between is never undone. Returns the settings before and after.
     pub fn update(&self, change: impl FnOnce(&Settings) -> Settings) -> Result<(Settings, Settings), AppError> {
         let now = crate::time::now_epoch_ms();
-        self.inner.update(|stored| {
+        let (before, after) = self.inner.update(|stored| {
             let before = stored.values.clone();
             *stored = stored.changed_to(change(&before), now);
             (before, stored.values.clone())
-        })
+        })?;
+        // A local-only setting such as the zoom has nothing to sync.
+        if after.differs_where_shared(&before) {
+            crate::edits::note();
+        }
+        Ok((before, after))
     }
 }
 
