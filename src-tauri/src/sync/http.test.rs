@@ -1,49 +1,17 @@
 use super::*;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use crate::sync::test_server::{nobody_listening, received, reply, serving, WAIT};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
 const SESSION: &str = "s3ss.ion_with-dots~and/slashes+=";
-const WAIT: Duration = Duration::from_secs(5);
 
-/// A server on a local port that gives one fixed answer, and the request it answered,
-/// its head lowercased so header names compare however the client spells them.
-async fn answering(response: String) -> (HttpServer, JoinHandle<String>) {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let base_url = format!("http://{}", listener.local_addr().unwrap());
-    let request = tokio::spawn(async move {
-        let (mut stream, _) = timeout(WAIT, listener.accept()).await.unwrap().unwrap();
-        let mut read = Vec::new();
-        let mut buffer = [0u8; 4096];
-        let request = loop {
-            let n = timeout(WAIT, stream.read(&mut buffer)).await.unwrap().unwrap();
-            read.extend_from_slice(&buffer[..n]);
-            let text = String::from_utf8_lossy(&read).to_string();
-            if let Some(end) = text.find("\r\n\r\n") {
-                let head = text[..end].to_lowercase();
-                let length = head
-                    .lines()
-                    .find_map(|line| line.strip_prefix("content-length: "))
-                    .map_or(0, |n| n.trim().parse().unwrap());
-                if read.len() >= end + 4 + length {
-                    break format!("{head}\r\n\r\n{}", &text[end + 4..]);
-                }
-            }
-            assert!(n > 0, "the client closed before sending its whole request");
-        };
-        timeout(WAIT, stream.write_all(response.as_bytes())).await.unwrap().unwrap();
-        request
-    });
-    (HttpServer::new(client().unwrap(), &base_url, SESSION.to_string()), request)
+async fn answering(response: String) -> (HttpServer, JoinHandle<Vec<String>>) {
+    let (base_url, requests) = serving(vec![response]).await;
+    (HttpServer::new(client().unwrap(), &base_url, SESSION.to_string()), requests)
 }
 
-fn reply(status: &str, headers: &str, body: &str) -> String {
-    format!("HTTP/1.1 {status}\r\n{headers}content-length: {}\r\nconnection: close\r\n\r\n{body}", body.len())
-}
-
-async fn sent(request: JoinHandle<String>) -> String {
-    timeout(WAIT, request).await.unwrap().unwrap()
+async fn sent(requests: JoinHandle<Vec<String>>) -> String {
+    received(requests).await.remove(0)
 }
 
 fn contents(recovery_wrapped_key: Option<&str>) -> Contents {
@@ -185,10 +153,7 @@ async fn any_other_answer_is_a_server_error_with_its_status() {
 
 #[tokio::test]
 async fn a_server_nobody_answers_at_is_unreachable() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let base_url = format!("http://{}", listener.local_addr().unwrap());
-    drop(listener);
-    let server = HttpServer::new(client().unwrap(), &base_url, SESSION.to_string());
+    let server = HttpServer::new(client().unwrap(), &nobody_listening().await, SESSION.to_string());
 
     match timeout(WAIT, server.download(None)).await.unwrap() {
         Err(AppError::Unreachable { address, reason }) => {
