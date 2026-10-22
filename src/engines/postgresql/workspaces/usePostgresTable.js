@@ -1,5 +1,6 @@
 import { toRef } from 'vue'
 import { segmentName } from '../../../utils/resourceRef'
+import { engineOf } from '../../index.js'
 import { explainSql } from './runSql.js'
 import { useTableDerived } from './tableDerived.js'
 import { useTableLoad } from './tableLoad.js'
@@ -10,7 +11,8 @@ import { useTableStage } from './tableStage.js'
 /**
  * One table-browse tab: a page of rows, the row count, sorting, and editing a cell by
  * the row's primary key. `tab` is the workspace: its `target` (the table's ref), and the
- * `state` and `ui` it keeps (tableState.js), which this reads and writes in place.
+ * `state` and `ui` it keeps (tableState.js), which this reads and writes in place. Its
+ * engine says how the SQL is written and which commands run it.
  */
 export function usePostgresTable(tab, { readOnly = false } = {}) {
   const target = {
@@ -78,8 +80,9 @@ export function usePostgresTable(tab, { readOnly = false } = {}) {
   const foreignKeys = toRef(runtime, 'foreignKeys')
   // The context every part of the tab reads: views onto the tab's state and runtime, and
   // what each part adds for the parts after it.
+  const { dialect, api } = engineOf(tab).sql
   const t = {
-    target, runtime, columns, rows, total, elapsedMs, offset, limit, messages, server, orderBy, descending,
+    dialect, api, target, runtime, columns, rows, total, elapsedMs, offset, limit, messages, server, orderBy, descending,
     loading, error, editError, filterText, filters, shownColumns, columnOrder, mode, tabReadOnly, filterRefusal, sql, sqlRun,
     mainColumns, joins, joinColumns, nextJoinKey, foreignKeys,
   }

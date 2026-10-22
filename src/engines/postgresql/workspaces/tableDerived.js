@@ -8,9 +8,12 @@ import { mergeColumnOrder } from '../../../composables/useColumnReorder'
 // the visible columns, the SQL the filters amount to, the joins on offer, paging flags.
 // `t` is the tab's shared context (usePostgresTable).
 export function useTableDerived(t) {
-  const { target, columns, rows, total, offset, limit, orderBy, descending, filters, shownColumns, columnOrder, mainColumns, joins, joinColumns, foreignKeys } = t
+  const { dialect, target, columns, rows, total, offset, limit, orderBy, descending, filters, shownColumns, columnOrder, mainColumns, joins, joinColumns, foreignKeys } = t
+  // Each column's info carries its cellKind, worked out once here for every reader.
+  const withKinds = (columns) => columns.map(info => ({ ...info, kind: dialect.cellKind(info.dataType, info.enumValues) }))
   const refs = computed(() => columnRefs(mainColumns.value && joins.value.every(j => joinColumns.value[j.key])
     ? [{ key: '', columns: mainColumns.value }, ...joins.value.map(j => ({ key: j.key, columns: joinColumns.value[j.key] }))]
+        .map(({ key, columns }) => ({ key, columns: withKinds(columns) }))
     : []))
   const refByKey = computed(() => Object.fromEntries(refs.value.map(r => [r.key, r])))
   const tableNames = computed(() => aliases([target.table, ...joins.value.map(j => j.table)]))
@@ -39,7 +42,7 @@ export function useTableDerived(t) {
     const positions = ordered.map(at)
     return { columns: ordered, rows: rows.value.map(row => positions.map(i => row[i])) }
   })
-  const currentSql = computed(() => buildSelectSql({
+  const currentSql = computed(() => buildSelectSql(dialect, {
     schema: target.schema,
     table: target.table,
     joins: wireJoins.value,

@@ -62,7 +62,7 @@ function explain() {
 }
 
 async function format() {
-  const { sql, reason } = await formatSql(props.sql)
+  const { sql, reason } = await formatSql(props.run, props.sql)
   if (reason) showToast(reason)
   else setSql(sql)
 }

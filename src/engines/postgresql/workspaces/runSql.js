@@ -1,22 +1,24 @@
-import { runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction } from '../api/queries'
-import { pushHistory } from '../api/library'
+import { engineOf } from '../../index.js'
 import { errMessage } from '../../../utils/errors'
 import { createSelection } from '../../../composables/useRowSelection'
 
-// A SQL editor's runs against one connection: the last result, a line per run, the plan
-// Explain found, and the Manual-mode transaction. Runtime only — the SQL itself is the
-// tab's lasting state, passed in to each call. `database`, when it names a database
-// other than the connection's own, opens a second database on the same server
-// (#124) — `null` behaves exactly as the connection's own.
-export function createSqlRun(connectionId, database = null) {
+// A SQL editor's runs against one connection, through its engine's commands
+// (engineOf(run).sql.api): the last result, a line per run, the plan Explain found, and
+// the Manual-mode transaction. Runtime only — the SQL itself is the tab's lasting state,
+// passed in to each call. `database`, when it names a database other than the
+// connection's own, opens a second database on the same server (#124) — `null`
+// behaves exactly as the connection's own.
+export function createSqlRun(engine, connectionId, database = null) {
   return {
-    connectionId, database,
+    engine, connectionId, database,
     result: null, error: null, running: false, runId: null, messages: [],
     txn: 'auto', txId: null,
     plan: null, planError: null, explaining: false,
     selection: createSelection(),
   }
 }
+
+const apiOf = (run) => engineOf(run).sql.api
 
 const log = (run, ok, text, ms) => { run.messages = [...run.messages, { at: new Date(), ok, text, ms }] }
 
@@ -31,9 +33,9 @@ export async function runSql(run, sql) {
   run.runId = crypto.randomUUID()
   try {
     if (run.txn === 'manual' && !run.txId) await begin(run)
-    run.result = await runQuery(run.connectionId, sql, run.runId, run.txId ?? null, run.database)
+    run.result = await apiOf(run).runQuery(run.connectionId, sql, run.runId, run.txId ?? null, run.database)
     log(run, true, outcome(run.result), run.result.elapsedMs)
-    pushHistory(run.connectionId, sql).catch(() => {})
+    apiOf(run).pushHistory(run.connectionId, sql).catch(() => {})
   } catch (e) {
     run.error = errMessage(e)
     run.result = null
@@ -47,7 +49,7 @@ export async function runSql(run, sql) {
 
 async function begin(run) {
   const txId = crypto.randomUUID()
-  await beginTransaction(run.connectionId, txId, run.database)
+  await apiOf(run).beginTransaction(run.connectionId, txId, run.database)
   run.txId = txId
 }
 
@@ -58,7 +60,8 @@ export async function endTransaction(run, commit) {
   if (!txId) return
   run.txId = null
   try {
-    await (commit ? commitTransaction : rollbackTransaction)(txId)
+    const api = apiOf(run)
+    await (commit ? api.commitTransaction : api.rollbackTransaction)(txId)
     log(run, true, commit ? 'COMMIT' : 'ROLLBACK')
   } catch (e) {
     log(run, false, errMessage(e))
@@ -72,7 +75,7 @@ export async function abandonTransaction(run) {
   if (!txId) return false
   run.txId = null
   try {
-    await rollbackTransaction(txId)
+    await apiOf(run).rollbackTransaction(txId)
   } catch {
     // The tab is going away; there is no one left to tell.
   }
@@ -87,7 +90,7 @@ export function outcome({ rows, rowsAffected }) {
 
 // The run then ends with a "cancelled" error, handled like any other.
 export function cancelSql(run) {
-  if (run.runId) return cancelQuery(run.connectionId, run.runId)
+  if (run.runId) return apiOf(run).cancelQuery(run.connectionId, run.runId)
 }
 
 // Explains `sql`, keeping the plan (or why there isn't one) on the run.
@@ -95,7 +98,7 @@ export async function explainSql(run, sql) {
   run.explaining = true
   run.planError = null
   try {
-    run.plan = await explainQuery(run.connectionId, sql, run.database)
+    run.plan = await apiOf(run).explainQuery(run.connectionId, sql, run.database)
   } catch (e) {
     run.plan = null
     run.planError = errMessage(e)
@@ -105,9 +108,9 @@ export async function explainSql(run, sql) {
 }
 
 // `sql` laid out, or — for SQL that can't be formatted — as typed, with the reason.
-export async function formatSql(sql) {
+export async function formatSql(run, sql) {
   try {
-    return { sql: await formatQuery(sql), reason: null }
+    return { sql: await apiOf(run).formatQuery(sql), reason: null }
   } catch (e) {
     return { sql, reason: errMessage(e) }
   }

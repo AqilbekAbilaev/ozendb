@@ -1,11 +1,8 @@
 import { computed } from 'vue'
-import { updateRow, deleteRows as deleteRowsApi, insertRow, beginTransaction, commitTransaction, rollbackTransaction } from '../api/queries'
 import { errMessage } from '../../../utils/errors'
 import { formatCell } from './formatCell.js'
 import { buildInsertSql, buildUpdateSql, buildDeleteSql } from '../../sql/workspaces/buildStagedSql.js'
 import { gridLayout } from '../../sql/workspaces/gridLayout.js'
-
-const JSON_TYPES = ['json', 'jsonb']
 
 // A row's identity as a stable string, from its primary-key columns' loaded values —
 // what `edits`/`deletedKeys` key by, and what a staged insert (no real identity yet)
@@ -17,11 +14,10 @@ function rowKeyOf(keyColumns, row, at) {
 // A readable, display-only SQL literal — never bound or executed, only shown in
 // Review SQL. The real statements this staged state amounts to are built server-side
 // (row_write.rs), with real type casts; this just has to read sensibly.
-function sqlLiteral(value) {
+function sqlLiteral(dialect, value) {
   if (value === null || value === undefined) return 'NULL'
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`
-  return `'${JSON.stringify(value).replace(/'/g, "''")}'`
+  return dialect.quoteText(typeof value === 'string' ? value : JSON.stringify(value))
 }
 
 // Staged editing, inserting and deleting for a table tab: nothing reaches the server
@@ -29,7 +25,7 @@ function sqlLiteral(value) {
 // show immediately (the row's displayed value is updated in place), but only as a
 // local draft — reverted by restoreRow or a plain refresh, never auto-committed.
 export function useTableStage(t, connectionReadOnly) {
-  const { target, rows, columns, view, editError, refByKey, columnInfo, keyColumns, at, refresh, tabReadOnly, offset } = t
+  const { dialect, api, target, rows, columns, view, editError, refByKey, columnInfo, keyColumns, at, refresh, tabReadOnly, offset } = t
   const staged = t.runtime.staged
 
   // Locked either way: `connectionReadOnly` is the backend's own refusal (static for
@@ -69,8 +65,7 @@ export function useTableStage(t, connectionReadOnly) {
   }
 
   // Only the browsed table's own cells are editable, by its primary key — and never
-  // an identity-always or stored-generated column, which Postgres never accepts a
-  // value for. Arrays aren't editable yet: their text form (`{a,b}`) isn't what the
+  // a column the server won't take a value for (dialect.takesValue). Arrays aren't editable yet: their text form (`{a,b}`) isn't what the
   // grid shows. A draft insert row skips the primary-key gate entirely — an insert
   // needs no WHERE clause.
   function canEdit(key, index) {
@@ -81,31 +76,28 @@ export function useTableStage(t, connectionReadOnly) {
     return canEditInsertColumn(column)
   }
 
-  // The same identity/generated exclusion, for a staged insert's draft cells — which
+  // The same exclusion, for a staged insert's draft cells — which
   // have no `refByKey` entry to read it from, since they aren't part of the loaded page.
   function canEditInsertColumn(column) {
     if (locked()) return false
-    const info = columnInfo.value[column]
-    return !(info?.identity === 'always' || info?.generated === 'stored')
+    return dialect.takesValue(columnInfo.value[column])
   }
 
-  // JSON and array columns are edited as JSON — arrays as the list the grid shows.
-  const asJson = (column) => {
-    const type = columnInfo.value[column]?.dataType ?? ''
-    return JSON_TYPES.includes(type) || type.endsWith('[]')
-  }
+  // JSON and list columns are edited as JSON — lists as the list the grid shows.
+  const shapeOf = (column) => dialect.jsonShape(columnInfo.value[column]?.dataType)
 
   // The editor's starting text: JSON (so a string keeps its quotes and saving it
   // unchanged parses back) where asJson, everything else as displayed, NULL as empty.
   function editText(column, value) {
     if (value === null) return ''
-    return asJson(column) ? JSON.stringify(value) : formatCell(value)
+    return shapeOf(column) ? JSON.stringify(value) : formatCell(value)
   }
 
   // `text` null is the editor's Set NULL, never text to parse.
   function parseInput(column, text) {
-    if (text === null || !asJson(column)) return text
-    const isArray = columnInfo.value[column].dataType.endsWith('[]')
+    const shape = shapeOf(column)
+    if (text === null || !shape) return text
+    const isArray = shape === 'list'
     let value
     try {
       value = JSON.parse(text)
@@ -252,16 +244,16 @@ export function useTableStage(t, connectionReadOnly) {
     for (const draft of staged.inserts) {
       const cols = Object.keys(draft.values)
       if (!cols.length) continue
-      statements.push(buildInsertSql(qualified, cols, cols.map(c => sqlLiteral(draft.values[c]))))
+      statements.push(buildInsertSql(qualified, cols, cols.map(c => sqlLiteral(dialect, draft.values[c]))))
     }
     for (const [key, edits] of Object.entries(staged.edits)) {
-      const where = JSON.parse(key).map((value, i) => `${keyColumns.value[i]} = ${sqlLiteral(value)}`).join(' AND ')
-      const set = Object.entries(edits).map(([column, { value }]) => `${column} = ${sqlLiteral(value)}`)
+      const where = JSON.parse(key).map((value, i) => `${keyColumns.value[i]} = ${sqlLiteral(dialect, value)}`).join(' AND ')
+      const set = Object.entries(edits).map(([column, { value }]) => `${column} = ${sqlLiteral(dialect, value)}`)
       statements.push(buildUpdateSql(qualified, set, where))
     }
     if (staged.deletedKeys.length) {
       const keyCols = keyColumns.value.join(', ')
-      const tuples = staged.deletedKeys.map(key => `(${JSON.parse(key).map(sqlLiteral).join(', ')})`)
+      const tuples = staged.deletedKeys.map(key => `(${JSON.parse(key).map(value => sqlLiteral(dialect, value)).join(', ')})`)
       statements.push(buildDeleteSql(qualified, keyCols, tuples))
     }
     return statements.join('\n\n')
@@ -279,26 +271,26 @@ export function useTableStage(t, connectionReadOnly) {
     }
     const txId = crypto.randomUUID()
     try {
-      await beginTransaction(target.connectionId, txId)
+      await api.beginTransaction(target.connectionId, txId)
       for (const draft of staged.inserts) {
-        const affected = await insertRow(target, Object.entries(draft.values).map(([column, value]) => ({ column, value })), txId)
+        const affected = await api.insertRow(target, Object.entries(draft.values).map(([column, value]) => ({ column, value })), txId)
         if (affected !== 1) throw new Error('An insert failed unexpectedly.')
       }
       for (const [key, edits] of Object.entries(staged.edits)) {
         const where = JSON.parse(key).map((value, i) => ({ column: keyColumns.value[i], value }))
         const set = Object.entries(edits).map(([column, { value }]) => ({ column, value }))
         const before = Object.entries(edits).map(([column, { original }]) => ({ column, value: original }))
-        const affected = await updateRow(target, set, before, where, txId)
+        const affected = await api.updateRow(target, set, before, where, txId)
         if (affected !== 1) throw new Error('A row changed or was deleted since it was loaded.')
       }
       if (staged.deletedKeys.length) {
         const rows = staged.deletedKeys.map(key => JSON.parse(key).map((value, i) => ({ column: keyColumns.value[i], value })))
-        const affected = await deleteRowsApi(target, rows, txId)
+        const affected = await api.deleteRows(target, rows, txId)
         if (affected !== staged.deletedKeys.length) throw new Error('Some rows changed or were already deleted since they were loaded.')
       }
-      await commitTransaction(txId)
+      await api.commitTransaction(txId)
     } catch (e) {
-      await rollbackTransaction(txId).catch(() => {})
+      await api.rollbackTransaction(txId).catch(() => {})
       editError.value = errMessage(e)
       return false
     }

@@ -4,7 +4,7 @@ const listDatabases = vi.fn()
 const listSchemas = vi.fn()
 
 vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases }))
-vi.mock('../engines/postgresql/api/resources', () => ({ listSchemas }))
+vi.mock('../engines/postgresql/api/resources', async (original) => ({ ...(await original()), listSchemas }))
 
 const {
   connDatabases,

@@ -20,6 +20,8 @@ async function rollBackOnClose(run) {
 const PostgresTableWorkspace = defineAsyncComponent(() => import('./PostgresTableWorkspace.vue'))
 const PostgresQueryWorkspace = defineAsyncComponent(() => import('./PostgresQueryWorkspace.vue'))
 
+const ENGINE = 'postgresql'
+
 // Tabs are reactive, which structuredClone can't copy; state and ui are JSON-only.
 const copy = (value) => JSON.parse(JSON.stringify(value))
 
@@ -44,7 +46,7 @@ function tableWorkspace({ target, connectionName }, state = createTableState(), 
     target,
     fields: {
       connectionName: connectionName ?? null,
-      state, ui, runtime: createTableRuntime(target.connectionId),
+      state, ui, runtime: createTableRuntime(ENGINE, target.connectionId),
     },
   }
 }
@@ -58,7 +60,7 @@ function queryWorkspace({ target, connectionName }, sql = '') {
     fields: {
       connectionName: connectionName ?? null,
       state: { sql },
-      runtime: { run: createSqlRun(target.connectionId, database) },
+      runtime: { run: createSqlRun(ENGINE, target.connectionId, database) },
     },
   }
 }
@@ -79,7 +81,7 @@ function searchWorkspace({ target, connectionName }, state = createSearchState()
 export const postgresDefinitions = [
   {
     type: 'postgresql.table_browse',
-    engine: 'postgresql',
+    engine: ENGINE,
     component: PostgresTableWorkspace,
     create: (ctx) => tableWorkspace(fromOpened(ctx.target), createTableState({ rowKey: ctx.options?.rowKey })),
     // Filter mode only reads; SQL mode runs whatever SQL the user wrote.
@@ -92,7 +94,7 @@ export const postgresDefinitions = [
   },
   {
     type: 'postgresql.query',
-    engine: 'postgresql',
+    engine: ENGINE,
     component: PostgresQueryWorkspace,
     create: (ctx) => queryWorkspace(fromOpened(ctx.target)),
     duplicate: (workspace) => queryWorkspace(workspace, workspace.state.sql),
@@ -102,7 +104,7 @@ export const postgresDefinitions = [
   },
   {
     type: 'postgresql.search',
-    engine: 'postgresql',
+    engine: ENGINE,
     component: PostgresSearchWorkspace,
     create: (ctx) => searchWorkspace(fromOpened(ctx.target)),
     duplicate: (workspace) => searchWorkspace(workspace, copy(workspace.state)),

@@ -6,17 +6,3 @@ export function formatCell(value) {
   return String(value)
 }
 
-// How a column's cells are styled, from its format_type() name. Arrays and JSON show
-// as JSON text, so they stay plain whatever their element type.
-const KINDS = [
-  [/^(smallint|integer|bigint|numeric|decimal|real|double precision|money)\b/, 'num'],
-  [/^(text|character|varchar|citext|uuid|name)\b/, 'str'],
-  [/^(timestamp|date|time|interval)\b/, 'date'],
-  [/^boolean$/, 'bool'],
-]
-// An enum column (one listing its labels) is its own kind, whatever its type's name.
-export function cellKind(dataType, enumValues) {
-  if (enumValues?.length) return 'enum'
-  if (!dataType || dataType.endsWith('[]')) return null
-  return KINDS.find(([pattern]) => pattern.test(dataType))?.[1] ?? null
-}

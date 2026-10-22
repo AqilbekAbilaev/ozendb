@@ -6,7 +6,6 @@ import BaseIcon from '../../../components/base/BaseIcon.vue'
 import BaseInput from '../../../components/base/BaseInput.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
-import { cellKind } from './formatCell.js'
 import { operatorsFor, rowsFromParts, partsFromRows } from '../../sql/workspaces/builderRows.js'
 
 // The table tab's Query Builder: its joins, the filter boxes as a list of conditions,
@@ -45,7 +44,7 @@ const kindOptions = computed(() => [
 ])
 const offerOptions = computed(() => props.joinOffers.map((o, i) => ({ value: i, label: o.label })))
 
-const kinds = computed(() => Object.fromEntries(props.columns.map(c => [c, cellKind(props.columnInfo[c]?.dataType, props.columnInfo[c]?.enumValues)])))
+const kinds = computed(() => Object.fromEntries(props.columns.map(c => [c, props.columnInfo[c]?.kind ?? null])))
 
 // Rows are kept here rather than derived, so a condition still missing its value
 // survives; they're re-read only when the boxes change from outside the panel.

@@ -1,6 +1,7 @@
 // PostgreSQL's entry in the engine table (engines/index.js).
 import { buildPostgresFields } from './connection/fields.js'
 import { listSchemas, tableStats } from './api/resources.js'
+import { dialect, api } from './sql.js'
 
 export const postgresql = Object.freeze({
   id: 'postgresql',
@@ -9,6 +10,8 @@ export const postgresql = Object.freeze({
   namesDatabase: true,
   buildFields: buildPostgresFields,
   loadResources: listSchemas,
+  // What the shared SQL tabs (engines/sql) write and call.
+  sql: Object.freeze({ dialect, api }),
   // Only table rows open a stats card here.
   statsTip: Object.freeze({
     kind: () => 'pgTable',

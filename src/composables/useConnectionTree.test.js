@@ -8,7 +8,7 @@ vi.mock('vue', async importOriginal => ({
 }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }))
 vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases: vi.fn() }))
-vi.mock('../engines/postgresql/api/resources', () => ({ listSchemas: vi.fn() }))
+vi.mock('../engines/postgresql/api/resources', async (original) => ({ ...(await original()), listSchemas: vi.fn() }))
 vi.mock('../appApi/connectionState', () => ({ setConnectionOpen: vi.fn() }))
 
 import { onMounted, onUnmounted } from 'vue'

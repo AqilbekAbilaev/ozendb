@@ -1,6 +1,4 @@
-import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
-import { cellKind } from './formatCell.js'
 import { parseFilter } from '../../sql/workspaces/parseFilter.js'
 import { useBuilderPauses } from '../../sql/workspaces/builderPauses.js'
 import { moveInOrder } from '../../../composables/useColumnReorder'
@@ -8,12 +6,12 @@ import { moveInOrder } from '../../../composables/useColumnReorder'
 // Changing what a table tab asks for: its joins, filters, sort and shown columns, and
 // the Query Builder's pauses over them.
 export function useTableQuery(t, paused) {
-  const { target, total, limit, orderBy, descending, error, filterText, filters, shownColumns, columnOrder, view, joins, joinColumns, nextJoinKey, refs, refByKey, loadForeignKeys, goTo, reload } = t
+  const { api, target, total, limit, orderBy, descending, error, filterText, filters, shownColumns, columnOrder, view, joins, joinColumns, nextJoinKey, refs, refByKey, loadForeignKeys, goTo, reload } = t
   const pauses = useBuilderPauses({ shownColumns, orderBy, descending, setShownColumns, setSort }, paused)
 
   async function addJoin({ schema, table, on }) {
     try {
-      const columns = await listColumns({ connectionId: target.connectionId, schema, table })
+      const columns = await api.listColumns({ connectionId: target.connectionId, schema, table })
       const key = nextJoinKey()
       joinColumns.value = { ...joinColumns.value, [key]: columns }
       joins.value = [...joins.value, { key, schema, table, kind: 'left', on }]
@@ -96,7 +94,7 @@ export function useTableQuery(t, paused) {
     limit.value = rowsPerPage
     filters.value = Object.entries(filterText.value).flatMap(([key, text]) => {
       const ref = refByKey.value[key]
-      const parsed = ref && parseFilter(text, cellKind(ref.info.dataType, ref.info.enumValues))
+      const parsed = ref && parseFilter(text, ref.info.kind)
       return parsed ? [{ key, ...parsed }] : []
     })
     total.value = null
