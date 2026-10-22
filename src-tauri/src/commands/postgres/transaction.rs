@@ -5,9 +5,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
-use super::query::{run_wrapped_on, PgQueryResult};
+use super::query::run_wrapped_on;
+use crate::commands::sql::SqlQueryResult;
 use super::row_write::execute_write;
-use super::statement::caller_sql;
+use crate::commands::sql::statement::caller_sql;
+use sqlparser::dialect::PostgreSqlDialect;
 use super::AppContext;
 
 // `failed`: PostgreSQL answers COMMIT of a transaction that hit an error by rolling
@@ -49,8 +51,8 @@ impl PgTransactions {
         self.open.lock().unwrap().get(tx_id).cloned().ok_or_else(ended)
     }
 
-    pub async fn run(&self, tx_id: &str, sql: &str, run_id: Option<&str>) -> Result<PgQueryResult, AppError> {
-        let sql = caller_sql(sql)?;
+    pub async fn run(&self, tx_id: &str, sql: &str, run_id: Option<&str>) -> Result<SqlQueryResult, AppError> {
+        let sql = caller_sql(&PostgreSqlDialect {}, sql)?;
         let held = self.held(tx_id)?;
         let mut held = held.lock().await;
         let tx = held.tx.as_mut().ok_or_else(ended)?;

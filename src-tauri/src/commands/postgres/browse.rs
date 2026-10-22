@@ -1,9 +1,9 @@
 use crate::error::AppError;
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tauri::State;
 
-use super::query::{run_wrapped, PgQueryResult, ROW_RESULT_CAP};
+use super::query::run_wrapped;
+use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, SqlQueryResult, TableJoin, ROW_RESULT_CAP};
 use super::row_write::column_types;
 use super::array_literal::array_literal;
 use super::{primary_key_columns, quote_ident, AppContext};
@@ -11,72 +11,6 @@ use super::{primary_key_columns, quote_ident, AppContext};
 /// Default page size for `browse_pg_table` when the caller sends a non-positive
 /// `limit` — mirrors `find_documents`' `FIND_LIMIT_FALLBACK`.
 const BROWSE_LIMIT_FALLBACK: i64 = 100;
-
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum FilterOp {
-    Eq,
-    Ne,
-    Gt,
-    Gte,
-    Lt,
-    Lte,
-    Contains,
-    StartsWith,
-    /// Any of a comma-separated list.
-    In,
-    IsNull,
-    NotNull,
-}
-
-/// A column of one of the tables in a browse: `table` 0 is the table being browsed,
-/// 1 and on are its joins in order.
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct ColumnRef {
-    #[serde(default)]
-    pub table: usize,
-    pub column: String,
-}
-
-/// One condition on a column of a browsed table (or a join, by `table`). `value` is
-/// text, cast to the column's own type by the server, so `qty > 9` compares numbers,
-/// not strings.
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct ColumnFilter {
-    #[serde(default)]
-    pub table: usize,
-    pub column: String,
-    pub op: FilterOp,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum JoinKind {
-    /// Keeps every row of the tables before it, matched or not.
-    Left,
-    /// Keeps only rows that have a match.
-    Inner,
-}
-
-/// One pair a join matches on: its own `column` equals `equals`, a column of a table
-/// before it.
-#[derive(Debug, Deserialize, Serialize)]
-pub struct JoinOn {
-    pub column: String,
-    pub equals: ColumnRef,
-}
-
-/// A table joined into a browse, matched where every pair in `on` holds — more than one
-/// for a foreign key over several columns.
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TableJoin {
-    pub schema: String,
-    pub table: String,
-    pub kind: JoinKind,
-    pub on: Vec<JoinOn>,
-}
 
 /// `"t<table>"."column"`, refused when `table` names none of the first `tables`.
 fn column_sql(table: usize, column: &str, tables: usize) -> Result<String, AppError> {
@@ -206,7 +140,7 @@ pub(crate) async fn browse_table_impl(
     descending: bool,
     limit: i64,
     offset: i64,
-) -> Result<PgQueryResult, AppError> {
+) -> Result<SqlQueryResult, AppError> {
     let (from_where, binds) = from_where_sql(pool, schema, table, joins, filters).await?;
     let effective_limit = if limit <= 0 { BROWSE_LIMIT_FALLBACK } else { limit.min(ROW_RESULT_CAP) };
     let effective_offset = offset.max(0);
@@ -264,7 +198,7 @@ pub async fn browse_pg_table(
     descending: bool,
     limit: i64,
     offset: i64,
-) -> Result<PgQueryResult, AppError> {
+) -> Result<SqlQueryResult, AppError> {
     let pool = ctx.pg_pool(&id).await?;
     let order = order_by.map(|column| ColumnRef { table: order_table.unwrap_or(0), column });
     let (joins, filters) = (joins.unwrap_or_default(), filters.unwrap_or_default());

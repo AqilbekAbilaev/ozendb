@@ -1,4 +1,8 @@
-use super::format_sql;
+use sqlparser::dialect::PostgreSqlDialect;
+
+fn format_sql(sql: &str) -> Result<String, String> {
+    super::format_sql(&PostgreSqlDialect {}, sql)
+}
 
 #[test]
 fn lays_a_query_out_one_clause_per_line() {
