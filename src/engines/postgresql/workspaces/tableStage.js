@@ -2,8 +2,8 @@ import { computed } from 'vue'
 import { updateRow, deleteRows as deleteRowsApi, insertRow, beginTransaction, commitTransaction, rollbackTransaction } from '../api/queries'
 import { errMessage } from '../../../utils/errors'
 import { formatCell } from './formatCell.js'
-import { buildInsertSql, buildUpdateSql, buildDeleteSql } from './buildStagedSql.js'
-import { gridLayout } from './gridLayout.js'
+import { buildInsertSql, buildUpdateSql, buildDeleteSql } from '../../sql/workspaces/buildStagedSql.js'
+import { gridLayout } from '../../sql/workspaces/gridLayout.js'
 
 const JSON_TYPES = ['json', 'jsonb']
 

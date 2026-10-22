@@ -7,7 +7,7 @@ import BaseInput from '../../../components/base/BaseInput.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { cellKind } from './formatCell.js'
-import { operatorsFor, rowsFromParts, partsFromRows } from './builderRows.js'
+import { operatorsFor, rowsFromParts, partsFromRows } from '../../sql/workspaces/builderRows.js'
 
 // The table tab's Query Builder: its joins, the filter boxes as a list of conditions,
 // the shown columns, and the sort. Changes apply at once, except a value being typed,

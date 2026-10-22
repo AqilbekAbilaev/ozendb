@@ -1,8 +1,8 @@
 import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 import { cellKind } from './formatCell.js'
-import { parseFilter } from './parseFilter.js'
-import { useBuilderPauses } from './builderPauses.js'
+import { parseFilter } from '../../sql/workspaces/parseFilter.js'
+import { useBuilderPauses } from '../../sql/workspaces/builderPauses.js'
 import { moveInOrder } from '../../../composables/useColumnReorder'
 
 // Changing what a table tab asks for: its joins, filters, sort and shown columns, and
