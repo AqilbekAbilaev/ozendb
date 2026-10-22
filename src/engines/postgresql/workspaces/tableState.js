@@ -43,13 +43,14 @@ export function createTableUi() {
 
 // What the tab works out and fetches as it's used: rebuilt fresh, never saved.
 // `generation` counts loads, so only the latest may write back; 0 means never loaded.
-export function createTableRuntime(connectionId) {
+// `engine` names whose commands the tab's SQL runs go through (runSql.js).
+export function createTableRuntime(engine, connectionId) {
   return {
     mainColumns: null, joinColumns: {}, foreignKeys: {}, server: null,
     columns: [], rows: [], total: null, elapsedMs: null,
     loading: false, error: null, editError: null, filterRefusal: null, messages: [],
     generation: 0, builtSql: null, selection: createSelection(),
-    sqlRun: createSqlRun(connectionId), explainRun: createSqlRun(connectionId),
+    sqlRun: createSqlRun(engine, connectionId), explainRun: createSqlRun(engine, connectionId),
     // Staged edits/deletes/inserts, sent to the server only by saveChanges — never
     // saved with the tab, same as a Manual-mode SQL transaction isn't (rolled back on
     // tab close instead). See tableStage.js.

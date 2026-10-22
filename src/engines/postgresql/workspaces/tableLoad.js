@@ -1,5 +1,3 @@
-import { browseTable, countTable, runQuery } from '../api/queries'
-import { listColumns, listForeignKeys } from '../api/resources'
 import { tableErrorText } from '../../sql/workspaces/tableError.js'
 import { createSelection } from '../../../composables/useRowSelection'
 
@@ -8,20 +6,19 @@ import { createSelection } from '../../../composables/useRowSelection'
 // (runtime.generation): a sort clicked while a page is loading must not be overwritten
 // by that older page.
 export function useTableLoad(t) {
-  const { target, runtime, columns, rows, total, elapsedMs, offset, limit, messages, server, orderBy, descending, loading, error, mainColumns, joins, joinColumns, foreignKeys, columnOf, wireFilters, wireJoins } = t
+  const { dialect, api, target, runtime, columns, rows, total, elapsedMs, offset, limit, messages, server, orderBy, descending, loading, error, mainColumns, joins, joinColumns, foreignKeys, columnOf, wireFilters, wireJoins } = t
   function log(ok, text, ms) {
     messages.value = [...messages.value, { at: new Date(), ok, text, ms }]
   }
 
   function loadServer() {
-    const sql = "SELECT current_setting('server_version'), current_setting('server_encoding')"
-    runQuery(target.connectionId, sql)
+    api.runQuery(target.connectionId, dialect.serverSql)
       .then(({ rows: [[version, encoding]] }) => { server.value = { version, encoding } })
       .catch(() => {})
   }
 
   function loadForeignKeys({ schema, table }) {
-    listForeignKeys({ connectionId: target.connectionId, schema, table })
+    api.listForeignKeys({ connectionId: target.connectionId, schema, table })
       .then(list => { foreignKeys.value = { ...foreignKeys.value, [`${schema}.${table}`]: list } })
       .catch(() => {})
   }
@@ -38,22 +35,22 @@ export function useTableLoad(t) {
       // Filters, sort and joins name columns by key, which needs the table's columns:
       // a restored tab has them before it has ever loaded.
       if (!mainColumns.value) {
-        const info = await listColumns(target)
+        const info = await api.listColumns(target)
         if (mine !== runtime.generation) return
         mainColumns.value = info
       }
       const missing = joins.value.filter(j => !joinColumns.value[j.key])
       if (missing.length) {
-        const lists = await Promise.all(missing.map(({ schema, table }) => listColumns({ connectionId: target.connectionId, schema, table })))
+        const lists = await Promise.all(missing.map(({ schema, table }) => api.listColumns({ connectionId: target.connectionId, schema, table })))
         if (mine !== runtime.generation) return
         joinColumns.value = { ...joinColumns.value, ...Object.fromEntries(missing.map((j, i) => [j.key, lists[i]])) }
       }
       const [page, count] = await Promise.all([
-        browseTable(target, {
+        api.browseTable(target, {
           joins: wireJoins.value, filters: wireFilters.value, orderBy: orderBy.value && columnOf(orderBy.value),
           descending: descending.value, limit: limit.value, offset: offset.value,
         }),
-        total.value == null ? countTable(target, wireFilters.value, wireJoins.value) : total.value,
+        total.value == null ? api.countTable(target, wireFilters.value, wireJoins.value) : total.value,
       ])
       if (mine !== runtime.generation) return
       columns.value = page.columns

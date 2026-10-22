@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { buildSelectSql } from './buildSelectSql.js'
+import { dialect } from '../sql.js'
 
 const col = (column, table = 0) => ({ table, column })
 const base = { schema: 'public', table: 'users', filters: [], orderBy: [], descending: false, limit: 100, offset: 0 }
 
 describe('buildSelectSql', () => {
   it('selects a page of the table', () => {
-    expect(buildSelectSql(base)).toBe('SELECT *\nFROM "public"."users"\nLIMIT 100;')
+    expect(buildSelectSql(dialect, base)).toBe('SELECT *\nFROM "public"."users"\nLIMIT 100;')
   })
 
   it('writes each filter as a condition, all of which must hold', () => {
@@ -19,7 +20,7 @@ describe('buildSelectSql', () => {
       { column: 'code', op: 'startsWith', value: '5_' },
       { column: 'mcc', op: 'in', value: '5411, 5812,' },
     ]
-    expect(buildSelectSql({ ...base, filters })).toBe([
+    expect(buildSelectSql(dialect, { ...base, filters })).toBe([
       'SELECT *',
       'FROM "public"."users"',
       'WHERE "age" >= \'30\'',
@@ -34,16 +35,16 @@ describe('buildSelectSql', () => {
   })
 
   it('orders every sort column in the one direction, and pages with OFFSET', () => {
-    const sql = buildSelectSql({ ...base, orderBy: [col('a'), col('b')], descending: true, offset: 200 })
+    const sql = buildSelectSql(dialect, { ...base, orderBy: [col('a'), col('b')], descending: true, offset: 200 })
     expect(sql).toBe('SELECT *\nFROM "public"."users"\nORDER BY "a" DESC, "b" DESC\nLIMIT 100 OFFSET 200;')
   })
 
   it('selects just the chosen columns, in order', () => {
-    expect(buildSelectSql({ ...base, columns: [col('id'), col('n"ame')] })).toBe('SELECT "id", "n""ame"\nFROM "public"."users"\nLIMIT 100;')
+    expect(buildSelectSql(dialect, { ...base, columns: [col('id'), col('n"ame')] })).toBe('SELECT "id", "n""ame"\nFROM "public"."users"\nLIMIT 100;')
   })
 
   it('quotes names and values so neither can break out of the query', () => {
-    const sql = buildSelectSql({
+    const sql = buildSelectSql(dialect, {
       ...base,
       table: 'we"ird',
       filters: [{ column: 'n"ame', op: 'eq', value: "O'Brien" }, { column: 'note', op: 'contains', value: "50%_off\\'" }],
@@ -56,7 +57,7 @@ describe('buildSelectSql', () => {
 
   it('joins related tables, naming every column by its table', () => {
     const joins = [{ schema: 'public', table: 'regions', kind: 'left', on: [{ column: 'id', equals: col('region_id') }] }]
-    const sql = buildSelectSql({
+    const sql = buildSelectSql(dialect, {
       ...base, table: 'merchants', joins,
       filters: [{ table: 1, column: 'name', op: 'contains', value: 'so' }],
       orderBy: [col('name', 1)],
@@ -73,7 +74,7 @@ describe('buildSelectSql', () => {
 
   it('gives a table joined twice a name of its own, and selects chosen columns by table', () => {
     const joins = [{ schema: 'public', table: 'merchants', kind: 'inner', on: [{ column: 'id', equals: col('parent_id') }] }]
-    const sql = buildSelectSql({ ...base, table: 'merchants', joins, columns: [col('name'), col('name', 1)] })
+    const sql = buildSelectSql(dialect, { ...base, table: 'merchants', joins, columns: [col('name'), col('name', 1)] })
     expect(sql).toBe([
       'SELECT "merchants"."name", "merchants_2"."name"',
       'FROM "public"."merchants"',
@@ -84,6 +85,6 @@ describe('buildSelectSql', () => {
 
   it('matches a join on every pair of a key over several columns', () => {
     const joins = [{ schema: 'public', table: 'pairs', kind: 'inner', on: [{ column: 'a', equals: col('x') }, { column: 'b', equals: col('y') }] }]
-    expect(buildSelectSql({ ...base, joins })).toContain('JOIN "public"."pairs" ON "pairs"."a" = "users"."x" AND "pairs"."b" = "users"."y"')
+    expect(buildSelectSql(dialect, { ...base, joins })).toContain('JOIN "public"."pairs" ON "pairs"."a" = "users"."x" AND "pairs"."b" = "users"."y"')
   })
 })

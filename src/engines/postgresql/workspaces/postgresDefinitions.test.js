@@ -31,7 +31,7 @@ describe('postgresql.table_browse', () => {
         { kind: 'table', name: 'users' },
       ],
     })
-    expect(created.fields).toEqual({ connectionName: 'local', state: createTableState(), ui: createTableUi(), runtime: createTableRuntime('c1') })
+    expect(created.fields).toEqual({ connectionName: 'local', state: createTableState(), ui: createTableUi(), runtime: createTableRuntime('postgresql', 'c1') })
   })
 
   // A table tab with a query built, on page 3, a sort paused and the builder open.
@@ -50,7 +50,7 @@ describe('postgresql.table_browse', () => {
     const copy = def.duplicate(tab)
     expect(copy.fields.state).toEqual(tab.state)
     expect(copy.fields.ui).toEqual(tab.ui)
-    expect(copy.fields.runtime).toEqual(createTableRuntime('c1'))
+    expect(copy.fields.runtime).toEqual(createTableRuntime('postgresql', 'c1'))
     copy.fields.state.query.filterText.name = 'changed'
     expect(tab.state.query.filterText.name).toBe('ad')
   })
@@ -78,14 +78,14 @@ describe('postgresql.query', () => {
     const created = def.create({ target: db })
     expect(created.title).toBe('SQL: app')
     expect(created.target).toEqual({ connectionId: 'c1', segments: [{ kind: 'database', name: 'app' }] })
-    expect(created.fields).toEqual({ connectionName: 'local', state: { sql: '' }, runtime: { run: createSqlRun('c1', 'app') } })
+    expect(created.fields).toEqual({ connectionName: 'local', state: { sql: '' }, runtime: { run: createSqlRun('postgresql', 'c1', 'app') } })
   })
 
   it('duplicates the SQL but not the result', () => {
     const tab = tabOf(def.create({ target: db }))
     tab.state.sql = 'SELECT 1'
     Object.assign(tab.runtime.run, { result: { rows: [[1]] }, error: 'x' })
-    expect(def.duplicate(tab).fields).toMatchObject({ state: { sql: 'SELECT 1' }, runtime: { run: createSqlRun('c1', 'app') } })
+    expect(def.duplicate(tab).fields).toMatchObject({ state: { sql: 'SELECT 1' }, runtime: { run: createSqlRun('postgresql', 'c1', 'app') } })
   })
 })
 
@@ -128,16 +128,16 @@ describe('postgresql.search', () => {
 describe('closing a tab with a transaction open', () => {
   it('rolls a query tab\'s transaction back and says so', async () => {
     const def = byType['postgresql.query']
-    await def.dispose({ id: 'q1', runtime: { run: { txId: 'tx-1' } } })
+    await def.dispose({ id: 'q1', runtime: { run: { engine: 'postgresql', txId: 'tx-1' } } })
     expect(rollbackTransaction).toHaveBeenCalledWith('tx-1')
     expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/rolled back/))
 
-    await def.dispose({ id: 'q2', runtime: { run: { txId: null } } })
+    await def.dispose({ id: 'q2', runtime: { run: { engine: 'postgresql', txId: null } } })
     expect(rollbackTransaction).toHaveBeenCalledTimes(1)
   })
 
   it('rolls back a table tab\'s SQL-mode transaction', async () => {
-    await byType['postgresql.table_browse'].dispose({ id: 't1', runtime: { sqlRun: { txId: 'tx-2' } } })
+    await byType['postgresql.table_browse'].dispose({ id: 't1', runtime: { sqlRun: { engine: 'postgresql', txId: 'tx-2' } } })
     expect(rollbackTransaction).toHaveBeenCalledWith('tx-2')
   })
 })

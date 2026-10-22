@@ -18,7 +18,7 @@ vi.mock('../api/queries', () => ({
   browseTable, countTable, updateRow, deleteRows, insertRow, beginTransaction, commitTransaction, rollbackTransaction,
   runQuery, readTableSelect, explainQuery,
 }))
-vi.mock('../api/resources', () => ({ listColumns, listForeignKeys }))
+vi.mock('../api/resources', async (original) => ({ ...(await original()), listColumns, listForeignKeys }))
 vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 
 const { usePostgresTable } = await import('./usePostgresTable.js')
@@ -56,7 +56,7 @@ const tableRef = createResourceRef(target.connectionId, [
   { kind: 'database', name: target.database }, { kind: 'schema', name: target.schema }, { kind: 'table', name: target.table },
 ])
 const tabOf = ({ pageSize, initial } = {}) =>
-  reactive({ target: tableRef, state: initial ?? createTableState({ limit: pageSize }), ui: createTableUi(), runtime: createTableRuntime(target.connectionId) })
+  reactive({ target: tableRef, state: initial ?? createTableState({ limit: pageSize }), ui: createTableUi(), runtime: createTableRuntime('postgresql', target.connectionId), engine: 'postgresql' })
 const table = ({ readOnly, ...start } = {}) => usePostgresTable(tabOf(start), { readOnly })
 
 async function loaded(options) {

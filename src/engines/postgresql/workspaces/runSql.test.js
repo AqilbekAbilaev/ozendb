@@ -13,7 +13,7 @@ vi.mock('../api/library', () => ({ pushHistory }))
 
 const { runSql, cancelSql, explainSql, formatSql, endTransaction, abandonTransaction, createSqlRun } = await import('./runSql.js')
 
-const newRun = (over = {}) => ({ ...createSqlRun('c1'), ...over })
+const newRun = (over = {}) => ({ ...createSqlRun('postgresql', 'c1'), ...over })
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -22,8 +22,8 @@ beforeEach(() => {
 
 describe('createSqlRun', () => {
   it('defaults to no database override, and carries one when given', () => {
-    expect(createSqlRun('c1').database).toBe(null)
-    expect(createSqlRun('c1', 'otherdb').database).toBe('otherdb')
+    expect(createSqlRun('postgresql', 'c1').database).toBe(null)
+    expect(createSqlRun('postgresql', 'c1', 'otherdb').database).toBe('otherdb')
   })
 })
 
@@ -145,13 +145,13 @@ describe('runSql', () => {
 describe('formatSql', () => {
   it('gives the SQL laid out', async () => {
     formatQuery.mockResolvedValue('SELECT\n  1;')
-    expect(await formatSql('select 1')).toEqual({ sql: 'SELECT\n  1;', reason: null })
+    expect(await formatSql(newRun(), 'select 1')).toEqual({ sql: 'SELECT\n  1;', reason: null })
     expect(formatQuery).toHaveBeenCalledWith('select 1')
   })
 
   it('gives SQL it cannot format back as typed, and says why', async () => {
     formatQuery.mockRejectedValue({ code: 'sql', message: 'SQL with comments isn\'t formatted' })
-    expect(await formatSql('select 1 -- x')).toEqual({ sql: 'select 1 -- x', reason: 'SQL with comments isn\'t formatted' })
+    expect(await formatSql(newRun(), 'select 1 -- x')).toEqual({ sql: 'select 1 -- x', reason: 'SQL with comments isn\'t formatted' })
   })
 })
 

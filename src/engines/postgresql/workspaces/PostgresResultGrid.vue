@@ -2,7 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import ContextMenu from '../../../components/base/ContextMenu.vue'
-import { formatCell, cellKind } from './formatCell.js'
+import { formatCell } from './formatCell.js'
 import { valueText, rowsAsTsv, rowsAsJson } from './copyText.js'
 import { useColumnResize } from '../../../composables/useColumnResize'
 import { useColumnReorder } from '../../../composables/useColumnReorder'
@@ -14,7 +14,7 @@ import { useRowVirtualizer } from '../../../composables/useRowVirtualizer'
 // Rows arrive as arrays aligned to `columns` — keys, which `columnInfo` names (with
 // their table, when the tab joins others) — so a repeated column name stays its own
 // column. Sorting and editing are opt-in: the query tab shows results read-only, and
-// without `columnInfo` (types, primary keys), since a query's columns aren't a table's.
+// without `columnInfo` (types, cell kinds, primary keys), since a query's columns aren't a table's.
 // `selection` is kept by whatever holds the rows (createSelection), which starts a fresh
 // one with each new result.
 const props = defineProps({
@@ -43,7 +43,7 @@ const emit = defineEmits(['sort', 'save', 'filter-text', 'apply-filters', 'move-
 const PLACEHOLDERS = { num: 'e.g. >100', date: 'e.g. 2026-09', bool: 'true / false', enum: 'e.g. a, b' }
 
 const filtering = computed(() => Object.values(props.filterText ?? {}).some(text => text?.trim()))
-const kinds = computed(() => props.columns.map(c => cellKind(props.columnInfo[c]?.dataType, props.columnInfo[c]?.enumValues)))
+const kinds = computed(() => props.columns.map(c => props.columnInfo[c]?.kind ?? null))
 
 // Virtualized rows mount as you scroll, so auto table-layout would resize the columns
 // under the pointer. The widths are pinned from the content instead, sampled from the

@@ -1,14 +1,11 @@
-import { readTableSelect } from '../api/queries'
-import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
-import { cellKind } from './formatCell.js'
 import { filterBoxText } from '../../sql/workspaces/parseFilter.js'
 import { runSql } from './runSql.js'
 
 // A table tab's SQL mode: opening it on the SQL the filters amount to, and going back —
 // reading edited SQL into the joins, boxes, sort and page, or saying why they can't show it.
 export function useTableSqlMode(t) {
-  const { target, runtime, total, limit, orderBy, descending, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun, mainColumns, joins, joinColumns, nextJoinKey, pauses, refs, keyColumns, currentSql, loadForeignKeys, goTo } = t
+  const { dialect, api, target, runtime, total, limit, orderBy, descending, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun, mainColumns, joins, joinColumns, nextJoinKey, pauses, refs, keyColumns, currentSql, loadForeignKeys, goTo } = t
   function toSql() {
     openSql(currentSql.value)
     return runSql(sqlRun, sql.value)
@@ -26,7 +23,7 @@ export function useTableSqlMode(t) {
     filterRefusal.value = null
     if (sql.value !== runtime.builtSql) {
       try {
-        filterRefusal.value = await adopt(await readTableSelect(target, sql.value))
+        filterRefusal.value = await adopt(await api.readTableSelect(target, sql.value))
       } catch (e) {
         filterRefusal.value = errMessage(e)
       }
@@ -42,7 +39,7 @@ export function useTableSqlMode(t) {
     if (rowsPerPage == null) return 'the filter view shows a page at a time, so it needs a LIMIT.'
     const nextJoins = await Promise.all(readJoins.map(async ({ schema, table, kind, on }) => ({
       key: nextJoinKey(), schema, table, kind, on,
-      columns: await listColumns({ connectionId: target.connectionId, schema, table }),
+      columns: await api.listColumns({ connectionId: target.connectionId, schema, table }),
     })))
     const keyOf = ({ table, column }) => (table ? `${nextJoins[table - 1].key}.${column}` : column)
     const infoOf = ({ table, column }) => (table ? nextJoins[table - 1].columns : mainColumns.value).find(c => c.name === column)
@@ -52,7 +49,7 @@ export function useTableSqlMode(t) {
     const texts = {}
     for (const f of read) {
       const key = keyOf(f)
-      const text = filterBoxText(f, cellKind(infoOf(f)?.dataType, infoOf(f)?.enumValues))
+      const text = filterBoxText(f, dialect.cellKind(infoOf(f)?.dataType, infoOf(f)?.enumValues))
       if (text == null || key in texts) return `the condition on "${f.column}" can't be typed in its filter box.`
       texts[key] = text
     }

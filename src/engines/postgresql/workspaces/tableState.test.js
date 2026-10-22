@@ -85,18 +85,18 @@ describe('createTableUi', () => {
 
 describe('createTableRuntime', () => {
   it('starts with nothing loaded, and its own SQL and Explain runs on the connection', () => {
-    const runtime = createTableRuntime('c1')
+    const runtime = createTableRuntime('postgresql', 'c1')
     expect(runtime).toMatchObject({
       mainColumns: null, joinColumns: {}, foreignKeys: {}, server: null,
       columns: [], rows: [], total: null, loading: false, error: null, messages: [],
       generation: 0, builtSql: null,
-      sqlRun: createSqlRun('c1'), explainRun: createSqlRun('c1'),
+      sqlRun: createSqlRun('postgresql', 'c1'), explainRun: createSqlRun('postgresql', 'c1'),
     })
     expect(runtime.sqlRun).not.toBe(runtime.explainRun)
   })
 
   it('selects nothing, apart from what its SQL run selects', () => {
-    const runtime = createTableRuntime('c1')
+    const runtime = createTableRuntime('postgresql', 'c1')
     expect(runtime.selection).toEqual({ selectedRow: -1, selectedRows: [], selectedField: null })
     expect(runtime.sqlRun.selection).toEqual(runtime.selection)
     expect(runtime.sqlRun.selection).not.toBe(runtime.selection)
