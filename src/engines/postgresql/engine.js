@@ -8,6 +8,8 @@ export const postgresql = Object.freeze({
   defaultPort: 5432,
   // A PostgreSQL connection names its one database up front.
   namesDatabase: true,
+  // How the server section of the connection editor labels that database.
+  databaseField: Object.freeze({ label: 'Database', placeholder: 'postgres' }),
   buildFields: buildSqlFields,
   loadResources: listSchemas,
   // What the shared SQL tabs (engines/sql) write and call.

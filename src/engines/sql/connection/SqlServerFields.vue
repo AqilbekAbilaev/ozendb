@@ -1,11 +1,13 @@
 <script setup>
 import BaseInput from '../../../components/base/BaseInput.vue'
 import FormField from '../../../components/base/FormField.vue'
+import { ENGINES } from '../../index.js'
 
 const props = defineProps({
   form: { type: Object, required: true },
 })
-const { hosts, database } = props.form
+const { engine, hosts, database } = props.form
+const { databaseField } = ENGINES[engine.value]
 </script>
 
 <template>
@@ -16,8 +18,8 @@ const { hosts, database } = props.form
       <BaseInput class="nc-input" v-model="h.port" type="number" style="flex:1" />
     </div>
   </FormField>
-  <FormField label="Database">
-    <BaseInput class="nc-input" v-model="database" placeholder="postgres" />
+  <FormField :label="databaseField.label">
+    <BaseInput class="nc-input" v-model="database" :placeholder="databaseField.placeholder" />
   </FormField>
 </template>
 

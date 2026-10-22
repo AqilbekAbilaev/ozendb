@@ -4,11 +4,10 @@ import MongoServerFields from './mongodb/connection/MongoServerFields.vue'
 import MongoAuthFields from './mongodb/connection/MongoAuthFields.vue'
 import MongoSslFields from './mongodb/connection/MongoSslFields.vue'
 import MongoAdvancedFields from './mongodb/connection/MongoAdvancedFields.vue'
-import PostgresServerFields from './postgresql/connection/PostgresServerFields.vue'
+import SqlServerFields from './sql/connection/SqlServerFields.vue'
 import SqlAuthFields from './sql/connection/SqlAuthFields.vue'
 import SqlSslFields from './sql/connection/SqlSslFields.vue'
 import { parsePostgresUri } from './postgresql/connection/parseUri.js'
-import MySqlServerFields from './mysql/connection/MySqlServerFields.vue'
 import { parseMySqlUri } from './mysql/connection/parseUri.js'
 import { parseConnectionUri } from '../utils/connectionUri.js'
 import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
@@ -43,7 +42,7 @@ export const CONNECTION_EDITORS = Object.freeze({
   postgresql: {
     tabs: [SERVER, AUTH, SSH, SSL, GENERAL],
     sections: {
-      server: PostgresServerFields,
+      server: SqlServerFields,
       auth: SqlAuthFields,
       ssl: SqlSslFields,
     },
@@ -55,7 +54,7 @@ export const CONNECTION_EDITORS = Object.freeze({
   mysql: {
     tabs: [SERVER, AUTH, SSH, SSL, GENERAL],
     sections: {
-      server: MySqlServerFields,
+      server: SqlServerFields,
       auth: SqlAuthFields,
       ssl: SqlSslFields,
     },
