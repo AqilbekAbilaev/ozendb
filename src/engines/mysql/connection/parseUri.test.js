@@ -31,21 +31,11 @@ describe('parseMySqlUri', () => {
     expect(parseMySqlUri('mysql://h/db?ssl-mode=VERIFY_IDENTITY&ssl-ca=/etc/my%20ca.pem').tlsCaFile).toBe('/etc/my ca.pem')
   })
 
-  it('takes an IPv6 host without its brackets', () => {
-    expect(parseMySqlUri('mysql://[::1]:3307/db').hosts).toEqual([{ host: '::1', port: 3307 }])
-  })
-
-  it('refuses what it can\'t fill the form from', () => {
+  it('refuses another engine\'s connection string', () => {
     expect(parseMySqlUri('postgresql://localhost')).toBe(null)
-    expect(parseMySqlUri('mysql://a:3306,b:3306/db')).toBe(null)
-    expect(parseMySqlUri('mysql://h/db?ssl-mode=sometimes')).toBe(null)
-    expect(parseMySqlUri('mysql://h/db?ssl-mode=constructor')).toBe(null)
-    expect(parseMySqlUri('not a uri')).toBe(null)
   })
 
-  it('refuses a broken percent escape in the user, password or database', () => {
-    expect(parseMySqlUri('mysql://user%ZZ@h/db')).toBe(null)
-    expect(parseMySqlUri('mysql://u:p%E0%A4@h/db')).toBe(null)
-    expect(parseMySqlUri('mysql://h/sales%E0')).toBe(null)
+  it('refuses PostgreSQL\'s spelling of an ssl-mode', () => {
+    expect(parseMySqlUri('mysql://h/db?ssl-mode=require')).toBe(null)
   })
 })

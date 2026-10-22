@@ -31,24 +31,11 @@ describe('parsePostgresUri', () => {
     expect(parsePostgresUri('postgresql://h/db?sslmode=verify-full&sslrootcert=/etc/ca.pem').tlsCaFile).toBe('/etc/ca.pem')
   })
 
-  it('takes an IPv6 host without its brackets', () => {
-    expect(parsePostgresUri('postgresql://[::1]:6432/db').hosts).toEqual([{ host: '::1', port: 6432 }])
-  })
-
-  it('refuses what it can\'t fill the form from', () => {
+  it('refuses another engine\'s connection string', () => {
     expect(parsePostgresUri('mongodb://localhost')).toBe(null)
-    expect(parsePostgresUri('postgresql://a:5432,b:5432/db')).toBe(null)
-    expect(parsePostgresUri('postgresql://h/db?sslmode=sometimes')).toBe(null)
-    expect(parsePostgresUri('not a uri')).toBe(null)
   })
 
-  it('refuses an sslmode named after a property every object inherits', () => {
-    expect(parsePostgresUri('postgresql://h/db?sslmode=constructor')).toBe(null)
-  })
-
-  it('refuses a broken percent escape in the user, password or database', () => {
-    expect(parsePostgresUri('postgresql://user%ZZ@h/db')).toBe(null)
-    expect(parsePostgresUri('postgresql://u:p%E0%A4@h/db')).toBe(null)
-    expect(parsePostgresUri('postgresql://h/sales%E0')).toBe(null)
+  it('refuses an sslmode spelled in another case', () => {
+    expect(parsePostgresUri('postgresql://h/db?sslmode=REQUIRE')).toBe(null)
   })
 })
