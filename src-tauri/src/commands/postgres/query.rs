@@ -4,7 +4,7 @@ use tauri::State;
 
 use super::{cancel, AppContext};
 use crate::commands::sql::{statement::caller_sql, SqlQueryResult, ROW_RESULT_CAP};
-use sqlparser::dialect::PostgreSqlDialect;
+use super::DIALECT;
 
 /// Column names and the `json_build_array(...)` wrapper SQL, built from a
 /// prepared statement's own reported columns — never from the wrapped query or
@@ -172,7 +172,7 @@ async fn run_wrapped_read_only(pool: &sqlx::PgPool, inner_sql: &str, run_id: Opt
 
 /// Runs caller SQL (see `run_pg_query`) — cancellable under `run_id` while it runs.
 pub(crate) async fn run_query_as(pool: &sqlx::PgPool, sql: &str, read_only: bool, run_id: Option<&str>) -> Result<SqlQueryResult, AppError> {
-    let trimmed = caller_sql(&PostgreSqlDialect {}, sql)?;
+    let trimmed = caller_sql(&DIALECT, sql)?;
     if read_only {
         return run_wrapped_read_only(pool, trimmed, run_id).await;
     }

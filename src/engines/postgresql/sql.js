@@ -17,6 +17,8 @@ const KINDS = [
 
 export const dialect = Object.freeze({
   quoteName: (name) => `"${name.replaceAll('"', '""')}"`,
+  // Backslashes stay as they are: a PostgreSQL string gives them no meaning. An engine
+  // whose strings do (MySQL) doubles them here, which also keeps LIKE's escapes intact.
   quoteText: (text) => `'${text.replaceAll("'", "''")}'`,
   // `pattern` is a LIKE pattern, escaped with backslashes — ILIKE's default escape.
   like: (column, pattern) => `${column}::text ILIKE ${dialect.quoteText(pattern)}`,
@@ -27,8 +29,8 @@ export const dialect = Object.freeze({
     return KINDS.find(([pattern]) => pattern.test(dataType))?.[1] ?? null
   },
   // Arrays are edited as the JSON list the grid shows, json and jsonb as JSON.
-  jsonShape(dataType = '') {
-    if (dataType.endsWith('[]')) return 'list'
+  jsonShape(dataType) {
+    if (dataType?.endsWith('[]')) return 'list'
     return dataType === 'json' || dataType === 'jsonb' ? 'json' : null
   },
   // PostgreSQL never accepts a value for an identity-always or stored generated column.

@@ -14,7 +14,7 @@
 use crate::commands::sql::statement::caller_sql;
 use crate::error::AppError;
 use futures_util::TryStreamExt;
-use sqlparser::dialect::PostgreSqlDialect;
+use super::DIALECT;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use tauri::State;
@@ -90,7 +90,7 @@ fn write_all<W: Write>(out: &mut W, bytes: &[u8]) -> Result<(), AppError> {
 /// A table's SELECT, its names quoted by the server: COPY takes no bind parameters.
 async fn inner_sql(conn: &mut sqlx::PgConnection, source: &PgExportSource) -> Result<String, AppError> {
     match source.kind()? {
-        SourceKind::Query(query) => Ok(caller_sql(&PostgreSqlDialect {}, query)?.to_string()),
+        SourceKind::Query(query) => Ok(caller_sql(&DIALECT, query)?.to_string()),
         SourceKind::Table(schema, table) => sqlx::query_scalar("SELECT format('SELECT * FROM %I.%I', $1, $2)")
             .bind(schema)
             .bind(table)

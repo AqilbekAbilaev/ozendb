@@ -2,6 +2,9 @@ use crate::error::AppError;
 
 pub(super) use super::AppContext;
 
+/// How PostgreSQL's SQL reads, for the shared readers in `commands/sql`.
+pub(super) const DIALECT: sqlparser::dialect::PostgreSqlDialect = sqlparser::dialect::PostgreSqlDialect {};
+
 pub mod schema;
 pub mod stats;
 pub mod serverinfo;

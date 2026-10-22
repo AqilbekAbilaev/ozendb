@@ -64,10 +64,9 @@ export function useTableStage(t, connectionReadOnly) {
     return row === null ? '+' : offset.value + row + 1
   }
 
-  // Only the browsed table's own cells are editable, by its primary key — and never
-  // a column the server won't take a value for (dialect.takesValue). Arrays aren't editable yet: their text form (`{a,b}`) isn't what the
-  // grid shows. A draft insert row skips the primary-key gate entirely — an insert
-  // needs no WHERE clause.
+  // Only the browsed table's own cells are editable, by its primary key — and never a
+  // column the server won't take a value for (dialect.takesValue). A draft insert row
+  // skips the primary-key gate entirely — an insert needs no WHERE clause.
   function canEdit(key, index) {
     const ref = refByKey.value[key]
     const column = ref?.info?.name ?? key
@@ -76,8 +75,8 @@ export function useTableStage(t, connectionReadOnly) {
     return canEditInsertColumn(column)
   }
 
-  // The same exclusion, for a staged insert's draft cells — which
-  // have no `refByKey` entry to read it from, since they aren't part of the loaded page.
+  // The same exclusion, for a staged insert's draft cells — which have no `refByKey`
+  // entry to read it from, since they aren't part of the loaded page.
   function canEditInsertColumn(column) {
     if (locked()) return false
     return dialect.takesValue(columnInfo.value[column])
@@ -87,7 +86,7 @@ export function useTableStage(t, connectionReadOnly) {
   const shapeOf = (column) => dialect.jsonShape(columnInfo.value[column]?.dataType)
 
   // The editor's starting text: JSON (so a string keeps its quotes and saving it
-  // unchanged parses back) where asJson, everything else as displayed, NULL as empty.
+  // unchanged parses back) where shapeOf says so, everything else as displayed, NULL as empty.
   function editText(column, value) {
     if (value === null) return ''
     return shapeOf(column) ? JSON.stringify(value) : formatCell(value)

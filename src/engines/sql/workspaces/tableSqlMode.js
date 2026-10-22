@@ -5,7 +5,7 @@ import { runSql } from './runSql.js'
 // A table tab's SQL mode: opening it on the SQL the filters amount to, and going back —
 // reading edited SQL into the joins, boxes, sort and page, or saying why they can't show it.
 export function useTableSqlMode(t) {
-  const { dialect, api, target, runtime, total, limit, orderBy, descending, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun, mainColumns, joins, joinColumns, nextJoinKey, pauses, refs, keyColumns, currentSql, loadForeignKeys, goTo } = t
+  const { api, kindOf, target, runtime, total, limit, orderBy, descending, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun, mainColumns, joins, joinColumns, nextJoinKey, pauses, refs, keyColumns, currentSql, loadForeignKeys, goTo } = t
   function toSql() {
     openSql(currentSql.value)
     return runSql(sqlRun, sql.value)
@@ -49,7 +49,7 @@ export function useTableSqlMode(t) {
     const texts = {}
     for (const f of read) {
       const key = keyOf(f)
-      const text = filterBoxText(f, dialect.cellKind(infoOf(f)?.dataType, infoOf(f)?.enumValues))
+      const text = filterBoxText(f, kindOf(infoOf(f)))
       if (text == null || key in texts) return `the condition on "${f.column}" can't be typed in its filter box.`
       texts[key] = text
     }

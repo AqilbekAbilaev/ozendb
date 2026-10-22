@@ -58,6 +58,7 @@ describe('jsonShape', () => {
   it('edits every other type as plain text', () => {
     expect(jsonShape('character varying(20)')).toBe(null)
     expect(jsonShape(undefined)).toBe(null)
+    expect(jsonShape(null)).toBe(null)
   })
 })
 

@@ -9,8 +9,9 @@ import { mergeColumnOrder } from '../../../composables/useColumnReorder'
 // `t` is the tab's shared context (useSqlTable).
 export function useTableDerived(t) {
   const { dialect, target, columns, rows, total, offset, limit, orderBy, descending, filters, shownColumns, columnOrder, mainColumns, joins, joinColumns, foreignKeys } = t
-  // Each column's info carries its cellKind, worked out once here for every reader.
-  const withKinds = (columns) => columns.map(info => ({ ...info, kind: dialect.cellKind(info.dataType, info.enumValues) }))
+  // A column's cellKind, by the engine's rules. Every column in `refs` carries it as `kind`.
+  const kindOf = (info) => dialect.cellKind(info?.dataType, info?.enumValues)
+  const withKinds = (columns) => columns.map(info => ({ ...info, kind: kindOf(info) }))
   const refs = computed(() => columnRefs(mainColumns.value && joins.value.every(j => joinColumns.value[j.key])
     ? [{ key: '', columns: mainColumns.value }, ...joins.value.map(j => ({ key: j.key, columns: joinColumns.value[j.key] }))]
         .map(({ key, columns }) => ({ key, columns: withKinds(columns) }))
@@ -54,5 +55,5 @@ export function useTableDerived(t) {
     offset: offset.value,
   }))
 
-  return { refs, refByKey, tableNames, columnInfo, columnOf, wireFilters, wireJoins, joinOffers, keyColumns, hasPrev, activeFilters, hasNext, keys, at, view, currentSql }
+  return { kindOf, refs, refByKey, tableNames, columnInfo, columnOf, wireFilters, wireJoins, joinOffers, keyColumns, hasPrev, activeFilters, hasNext, keys, at, view, currentSql }
 }
