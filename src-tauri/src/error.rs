@@ -8,6 +8,10 @@ pub enum AppError {
     #[error("Postgres error: {0}")]
     Postgres(#[from] sqlx::Error),
 
+    // No `#[from]`: sqlx has one error type for both engines, and `?` already picks Postgres.
+    #[error("MySQL error: {0}")]
+    MySql(sqlx::Error),
+
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -107,6 +111,7 @@ impl AppError {
         match self {
             AppError::Mongo(e) => mongo_code(e),
             AppError::Postgres(e) => postgres_code(e),
+            AppError::MySql(e) => mysql_code(e),
             AppError::Io(_) => "io",
             AppError::Serde(_) => "serde",
             AppError::Unreachable { .. } => "unreachable",
@@ -157,6 +162,7 @@ impl AppError {
         match self {
             AppError::Mongo(e) => mongo_message(e),
             AppError::Postgres(e) => postgres_message(e),
+            AppError::MySql(sqlx::Error::Database(db_err)) => db_err.message().to_string(),
             _ => self.to_string(),
         }
     }
@@ -275,11 +281,28 @@ fn postgres_code(e: &sqlx::Error) -> &'static str {
             Some("42P01") | Some("3F000") => "missing",
             _ => "command",
         },
-        sqlx::Error::Tls(_) => "tls",
+        _ => sqlx_code(e).unwrap_or("postgres"),
+    }
+}
+
+/// `postgres_code` for MySQL. Only the server's own errors differ between the two.
+fn mysql_code(e: &sqlx::Error) -> &'static str {
+    match e {
+        // SQLSTATE 28000 is MySQL's access-denied class too (error 1045 among them).
+        sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("28000") => "auth",
+        sqlx::Error::Database(_) => "command",
+        _ => sqlx_code(e).unwrap_or("mysql"),
+    }
+}
+
+/// The code for a sqlx error that never reached the server, whichever engine it was dialling.
+fn sqlx_code(e: &sqlx::Error) -> Option<&'static str> {
+    match e {
+        sqlx::Error::Tls(_) => Some("tls"),
         sqlx::Error::Io(_) | sqlx::Error::PoolTimedOut | sqlx::Error::PoolClosed
-        | sqlx::Error::WorkerCrashed => "network",
-        sqlx::Error::Configuration(_) | sqlx::Error::InvalidArgument(_) => "validation",
-        _ => "postgres",
+        | sqlx::Error::WorkerCrashed => Some("network"),
+        sqlx::Error::Configuration(_) | sqlx::Error::InvalidArgument(_) => Some("validation"),
+        _ => None,
     }
 }
 

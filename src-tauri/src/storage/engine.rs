@@ -177,6 +177,14 @@ impl EngineConfig {
             _ => None,
         }
     }
+
+    /// The MySQL settings, or `None` on any other connection.
+    pub fn as_mysql(&self) -> Option<&MySqlConfig> {
+        match self {
+            EngineConfig::MySql(config) => Some(config),
+            _ => None,
+        }
+    }
 }
 
 impl MongoConfig {

@@ -1,4 +1,4 @@
-use super::{default_port_for, mongo_config, postgres_config, tunnel_params};
+use super::{default_port_for, mongo_config, mysql_config, postgres_config, tunnel_params};
 use crate::ssh::SshAuth;
 use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoConfig, MySqlConfig, PostgresConfig};
 
@@ -27,6 +27,13 @@ fn postgres_config_passes_postgres_and_rejects_mongo() {
     assert!(postgres_config(&config(Engine::Postgres)).is_ok());
     assert_eq!(postgres_config(&config(Engine::Mongo)).unwrap_err().code(), "validation");
     assert_eq!(postgres_config(&config(Engine::MySql)).unwrap_err().code(), "validation");
+}
+
+#[test]
+fn mysql_config_passes_mysql_and_rejects_the_others() {
+    assert!(mysql_config(&config(Engine::MySql)).is_ok());
+    assert_eq!(mysql_config(&config(Engine::Mongo)).unwrap_err().code(), "validation");
+    assert_eq!(mysql_config(&config(Engine::Postgres)).unwrap_err().code(), "validation");
 }
 
 #[test]

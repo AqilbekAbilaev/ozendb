@@ -17,8 +17,11 @@ use ssh::open_test_tunnel;
 mod postgres;
 use postgres::test_postgres_connection;
 
+mod mysql;
+use mysql::test_mysql_connection;
+
 mod fields;
-use fields::{ConnectionFields, EngineFields};
+use fields::ConnectionFields;
 
 mod purge;
 use purge::ConnectionData;
@@ -26,8 +29,8 @@ use purge::ConnectionData;
 mod edit;
 
 /// Test the connection the editor currently describes, without saving it. Dials
-/// through `uri::build_uri` (MongoDB) or `postgres::uri::build_options` (PostgreSQL) — the
-/// same functions the real connect paths use — so a green test means the connection
+/// through `uri::build_uri` (MongoDB), `postgres::uri::build_options` (PostgreSQL) or
+/// `mysql::uri::build_options` (MySQL) — the same functions the real connect paths use — so a green test means the connection
 /// will be dialled exactly the way it was tested.
 ///
 /// `id` is set when editing an existing connection, where a blank password field means
@@ -43,11 +46,6 @@ pub async fn test_connection(
     id: Option<String>,
     fields: ConnectionFields,
 ) -> Result<(), AppError> {
-    // A MySQL test can't run yet (see not_available), so it is refused before any keychain
-    // read or SSH prompt.
-    if matches!(fields.engine, EngineFields::MySql(_)) {
-        return Err(crate::mysql::not_available());
-    }
     let existing = id.as_deref().and_then(|val| ctx.storage.find(val));
     let typed_or_stored = |typed: Option<String>, key: Option<String>| {
         typed.filter(|s| !s.is_empty()).or_else(|| key.as_deref().and_then(crate::keychain::get))
@@ -69,7 +67,9 @@ pub async fn test_connection(
         EngineConfig::Mongo(mongo) => {
             test_mongo_connection(&config, mongo, password.as_deref(), via).await
         }
-        EngineConfig::MySql(_) => Err(crate::mysql::not_available()),
+        EngineConfig::MySql(mysql) => {
+            test_mysql_connection(&config, mysql, password.as_deref(), via).await
+        }
     }
 }
 
@@ -177,9 +177,7 @@ pub async fn save_connection(
     let warm = match &config.engine {
         EngineConfig::Postgres(_) => ctx.pool.connect_postgres(&config, None).await.map(|_| ()),
         EngineConfig::Mongo(_) => ctx.pool.connect(&config).await.map(|_| ()),
-        // Saving must still succeed while there is nothing to warm.
-        // TODO #386: warm a MySQL pool here once one can connect.
-        EngineConfig::MySql(_) => Ok(()),
+        EngineConfig::MySql(_) => ctx.pool.connect_mysql(&config, None).await.map(|_| ()),
     };
     warm?;
 
