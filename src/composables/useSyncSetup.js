@@ -18,7 +18,7 @@ const MESSAGES = {
   sync_not_set_up: 'The new keys were lost. Choose your sync password again.',
 }
 
-function setupErrorText(e) {
+export function setupErrorText(e) {
   return MESSAGES[errCode(e)] || accountErrorText(e)
 }
 

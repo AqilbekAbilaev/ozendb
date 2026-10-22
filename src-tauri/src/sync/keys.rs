@@ -33,6 +33,11 @@ impl SyncKeys {
         Self { data_key, wrapped_key, recovery_wrapped_key }
     }
 
+    /// The same data key with other wrapped copies of it.
+    pub fn relocked(self, wrapped_key: Vec<u8>, recovery_wrapped_key: Option<Vec<u8>>) -> Self {
+        Self { wrapped_key, recovery_wrapped_key, ..self }
+    }
+
     /// The keys as a sync pass takes them.
     pub fn keys(&self) -> Keys<'_> {
         Keys { data_key: &self.data_key, wrapped_key: &self.wrapped_key, recovery_wrapped_key: self.recovery_wrapped_key.as_deref() }

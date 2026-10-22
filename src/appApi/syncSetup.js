@@ -7,6 +7,8 @@
 // backend keeps the keys, so calling it again shows no new recovery key.
 // Another device: `unlockSyncWithPassword` or `unlockSyncWithRecoveryKey`; the first
 // sync then runs on its own and reports through the `sync-status` event.
+// Once set up: `changeSyncPassword(password)` locks the account's key with a new password,
+// and `replaceRecoveryKey()` answers a new recovery key to show once; the old one stops working.
 
 import { invoke } from '@tauri-apps/api/core'
 
@@ -28,4 +30,12 @@ export function unlockSyncWithPassword(password) {
 
 export function unlockSyncWithRecoveryKey(recoveryKey) {
   return invoke('unlock_sync_with_recovery_key', { recoveryKey })
+}
+
+export function changeSyncPassword(password) {
+  return invoke('change_sync_password', { password })
+}
+
+export function replaceRecoveryKey() {
+  return invoke('replace_recovery_key')
 }
