@@ -1,4 +1,4 @@
-// A PostgreSQL table tab's lasting state: what the user built, as JSON-only data a
+// A SQL table tab's lasting state: what the user built, as JSON-only data a
 // session saves (and sync will later share). Nothing derived or fetched lives here —
 // column info, SQL text and rows are worked out from it. See
 // .local-docs/postgresql-tab-objects.md.

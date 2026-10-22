@@ -4,8 +4,8 @@
 import { defineAsyncComponent } from 'vue'
 import PostgresSearchWorkspace from './PostgresSearchWorkspace.vue'
 import { createResourceRef, segmentName } from '../../../utils/resourceRef'
-import { createTableState, createTableUi, createTableRuntime, migrateTableState } from './tableState.js'
-import { abandonTransaction, createSqlRun } from './runSql.js'
+import { createTableState, createTableUi, createTableRuntime, migrateTableState } from '../../sql/workspaces/tableState.js'
+import { abandonTransaction, createSqlRun } from '../../sql/workspaces/runSql.js'
 import { createSearchState, createSearchRuntime, cancelSearch } from './searchRun.js'
 import { showToast } from '../../../stores/toast'
 
@@ -17,8 +17,8 @@ async function rollBackOnClose(run) {
 
 // Both carry the SQL editor (CodeMirror), so they load when the first tab opens rather
 // than at launch. Module scope keeps each one a single component identity.
-const PostgresTableWorkspace = defineAsyncComponent(() => import('./PostgresTableWorkspace.vue'))
-const PostgresQueryWorkspace = defineAsyncComponent(() => import('./PostgresQueryWorkspace.vue'))
+const SqlTableWorkspace = defineAsyncComponent(() => import('../../sql/workspaces/SqlTableWorkspace.vue'))
+const SqlQueryWorkspace = defineAsyncComponent(() => import('../../sql/workspaces/SqlQueryWorkspace.vue'))
 
 const ENGINE = 'postgresql'
 
@@ -82,7 +82,7 @@ export const postgresDefinitions = [
   {
     type: 'postgresql.table_browse',
     engine: ENGINE,
-    component: PostgresTableWorkspace,
+    component: SqlTableWorkspace,
     create: (ctx) => tableWorkspace(fromOpened(ctx.target), createTableState({ rowKey: ctx.options?.rowKey })),
     // Filter mode only reads; SQL mode runs whatever SQL the user wrote.
     canRefresh: (workspace) => workspace.state.mode === 'filter',
@@ -95,7 +95,7 @@ export const postgresDefinitions = [
   {
     type: 'postgresql.query',
     engine: ENGINE,
-    component: PostgresQueryWorkspace,
+    component: SqlQueryWorkspace,
     create: (ctx) => queryWorkspace(fromOpened(ctx.target)),
     duplicate: (workspace) => queryWorkspace(workspace, workspace.state.sql),
     serialize: (workspace) => ({ sql: workspace.state.sql }),

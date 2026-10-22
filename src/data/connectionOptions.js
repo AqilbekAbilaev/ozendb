@@ -99,6 +99,8 @@ export const ENGINE_OPTIONS = [
   { value: 'postgresql', label: 'PostgreSQL', badge: 'PG' },
 ]
 
+export const engineLabel = (engine) => ENGINE_OPTIONS.find(e => e.value === engine).label
+
 // `available: false` modes are shown disabled and badged "soon" rather than hidden,
 // so the list reads as the full set of what MongoDB supports.
 const AUTH_MODES = [

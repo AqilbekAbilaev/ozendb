@@ -1,4 +1,4 @@
-// Every shape a PostgreSQL table tab has been saved in, as the v2 session record's
+// Every shape a SQL table tab has been saved in, as the v2 session record's
 // `state`, with what the tab must ask for once restored. A new saved shape adds a
 // fixture here; none is ever removed, since old sessions stay on disk.
 

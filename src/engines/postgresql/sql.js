@@ -1,8 +1,10 @@
 // What the shared SQL tabs (engines/sql) need from PostgreSQL: how its SQL is written,
-// and the commands they call. Reached through the engine table as `engineOf(x).sql`.
+// the commands they call, how to read its Explain output, and its own windows. Reached
+// through the engine table as `engineOf(x).sql`.
 import * as queries from './api/queries.js'
 import { listColumns, listForeignKeys } from './api/resources.js'
 import * as library from './api/library.js'
+import { planRows } from './workspaces/planRows.js'
 
 // How a column's cells are styled, from its format_type() name. Arrays and JSON show
 // as JSON text, so they stay plain whatever their element type.
@@ -35,3 +37,11 @@ export const dialect = Object.freeze({
 })
 
 export const api = Object.freeze({ ...queries, listColumns, listForeignKeys, ...library })
+
+export const postgresSql = Object.freeze({
+  dialect,
+  api,
+  readPlan: planRows,
+  // modalRegistry names: exporting a query's rows, and a table's row-edit history.
+  modals: Object.freeze({ export: 'pgExport', rowHistory: 'pgRowHistory' }),
+})

@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import WorkspaceCrumbs from '../../../components/base/WorkspaceCrumbs.vue'
-import PostgresSqlPanel from './PostgresSqlPanel.vue'
+import SqlPanel from './SqlPanel.vue'
 import { crumbSegments } from '../../../utils/crumbSegments'
 
 const props = defineProps({
@@ -12,7 +12,7 @@ const items = computed(() => crumbSegments({ connection: props.activeTab.connect
 </script>
 
 <template>
-  <PostgresSqlPanel v-model:sql="activeTab.state.sql" :run="activeTab.runtime.run">
-    <WorkspaceCrumbs engine="postgresql" :items="items" />
-  </PostgresSqlPanel>
+  <SqlPanel v-model:sql="activeTab.state.sql" :run="activeTab.runtime.run">
+    <WorkspaceCrumbs :engine="activeTab.engine" :items="items" />
+  </SqlPanel>
 </template>

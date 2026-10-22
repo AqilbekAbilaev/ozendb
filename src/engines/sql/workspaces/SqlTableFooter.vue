@@ -3,10 +3,12 @@ import { computed } from 'vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
+import { engineLabel } from '../../../data/connectionOptions.js'
 
-// The table tab's status line. `t` is the tab's usePostgresTable state.
+// The table tab's status line. `t` is the tab's useSqlTable state, `engine` its engine.
 const props = defineProps({
-  t: { type: Object, required: true },
+  t:      { type: Object, required: true },
+  engine: { type: String, required: true },
 })
 
 const range = computed(() => {
@@ -17,7 +19,7 @@ const range = computed(() => {
 </script>
 
 <template>
-  <div class="pg-footer">
+  <div class="sql-footer">
     <span>{{ range }}</span>
     <span v-if="t.elapsedMs != null" class="fitem"><BaseIcon name="clock" :size="14" /> {{ t.elapsedMs }} ms</span>
     <span v-if="t.activeFilters" class="fitem">
@@ -34,13 +36,13 @@ const range = computed(() => {
     </span>
     <template v-if="t.server">
       <span>{{ t.server.encoding }}</span>
-      <span>PostgreSQL {{ t.server.version }}</span>
+      <span>{{ engineLabel(engine) }} {{ t.server.version }}</span>
     </template>
   </div>
 </template>
 
 <style scoped>
-.pg-footer {
+.sql-footer {
   display: flex; align-items: center; gap: 16px; flex: none;
   padding: 4px 12px; font-size: 12px; color: var(--text-dim);
   border-top: 1px solid var(--border); background: var(--bg-panel);

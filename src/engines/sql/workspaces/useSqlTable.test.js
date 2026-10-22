@@ -14,14 +14,14 @@ const listForeignKeys = vi.fn()
 const runQuery = vi.fn()
 const readTableSelect = vi.fn()
 const explainQuery = vi.fn()
-vi.mock('../api/queries', () => ({
+vi.mock('../../postgresql/api/queries', () => ({
   browseTable, countTable, updateRow, deleteRows, insertRow, beginTransaction, commitTransaction, rollbackTransaction,
   runQuery, readTableSelect, explainQuery,
 }))
-vi.mock('../api/resources', async (original) => ({ ...(await original()), listColumns, listForeignKeys }))
-vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
+vi.mock('../../postgresql/api/resources', async (original) => ({ ...(await original()), listColumns, listForeignKeys }))
+vi.mock('../../postgresql/api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 
-const { usePostgresTable } = await import('./usePostgresTable.js')
+const { useSqlTable } = await import('./useSqlTable.js')
 const { createTableState, createTableUi, createTableRuntime } = await import('./tableState.js')
 const { createResourceRef } = await import('../../../utils/resourceRef')
 
@@ -57,7 +57,7 @@ const tableRef = createResourceRef(target.connectionId, [
 ])
 const tabOf = ({ pageSize, initial } = {}) =>
   reactive({ target: tableRef, state: initial ?? createTableState({ limit: pageSize }), ui: createTableUi(), runtime: createTableRuntime('postgresql', target.connectionId), engine: 'postgresql' })
-const table = ({ readOnly, ...start } = {}) => usePostgresTable(tabOf(start), { readOnly })
+const table = ({ readOnly, ...start } = {}) => useSqlTable(tabOf(start), { readOnly })
 
 async function loaded(options) {
   const t = table(options)
@@ -388,7 +388,7 @@ describe('explain', () => {
 describe('snapshot and restore', () => {
   it('keeps what the user builds in the tab\'s state, which a new view of the tab starts from', async () => {
     const tab = tabOf()
-    const t = usePostgresTable(tab)
+    const t = useSqlTable(tab)
     await t.load()
     t.setFilterText('name', 'ad')
     await t.applyFilters(25)
@@ -989,7 +989,7 @@ describe('a table that is gone or unreadable', () => {
 describe('panel state', () => {
   it('keeps the builder and result sub-tab in the tab\'s ui, starting closed on Result', () => {
     const tab = tabOf()
-    const t = usePostgresTable(tab)
+    const t = useSqlTable(tab)
     expect(t.panel).toEqual({ builderOpen: false, builderWidth: 360, rtab: 'Result' })
     t.panel.builderOpen = true
     expect(tab.ui.builderOpen).toBe(true)
@@ -997,7 +997,7 @@ describe('panel state', () => {
 
   it('writes the SQL and the mode into the tab\'s state', async () => {
     const tab = tabOf()
-    const t = usePostgresTable(tab)
+    const t = useSqlTable(tab)
     await t.load()
     t.openSql('SELECT 2')
     expect(tab.state).toMatchObject({ mode: 'sql', sql: 'SELECT 2' })

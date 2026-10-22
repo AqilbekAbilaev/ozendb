@@ -1,8 +1,8 @@
 import { computed } from 'vue'
 import { errMessage } from '../../../utils/errors'
 import { formatCell } from './formatCell.js'
-import { buildInsertSql, buildUpdateSql, buildDeleteSql } from '../../sql/workspaces/buildStagedSql.js'
-import { gridLayout } from '../../sql/workspaces/gridLayout.js'
+import { buildInsertSql, buildUpdateSql, buildDeleteSql } from './buildStagedSql.js'
+import { gridLayout } from './gridLayout.js'
 
 // A row's identity as a stable string, from its primary-key columns' loaded values —
 // what `edits`/`deletedKeys` key by, and what a staged insert (no real identity yet)

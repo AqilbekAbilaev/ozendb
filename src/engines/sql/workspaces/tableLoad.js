@@ -1,4 +1,4 @@
-import { tableErrorText } from '../../sql/workspaces/tableError.js'
+import { tableErrorText } from './tableError.js'
 import { createSelection } from '../../../composables/useRowSelection'
 
 // Loading a table tab's page and count, and what the view fetches once: the server's

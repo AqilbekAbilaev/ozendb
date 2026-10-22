@@ -11,7 +11,7 @@ import { queryDefinitions } from '../engines/mongodb/workspaces/queryDefinitions
 import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
 import { postgresDefinitions } from '../engines/postgresql/workspaces/postgresDefinitions'
 import { legacy, expected, sessions } from './sessionMigration.fixtures'
-import { migrateTableState } from '../engines/postgresql/workspaces/tableState'
+import { migrateTableState } from '../engines/sql/workspaces/tableState'
 import { isCollectionTab } from '../utils/workspaceTypes'
 import { createResourceRef } from '../utils/resourceRef'
 
