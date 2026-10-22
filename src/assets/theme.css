@@ -32,6 +32,8 @@
   --eng-mongodb-text:     #cdebd8;
   --eng-postgresql-bg:    #2e4f78;
   --eng-postgresql-text:  #d3e2f5;
+  --eng-mysql-bg:         #6b4320;
+  --eng-mysql-text:       #f5dcc4;
   --bg-menu:       #2b2d31;   /* context / dropdown / cell menus */
   --bg-field:      #2a2c30;   /* raised input-like fields (query bar) */
   --success-bg:     #1a3a1a;  /* success callout (connection test) */
@@ -87,6 +89,8 @@
   --eng-mongodb-text:     #1f5a3a;
   --eng-postgresql-bg:    #dbe7f6;
   --eng-postgresql-text:  #23497a;
+  --eng-mysql-bg:         #fbe3cf;
+  --eng-mysql-text:       #7a4515;
   --bg-menu:       #ffffff;
   --bg-field:      #ffffff;
   --success-bg:     #e6f4ea;

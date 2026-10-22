@@ -8,8 +8,9 @@
 // engines/ui.js.
 import { mongodb } from './mongodb/engine.js'
 import { postgresql } from './postgresql/engine.js'
+import { mysql } from './mysql/engine.js'
 
-export const ENGINES = Object.freeze({ mongodb, postgresql })
+export const ENGINES = Object.freeze({ mongodb, postgresql, mysql })
 
 // A connection, tab or tree node saved before engines existed carries none: it is MongoDB.
 export const DEFAULT_ENGINE = 'mongodb'
