@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import { buildSelectSql, aliases } from './buildSelectSql.js'
-import { columnRefs } from './columnRefs.js'
-import { joinOffers as offersFor } from './joinOffers.js'
+import { columnRefs } from '../../sql/workspaces/columnRefs.js'
+import { joinOffers as offersFor } from '../../sql/workspaces/joinOffers.js'
 import { mergeColumnOrder } from '../../../composables/useColumnReorder'
 
 // What a table tab's view works out from its state and runtime: column refs and info,

@@ -1,6 +1,6 @@
 import { browseTable, countTable, runQuery } from '../api/queries'
 import { listColumns, listForeignKeys } from '../api/resources'
-import { tableErrorText } from './tableError.js'
+import { tableErrorText } from '../../sql/workspaces/tableError.js'
 import { createSelection } from '../../../composables/useRowSelection'
 
 // Loading a table tab's page and count, and what the view fetches once: the server's

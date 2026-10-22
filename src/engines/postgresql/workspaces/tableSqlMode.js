@@ -2,7 +2,7 @@ import { readTableSelect } from '../api/queries'
 import { listColumns } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 import { cellKind } from './formatCell.js'
-import { filterBoxText } from './parseFilter.js'
+import { filterBoxText } from '../../sql/workspaces/parseFilter.js'
 import { runSql } from './runSql.js'
 
 // A table tab's SQL mode: opening it on the SQL the filters amount to, and going back —
