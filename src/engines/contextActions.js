@@ -1,6 +1,7 @@
 // Right-click menus and actions an engine handles itself, keyed by engine. MongoDB's are still the
 // FEATURES table in composables/useFeatures.js, which takes any action not found here.
 import { PG_ACTIONS, PG_MENUS } from './postgresql/tree/contextMenus.js'
+import { MYSQL_MENUS } from './mysql/tree/contextMenus.js'
 import { createResourceRef } from '../utils/resourceRef.js'
 
 const CONTEXT_ACTIONS = Object.freeze({ postgresql: PG_ACTIONS })
@@ -20,6 +21,13 @@ const CONNECTION_MENUS = Object.freeze({
       resource: createResourceRef(conn.id),
     },
     items: PG_MENUS.connection,
+  }),
+  mysql: (conn) => ({
+    node: {
+      connId: conn.id, connName: conn.name, engine: 'mysql', database: conn.database || null,
+      resource: createResourceRef(conn.id),
+    },
+    items: MYSQL_MENUS.connection,
   }),
 })
 

@@ -1,14 +1,12 @@
 import { openPostgresQuery, openPostgresTable, openPostgresSearch } from '../../../stores/tabCreators'
 import { openModal } from '../../../stores/modals'
-import { CHOOSE_COLOR } from '../../../constants/contextMenus'
+import { CHOOSE_COLOR, COPY_NAME, DISCONNECT, REFRESH_NODE } from '../../../constants/contextMenus'
 
 // The right-click menus for PostgreSQL's sidebar rows, in the same shape as
 // constants/contextMenus.js: `value` is the action id, `label` only what shows. A node
 // here is `{ connId, connName, engine, database, schema?, table?, resource }`.
 // PG_ACTIONS runs the PostgreSQL-only items; every other id (Copy Name, Refresh, Choose
 // Color, Disconnect…) is the shared handler in useFeatures, which reads `resource`.
-const REFRESH = { value: 'node:refresh', label: 'Refresh' }
-const COPY_NAME = { value: 'node:copy_name', label: 'Copy Name', shortcut: '⌥⌘C' }
 const NEW_SQL = { value: 'pg:new_sql', label: 'New SQL Query', icon: 'sql' }
 const ROUTINES = { value: 'pg:routines', label: 'Functions & Procedures…', icon: 'aggregate' }
 
@@ -22,18 +20,16 @@ export const PG_MENUS = {
     { sep: true },
     COPY_NAME,
     { sep: true },
-    REFRESH,
+    REFRESH_NODE,
     CHOOSE_COLOR,
     { sep: true },
-    { value: 'conn:disconnect', label: 'Disconnect', shortcut: '⌃⌥D' },
-    { value: 'conn:disconnect_others', label: 'Disconnect Others' },
-    { value: 'conn:disconnect_all', label: 'Disconnect All' },
+    ...DISCONNECT,
   ],
-  database: [NEW_SQL, ROUTINES, { sep: true }, { value: 'pg:create_schema', label: 'Create Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH, CHOOSE_COLOR],
+  database: [NEW_SQL, ROUTINES, { sep: true }, { value: 'pg:create_schema', label: 'Create Schema…' }, { sep: true }, COPY_NAME, { sep: true }, REFRESH_NODE, CHOOSE_COLOR],
   schema: [
     ROUTINES, { value: 'pg:search_schema', label: 'Search in Schema…', icon: 'search' },
     { sep: true }, { value: 'pg:create_table', label: 'Create Table…', icon: 'table' }, { value: 'pg:drop_schema', label: 'Drop Schema…' },
-    { sep: true }, COPY_NAME, { sep: true }, REFRESH, CHOOSE_COLOR,
+    { sep: true }, COPY_NAME, { sep: true }, REFRESH_NODE, CHOOSE_COLOR,
   ],
   table: [
     { value: 'pg:open_table', label: 'Open Table', icon: 'table', shortcut: '↵' }, NEW_SQL,

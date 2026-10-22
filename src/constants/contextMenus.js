@@ -11,9 +11,16 @@
 // The colour submenu's picks: this prefix plus the colour (a preset name or a hex).
 export const COLOR_ACTION = 'node:color:'
 
-const COPY_NAME = { value: 'node:copy_name', label: 'Copy Name', shortcut: '⌥⌘C' }
+// The items every engine's menus share, handled by useFeatures for any node with a `resource`.
+export const COPY_NAME = { value: 'node:copy_name', label: 'Copy Name', shortcut: '⌥⌘C' }
 export const CHOOSE_COLOR = { label: 'Choose Color', icon: 'brush', sub: 'color' }
-const REFRESH = { value: 'node:refresh', label: 'Refresh', shortcut: '⌘R' }
+export const REFRESH_NODE = { value: 'node:refresh', label: 'Refresh' }
+export const DISCONNECT = [
+  { value: 'conn:disconnect', label: 'Disconnect', shortcut: '⌃⌥D' },
+  { value: 'conn:disconnect_others', label: 'Disconnect Others' },
+  { value: 'conn:disconnect_all', label: 'Disconnect All' },
+]
+const REFRESH = { ...REFRESH_NODE, shortcut: '⌘R' }
 const INTELLISHELL = { value: 'file:intellishell', label: 'Open IntelliShell', icon: 'shell' }
 const SEARCH = { value: 'file:search', label: 'Search in…', icon: 'search' }
 const IMPORT = { value: 'coll:import', label: 'Import…' }
@@ -46,9 +53,7 @@ export const MENUS = {
     { value: 'view:refresh_all', label: 'Refresh All', shortcut: '⇧⌘R' },
     CHOOSE_COLOR,
     { sep: true },
-    { value: 'conn:disconnect', label: 'Disconnect', shortcut: '⌃⌥D' },
-    { value: 'conn:disconnect_others', label: 'Disconnect Others' },
-    { value: 'conn:disconnect_all', label: 'Disconnect All' },
+    ...DISCONNECT,
   ],
   database: [
     { ...INTELLISHELL, shortcut: '⌘L' },
