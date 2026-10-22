@@ -144,6 +144,8 @@ pub struct SyncStatus {
     status: Stage,
     error: Option<Problem>,
     received_only: bool,
+    /// The sync wrote something here: the screens reload what they show.
+    changed: bool,
     keychain_error: Option<Problem>,
     /// Epoch milliseconds.
     time: i64,
@@ -153,7 +155,7 @@ pub struct SyncStatus {
 
 impl SyncStatus {
     pub fn running(time: i64, last_synced: Option<i64>) -> Self {
-        SyncStatus { status: Stage::Running, error: None, received_only: false, keychain_error: None, time, last_synced }
+        SyncStatus { status: Stage::Running, error: None, received_only: false, changed: false, keychain_error: None, time, last_synced }
     }
 
     pub fn finished(result: &Result<Synced, AppError>, time: i64, last_synced: Option<i64>) -> Self {
@@ -162,6 +164,7 @@ impl SyncStatus {
                 status: Stage::Synced,
                 error: None,
                 received_only: synced.received_only,
+                changed: synced.changed,
                 keychain_error: synced.keychain_error.as_ref().map(Problem::from),
                 time,
                 last_synced,
@@ -170,6 +173,7 @@ impl SyncStatus {
                 status: Stage::Failed,
                 error: Some(Problem::from(e)),
                 received_only: false,
+                changed: false,
                 keychain_error: None,
                 time,
                 last_synced,

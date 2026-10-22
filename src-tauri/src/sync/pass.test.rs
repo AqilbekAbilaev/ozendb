@@ -363,3 +363,26 @@ async fn a_secret_a_later_pass_writes_is_not_reported_as_refused() {
     assert!(synced.keychain_error.is_none());
     assert_eq!(device.keychain.read("c1").unwrap().as_deref().map(String::as_str), Some("from elsewhere"));
 }
+
+#[tokio::test]
+async fn a_sync_that_brings_another_devices_changes_says_so() {
+    let (server, key) = (FakeServer::default(), data_key());
+    let other = Device::new();
+    other.folders.insert(folder("f.1", "from the öther device", 1)).unwrap();
+    sync_on(&other, &server, &key).await.unwrap();
+
+    let synced = sync_on(&Device::new(), &server, &key).await.unwrap();
+
+    assert!(synced.changed);
+}
+
+#[tokio::test]
+async fn a_sync_that_only_uploads_says_nothing_changed_here() {
+    let (server, key) = (FakeServer::default(), data_key());
+    let device = Device::new();
+    device.folders.insert(folder("f.1", "only hére", 1)).unwrap();
+
+    let synced = sync_on(&device, &server, &key).await.unwrap();
+
+    assert!(!synced.changed);
+}

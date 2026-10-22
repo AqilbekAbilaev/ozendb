@@ -77,6 +77,16 @@ export async function openConnectionById(id) {
   return conn
 }
 
+/** Takes what a sync saved: each open connection's new settings, and closes the ones
+ *  it deleted. Their records are already gone, so the closing is not persisted. */
+export async function refreshOpenConnections() {
+  const all = await listConnections()
+  for (const conn of openConnections.value) {
+    if (!all.some(c => c.id === conn.id)) closeConnection(conn.id, { persist: false })
+  }
+  openConnections.value = openConnections.value.map(conn => all.find(c => c.id === conn.id)).filter(Boolean)
+}
+
 /** Test seam, and the reset used if the whole list must be refetched. */
 export function resetOpenConnections() {
   loaded = null

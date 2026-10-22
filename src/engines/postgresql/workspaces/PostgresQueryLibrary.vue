@@ -6,6 +6,7 @@ import BaseModal from '../../../components/base/BaseModal.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import { listHistory, clearHistory, listSaved, saveQuery, deleteSaved } from '../api/library'
 import { errMessage } from '../../../utils/errors'
+import { syncedDataVersion } from '../../../stores/sync'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // The connection's saved queries and the SQL it has run. Picking one emits `load`
@@ -35,7 +36,7 @@ const reload = () => attempt(async () => {
   saved.value = await listSaved(props.connectionId)
   history.value = await listHistory(props.connectionId)
 })
-watch(() => props.connectionId, reload, { immediate: true })
+watch([() => props.connectionId, syncedDataVersion], reload, { immediate: true })
 
 const save = () => attempt(async () => {
   await saveQuery(props.connectionId, name.value, props.sql)

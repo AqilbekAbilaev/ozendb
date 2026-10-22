@@ -10,6 +10,7 @@ import { clearConnectionResources } from './connectionData'
 import {
   openConnections, loadOpenConnections, addOpenConnection,
   updateOpenConnection, closeConnection, openConnectionById, resetOpenConnections,
+  refreshOpenConnections,
 } from './openConnections'
 
 const a = { id: 'a', name: 'Alpha', open: true }
@@ -117,4 +118,17 @@ it('returns null for an id that no longer exists', async () => {
   listConnections.mockResolvedValue([a])
   expect(await openConnectionById('gone')).toBe(null)
   expect(openConnections.value).toEqual([])
+})
+
+it('refreshes the open connections from what a sync saved, keeping only those still open', async () => {
+  listConnections.mockResolvedValue([a, b])
+  await loadOpenConnections()
+  const renamed = { ...a, name: 'Alpha ü/renamed' }
+  listConnections.mockResolvedValue([renamed, closed])
+
+  await refreshOpenConnections()
+
+  expect(openConnections.value).toEqual([renamed])
+  expect(clearConnectionResources).toHaveBeenCalledWith('b')
+  expect(setConnectionOpen).not.toHaveBeenCalled()
 })

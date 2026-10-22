@@ -5,12 +5,12 @@ vi.mock('../appApi/events', () => ({ onSyncStatus: vi.fn() }))
 
 import { getSyncStatus, syncNow as askForSync } from '../appApi/sync'
 import { onSyncStatus } from '../appApi/events'
-import { syncStatus, startSyncStatus, syncNow, resetSyncStatus } from './sync'
+import { syncStatus, syncedDataVersion, startSyncStatus, syncNow, resetSyncStatus } from './sync'
 
 const NOW = 1792600000000
 
 function status(fields) {
-  return { status: 'synced', error: null, received_only: false, keychain_error: null, time: NOW, last_synced: NOW, ...fields }
+  return { status: 'synced', error: null, received_only: false, changed: false, keychain_error: null, time: NOW, last_synced: NOW, ...fields }
 }
 
 // The handler the store subscribed with, to send it a status as the backend would.
@@ -69,5 +69,25 @@ describe('sync store', () => {
     await startSyncStatus()
     resetSyncStatus()
     expect(stop).toHaveBeenCalledTimes(1)
+  })
+  it('counts a sync that wrote other devices\' changes here, so screens reload', async () => {
+    getSyncStatus.mockResolvedValue(null)
+    await startSyncStatus()
+    send(status({ changed: true }))
+    expect(syncedDataVersion.value).toBe(1)
+  })
+
+  it('does not count a sync that changed nothing here', async () => {
+    getSyncStatus.mockResolvedValue(null)
+    await startSyncStatus()
+    send(status({ changed: false }))
+    send(status({ status: 'running' }))
+    expect(syncedDataVersion.value).toBe(0)
+  })
+
+  it('does not count the kept status, which the screens loaded after', async () => {
+    getSyncStatus.mockResolvedValue(status({ changed: true }))
+    await startSyncStatus()
+    expect(syncedDataVersion.value).toBe(0)
   })
 })
