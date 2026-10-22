@@ -10,6 +10,10 @@
 // answers `{ state: 'signed_in' }`. The server allows 60 polls a minute per address, so on
 // `account_rate_limited` wait 60 seconds; on `sign_in_expired` stop. After signing in or
 // out, call `refreshPremium()` so the UI shows the new answer.
+//
+// `deleteAccount()` deletes the account on the server and signs this device out. It fails
+// with `sign_in_again` when the session is more than ten minutes old, and with
+// `subscription_active` while a subscription could still charge.
 
 import { invoke } from '@tauri-apps/api/core'
 
@@ -31,4 +35,8 @@ export function pollSignIn(request) {
 
 export function signOut() {
   return invoke('sign_out')
+}
+
+export function deleteAccount() {
+  return invoke('delete_account')
 }

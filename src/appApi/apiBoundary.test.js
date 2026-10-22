@@ -34,7 +34,7 @@ const APP_COMMANDS = [
   // updater.js
   'can_self_update',
   // account.js
-  'get_entitlement', 'get_account', 'start_sign_in', 'poll_sign_in', 'sign_out',
+  'get_entitlement', 'get_account', 'start_sign_in', 'poll_sign_in', 'sign_out', 'delete_account',
   // sync.js
   'sync_now', 'sync_status',
   // syncSetup.js

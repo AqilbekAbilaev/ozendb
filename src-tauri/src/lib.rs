@@ -301,6 +301,7 @@ pub fn run() {
             start_sign_in,
             poll_sign_in,
             sign_out,
+            delete_account,
             insert_document,
             insert_documents,
             replace_document,

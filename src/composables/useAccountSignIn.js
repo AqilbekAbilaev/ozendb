@@ -16,6 +16,8 @@ const MESSAGES = {
   unreachable: "Can't reach the OzenDB server. Check your internet connection.",
   account_server: 'The OzenDB server had a problem. Try again later.',
   signed_out: 'You were signed out. Sign in again.',
+  sign_in_again: 'For your safety, deleting needs a recent sign-in. Sign out, sign in again, then delete within ten minutes.',
+  subscription_active: 'Cancel your subscription first, with Manage subscription, then delete the account.',
 }
 
 export function accountErrorText(e) {
@@ -32,6 +34,7 @@ export function useAccountSignIn() {
   const notice = ref('')
   const error = ref('')
   const signingOut = ref(false)
+  const deleting = ref(false)
 
   // The sign-in request being polled; null when not waiting. A poll whose request is no
   // longer this one was cancelled while it ran, and schedules nothing.
@@ -128,6 +131,25 @@ export function useAccountSignIn() {
     await refreshPremium()
   }
 
+  async function deleteAccount() {
+    error.value = ''
+    deleting.value = true
+    try {
+      await accountApi.deleteAccount()
+      account.value = null
+      step.value = 'signed_out'
+    } catch (e) {
+      error.value = accountErrorText(e)
+      if (errCode(e) === 'signed_out') {
+        account.value = null
+        step.value = 'signed_out'
+      }
+    } finally {
+      deleting.value = false
+    }
+    await refreshPremium()
+  }
+
   onScopeDispose(() => {
     disposed = true
     stopWaiting()
@@ -135,5 +157,5 @@ export function useAccountSignIn() {
 
   load()
 
-  return { step, account, code, notice, error, signingOut, start, cancel, signOut }
+  return { step, account, code, notice, error, signingOut, deleting, start, cancel, signOut, deleteAccount }
 }
