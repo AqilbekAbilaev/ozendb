@@ -34,5 +34,7 @@ describe('CONNECTION_EDITORS', () => {
     expect(CONNECTION_EDITORS.postgresql.parseUri('mongodb://h')).toBe(null)
     expect(CONNECTION_EDITORS.mongodb.parseUri('mongodb://h')).not.toBe(null)
     expect(CONNECTION_EDITORS.mongodb.parseUri('postgresql://u@h/db')).toBe(null)
+    expect(CONNECTION_EDITORS.mysql.parseUri('mysql://u@h/db').database).toBe('db')
+    expect(CONNECTION_EDITORS.mysql.parseUri('postgresql://u@h/db')).toBe(null)
   })
 })

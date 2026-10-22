@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { ENGINE_OPTIONS } from '../../data/connectionOptions.js'
 
-// A connection's database engine as a short coloured tag (MDB, PG).
+// A connection's database engine as a short coloured tag (MDB, PG, MY).
 const props = defineProps({
   engine: { type: String, required: true },
 })
@@ -20,4 +20,5 @@ const option = computed(() => ENGINE_OPTIONS.find(e => e.value === props.engine)
 }
 .eng-mongodb    { background: var(--eng-mongodb-bg);    color: var(--eng-mongodb-text); }
 .eng-postgresql { background: var(--eng-postgresql-bg); color: var(--eng-postgresql-text); }
+.eng-mysql      { background: var(--eng-mysql-bg);      color: var(--eng-mysql-text); }
 </style>

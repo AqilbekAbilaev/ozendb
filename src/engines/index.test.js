@@ -15,6 +15,11 @@ describe('the engine table', () => {
       expect(typeof engine.namesDatabase, engine.id).toBe('boolean')
       expect(typeof engine.buildFields, engine.id).toBe('function')
       expect(typeof engine.loadResources, engine.id).toBe('function')
+    }
+  })
+
+  it('gives every stats card an engine has all three of its hooks', () => {
+    for (const engine of Object.values(ENGINES).filter((e) => e.statsTip)) {
       for (const hook of ['kind', 'label', 'read']) {
         expect(typeof engine.statsTip[hook], `${engine.id}.statsTip.${hook}`).toBe('function')
       }
@@ -24,8 +29,14 @@ describe('the engine table', () => {
   it('knows the default ports and which engine names a database up front', () => {
     expect(ENGINES.mongodb.defaultPort).toBe(27017)
     expect(ENGINES.postgresql.defaultPort).toBe(5432)
+    expect(ENGINES.mysql.defaultPort).toBe(3306)
     expect(ENGINES.mongodb.namesDatabase).toBe(false)
     expect(ENGINES.postgresql.namesDatabase).toBe(true)
+    expect(ENGINES.mysql.namesDatabase).toBe(true)
+  })
+
+  it('refuses to list a MySQL server until one can be browsed', async () => {
+    await expect(ENGINES.mysql.loadResources('conn 1')).rejects.toThrow('isn’t available yet')
   })
 })
 

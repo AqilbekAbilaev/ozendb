@@ -8,6 +8,8 @@ import PostgresServerFields from './postgresql/connection/PostgresServerFields.v
 import SqlAuthFields from './sql/connection/SqlAuthFields.vue'
 import SqlSslFields from './sql/connection/SqlSslFields.vue'
 import { parsePostgresUri } from './postgresql/connection/parseUri.js'
+import MySqlServerFields from './mysql/connection/MySqlServerFields.vue'
+import { parseMySqlUri } from './mysql/connection/parseUri.js'
 import { parseConnectionUri } from '../utils/connectionUri.js'
 import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
 import PostgresTreeNodes from './postgresql/tree/PostgresTreeNodes.vue'
@@ -48,6 +50,18 @@ export const CONNECTION_EDITORS = Object.freeze({
     parseUri: parsePostgresUri,
     uriExample: 'postgresql://user:password@host:5432/database?sslmode=require',
     uriRefusal: 'That doesn’t look like a PostgreSQL connection string this editor can hold (expected postgresql:// with one host).',
+    sshHint: '',
+  },
+  mysql: {
+    tabs: [SERVER, AUTH, SSH, SSL, GENERAL],
+    sections: {
+      server: MySqlServerFields,
+      auth: SqlAuthFields,
+      ssl: SqlSslFields,
+    },
+    parseUri: parseMySqlUri,
+    uriExample: 'mysql://user:password@host:3306/database?ssl-mode=REQUIRED',
+    uriRefusal: 'That doesn’t look like a MySQL connection string this editor can hold (expected mysql:// with one host).',
     sshHint: '',
   },
 })
