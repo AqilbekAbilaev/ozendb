@@ -66,6 +66,8 @@ export function useStatsTip({ delay = HOVER_DELAY, grace = HOVER_GRACE } = {}) {
 
   function show(e, target) {
     hide()
+    // Not every engine has a card yet (the engine table lets statsTip be absent).
+    if (!engineOf(target).statsTip) return
     const mine = seq
     pending = { x: e.clientX, y: e.clientY }
     timer = setTimeout(() => {
