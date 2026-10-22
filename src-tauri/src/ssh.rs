@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use russh::client;
-use russh::keys::{load_secret_key, HashAlg, PrivateKeyWithHashAlg, PublicKey};
+use russh::keys::{load_secret_key, HashAlg, PrivateKeyWithHashAlg, PublicKey, PublicKeyOrCertificate};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Runtime};
 use tokio::net::{TcpListener, TcpStream};
@@ -170,7 +170,16 @@ impl ClientHandler {
 impl client::Handler for ClientHandler {
     type Error = russh::Error;
 
-    async fn check_server_key(&mut self, server_public_key: &PublicKey) -> Result<bool, Self::Error> {
+    async fn check_server_key(&mut self, server_key: &PublicKeyOrCertificate) -> Result<bool, Self::Error> {
+        // A server only presents a host certificate when the client advertises certificate
+        // algorithms (`Preferred::host_key_certificates`), which we never do.
+        let server_public_key = match server_key {
+            PublicKeyOrCertificate::PublicKey { key, .. } => key,
+            PublicKeyOrCertificate::Certificate(_) => {
+                self.set_reason("the server sent a host certificate, which OzenDB does not support".into());
+                return Ok(false);
+            }
+        };
         // OpenSSH authorized_keys form ("<algo> <base64>"); both the stored and
         // the presented key are serialized the same way, so string equality is
         // a reliable comparison.

@@ -62,7 +62,7 @@ chrono = { version = "0.4", features = ["clock"] }
 # remote MongoDB host). Integrates with the existing tokio runtime. Use the
 # `ring` crypto backend (already built via mongodb's rustls) instead of the
 # default aws-lc-rs, to avoid a second C/asm crypto build.
-russh = { version = "0.61", default-features = false, features = ["ring", "flate2", "rsa"] }
+russh = { version = "0.64", default-features = false, features = ["ring", "flate2", "rsa"] }
 # Pure-Rust JavaScript engine powering the embedded shell (IntelliShell). Pure
 # Rust keeps cross-platform Tauri builds toolchain-free (no C deps like QuickJS).
 boa_engine = "0.22"
