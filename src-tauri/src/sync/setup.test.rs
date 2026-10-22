@@ -264,3 +264,94 @@ async fn a_device_that_joins_merges_its_data_with_the_accounts() {
     names.sort();
     assert_eq!(names, vec!["from the first. é", "from the joining one"]);
 }
+
+const NEW_PASSWORD: &str = "nëw pässword/2 — long enough";
+
+/// A server holding the account's data as its first device uploaded it, and that device's keys.
+async fn set_up() -> (FakeServer<'static>, SyncKeys) {
+    let (server, keys) = (FakeServer::default(), new_keys());
+    upload_from(&Device::new(), &server, &keys).await.unwrap();
+    (server, keys)
+}
+
+fn new_password_lock(keys: &SyncKeys) -> NewLock {
+    NewLock::Password(keys.keys().data_key.wrap(NEW_PASSWORD, &cheap()).unwrap())
+}
+
+#[tokio::test]
+async fn a_new_password_unlocks_the_same_key_and_leaves_the_data_and_recovery_copy_alone() {
+    let (server, keys) = set_up().await;
+    let before = server.stored.borrow().clone().unwrap().contents;
+    let lock = new_password_lock(&keys);
+
+    relock(&server, keys, lock).await.unwrap();
+
+    let after = server.stored.borrow().clone().unwrap().contents;
+    assert_eq!((&after.blob, &after.recovery_wrapped_key), (&before.blob, &before.recovery_wrapped_key));
+    let unlocked = ServerKeys::decode(&after).unwrap().unlock(&password(NEW_PASSWORD)).unwrap();
+    let old = ServerKeys::decode(&before).unwrap().unlock(&password(PASSWORD)).unwrap();
+    assert!(same_key(unlocked.keys().data_key, old.keys().data_key));
+}
+
+#[tokio::test]
+async fn the_old_password_no_longer_unlocks_once_changed() {
+    let (server, keys) = set_up().await;
+    let lock = new_password_lock(&keys);
+
+    relock(&server, keys, lock).await.unwrap();
+
+    let held = ServerKeys::decode(&server.stored.borrow().clone().unwrap().contents).unwrap();
+    assert!(matches!(held.unlock(&password(PASSWORD)), Err(AppError::WrongSyncPassword)));
+}
+
+#[tokio::test]
+async fn a_relock_beaten_by_another_devices_upload_tries_again_on_its_copy() {
+    let (server, keys) = set_up().await;
+    let lock = new_password_lock(&keys);
+    server.meanwhile(|server| {
+        let contents = server.stored.borrow().clone().unwrap().contents;
+        server.store(contents);
+    });
+
+    relock(&server, keys, lock).await.unwrap();
+
+    let held = ServerKeys::decode(&server.stored.borrow().clone().unwrap().contents).unwrap();
+    assert!(held.unlock(&password(NEW_PASSWORD)).is_ok());
+}
+
+#[tokio::test]
+async fn a_relock_never_locks_another_keys_data_with_this_one() {
+    let (server, _) = set_up().await;
+    let other = new_keys();
+    let lock = new_password_lock(&other);
+    let before = server.stored.borrow().clone().unwrap().contents;
+
+    let relocked = relock(&server, other, lock).await;
+
+    assert!(matches!(relocked, Err(AppError::SyncSetUpElsewhere)));
+    assert_eq!(server.stored.borrow().clone().unwrap().contents.wrapped_key, before.wrapped_key);
+}
+
+#[tokio::test]
+async fn a_relock_with_nothing_on_the_server_says_sync_is_not_set_up() {
+    let keys = new_keys();
+    let lock = new_password_lock(&keys);
+
+    assert!(matches!(relock(&FakeServer::default(), keys, lock).await, Err(AppError::SyncNotSetUp)));
+}
+
+#[tokio::test]
+async fn a_new_recovery_key_unlocks_the_same_key_and_leaves_the_password_copy_alone() {
+    let (server, keys) = set_up().await;
+    let before = server.stored.borrow().clone().unwrap().contents;
+    let recovery_key = RecoveryKey::generate().unwrap();
+    let lock = NewLock::RecoveryKey(keys.keys().data_key.wrap_for_recovery(&recovery_key).unwrap());
+
+    relock(&server, keys, lock).await.unwrap();
+
+    let after = server.stored.borrow().clone().unwrap().contents;
+    assert_eq!(after.wrapped_key, before.wrapped_key);
+    let unlocked = ServerKeys::decode(&after).unwrap().unlock(&recovery(&recovery_key.display())).unwrap();
+    let old = ServerKeys::decode(&before).unwrap().unlock(&password(PASSWORD)).unwrap();
+    assert!(same_key(unlocked.keys().data_key, old.keys().data_key));
+}

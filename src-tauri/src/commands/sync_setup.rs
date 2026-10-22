@@ -4,9 +4,10 @@ use crate::sync::account::Device;
 use crate::sync::crypto::INTERACTIVE;
 use crate::sync::http::{client, HttpServer, PRODUCTION_URL};
 use crate::sync::pass::Local;
+use crate::sync::recovery::RecoveryKey;
 use crate::sync::run::AppSync;
 use crate::sync::schedule::SyncLoop;
-use crate::sync::setup::{create, first_upload, server_status, PendingSetup, Secret, ServerKeys, SetupStatus};
+use crate::sync::setup::{check_password, create, first_upload, relock, server_status, NewLock, PendingSetup, Secret, ServerKeys, SetupStatus};
 use crate::time::now_epoch_ms;
 use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroizing;
@@ -92,6 +93,40 @@ async fn unlock(app: AppHandle, secret: Secret) -> Result<(), AppError> {
     device.keys.save(device.keychain, &keys)?;
     app.state::<SyncLoop>().sync_now();
     Ok(())
+}
+
+/// Locks the account's sync key with a new sync password. Devices already syncing keep
+/// syncing; any device that joins later needs the new password.
+#[tauri::command]
+pub async fn change_sync_password(app: AppHandle, password: String) -> Result<(), AppError> {
+    let password = Zeroizing::new(password);
+    check_password(&password)?;
+    let sync = AppSync(app);
+    let device = sync.device();
+    let keys = device.keys.keys(device.keychain)?.ok_or(AppError::SyncNotSetUp)?;
+    // Argon2id takes most of a second, too long to hold up an async worker.
+    let (keys, wrapped) = tokio::task::spawn_blocking(move || {
+        let wrapped = keys.keys().data_key.wrap(&password, &INTERACTIVE);
+        wrapped.map(|wrapped| (keys, wrapped))
+    })
+    .await
+    .map_err(|e| AppError::Crypto(format!("Locking the sync key failed: {e}.")))??;
+    let keys = relock(&server(&device)?, keys, NewLock::Password(wrapped)).await?;
+    device.keys.save(device.keychain, &keys)
+}
+
+/// Replaces the account's recovery key and returns the new one, to show the user once.
+/// The old one stops working.
+#[tauri::command]
+pub async fn replace_recovery_key(app: AppHandle) -> Result<String, AppError> {
+    let sync = AppSync(app);
+    let device = sync.device();
+    let keys = device.keys.keys(device.keychain)?.ok_or(AppError::SyncNotSetUp)?;
+    let recovery = RecoveryKey::generate()?;
+    let wrapped = keys.keys().data_key.wrap_for_recovery(&recovery)?;
+    let keys = relock(&server(&device)?, keys, NewLock::RecoveryKey(wrapped)).await?;
+    device.keys.save(device.keychain, &keys)?;
+    Ok(recovery.display().to_string())
 }
 
 // The sync server, called as the signed-in account.

@@ -7,6 +7,7 @@ import BaseButton from '../base/BaseButton.vue'
 import BaseCheckbox from '../base/BaseCheckbox.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
+import SyncKeysSection from './SyncKeysSection.vue'
 
 // Setting sync up on this device, in the Account tab once signed in.
 const {
@@ -27,7 +28,7 @@ function copyRecoveryKey() {
 
     <HintText v-else-if="step === 'premium_needed'">Syncing your connections and queries between devices needs OzenDB Premium.</HintText>
 
-    <HintText v-else-if="step === 'set_up'">Sync is set up on this device.</HintText>
+    <SyncKeysSection v-else-if="step === 'set_up'" />
 
     <template v-else-if="step === 'failed'">
       <div class="ss-row">

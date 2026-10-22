@@ -5,7 +5,7 @@ use crate::error::AppError;
 use crate::keychain::Keychain;
 use crate::sync::crypto::DataKey;
 use crate::sync::keys::SyncKeys;
-use crate::sync::pass::{sync, Download, Local, SyncServer, Synced};
+use crate::sync::pass::{sync, Download, Local, SyncServer, Synced, MAX_PASSES};
 use crate::sync::recovery::RecoveryKey;
 use crate::sync::state::Contents;
 use argon2::Params;
@@ -75,7 +75,7 @@ impl ServerKeys {
         self.wrapped_key == keys.keys().wrapped_key
     }
 
-    fn decode(contents: &Contents) -> Result<Self, AppError> {
+    pub(crate) fn decode(contents: &Contents) -> Result<Self, AppError> {
         let decode = |text: &str| BASE64.decode(text).map_err(|_| AppError::UnreadableSyncData);
         Ok(Self {
             wrapped_key: decode(&contents.wrapped_key)?,
@@ -130,6 +130,47 @@ pub async fn first_upload(local: &Local<'_, impl Keychain>, server: &impl SyncSe
             _ => Err(error),
         },
     }
+}
+
+/// A new lock on the account's data key: the key wrapped by a new sync password, or by
+/// a new recovery key.
+pub enum NewLock {
+    Password(Vec<u8>),
+    RecoveryKey(Vec<u8>),
+}
+
+/// Puts `lock` on the server in place of the copy it replaces, keeping the data and the
+/// other copy as the server holds them, and returns `keys` holding the server's copies.
+/// The data key stays the same, so no device has to unlock sync again.
+pub async fn relock(server: &impl SyncServer, keys: SyncKeys, lock: NewLock) -> Result<SyncKeys, AppError> {
+    for _ in 0..MAX_PASSES {
+        let copy = match server.download(None).await? {
+            Download::Copy(copy) => copy,
+            Download::Nothing => return Err(AppError::SyncNotSetUp),
+            // Named no version, so "not modified" can't be about one this device knows.
+            Download::Unchanged => return Err(AppError::UnreadableSyncData),
+        };
+        // Data under another key, as after another device set sync up again, must never
+        // end up locked with this one: nobody could read it any more.
+        let sealed = BASE64.decode(&copy.contents.blob).map_err(|_| AppError::UnreadableSyncData)?;
+        if keys.keys().data_key.decrypt(&sealed).is_err() {
+            return Err(AppError::SyncSetUpElsewhere);
+        }
+        let held = ServerKeys::decode(&copy.contents)?;
+        let (wrapped_key, recovery_wrapped_key) = match &lock {
+            NewLock::Password(wrapped) => (wrapped.clone(), held.recovery_wrapped_key),
+            NewLock::RecoveryKey(wrapped) => (held.wrapped_key, Some(wrapped.clone())),
+        };
+        let contents = Contents {
+            blob: copy.contents.blob,
+            wrapped_key: BASE64.encode(&wrapped_key),
+            recovery_wrapped_key: recovery_wrapped_key.as_ref().map(|key| BASE64.encode(key)),
+        };
+        if server.upload(Some(&copy.version), &contents).await?.is_some() {
+            return Ok(keys.relocked(wrapped_key, recovery_wrapped_key));
+        }
+    }
+    Err(AppError::SyncKeptChanging)
 }
 
 /// The keys made by the first step of a first device's setup, held in memory until the
