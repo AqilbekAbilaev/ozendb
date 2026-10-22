@@ -232,4 +232,15 @@ describe('useStatsTip — which engine a target belongs to', () => {
     expect(tip.value).toMatchObject({ label: 'public.users', kind: 'pgTable' })
     vi.useRealTimers()
   })
+
+  it('opens no card for a row whose engine has none', async () => {
+    vi.useFakeTimers()
+    invoke.mockReset()
+    const { tip, show } = useStatsTip()
+    show(AT, { connId: 'c 1', engine: 'mysql', dbName: 'продажи 2024' })
+    await vi.advanceTimersByTimeAsync(HOVER_DELAY)
+    expect(invoke).not.toHaveBeenCalled()
+    expect(tip.value).toBe(null)
+    vi.useRealTimers()
+  })
 })
