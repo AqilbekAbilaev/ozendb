@@ -42,4 +42,10 @@ describe('parseMySqlUri', () => {
     expect(parseMySqlUri('mysql://h/db?ssl-mode=constructor')).toBe(null)
     expect(parseMySqlUri('not a uri')).toBe(null)
   })
+
+  it('refuses a broken percent escape in the user, password or database', () => {
+    expect(parseMySqlUri('mysql://user%ZZ@h/db')).toBe(null)
+    expect(parseMySqlUri('mysql://u:p%E0%A4@h/db')).toBe(null)
+    expect(parseMySqlUri('mysql://h/sales%E0')).toBe(null)
+  })
 })

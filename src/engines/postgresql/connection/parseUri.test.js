@@ -41,4 +41,14 @@ describe('parsePostgresUri', () => {
     expect(parsePostgresUri('postgresql://h/db?sslmode=sometimes')).toBe(null)
     expect(parsePostgresUri('not a uri')).toBe(null)
   })
+
+  it('refuses an sslmode named after a property every object inherits', () => {
+    expect(parsePostgresUri('postgresql://h/db?sslmode=constructor')).toBe(null)
+  })
+
+  it('refuses a broken percent escape in the user, password or database', () => {
+    expect(parsePostgresUri('postgresql://user%ZZ@h/db')).toBe(null)
+    expect(parsePostgresUri('postgresql://u:p%E0%A4@h/db')).toBe(null)
+    expect(parsePostgresUri('postgresql://h/sales%E0')).toBe(null)
+  })
 })
