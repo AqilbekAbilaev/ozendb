@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::record::RecordList;
-use crate::storage::{ConnectionConfig, Engine, EngineConfig, MongoConfig};
+use crate::storage::{ConnectionConfig, EngineConfig, MongoConfig};
 use super::AppContext;
 use crate::known_hosts::KnownHostsStore;
 use crate::ssh::HostKeyPrompts;
@@ -18,7 +18,7 @@ mod postgres;
 use postgres::test_postgres_connection;
 
 mod fields;
-use fields::ConnectionFields;
+use fields::{ConnectionFields, EngineFields};
 
 mod purge;
 use purge::ConnectionData;
@@ -43,6 +43,11 @@ pub async fn test_connection(
     id: Option<String>,
     fields: ConnectionFields,
 ) -> Result<(), AppError> {
+    // A MySQL test can't run yet (see not_available), so it is refused before any keychain
+    // read or SSH prompt.
+    if matches!(fields.engine, EngineFields::MySql(_)) {
+        return Err(crate::mysql::not_available());
+    }
     let existing = id.as_deref().and_then(|val| ctx.storage.find(val));
     let typed_or_stored = |typed: Option<String>, key: Option<String>| {
         typed.filter(|s| !s.is_empty()).or_else(|| key.as_deref().and_then(crate::keychain::get))
@@ -51,11 +56,6 @@ pub async fn test_connection(
     let ssh_password = typed_or_stored(fields.ssh_password.clone(), id.as_ref().map(|v| format!("{v}::ssh-pass")));
     let ssh_passphrase = typed_or_stored(fields.ssh_passphrase.clone(), id.as_ref().map(|v| format!("{v}::ssh-key-pass")));
     let config = fields.into_config(id.unwrap_or_default(), existing.as_ref(), None, None, false)?;
-    // Refused before the tunnel opens, so no SSH prompt asks about a test that can't run.
-    // TODO #386: drop this once MySQL connects.
-    if config.engine_kind() == Engine::MySql {
-        return Err(crate::mysql::not_available());
-    }
 
     let tunnel = open_test_tunnel(app, known_hosts.inner(), prompts.inner(), &config, ssh_password, ssh_passphrase).await?;
     let via = tunnel.as_ref().map(|t| t.local_addr.port());
