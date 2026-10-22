@@ -192,7 +192,7 @@ describe('useAccountSignIn', () => {
 
   it('keeps the account and asks to sign in again when the sign-in is too old to delete it', async () => {
     getAccount.mockResolvedValue(ACCOUNT)
-    deleteAccount.mockReturnValue(failure('sign_in_again'))
+    deleteAccount.mockImplementation(() => failure('sign_in_again'))
     const account = signIn()
     await vi.advanceTimersByTimeAsync(0)
     await account.deleteAccount()
@@ -202,7 +202,7 @@ describe('useAccountSignIn', () => {
 
   it('keeps the account and says to cancel the subscription before deleting it', async () => {
     getAccount.mockResolvedValue(ACCOUNT)
-    deleteAccount.mockReturnValue(failure('subscription_active'))
+    deleteAccount.mockImplementation(() => failure('subscription_active'))
     const account = signIn()
     await vi.advanceTimersByTimeAsync(0)
     await account.deleteAccount()
