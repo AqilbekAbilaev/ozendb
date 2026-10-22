@@ -86,3 +86,18 @@ fn a_command_error_reaches_the_frontend_as_code_and_message() {
     let error = tauri::ipc::InvokeError::from(super::AppError::Validation("Name is required".into()));
     assert_eq!(error.0, serde_json::json!({ "code": "validation", "message": "Name is required" }));
 }
+
+#[test]
+fn a_mysql_error_that_never_reached_the_server_shares_postgres_codes() {
+    use super::AppError;
+    assert_eq!(AppError::MySql(sqlx::Error::PoolTimedOut).code(), "network");
+    assert_eq!(AppError::MySql(sqlx::Error::InvalidArgument(String::from("port"))).code(), "validation");
+    assert_eq!(AppError::Postgres(sqlx::Error::PoolTimedOut).code(), "network");
+}
+
+#[test]
+fn any_other_mysql_driver_error_keeps_its_own_code() {
+    use super::AppError;
+    assert_eq!(AppError::MySql(sqlx::Error::RowNotFound).code(), "mysql");
+    assert_eq!(AppError::Postgres(sqlx::Error::RowNotFound).code(), "postgres");
+}

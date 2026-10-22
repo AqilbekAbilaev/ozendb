@@ -2,24 +2,26 @@ use crate::error::AppError;
 use crate::known_hosts::KnownHostsStore;
 use crate::postgres::uri as pg_uri;
 use crate::ssh::{self, HostKeyPrompts, SshAuth, SshParams, SshTunnel};
-use crate::storage::{ConnectionConfig, Engine, MongoConfig, PostgresConfig, SshAuthMethod};
+use crate::mysql::uri as mysql_uri;
+use crate::storage::{ConnectionConfig, Engine, MongoConfig, MySqlConfig, PostgresConfig, SshAuthMethod};
 use crate::uri;
 use mongodb::Client;
+use sqlx::mysql::MySqlConnectOptions;
 use sqlx::postgres::PgConnectOptions;
-use sqlx::PgPool;
+use sqlx::{MySqlPool, PgPool};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::AppHandle;
 use tokio::sync::Mutex;
 
 /// Holds one live handle per saved connection, keyed by connection ID — a MongoDB
-/// `Client` in `clients` or a Postgres `PgPool` in `pg_pools`, never both for the
-/// same id (a connection's `engine` doesn't change without a new id). Kept as two
-/// parallel maps rather than one map of an enum: nearly every existing command is
-/// Mongo-only and reaches its client through `AppContext::client`, which would
-/// otherwise have to unwrap an enum variant it can never see the other arm of.
-/// Both handle types are cheap to clone (Arc-backed) and manage their own
-/// connection pooling internally. For SSH-tunnelled connections the pool also owns
+/// `Client` in `clients`, a Postgres `PgPool` in `pg_pools` or a `MySqlPool` in
+/// `mysql_pools`, never two for the same id (a connection's `engine` doesn't change
+/// without a new id). Kept as parallel maps rather than one map of an enum: nearly
+/// every existing command is Mongo-only and reaches its client through
+/// `AppContext::client`, which would otherwise have to unwrap an enum variant it can
+/// never see the other arms of. Every handle type is cheap to clone (Arc-backed) and
+/// manages its own connection pooling internally. For SSH-tunnelled connections the pool also owns
 /// the live tunnel, keyed by the same id, shared by whichever map is in use.
 pub struct ConnectionPool {
     clients: Mutex<HashMap<String, Client>>,
@@ -27,6 +29,9 @@ pub struct ConnectionPool {
     // tunnel/credentials are shared, but Postgres has no per-query `USE`, so
     // opening a second database on the same server (#124) needs its own pool.
     pg_pools: Mutex<HashMap<(String, String), PgPool>>,
+    // Keyed the same way, so each database opened on one server gets its own pool, as
+    // PostgreSQL's do. An empty database name is a session with no default database.
+    mysql_pools: Mutex<HashMap<(String, String), MySqlPool>>,
     tunnels: Mutex<HashMap<String, Arc<SshTunnel>>>,
     // One lock per connection id, held while a tunnel is established. Without it,
     // two concurrent operations on the same SSH connection each build a tunnel on
@@ -51,6 +56,7 @@ impl ConnectionPool {
         Self {
             clients: Mutex::new(HashMap::new()),
             pg_pools: Mutex::new(HashMap::new()),
+            mysql_pools: Mutex::new(HashMap::new()),
             tunnels: Mutex::new(HashMap::new()),
             setup_locks: Mutex::new(HashMap::new()),
             known_hosts,
@@ -77,10 +83,12 @@ impl ConnectionPool {
         self.pg_pools.lock().await.get(&(id.to_string(), database.to_string())).cloned()
     }
 
+    pub async fn get_mysql(&self, id: &str, database: &str) -> Option<MySqlPool> {
+        self.mysql_pools.lock().await.get(&(id.to_string(), database.to_string())).cloned()
+    }
+
     pub async fn remove(&self, id: &str) {
-        self.clients.lock().await.remove(id);
-        // Every database's pool for this connection, not just one.
-        self.pg_pools.lock().await.retain(|(cid, _), _| cid != id);
+        self.drop_handles(id).await;
         // Dropping the last Arc tears the tunnel (accept loop + session) down.
         self.tunnels.lock().await.remove(id);
     }
@@ -124,6 +132,29 @@ impl ConnectionPool {
         };
 
         let mut map = self.pg_pools.lock().await;
+        Ok(map.entry((id.to_string(), database.to_string())).or_insert(pool).clone())
+    }
+
+    /// Forgets the connection's client or every one of its database pools. Only one of
+    /// the maps ever holds the id, so clearing all of them is harmless.
+    async fn drop_handles(&self, id: &str) {
+        self.clients.lock().await.remove(id);
+        self.pg_pools.lock().await.retain(|(cid, _), _| cid != id);
+        self.mysql_pools.lock().await.retain(|(cid, _), _| cid != id);
+    }
+
+    /// MySQL sibling of `get_or_create_postgres`.
+    async fn get_or_create_mysql(
+        &self,
+        id: &str,
+        database: &str,
+        options: MySqlConnectOptions,
+    ) -> Result<MySqlPool, AppError> {
+        if let Some(pool) = self.get_mysql(id, database).await {
+            return Ok(pool);
+        }
+        let pool = MySqlPool::connect_with(options).await.map_err(AppError::MySql)?;
+        let mut map = self.mysql_pools.lock().await;
         Ok(map.entry((id.to_string(), database.to_string())).or_insert(pool).clone())
     }
 
@@ -198,6 +229,24 @@ impl ConnectionPool {
         self.get_or_create_postgres(&config.id, database, options).await
     }
 
+    /// MySQL sibling of `connect_postgres`, with the same tunnel-then-cache shape.
+    /// `database` overrides the config's own; an empty one opens no default database.
+    pub async fn connect_mysql(&self, config: &ConnectionConfig, database: Option<&str>) -> Result<MySqlPool, AppError> {
+        let mysql = mysql_config(config)?;
+        let database = database.unwrap_or_else(|| mysql_uri::own_database(mysql));
+        // The tunnel comes first: re-establishing a dead one evicts the stale pools.
+        let via = match config.ssh_enabled {
+            true => Some(self.ensure_tunnel(config).await?.local_addr.port()),
+            false => None,
+        };
+        if let Some(pool) = self.get_mysql(&config.id, database).await {
+            return Ok(pool);
+        }
+        let password = crate::keychain::get(&config.id);
+        let options = mysql_uri::build_options(config, password.as_deref(), database, via)?;
+        self.get_or_create_mysql(&config.id, database, options).await
+    }
+
     /// Returns the cached SSH tunnel for `config`, establishing one if needed.
     /// SSH secrets are read from the keychain under composite keys.
     async fn ensure_tunnel(&self, config: &ConnectionConfig) -> Result<Arc<SshTunnel>, AppError> {
@@ -218,15 +267,12 @@ impl ConnectionPool {
             if existing.is_alive() {
                 return Ok(existing);
             }
-            // Dead tunnel: drop it and the stale client/pool so we re-establish
-            // below. Only one of the two maps ever holds this id, so clearing both
-            // is harmless.
+            // Dead tunnel: drop it and the stale client/pool so we re-establish below.
             eprintln!(
                 "[ozendb] ssh tunnel for {} is dead; re-establishing",
                 config.id
             );
-            self.clients.lock().await.remove(&config.id);
-            self.pg_pools.lock().await.retain(|(cid, _), _| cid != &config.id);
+            self.drop_handles(&config.id).await;
             self.tunnels.lock().await.remove(&config.id);
         }
 
@@ -254,8 +300,7 @@ impl ConnectionPool {
         // A fresh tunnel has a new local port; drop any client/pool cached against
         // the old one so `get_or_create`/`get_or_create_postgres` rebuilds it for
         // this tunnel's port.
-        self.clients.lock().await.remove(&config.id);
-        self.pg_pools.lock().await.retain(|(cid, _), _| cid != &config.id);
+        self.drop_handles(&config.id).await;
         self.tunnels
             .lock()
             .await
@@ -285,6 +330,16 @@ fn postgres_config(config: &ConnectionConfig) -> Result<&PostgresConfig, AppErro
         Some(postgres) => Ok(postgres),
         None => Err(AppError::Validation(
             "This connection is not configured for PostgreSQL.".to_string(),
+        )),
+    }
+}
+
+/// The `connect_mysql()` sibling of `mongo_config`.
+fn mysql_config(config: &ConnectionConfig) -> Result<&MySqlConfig, AppError> {
+    match config.engine.as_mysql() {
+        Some(mysql) => Ok(mysql),
+        None => Err(AppError::Validation(
+            "This connection is not configured for MySQL.".to_string(),
         )),
     }
 }
