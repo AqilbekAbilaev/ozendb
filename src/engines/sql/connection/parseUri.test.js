@@ -28,6 +28,11 @@ describe('parseSqlUri', () => {
     })
   })
 
+  it('takes the SSL mode and CA file from the first of their parameters present', () => {
+    const { tls, tlsCaFile } = parse('sql://h/db?sslMode=on&ssl.mode=off%20%C3%BC&sslCa=/second.pem&ssl.ca=/first.pem')
+    expect([tls, tlsCaFile]).toEqual([false, '/first.pem'])
+  })
+
   it('takes an IPv6 host without its brackets', () => {
     expect(parse('sql://[::1]:4322/db').hosts).toEqual([{ host: '::1', port: 4322 }])
   })
