@@ -35,6 +35,11 @@ describe('the engine table', () => {
     expect(ENGINES.mysql.namesDatabase).toBe(true)
   })
 
+  it('names the database field each SQL engine\'s server section shows', () => {
+    expect(ENGINES.postgresql.databaseField).toEqual({ label: 'Database', placeholder: 'postgres' })
+    expect(ENGINES.mysql.databaseField).toEqual({ label: 'Default database', placeholder: 'optional' })
+  })
+
   it('refuses to list a MySQL server until one can be browsed', async () => {
     await expect(ENGINES.mysql.loadResources('conn 1')).rejects.toThrow('isn’t available yet')
   })

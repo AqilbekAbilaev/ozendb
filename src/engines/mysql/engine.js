@@ -7,6 +7,8 @@ export const mysql = Object.freeze({
   // The form's database is only the one a session starts in: a MySQL connection reaches
   // every database on the server, so it may be left blank.
   namesDatabase: true,
+  // How the server section of the connection editor labels that database.
+  databaseField: Object.freeze({ label: 'Default database', placeholder: 'optional' }),
   buildFields: buildSqlFields,
   // TODO #387: list the server's databases once a MySQL connection can connect (#386).
   loadResources: async () => {
