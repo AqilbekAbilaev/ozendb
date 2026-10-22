@@ -11,7 +11,7 @@ use sqlx::postgres::PgConnectOptions;
 use sqlx::{MySqlPool, PgPool};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime, Wry};
 use tokio::sync::Mutex;
 
 /// Holds one live handle per saved connection, keyed by connection ID — a MongoDB
@@ -23,7 +23,9 @@ use tokio::sync::Mutex;
 /// never see the other arms of. Every handle type is cheap to clone (Arc-backed) and
 /// manages its own connection pooling internally. For SSH-tunnelled connections the pool also owns
 /// the live tunnel, keyed by the same id, shared by whichever map is in use.
-pub struct ConnectionPool {
+// Generic over the Tauri runtime only so the live tests can build a real pool on the mock
+// runtime; the app always uses the default.
+pub struct ConnectionPool<R: Runtime = Wry> {
     clients: Mutex<HashMap<String, Client>>,
     // Keyed by (connection id, database) rather than just id: a connection's own
     // tunnel/credentials are shared, but Postgres has no per-query `USE`, so
@@ -44,14 +46,14 @@ pub struct ConnectionPool {
     // The host-key prompt broker + app handle let an SSH handshake started here
     // raise the first-contact trust prompt in the UI (see ssh::ClientHandler).
     prompts: Arc<HostKeyPrompts>,
-    app: AppHandle,
+    app: AppHandle<R>,
 }
 
-impl ConnectionPool {
+impl<R: Runtime> ConnectionPool<R> {
     pub fn new(
         known_hosts: Arc<KnownHostsStore>,
         prompts: Arc<HostKeyPrompts>,
-        app: AppHandle,
+        app: AppHandle<R>,
     ) -> Self {
         Self {
             clients: Mutex::new(HashMap::new()),
@@ -386,9 +388,9 @@ fn default_port_for(config: &ConnectionConfig) -> u16 {
     }
 }
 
-// The pool's real paths (client creation, tunnels) need a live server and are covered by
-// manual/integration testing instead. The pure functions above get a unit test module in
-// `pool.test.rs`.
+// The pool's real paths (client creation, caching, tunnels) need a live server, so they
+// are covered by the live tests (`live_tests/mysql.rs` builds a pool on Tauri's mock
+// runtime). The pure functions above get a unit test module in `pool.test.rs`.
 
 #[cfg(test)]
 #[path = "pool.test.rs"]

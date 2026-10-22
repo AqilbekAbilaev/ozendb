@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use tauri::Listener;
 
-struct Bastion {
+pub(super) struct Bastion {
     host: String,
     port: u16,
     user: String,
@@ -23,23 +23,25 @@ struct Bastion {
     target: (String, u16),
 }
 
-fn host_port(value: &str) -> (String, u16) {
+pub(super) fn host_port(value: &str) -> (String, u16) {
     let (host, port) = value.rsplit_once(':').expect("host:port");
     (host.to_string(), port.parse().expect("a port number"))
 }
 
-fn bastion() -> Option<Bastion> {
+/// The bastion the environment names, forwarding to the server `target_var` names as it
+/// sees it. Shared with `mysql.rs`'s tunnel test.
+pub(super) fn bastion(target_var: &str) -> Option<Bastion> {
     let (host, port) = host_port(&std::env::var("OZENDB_TEST_SSH").ok()?);
     Some(Bastion {
         host,
         port,
         user: std::env::var("OZENDB_TEST_SSH_USER").ok()?,
         password: std::env::var("OZENDB_TEST_SSH_PASSWORD").ok()?,
-        target: host_port(&std::env::var("OZENDB_TEST_SSH_TARGET").ok()?),
+        target: host_port(&std::env::var(target_var).ok()?),
     })
 }
 
-fn params(b: &Bastion) -> SshParams {
+pub(super) fn params(b: &Bastion) -> SshParams {
     SshParams {
         ssh_host: b.host.clone(),
         ssh_port: b.port,
@@ -52,7 +54,7 @@ fn params(b: &Bastion) -> SshParams {
 
 #[tokio::test]
 async fn a_postgres_connection_runs_through_the_tunnel_trusting_its_host_key_once() {
-    let Some(b) = bastion() else {
+    let Some(b) = bastion("OZENDB_TEST_SSH_TARGET") else {
         eprintln!("skipping: set OZENDB_TEST_SSH, _USER, _PASSWORD and _TARGET to run the tunnel test");
         return;
     };
