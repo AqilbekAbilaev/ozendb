@@ -1,5 +1,5 @@
 // A MongoDB collection tab's state, split the way a PostgreSQL table tab's already is
-// (engines/postgresql/workspaces/tableState.js): `state` is what the user built, as
+// (engines/sql/workspaces/tableState.js): `state` is what the user built, as
 // JSON-only data a session saves; `ui` is this device's view of the tab; `runtime` is
 // what it fetched, rebuilt fresh and never saved.
 

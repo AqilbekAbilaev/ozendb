@@ -1,4 +1,4 @@
-// The grid knows a column by a key of its own (PostgresResultGrid), but a query can return
+// The grid knows a column by a key of its own (SqlResultGrid), but a query can return
 // one name twice (`SELECT a.id, b.id`). Each repeat is keyed `id_2`, `id_3`… — never a key
 // the query itself returned — and keeps its name for the header.
 export function resultColumns(names) {

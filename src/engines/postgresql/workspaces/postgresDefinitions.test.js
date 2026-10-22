@@ -6,8 +6,8 @@ vi.mock('../api/queries', async (original) => ({ ...(await original()), rollback
 vi.mock('../../../stores/toast', () => ({ showToast }))
 
 const { postgresDefinitions } = await import('./postgresDefinitions.js')
-const { createTableState, createTableUi, createTableRuntime } = await import('./tableState.js')
-const { createSqlRun } = await import('./runSql.js')
+const { createTableState, createTableUi, createTableRuntime } = await import('../../sql/workspaces/tableState.js')
+const { createSqlRun } = await import('../../sql/workspaces/runSql.js')
 
 beforeEach(() => vi.clearAllMocks())
 

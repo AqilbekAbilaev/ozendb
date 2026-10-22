@@ -1,25 +1,27 @@
 <script setup>
 import { computed } from 'vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
-import { planRows } from './planRows.js'
+import { engineOf } from '../../index.js'
+import { engineLabel } from '../../../data/connectionOptions.js'
 
 // The Explain tab: the query plan as an indented list, each node's time as a bar
-// against the whole query's, the slowest step marked. `plan` is the backend's
-// EXPLAIN (ANALYZE, FORMAT JSON) array.
+// against the whole query's, the slowest step marked. `plan` is the backend's Explain
+// output, which `engine` reads (engineOf(x).sql.readPlan).
 const props = defineProps({
+  engine:     { type: String,  required: true },
   plan:       { type: Array,   default: null },
   error:      { type: String,  default: null },
   explaining: { type: Boolean, default: false },
 })
 
-const view = computed(() => (props.plan ? planRows(props.plan) : null))
+const view = computed(() => (props.plan ? engineOf({ engine: props.engine }).sql.readPlan(props.plan) : null))
 const ms = (value) => (value < 10 ? value.toFixed(3) : value.toFixed(1))
 </script>
 
 <template>
   <StateMessage v-if="error" mode="error" :message="error" />
   <StateMessage v-else-if="explaining" mode="loading" />
-  <StateMessage v-else-if="!view" mode="empty" label="Press Explain to see how PostgreSQL runs this query" />
+  <StateMessage v-else-if="!view" mode="empty" :label="`Press Explain to see how ${engineLabel(engine)} runs this query`" />
   <div v-else class="plan">
     <div class="plan-row plan-head"><span>Step</span><span>Time</span><span>Rows</span><span>ms</span></div>
     <div v-for="(r, i) in view.rows" :key="i" class="plan-row">

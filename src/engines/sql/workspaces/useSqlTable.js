@@ -14,7 +14,7 @@ import { useTableStage } from './tableStage.js'
  * `state` and `ui` it keeps (tableState.js), which this reads and writes in place. Its
  * engine says how the SQL is written and which commands run it.
  */
-export function usePostgresTable(tab, { readOnly = false } = {}) {
+export function useSqlTable(tab, { readOnly = false } = {}) {
   const target = {
     connectionId: tab.target.connectionId,
     database: segmentName(tab.target, 'database'),

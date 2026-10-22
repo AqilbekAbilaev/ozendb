@@ -4,19 +4,22 @@ import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseInput from '../../../components/base/BaseInput.vue'
 import BaseModal from '../../../components/base/BaseModal.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
-import { listHistory, clearHistory, listSaved, saveQuery, deleteSaved } from '../api/library'
+import { engineOf } from '../../index.js'
 import { errMessage } from '../../../utils/errors'
 import { syncedDataVersion } from '../../../stores/sync'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // The connection's saved queries and the SQL it has run. Picking one emits `load`
-// with its SQL. Given `sql`, the Saved view offers to save it under a name.
+// with its SQL. Given `sql`, the Saved view offers to save it under a name. `engine`
+// says whose commands keep them.
 const props = defineProps({
+  engine:       { type: String, required: true },
   connectionId: { type: String, required: true },
   sql:          { type: String, default: '' },
   view:         { type: String, default: 'saved' },
 })
 const emit = defineEmits(['load', 'close'])
+const api = engineOf({ engine: props.engine }).sql.api
 
 const VIEWS = [{ value: 'saved', label: 'Saved' }, { value: 'history', label: 'History' }]
 const shown = ref(props.view)
@@ -33,18 +36,18 @@ async function attempt(action) {
 }
 
 const reload = () => attempt(async () => {
-  saved.value = await listSaved(props.connectionId)
-  history.value = await listHistory(props.connectionId)
+  saved.value = await api.listSaved(props.connectionId)
+  history.value = await api.listHistory(props.connectionId)
 })
 watch([() => props.connectionId, syncedDataVersion], reload, { immediate: true })
 
 const save = () => attempt(async () => {
-  await saveQuery(props.connectionId, name.value, props.sql)
+  await api.saveQuery(props.connectionId, name.value, props.sql)
   name.value = ''
   await reload()
 })
-const remove = (entry) => attempt(async () => { await deleteSaved(entry.id); await reload() })
-const clear = () => attempt(async () => { await clearHistory(props.connectionId); await reload() })
+const remove = (entry) => attempt(async () => { await api.deleteSaved(entry.id); await reload() })
+const clear = () => attempt(async () => { await api.clearHistory(props.connectionId); await reload() })
 
 function load(entry) {
   emit('load', entry.sql)

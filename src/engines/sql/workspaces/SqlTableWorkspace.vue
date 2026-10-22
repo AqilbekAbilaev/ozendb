@@ -7,22 +7,24 @@ import CodeEditor from '../../../components/base/CodeEditor.vue'
 import NumberStepper from '../../../components/base/NumberStepper.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
-import PostgresMessages from './PostgresMessages.vue'
-import PostgresPlan from './PostgresPlan.vue'
-import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
-import PostgresQueryBuilder from './PostgresQueryBuilder.vue'
-import PostgresResultGrid from './PostgresResultGrid.vue'
-import PostgresReviewSqlModal from './PostgresReviewSqlModal.vue'
-import PostgresSqlPanel from './PostgresSqlPanel.vue'
-import PostgresTableFooter from './PostgresTableFooter.vue'
-import PostgresTableHeader from './PostgresTableHeader.vue'
+import SqlMessages from './SqlMessages.vue'
+import SqlPlan from './SqlPlan.vue'
+import SqlQueryLibrary from './SqlQueryLibrary.vue'
+import SqlQueryBuilder from './SqlQueryBuilder.vue'
+import SqlResultGrid from './SqlResultGrid.vue'
+import SqlReviewModal from './SqlReviewModal.vue'
+import SqlPanel from './SqlPanel.vue'
+import SqlTableFooter from './SqlTableFooter.vue'
+import SqlTableHeader from './SqlTableHeader.vue'
 import Resizer from '../../../components/base/Resizer.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
-import { usePostgresTable } from './usePostgresTable.js'
+import { useSqlTable } from './useSqlTable.js'
 import { openConnections } from '../../../stores/openConnections'
 import { showToast } from '../../../stores/toast'
 import { refreshRequest } from '../../../stores/menuRequests'
 import { openModal } from '../../../stores/modals'
+import { engineOf } from '../../index.js'
+import { engineLabel } from '../../../data/connectionOptions.js'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 const props = defineProps({
@@ -37,7 +39,7 @@ const limitDraft = ref(0)
 const library = ref(null)   // which view of the query library is open, if any
 watch(() => props.activeTab.id, () => {
   const readOnly = !!openConnections.value.find(c => c.id === props.activeTab.target.connectionId)?.read_only
-  t.value = reactive(usePostgresTable(props.activeTab, { readOnly }))
+  t.value = reactive(useSqlTable(props.activeTab, { readOnly }))
   limitDraft.value = t.value.limit
   if (props.activeTab.runtime.generation === 0) t.value.load()
 }, { immediate: true })
@@ -117,27 +119,27 @@ async function saveChanges() {
 </script>
 
 <template>
-  <div class="pg-table">
-    <PostgresTableHeader :active-tab="activeTab" />
+  <div class="sql-table">
+    <SqlTableHeader :active-tab="activeTab" />
 
     <template v-if="t.mode === 'sql'">
-      <div v-if="t.filterRefusal" class="pg-edit-error">Can't show this as filters: {{ t.filterRefusal }}</div>
-      <PostgresSqlPanel v-model:sql="t.sql" :run="t.sqlRun" :server="t.server">
+      <div v-if="t.filterRefusal" class="sql-edit-error">Can't show this as filters: {{ t.filterRefusal }}</div>
+      <SqlPanel v-model:sql="t.sql" :run="t.sqlRun" :server="t.server">
         <template #toolbar-start>
           <SegmentedControl class="mode-toggle" :model-value="t.mode" :options="MODES" @update:model-value="switchMode" />
         </template>
-      </PostgresSqlPanel>
+      </SqlPanel>
     </template>
     <template v-else>
       <div class="qbar">
         <SegmentedControl class="mode-toggle" :model-value="t.mode" :options="MODES" @update:model-value="switchMode" />
         <BaseButton variant="ghost" icon="run" class="run" :disabled="t.loading" title="Apply the filters and limit (Enter)" @click="run">{{ t.loading ? 'Running…' : 'Run' }}</BaseButton>
-        <BaseButton variant="ghost" icon="exScan" :disabled="t.explainRun.explaining" title="Show how PostgreSQL runs these filters" @click="explain">Explain</BaseButton>
+        <BaseButton variant="ghost" icon="exScan" :disabled="t.explainRun.explaining" :title="`Show how ${engineLabel(activeTab.engine)} runs these filters`" @click="explain">Explain</BaseButton>
         <span class="qsep"></span>
         <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" title="Open a saved query" @click="library = 'saved'" />
         <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save these filters' SQL" @click="library = 'saved'" />
         <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
-        <BaseButton variant="ghost" icon="undo" class="qbar-hide-sm" title="Row edit history for this table" @click="openModal('pgRowHistory', t.target)" />
+        <BaseButton variant="ghost" icon="undo" class="qbar-hide-sm" title="Row edit history for this table" @click="openModal(engineOf(activeTab).sql.modals.rowHistory, t.target)" />
         <BaseButton variant="ghost" icon="copy" class="qbar-hide-md" title="Copy SQL" @click="copySql" />
         <BaseButton v-if="t.activeFilters" variant="ghost" icon="close" title="Show every row again" @click="t.clearFilters">
           Clear ({{ t.activeFilters }})
@@ -148,8 +150,8 @@ async function saveChanges() {
         <BaseButton bordered icon="aggregate" class="qbar-hide-lg" :active="t.panel.builderOpen" title="Visual Query Builder" @click="t.panel.builderOpen = !t.panel.builderOpen">Query Builder</BaseButton>
       </div>
 
-      <div class="pg-body">
-        <div class="pg-main">
+      <div class="sql-body">
+        <div class="sql-main">
           <div class="rtabs">
             <TabStrip v-model="t.panel.rtab" :options="rtabs" />
           </div>
@@ -183,15 +185,15 @@ async function saveChanges() {
           </div>
 
           <template v-if="t.panel.rtab === 'Result'">
-            <div v-if="t.editError" class="pg-edit-error">{{ t.editError }}</div>
+            <div v-if="t.editError" class="sql-edit-error">{{ t.editError }}</div>
             <!-- Once the grid has columns, a failure (usually a filter value the column's type
                  can't read) keeps it on screen, so the filter can be corrected in place. -->
-            <div v-if="t.error && t.columns.length" class="pg-edit-error">{{ t.error }}</div>
+            <div v-if="t.error && t.columns.length" class="sql-edit-error">{{ t.error }}</div>
 
             <StateMessage v-if="t.error && !t.columns.length" mode="error" :message="t.error" retryable @retry="t.load" />
             <StateMessage v-else-if="t.loading && !t.columns.length" mode="loading" />
             <StateMessage v-else-if="!t.rows.length && !t.activeFilters && !t.error" mode="empty" label="This table has no rows" />
-            <PostgresResultGrid
+            <SqlResultGrid
               v-else
               ref="resultGridRef"
               :columns="t.view.columns"
@@ -223,16 +225,17 @@ async function saveChanges() {
             </div>
             <CodeEditor :model-value="t.currentSql" readonly language="sql" class="qcode-sql" />
           </div>
-          <PostgresPlan
+          <SqlPlan
             v-else-if="t.panel.rtab === 'Explain'"
+            :engine="activeTab.engine"
             :plan="t.explainRun.plan"
             :error="t.explainRun.planError"
             :explaining="t.explainRun.explaining"
           />
-          <PostgresMessages v-else :messages="t.messages" />
+          <SqlMessages v-else :messages="t.messages" />
         </div>
         <Resizer v-if="t.panel.builderOpen && t.columns.length" v-model="t.panel.builderWidth" axis="x" invert :min="280" :max="760" />
-        <PostgresQueryBuilder
+        <SqlQueryBuilder
           v-if="t.panel.builderOpen && t.columns.length"
           :style="{ width: t.panel.builderWidth + 'px' }"
           :table="segmentName(activeTab.target, 'table')"
@@ -259,26 +262,27 @@ async function saveChanges() {
         />
       </div>
 
-      <PostgresTableFooter :t="t" />
-      <PostgresQueryLibrary
+      <SqlTableFooter :t="t" :engine="activeTab.engine" />
+      <SqlQueryLibrary
         v-if="library"
+        :engine="activeTab.engine"
         :connection-id="activeTab.target.connectionId"
         :sql="t.currentSql"
         :view="library"
         @load="t.openSql"
         @close="library = null"
       />
-      <PostgresReviewSqlModal v-if="reviewSqlOpen" :sql="t.reviewSql" @close="reviewSqlOpen = false" />
+      <SqlReviewModal v-if="reviewSqlOpen" :sql="t.reviewSql" @close="reviewSqlOpen = false" />
     </template>
   </div>
 </template>
 
 <style scoped>
-.pg-table { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.sql-table { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .limit { margin-right: 6px; }
 .limit + * { margin-right: 8px; }
-.pg-body { display: flex; flex: 1; min-height: 0; }
-.pg-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.sql-body { display: flex; flex: 1; min-height: 0; }
+.sql-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .rtabs { display: flex; flex: none; border-bottom: 1px solid var(--border); }
 .qcode { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .qcode-bar {
@@ -287,7 +291,7 @@ async function saveChanges() {
   border-bottom: 1px solid var(--border);
 }
 .qcode-sql { flex: 1; min-height: 0; }
-.pg-edit-error {
+.sql-edit-error {
   padding: 6px 10px; font-size: 12.5px;
   color: var(--danger-text); background: var(--danger-bg);
 }

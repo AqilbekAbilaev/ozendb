@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildSelectSql } from './buildSelectSql.js'
-import { dialect } from '../sql.js'
+import { dialect } from '../../postgresql/sql.js'
 
 const col = (column, table = 0) => ({ table, column })
 const base = { schema: 'public', table: 'users', filters: [], orderBy: [], descending: false, limit: 100, offset: 0 }

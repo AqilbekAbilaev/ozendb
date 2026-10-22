@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { reactive } from 'vue'
-import { COLUMNS, SAVED_TABLE_STATES } from './tableState.fixtures.js'
+import { COLUMNS, SAVED_TABLE_STATES } from '../../sql/workspaces/tableState.fixtures.js'
 
 const browseTable = vi.fn()
 const countTable = vi.fn()
@@ -16,7 +16,7 @@ const { registerWorkspaceDefinitions } = await import('../../../workspaces/regis
 const { restoreWorkspace } = await import('../../../workspaces/lifecycle.js')
 const { getWorkspaceDefinition } = await import('../../../workspaces/registry.js')
 const { toRestoreRecord } = await import('../../../workspaces/sessionMigration.js')
-const { usePostgresTable } = await import('./usePostgresTable.js')
+const { useSqlTable } = await import('../../sql/workspaces/useSqlTable.js')
 registerWorkspaceDefinitions()
 
 const TYPE = 'postgresql.table_browse'
@@ -34,7 +34,7 @@ const serialize = (tab) => JSON.parse(JSON.stringify(getWorkspaceDefinition(TYPE
 // The one place these specs reach into how a tab holds its state; the plan's steps
 // (postgresql-tab-objects.md) change only this, never the fixtures or expectations.
 async function load(tab) {
-  const t = reactive(usePostgresTable(reactive(tab)))
+  const t = reactive(useSqlTable(reactive(tab)))
   await t.load()
   return { mode: t.mode, sql: t.sql, filterText: t.filterText, shownColumns: t.shownColumns, columnOrder: t.columnOrder }
 }

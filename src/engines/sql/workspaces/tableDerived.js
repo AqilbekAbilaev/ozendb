@@ -1,12 +1,12 @@
 import { computed } from 'vue'
 import { buildSelectSql, aliases } from './buildSelectSql.js'
-import { columnRefs } from '../../sql/workspaces/columnRefs.js'
-import { joinOffers as offersFor } from '../../sql/workspaces/joinOffers.js'
+import { columnRefs } from './columnRefs.js'
+import { joinOffers as offersFor } from './joinOffers.js'
 import { mergeColumnOrder } from '../../../composables/useColumnReorder'
 
 // What a table tab's view works out from its state and runtime: column refs and info,
 // the visible columns, the SQL the filters amount to, the joins on offer, paging flags.
-// `t` is the tab's shared context (usePostgresTable).
+// `t` is the tab's shared context (useSqlTable).
 export function useTableDerived(t) {
   const { dialect, target, columns, rows, total, offset, limit, orderBy, descending, filters, shownColumns, columnOrder, mainColumns, joins, joinColumns, foreignKeys } = t
   // Each column's info carries its cellKind, worked out once here for every reader.

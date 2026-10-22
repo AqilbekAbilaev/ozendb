@@ -210,7 +210,7 @@ defineExpose({ focusNewRow, flashRow })
 </script>
 
 <template>
-  <div ref="gridWrapRef" class="pg-grid">
+  <div ref="gridWrapRef" class="sql-grid">
     <table ref="tableRef" :class="{ pressed }">
       <thead>
         <tr>
@@ -276,11 +276,11 @@ defineExpose({ focusNewRow, flashRow })
             @contextmenu="openCellCtx($event, vrow.index, columns[c])"
             @dblclick="startEdit(vrow.index, columns[c], value)"
           >
-            <span v-if="editing && editing.row === vrow.index && editing.column === columns[c]" class="pg-editing">
+            <span v-if="editing && editing.row === vrow.index && editing.column === columns[c]" class="sql-editing">
               <input
                 ref="input"
                 v-model="editing.text"
-                class="pg-edit"
+                class="sql-edit"
                 @keydown.enter="commit"
                 @keydown.esc.prevent="editing = null"
                 @blur="commit"
@@ -288,7 +288,7 @@ defineExpose({ focusNewRow, flashRow })
               <!-- mousedown.prevent keeps the input focused, so its blur doesn't save the text first. -->
               <button
                 v-if="columnInfo[columns[c]]?.nullable"
-                class="pg-null"
+                class="sql-null"
                 title="Set to NULL"
                 @mousedown.prevent
                 @click="setNull"
@@ -321,7 +321,7 @@ defineExpose({ focusNewRow, flashRow })
 </template>
 
 <style scoped>
-.pg-grid { flex: 1; min-height: 0; overflow: auto; background: var(--bg-window); }
+.sql-grid { flex: 1; min-height: 0; overflow: auto; background: var(--bg-window); }
 /* Separate borders: collapsed ones don't travel with the sticky header and gutter. */
 table { border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
 th, td {
@@ -418,14 +418,14 @@ td.editable { cursor: text; }
    every row from one measurement, so a row that grows while it is edited drifts the
    scroll extent under it — hence the negative margins, which buy the input's border
    back out of the cell's padding instead of out of the row. */
-.pg-editing { display: flex; align-items: center; gap: 4px; margin: -3px 0; }
-.pg-null {
+.sql-editing { display: flex; align-items: center; gap: 4px; margin: -3px 0; }
+.sql-null {
   flex: none; height: 22px; padding: 0 6px; border-radius: 3px; cursor: pointer;
   background: var(--bg-input); color: var(--text-faint); border: 1px solid var(--border-soft);
   font: italic 11px var(--mono);
 }
-.pg-null:hover { color: var(--text); border-color: var(--accent); }
-.pg-edit {
+.sql-null:hover { color: var(--text); border-color: var(--accent); }
+.sql-edit {
   width: 100%; min-width: 120px; height: 22px;
   background: var(--bg-input); color: var(--text);
   border: 1px solid var(--accent); border-radius: 3px;

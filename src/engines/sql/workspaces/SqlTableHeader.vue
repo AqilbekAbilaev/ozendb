@@ -18,5 +18,5 @@ const items = computed(() => {
 </script>
 
 <template>
-  <WorkspaceCrumbs engine="postgresql" :items="items" />
+  <WorkspaceCrumbs :engine="activeTab.engine" :items="items" />
 </template>

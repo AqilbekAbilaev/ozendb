@@ -9,15 +9,17 @@ import Resizer from '../../../components/base/Resizer.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
 import TabStrip from '../../../components/base/TabStrip.vue'
-import PostgresMessages from './PostgresMessages.vue'
-import PostgresResultGrid from './PostgresResultGrid.vue'
-import { resultColumns } from '../../sql/workspaces/resultColumns.js'
+import SqlMessages from './SqlMessages.vue'
+import SqlResultGrid from './SqlResultGrid.vue'
+import { resultColumns } from './resultColumns.js'
 import { runSql, cancelSql, explainSql, formatSql, outcome, endTransaction } from './runSql.js'
 import { showToast } from '../../../stores/toast'
-import PostgresPlan from './PostgresPlan.vue'
-import PostgresQueryLibrary from './PostgresQueryLibrary.vue'
+import SqlPlan from './SqlPlan.vue'
+import SqlQueryLibrary from './SqlQueryLibrary.vue'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 import { openModal } from '../../../stores/modals'
+import { engineOf } from '../../index.js'
+import { engineLabel } from '../../../data/connectionOptions.js'
 
 // A SQL editor with its toolbar, results and status line. `sql` is the editor's text
 // (v-model:sql — the tab's lasting state); `run` is its runs (createSqlRun), written in
@@ -31,7 +33,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:sql'])
 const setSql = (text) => emit('update:sql', text)
-const exportQuery = () => openModal('pgExport', { connId: props.run.connectionId, database: props.run.database, query: props.sql })
+const exportQuery = () => openModal(engineOf(props.run).sql.modals.export, { connId: props.run.connectionId, database: props.run.database, query: props.sql })
 
 // Manual: runs go into one transaction, begun by the first of them, until Commit or
 // Rollback. The switch holds still while one is open.
@@ -101,7 +103,7 @@ const summary = computed(() => {
 </script>
 
 <template>
-  <div class="pg-sql">
+  <div class="sql-sql">
     <slot />
     <div class="qbar">
       <slot name="toolbar-start" />
@@ -109,7 +111,7 @@ const summary = computed(() => {
         {{ run.running ? 'Running…' : 'Run' }} <span class="kbd">⌘↵</span>
       </BaseButton>
       <BaseButton variant="ghost" icon="run" :disabled="run.running" title="Run the selected text" @click="runSelection">Run selection</BaseButton>
-      <BaseButton variant="ghost" icon="exScan" :disabled="run.explaining || !sql.trim()" title="Show how PostgreSQL runs this query" @click="explain">Explain</BaseButton>
+      <BaseButton variant="ghost" icon="exScan" :disabled="run.explaining || !sql.trim()" :title="`Show how ${engineLabel(run.engine)} runs this query`" @click="explain">Explain</BaseButton>
       <BaseButton variant="ghost" icon="close" :disabled="!run.running" title="Stop the running query" @click="cancelSql(run)">Cancel</BaseButton>
       <span class="qsep"></span>
       <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" :disabled="run.running || !sql.trim()" title="Lay the SQL out one clause per line" @click="format">Format</BaseButton>
@@ -128,7 +130,7 @@ const summary = computed(() => {
       ref="editor"
       :model-value="sql"
       @update:model-value="setSql"
-      class="pg-editor"
+      class="sql-editor"
       :style="{ height: editorHeight + 'px' }"
       language="sql"
       :extensions="editorExtensions"
@@ -138,21 +140,22 @@ const summary = computed(() => {
     <div class="rtabs">
       <TabStrip v-model="rtab" :options="rtabs" />
     </div>
-    <div class="pg-results">
-      <PostgresMessages v-if="rtab === 'Messages'" :messages="run.messages" />
-      <PostgresPlan v-else-if="rtab === 'Explain'" :plan="run.plan ?? null" :error="run.planError ?? null" :explaining="!!run.explaining" />
+    <div class="sql-results">
+      <SqlMessages v-if="rtab === 'Messages'" :messages="run.messages" />
+      <SqlPlan v-else-if="rtab === 'Explain'" :engine="run.engine" :plan="run.plan ?? null" :error="run.planError ?? null" :explaining="!!run.explaining" />
       <StateMessage v-else-if="run.error" mode="error" :message="run.error" />
       <StateMessage v-else-if="run.running && !run.result" mode="loading" />
       <template v-else-if="run.result">
         <StateMessage v-if="run.result.rowsAffected != null" mode="empty" :label="outcome(run.result)" />
         <StateMessage v-else-if="!run.result.rows.length" mode="empty" label="The query returned no rows" />
-        <PostgresResultGrid v-else :columns="columns.keys" :column-info="columns.info" :rows="run.result.rows" :selection="run.selection" />
+        <SqlResultGrid v-else :columns="columns.keys" :column-info="columns.info" :rows="run.result.rows" :selection="run.selection" />
       </template>
       <StateMessage v-else mode="empty" label="Run a query to see its results (⌘↵)" />
     </div>
 
-    <PostgresQueryLibrary
+    <SqlQueryLibrary
       v-if="library"
+      :engine="run.engine"
       :connection-id="run.connectionId"
       :sql="sql"
       :view="library"
@@ -160,7 +163,7 @@ const summary = computed(() => {
       @close="library = null"
     />
 
-    <div class="pg-footer">
+    <div class="sql-footer">
       <span>{{ summary }}</span>
       <span v-if="run.result" class="fitem"><BaseIcon name="clock" :size="14" /> {{ run.result.elapsedMs }} ms</span>
       <span v-if="run.txId" class="fitem txn-open">● Transaction open</span>
@@ -169,18 +172,18 @@ const summary = computed(() => {
       <span>Ln {{ cursor.line }}, Col {{ cursor.col }}</span>
       <template v-if="server">
         <span>{{ server.encoding }}</span>
-        <span>PostgreSQL {{ server.version }}</span>
+        <span>{{ engineLabel(run.engine) }} {{ server.version }}</span>
       </template>
     </div>
   </div>
 </template>
 
 <style scoped>
-.pg-sql { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.pg-editor { flex: none; }
+.sql-sql { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.sql-editor { flex: none; }
 .rtabs { display: flex; flex: none; border-bottom: 1px solid var(--border); }
-.pg-results { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.pg-footer {
+.sql-results { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.sql-footer {
   display: flex; align-items: center; gap: 16px; flex: none;
   padding: 4px 12px; font-size: 12px; color: var(--text-dim);
   border-top: 1px solid var(--border); background: var(--bg-panel);

@@ -1,5 +1,5 @@
 import { errMessage } from '../../../utils/errors'
-import { filterBoxText } from '../../sql/workspaces/parseFilter.js'
+import { filterBoxText } from './parseFilter.js'
 import { runSql } from './runSql.js'
 
 // A table tab's SQL mode: opening it on the SQL the filters amount to, and going back —

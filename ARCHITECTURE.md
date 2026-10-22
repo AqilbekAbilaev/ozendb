@@ -118,9 +118,15 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
 
 - **`src/engines/index.js`** — the component-free engine table (`ENGINES`, `engineOf`):
   default port, connection-field builder, the sidebar's top-level loader, the stats card,
-  whether a connection names its database. Stores and composables read it.
+  whether a connection names its database, and for a SQL engine its `sql` entry. Stores and
+  composables read it.
 - **`src/engines/ui.js`** — the component half: connection editor sections, sidebar rows.
 - **`src/engines/contextActions.js`** — right-click menus and actions an engine handles itself.
+- **`src/engines/sql/`** — the table and SQL tabs every SQL engine shares. What differs comes
+  from the tab's engine as `engineOf(tab).sql`: its `dialect` (quoting, case-insensitive
+  matching, column-type kinds, which columns take a value), its `api` (the commands the tabs
+  call), `readPlan` for its Explain output, and the names of its own export and row-history
+  windows. A run carries its engine's name, so `runSql` finds the same commands.
 
 A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
 screens still sit in the shared `components/` folders and its sidebar rows in
@@ -157,8 +163,10 @@ ResourceRefs.
 - **Frontend: `src/engines/postgresql/`.**
   - `connection/` holds the connection fields and URI parsing.
   - `tree/` holds the sidebar's database → schema → table nodes and their menus.
-  - `workspaces/` holds the table, query and search workspaces. `postgresDefinitions.js`
-    registers them as `postgresql.table_browse`, `postgresql.query` and `postgresql.search`.
+  - `sql.js` is its `sql` entry for the shared SQL tabs in `src/engines/sql/`.
+  - `workspaces/` holds the search workspace and the definitions: `postgresDefinitions.js`
+    registers the shared table and query screens and its own search as
+    `postgresql.table_browse`, `postgresql.query` and `postgresql.search`.
   - `admin/` holds the server-info, activity, roles, grants, routines, DDL, import/export and
     row-history modals.
   - `api/` is its half of the Tauri boundary.

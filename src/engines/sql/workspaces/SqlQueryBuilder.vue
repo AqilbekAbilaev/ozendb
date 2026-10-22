@@ -6,7 +6,7 @@ import BaseIcon from '../../../components/base/BaseIcon.vue'
 import BaseInput from '../../../components/base/BaseInput.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
-import { operatorsFor, rowsFromParts, partsFromRows } from '../../sql/workspaces/builderRows.js'
+import { operatorsFor, rowsFromParts, partsFromRows } from './builderRows.js'
 
 // The table tab's Query Builder: its joins, the filter boxes as a list of conditions,
 // the shown columns, and the sort. Changes apply at once, except a value being typed,
@@ -21,12 +21,12 @@ const props = defineProps({
   descending: { type: Boolean, default: false },
   // Empty shows every column.
   shownColumns: { type: Array, default: () => [] },
-  // The tab's joins and the ones it could add, as usePostgresTable keeps them, and
+  // The tab's joins and the ones it could add, as useSqlTable keeps them, and
   // each table's name in the query (the browsed table's first).
   joins:      { type: Array,  default: () => [] },
   joinOffers: { type: Array,  default: () => [] },
   tableNames: { type: Array,  default: () => [] },
-  // `key` → `{ own, earlier }`: what a join's pairs can match (usePostgresTable).
+  // `key` → `{ own, earlier }`: what a join's pairs can match (useSqlTable).
   joinChoices: { type: Function, required: true },
   pauses:     { type: Object, required: true },
 })
