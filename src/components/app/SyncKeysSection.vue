@@ -8,11 +8,17 @@ import BaseCheckbox from '../base/BaseCheckbox.vue'
 import FieldError from '../base/FieldError.vue'
 import HintText from '../base/HintText.vue'
 
-// Once sync is set up here: a new sync password, or a new recovery key.
+// Once sync is set up here: a new sync password, a new recovery key, or sync turned off.
+const emit = defineEmits(['turned-off'])
 const {
   step, password, confirmation, recoveryKey, recoveryKeySaved, busy, error, notice,
-  startPasswordChange, changePassword, askForRecoveryKey, replaceRecoveryKey, doneWithRecoveryKey, cancel,
+  startPasswordChange, changePassword, askForRecoveryKey, replaceRecoveryKey, doneWithRecoveryKey,
+  askToTurnOff, turnOff, cancel,
 } = useSyncKeys()
+
+async function confirmTurnOff() {
+  if (await turnOff()) emit('turned-off')
+}
 
 function copyRecoveryKey() {
   navigator.clipboard.writeText(recoveryKey.value).then(() => showToast('Copied'), () => showToast('Could not copy'))
@@ -24,6 +30,7 @@ function copyRecoveryKey() {
     <HintText class="sk-grow">{{ notice || 'Sync is set up on this device.' }}</HintText>
     <BaseButton @click="startPasswordChange">Change password…</BaseButton>
     <BaseButton @click="askForRecoveryKey">New recovery key…</BaseButton>
+    <BaseButton @click="askToTurnOff">Turn off…</BaseButton>
   </div>
 
   <template v-else-if="step === 'password'">
@@ -59,6 +66,18 @@ function copyRecoveryKey() {
     <div class="sk-row">
       <span class="sk-grow" />
       <BaseButton variant="primary" :disabled="!recoveryKeySaved" @click="doneWithRecoveryKey">Done</BaseButton>
+    </div>
+  </template>
+
+  <template v-else-if="step === 'off_confirm'">
+    <HintText>
+      Turn sync off on this device? You stay signed in, and everything already here stays. Your other devices
+      keep syncing. To sync this device again, set sync up with your sync password.
+    </HintText>
+    <div class="sk-row">
+      <span class="sk-grow" />
+      <BaseButton :disabled="busy" @click="cancel">Cancel</BaseButton>
+      <BaseButton variant="danger" :disabled="busy" @click="confirmTurnOff">Turn off sync</BaseButton>
     </div>
   </template>
 

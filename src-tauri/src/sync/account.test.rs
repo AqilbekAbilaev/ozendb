@@ -350,3 +350,16 @@ async fn deleting_without_a_session_asks_nothing_of_the_server() {
     assert!(matches!(deleted, Err(AppError::SignedOut)));
     assert!(timeout(Duration::from_millis(200), requests).await.is_err(), "expected no request");
 }
+
+#[test]
+fn turning_sync_off_forgets_the_sync_keys_and_state_but_stays_signed_in() {
+    let (keychain, files) = (signed_in(), files_of_another_account());
+
+    device(&keychain, &files).turn_off_sync().unwrap();
+
+    assert!(files.keys.load().is_none());
+    let state = files.state.load();
+    assert_eq!((state.last_sync, state.server), (None, None));
+    assert_eq!(keychain.entries().get(SESSION_KEY).map(String::as_str), Some(SESSION));
+    assert_ne!(files.entitlement.entitlement(NOW), Entitlement::Unknown);
+}

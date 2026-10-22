@@ -129,6 +129,13 @@ pub async fn replace_recovery_key(app: AppHandle) -> Result<String, AppError> {
     Ok(recovery.display().to_string())
 }
 
+/// Stops syncing on this device without signing out. Setting sync up again later merges
+/// this device's data with the account's, as on any device that joins.
+#[tauri::command(async)]
+pub fn turn_off_sync(app: AppHandle) -> Result<(), AppError> {
+    AppSync(app).device().turn_off_sync()
+}
+
 // The sync server, called as the signed-in account.
 fn server(device: &Device<'_, AccountKeychain<OsKeychain>>) -> Result<HttpServer, AppError> {
     let session = device.session()?.ok_or(AppError::SignedOut)?;

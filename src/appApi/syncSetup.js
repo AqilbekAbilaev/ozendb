@@ -9,6 +9,7 @@
 // sync then runs on its own and reports through the `sync-status` event.
 // Once set up: `changeSyncPassword(password)` locks the account's key with a new password,
 // and `replaceRecoveryKey()` answers a new recovery key to show once; the old one stops working.
+// `turnOffSync()` stops syncing here but stays signed in.
 
 import { invoke } from '@tauri-apps/api/core'
 
@@ -38,4 +39,8 @@ export function changeSyncPassword(password) {
 
 export function replaceRecoveryKey() {
   return invoke('replace_recovery_key')
+}
+
+export function turnOffSync() {
+  return invoke('turn_off_sync')
 }

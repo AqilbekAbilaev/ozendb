@@ -201,6 +201,14 @@ impl<K: Keychain> Device<'_, K> {
         }
     }
 
+    /// Stops syncing here but stays signed in: forgets the sync keys and what this device
+    /// knew of the server's copy, as if sync had never been set up on it.
+    pub fn turn_off_sync(&self) -> Result<(), AppError> {
+        let keys_forgotten = self.keys.forget(self.keychain);
+        self.state.clear()?;
+        keys_forgotten
+    }
+
     /// Drops the session and everything this device learned with it, as after the
     /// server answers that the session is gone.
     pub fn forget(&self) -> Result<(), AppError> {
