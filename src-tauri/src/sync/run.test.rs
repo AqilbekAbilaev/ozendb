@@ -36,7 +36,7 @@ fn a_device_without_sync_keys_cannot_sync() {
 #[test]
 fn a_running_sync_is_sent_as_running() {
     let sent = serde_json::to_value(SyncStatus::running(NOW, None)).unwrap();
-    assert_eq!(sent, json!({ "status": "running", "error": null, "received_only": false, "keychain_error": null, "time": NOW, "last_synced": null }));
+    assert_eq!(sent, json!({ "status": "running", "error": null, "received_only": false, "changed": false, "keychain_error": null, "time": NOW, "last_synced": null }));
 }
 
 #[test]
@@ -52,6 +52,13 @@ fn a_sync_the_server_only_let_download_is_synced_and_received_only() {
     let synced = Synced { received_only: true, ..Synced::default() };
     let sent = serde_json::to_value(SyncStatus::finished(&Ok(synced), NOW, Some(NOW))).unwrap();
     assert_eq!((sent["status"].clone(), sent["received_only"].clone()), (json!("synced"), json!(true)));
+}
+
+#[test]
+fn a_sync_that_changed_this_devices_data_says_so() {
+    let synced = Synced { changed: true, ..Synced::default() };
+    let sent = serde_json::to_value(SyncStatus::finished(&Ok(synced), NOW, Some(NOW))).unwrap();
+    assert_eq!((sent["status"].clone(), sent["changed"].clone()), (json!("synced"), json!(true)));
 }
 
 #[test]

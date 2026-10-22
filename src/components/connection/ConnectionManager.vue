@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import * as connApi from '../../appApi/connections'
 import { connectionUri } from '../../engines/mongodb/api/connections'
 import { updateLastAccessed } from '../../appApi/connectionState'
@@ -9,6 +9,7 @@ import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialo
 import { errText } from '../../utils/errors'
 import { colorHex } from '../../utils/tabColor.js'
 import { showToast } from '../../stores/toast'
+import { syncedDataVersion } from '../../stores/sync'
 import { useConnectionFolders } from '../../composables/useConnectionFolders'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseModal from '../base/BaseModal.vue'
@@ -38,9 +39,15 @@ onMounted(async () => {
     if (!connections.value.find(c => c.id === conn.id))
       connections.value.push(conn)
   })
+  await reload()
+})
+
+// A sync can change the saved connections and folders while the dialog is open.
+async function reload() {
   connections.value = await connApi.listConnections()
   await loadFolders()
-})
+}
+watch(syncedDataVersion, reload)
 
 onUnmounted(() => unlisten.then(off => off()))
 

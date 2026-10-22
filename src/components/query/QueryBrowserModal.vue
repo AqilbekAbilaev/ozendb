@@ -1,11 +1,12 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { listSavedQueries, deleteSavedQuery } from '../../engines/mongodb/api/queryLibrary'
 import BaseIcon from '../base/BaseIcon.vue'
 import BaseInput from '../base/BaseInput.vue'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import FlexSpacer from '../base/FlexSpacer.vue'
+import { syncedDataVersion } from '../../stores/sync'
 
 const emit = defineEmits(['close', 'apply'])
 
@@ -19,13 +20,13 @@ const filtered = computed(() => {
   return entries.value.filter(e => e.name.toLowerCase().includes(q))
 })
 
-onMounted(async () => {
+watch(syncedDataVersion, async () => {
   try {
     entries.value = await listSavedQueries()
   } catch (_) {
     entries.value = []
   }
-})
+}, { immediate: true })
 
 function select(entry) {
   selected.value = entry

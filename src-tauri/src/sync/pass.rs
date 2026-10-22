@@ -48,6 +48,8 @@ pub struct Synced {
     /// The server refused the upload, as it does once Premium lapses: what came down was
     /// saved here, but this device's edits have not gone up.
     pub received_only: bool,
+    /// Something came down and was written here, so what the screens show may be stale.
+    pub changed: bool,
 }
 
 impl Synced {
@@ -136,6 +138,7 @@ fn receive_only(local: &Local<'_, impl Keychain>, before: &Snapshot, downloaded:
 // server's copy it was merged with. False when a store was left alone.
 fn save(local: &Local<'_, impl Keychain>, merged: &Snapshot, before: &Snapshot, copy: ServerCopy, state: &SyncState, now: i64, synced: &mut Synced) -> Result<bool, AppError> {
     let written = merged.write_if_unchanged(before, local.stores, local.keychain)?;
+    synced.changed |= !merged.same_as(before)?;
     let complete = written.complete;
     // A store left alone is not synced yet: keeping the old time keeps a long-offline
     // device's next pass from merging that store's records back in. A pass that only
