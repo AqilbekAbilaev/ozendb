@@ -6,7 +6,7 @@ use crate::default_queries::DefaultQueryStorage;
 use crate::error::AppError;
 use crate::events::SYNC_STATUS;
 use crate::folders::FolderStorage;
-use crate::keychain::OsKeychain;
+use crate::keychain::{AccountKeychain, OsKeychain};
 use crate::known_hosts::KnownHostsStore;
 use crate::node_tags::NodeTagStorage;
 use crate::postgres::query_library::PgQueryLibraryStore;
@@ -46,9 +46,9 @@ pub fn readiness(signed_in: bool, entitlement: Entitlement, set_up: bool) -> Res
 pub struct AppSync(pub AppHandle);
 
 impl AppSync {
-    pub fn device(&self) -> Device<'_, OsKeychain> {
+    pub fn device(&self) -> Device<'_, AccountKeychain<OsKeychain>> {
         Device {
-            keychain: &OsKeychain,
+            keychain: self.0.state::<AccountKeychain<OsKeychain>>().inner(),
             entitlement: self.0.state::<EntitlementStorage>().inner(),
             state: self.0.state::<SyncStateStorage>().inner(),
             keys: self.0.state::<SyncKeysStorage>().inner(),
@@ -67,13 +67,13 @@ impl Job for AppSync {
     fn ready(&self) -> Result<(), AppError> {
         let device = self.device();
         let signed_in = device.session()?.is_some();
-        readiness(signed_in, device.entitlement.entitlement(now_epoch_ms()), device.keys.keys(&OsKeychain)?.is_some())
+        readiness(signed_in, device.entitlement.entitlement(now_epoch_ms()), device.keys.keys(device.keychain)?.is_some())
     }
 
     async fn run(&self) -> Result<Synced, AppError> {
         let device = self.device();
         let session = device.session()?.ok_or(AppError::SignedOut)?;
-        let keys = device.keys.keys(&OsKeychain)?.ok_or(AppError::SyncNotSetUp)?;
+        let keys = device.keys.keys(device.keychain)?.ok_or(AppError::SyncNotSetUp)?;
         let server = HttpServer::new(client()?, PRODUCTION_URL, session.to_string());
         let stores = self.stores();
         let local = Local { stores: &stores, keychain: &OsKeychain, state: device.state };
