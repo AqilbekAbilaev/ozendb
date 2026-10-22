@@ -4,12 +4,12 @@ import { syncPasswordProblem } from '../utils/syncPassword'
 import { setupErrorText } from './useSyncSetup'
 
 // Changing what unlocks the account's sync key, once sync is set up here: a new sync
-// password, or a new recovery key shown once. The key itself stays the same, so devices
+// password, or a new recovery key shown once; or turning sync off on this device. The key itself stays the same, so devices
 // already syncing carry on. What was typed, and the recovery key shown, live only until
 // their step ends.
 
 export function useSyncKeys() {
-  // 'idle' | 'password' | 'recovery_confirm' | 'recovery_key'
+  // 'idle' | 'password' | 'recovery_confirm' | 'recovery_key' | 'off_confirm'
   const step = ref('idle')
   const password = ref('')
   const confirmation = ref('')
@@ -80,6 +80,15 @@ export function useSyncKeys() {
     notice.value = 'Recovery key replaced. The old one no longer works.'
   }
 
+  function askToTurnOff() {
+    begin('off_confirm')
+  }
+
+  // Answers whether sync is now off here, so the caller can show setup again.
+  function turnOff() {
+    return attempt(setupApi.turnOffSync)
+  }
+
   function cancel() {
     clearTyped()
     begin('idle')
@@ -92,6 +101,7 @@ export function useSyncKeys() {
 
   return {
     step, password, confirmation, recoveryKey, recoveryKeySaved, busy, error, notice,
-    startPasswordChange, changePassword, askForRecoveryKey, replaceRecoveryKey, doneWithRecoveryKey, cancel,
+    startPasswordChange, changePassword, askForRecoveryKey, replaceRecoveryKey, doneWithRecoveryKey,
+    askToTurnOff, turnOff, cancel,
   }
 }

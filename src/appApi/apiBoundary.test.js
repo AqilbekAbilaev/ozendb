@@ -39,7 +39,7 @@ const APP_COMMANDS = [
   'sync_now', 'sync_status',
   // syncSetup.js
   'sync_setup_status', 'create_sync_keys', 'finish_sync_setup',
-  'unlock_sync_with_password', 'unlock_sync_with_recovery_key', 'change_sync_password', 'replace_recovery_key',
+  'unlock_sync_with_password', 'unlock_sync_with_recovery_key', 'change_sync_password', 'replace_recovery_key', 'turn_off_sync',
 ]
 
 // Roots where custom commands and the Tauri transport are allowed: the application

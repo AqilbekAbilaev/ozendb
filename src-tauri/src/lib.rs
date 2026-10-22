@@ -301,6 +301,7 @@ pub fn run() {
             unlock_sync_with_recovery_key,
             change_sync_password,
             replace_recovery_key,
+            turn_off_sync,
             start_sign_in,
             poll_sign_in,
             sign_out,

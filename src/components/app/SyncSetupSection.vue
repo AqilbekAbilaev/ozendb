@@ -28,7 +28,7 @@ function copyRecoveryKey() {
 
     <HintText v-else-if="step === 'premium_needed'">Syncing your connections and queries between devices needs OzenDB Premium.</HintText>
 
-    <SyncKeysSection v-else-if="step === 'set_up'" />
+    <SyncKeysSection v-else-if="step === 'set_up'" @turned-off="checkAgain" />
 
     <template v-else-if="step === 'failed'">
       <div class="ss-row">

@@ -4,9 +4,10 @@ import { effectScope } from 'vue'
 vi.mock('../appApi/syncSetup', () => ({
   changeSyncPassword: vi.fn(),
   replaceRecoveryKey: vi.fn(),
+  turnOffSync: vi.fn(),
 }))
 
-import { changeSyncPassword, replaceRecoveryKey } from '../appApi/syncSetup'
+import { changeSyncPassword, replaceRecoveryKey, turnOffSync } from '../appApi/syncSetup'
 import { useSyncKeys } from './useSyncKeys'
 
 const PASSWORD = 'nëw pässword/2 — long enough'
@@ -93,5 +94,21 @@ describe('useSyncKeys', () => {
     k.password.value = PASSWORD
     k.cancel()
     expect([k.step.value, k.password.value]).toEqual(['idle', ''])
+  })
+  it('turns sync off on this device once confirmed, and says it did', async () => {
+    turnOffSync.mockResolvedValue(null)
+    const k = keys()
+    k.askToTurnOff()
+    expect(await k.turnOff()).toBe(true)
+    expect(turnOffSync).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays on the confirmation and says why when turning sync off fails', async () => {
+    turnOffSync.mockImplementation(() => failure('keychain'))
+    const k = keys()
+    k.askToTurnOff()
+    expect(await k.turnOff()).toBe(false)
+    expect(k.step.value).toBe('off_confirm')
+    expect(k.error.value).toMatch(/keychain/)
   })
 })
