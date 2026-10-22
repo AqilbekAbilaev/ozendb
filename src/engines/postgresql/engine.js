@@ -1,5 +1,5 @@
 // PostgreSQL's entry in the engine table (engines/index.js).
-import { buildPostgresFields } from './connection/fields.js'
+import { buildSqlFields } from '../sql/connection/fields.js'
 import { listSchemas, tableStats } from './api/resources.js'
 import { postgresSql } from './sql.js'
 
@@ -8,7 +8,7 @@ export const postgresql = Object.freeze({
   defaultPort: 5432,
   // A PostgreSQL connection names its one database up front.
   namesDatabase: true,
-  buildFields: buildPostgresFields,
+  buildFields: buildSqlFields,
   loadResources: listSchemas,
   // What the shared SQL tabs (engines/sql) write and call.
   sql: postgresSql,
