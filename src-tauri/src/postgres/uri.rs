@@ -1,9 +1,18 @@
 use crate::error::AppError;
 use crate::storage::{ConnectionConfig, PostgresConfig};
+use crate::uri::sql::{self, SqlUriFormat};
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 const DEFAULT_DATABASE: &str = "postgres";
 pub(crate) const DEFAULT_PORT: u16 = 5432;
+
+const URI_FORMAT: SqlUriFormat = SqlUriFormat {
+    scheme: "postgresql",
+    default_port: DEFAULT_PORT,
+    mode_param: "sslmode",
+    modes: ["disable", "require", "verify-full"],
+    ca_param: "sslrootcert",
+};
 
 /// Builds sqlx's typed connect-options from a stored `ConnectionConfig` plus the
 /// password fetched separately from the OS keychain — the same split `uri::build_uri`
@@ -153,30 +162,9 @@ fn options_for(
 }
 
 /// The saved connection as a `postgresql://` string, for Copy URI: the same host, database
-/// and TLS mode `build_options` connects with, but never the password — that stays in
-/// the keychain, as it does for MongoDB's.
+/// and TLS mode `build_options` connects with.
 pub fn connection_string(config: &ConnectionConfig, postgres: &PostgresConfig) -> String {
-    use crate::uri::percent_encode;
-    let (host, port) = match config.hosts.first() {
-        Some(entry) => (entry.host.as_str(), entry.port),
-        None => ("localhost", DEFAULT_PORT),
-    };
-    let host = if host.contains(':') { format!("[{host}]") } else { host.to_string() };
-    let user = match config.username.as_deref().filter(|s| !s.is_empty()) {
-        Some(user) => format!("{}@", percent_encode(user)),
-        None => String::new(),
-    };
-    let database = postgres.database.as_deref().filter(|s| !s.is_empty()).unwrap_or(DEFAULT_DATABASE);
-    let mode = match (config.tls, config.tls_allow_invalid_certificates) {
-        (false, _) => "disable",
-        (true, true) => "require",
-        (true, false) => "verify-full",
-    };
-    let mut uri = format!("postgresql://{user}{host}:{port}/{}?sslmode={mode}", percent_encode(database));
-    if let Some(ca) = config.tls_ca_file.as_deref().filter(|s| config.tls && !s.is_empty()) {
-        uri.push_str(&format!("&sslrootcert={}", percent_encode(ca)));
-    }
-    uri
+    sql::connection_string(config, resolved_database(postgres), &URI_FORMAT)
 }
 
 /// Performs an async TCP probe against the options' host:port, the same way

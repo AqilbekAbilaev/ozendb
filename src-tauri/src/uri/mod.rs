@@ -1,6 +1,8 @@
 use crate::error::AppError;
 use crate::storage::{ConnectionConfig, ConnectionKind, MongoConfig};
 
+pub(crate) mod sql;
+
 const TIMEOUT_MS: u64 = 5000;
 const TCP_PROBE_SECS: u64 = 3;
 
