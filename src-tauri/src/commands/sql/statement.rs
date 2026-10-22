@@ -1,16 +1,16 @@
 use crate::error::AppError;
 use sqlparser::ast::Statement;
-use sqlparser::dialect::PostgreSqlDialect;
+use sqlparser::dialect::Dialect;
 use sqlparser::parser::Parser;
 
 /// Caller SQL as it's run: trimmed of whitespace and a trailing `;`, and refused if
-/// empty or transaction control.
-pub(super) fn caller_sql(sql: &str) -> Result<&str, AppError> {
+/// empty or transaction control, read in the engine's `dialect`.
+pub(crate) fn caller_sql<'a>(dialect: &dyn Dialect, sql: &'a str) -> Result<&'a str, AppError> {
     let trimmed = sql.trim().trim_end_matches(';');
     if trimmed.is_empty() {
         return Err(AppError::Validation("Enter a query to run.".to_string()));
     }
-    refuse_transaction_control(trimmed).map_err(AppError::Validation)?;
+    refuse_transaction_control(dialect, trimmed).map_err(AppError::Validation)?;
     Ok(trimmed)
 }
 
@@ -18,8 +18,8 @@ pub(super) fn caller_sql(sql: &str) -> Result<&str, AppError> {
 /// connection, a BEGIN would leave that connection mid-transaction for whichever run
 /// borrows it next. The Manual switch holds a transaction properly. SQL sqlparser
 /// can't read is let through for the server to judge.
-pub(super) fn refuse_transaction_control(sql: &str) -> Result<(), String> {
-    let Ok(statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql) else { return Ok(()) };
+pub(crate) fn refuse_transaction_control(dialect: &dyn Dialect, sql: &str) -> Result<(), String> {
+    let Ok(statements) = Parser::parse_sql(dialect, sql) else { return Ok(()) };
     let controls = statements.iter().any(|s| matches!(s,
         Statement::StartTransaction { .. } | Statement::Commit { .. } | Statement::Rollback { .. }
         | Statement::Savepoint { .. } | Statement::ReleaseSavepoint { .. }));

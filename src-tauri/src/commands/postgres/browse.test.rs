@@ -1,4 +1,5 @@
-use super::{from_clause, where_clause, ColumnFilter, ColumnRef, FilterOp, JoinKind, JoinOn, TableJoin};
+use super::{from_clause, where_clause};
+use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, JoinOn, TableJoin};
 use crate::error::AppError;
 use std::collections::BTreeMap;
 

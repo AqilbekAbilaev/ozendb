@@ -1,4 +1,8 @@
-use super::refuse_transaction_control;
+use sqlparser::dialect::PostgreSqlDialect;
+
+fn refuse_transaction_control(sql: &str) -> Result<(), String> {
+    super::refuse_transaction_control(&PostgreSqlDialect {}, sql)
+}
 
 #[test]
 fn refuses_transaction_control_typed_into_the_editor() {

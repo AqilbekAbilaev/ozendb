@@ -13,6 +13,7 @@ pub mod account;
 pub mod connection;
 pub mod mongo;
 pub mod postgres;
+pub mod sql;
 pub mod persistence;
 pub mod folders;
 pub mod operations;

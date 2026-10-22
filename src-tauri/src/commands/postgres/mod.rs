@@ -18,7 +18,6 @@ pub mod cancel;
 pub mod explain;
 pub mod library;
 pub mod format;
-mod statement;
 pub mod transaction;
 pub mod search;
 pub mod history;

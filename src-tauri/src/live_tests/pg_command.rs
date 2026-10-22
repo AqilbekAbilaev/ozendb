@@ -5,9 +5,10 @@
 //! Shares that file's `test_config`/`pool` helpers and skip behavior; see its
 //! module doc comment for how to run these.
 
+use crate::commands::sql::ColumnRef;
 use crate::commands::{
     browse_table_impl, count_table_impl, list_columns_impl, list_databases_impl, list_schemas_impl,
-    list_tables_impl, run_query_as, search_tables_impl, update_row_impl, ColumnRef, ColumnValue,
+    list_tables_impl, run_query_as, search_tables_impl, update_row_impl, ColumnValue,
 };
 use super::pg::{pool, test_config};
 

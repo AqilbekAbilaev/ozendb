@@ -1,30 +1,10 @@
 use crate::error::AppError;
-use serde::Serialize;
 use sqlx::{Column, Executor, SqlSafeStr, Statement};
 use tauri::State;
 
 use super::{cancel, AppContext};
-
-/// Cap on rows returned by an arbitrary or browse query — the Postgres sibling of
-/// `AGG_RESULT_CAP` for Mongo's `run_aggregate`. Requested as `<cap>+1` so
-/// truncation is detectable without a second `COUNT(*)` round trip.
-pub(super) const ROW_RESULT_CAP: i64 = 10_000;
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PgQueryResult {
-    /// Column names in the query's own order, from the statement's describe —
-    /// never inferred from a decoded row's own shape (see `run_wrapped`'s doc
-    /// comment for why: two columns can share a name, or have none at all).
-    pub columns: Vec<String>,
-    /// One array of values per row, aligned to `columns` by position — not one
-    /// JSON object per row, which would silently collapse duplicate column names.
-    pub rows: Vec<Vec<serde_json::Value>>,
-    pub truncated: bool,
-    pub elapsed_ms: u64,
-    /// Set for a statement that returns no rows (INSERT, UPDATE, DDL…): how many rows it changed.
-    pub rows_affected: Option<u64>,
-}
+use crate::commands::sql::{statement::caller_sql, SqlQueryResult, ROW_RESULT_CAP};
+use sqlparser::dialect::PostgreSqlDialect;
 
 /// Column names and the `json_build_array(...)` wrapper SQL, built from a
 /// prepared statement's own reported columns — never from the wrapped query or
@@ -92,7 +72,7 @@ fn wrap_for_json(stmt: &sqlx::postgres::PgStatement, inner_sql: &str) -> (Vec<St
     (columns, wrapped)
 }
 
-/// Turns the raw `json_build_array(...)` results into `PgQueryResult`'s
+/// Turns the raw `json_build_array(...)` results into `SqlQueryResult`'s
 /// rows-of-values shape and applies the truncation cap. Pure, shared by both
 /// `run_wrapped` and `run_wrapped_read_only`.
 fn rows_from_json(mut raw_rows: Vec<serde_json::Value>) -> (Vec<Vec<serde_json::Value>>, bool) {
@@ -130,7 +110,7 @@ pub(super) async fn run_wrapped_on(
     inner_sql: &str,
     binds: &[String],
     run_id: Option<&str>,
-) -> Result<PgQueryResult, AppError> {
+) -> Result<SqlQueryResult, AppError> {
     let _running = match run_id {
         Some(id) => Some(cancel::register(&mut *conn, id).await?),
         None => None,
@@ -146,7 +126,7 @@ pub(super) async fn run_wrapped_on(
         }
         let done = query.execute(&mut *conn).await.map_err(AppError::Postgres)?;
         let elapsed_ms = started.elapsed().as_millis() as u64;
-        return Ok(PgQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms, rows_affected: Some(done.rows_affected()) });
+        return Ok(SqlQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms, rows_affected: Some(done.rows_affected()) });
     }
     let mut query = sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped));
     for bind in binds {
@@ -159,11 +139,11 @@ pub(super) async fn run_wrapped_on(
     let elapsed_ms = started.elapsed().as_millis() as u64;
     let (rows, truncated) = rows_from_json(raw_rows);
 
-    Ok(PgQueryResult { columns, rows, truncated, elapsed_ms, rows_affected: None })
+    Ok(SqlQueryResult { columns, rows, truncated, elapsed_ms, rows_affected: None })
 }
 
 /// `run_wrapped_on` a connection borrowed from the pool.
-pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[String], run_id: Option<&str>) -> Result<PgQueryResult, AppError> {
+pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[String], run_id: Option<&str>) -> Result<SqlQueryResult, AppError> {
     let mut conn = pool.acquire().await.map_err(AppError::Postgres)?;
     run_wrapped_on(&mut conn, inner_sql, binds, run_id).await
 }
@@ -177,7 +157,7 @@ pub(super) async fn run_wrapped(pool: &sqlx::PgPool, inner_sql: &str, binds: &[S
 /// `set_config('default_transaction_read_only', 'off', false)` (confirmed live),
 /// but can't do the same to a transaction that already explicitly set itself
 /// read-only, and every call here starts a fresh one.
-async fn run_wrapped_read_only(pool: &sqlx::PgPool, inner_sql: &str, run_id: Option<&str>) -> Result<PgQueryResult, AppError> {
+async fn run_wrapped_read_only(pool: &sqlx::PgPool, inner_sql: &str, run_id: Option<&str>) -> Result<SqlQueryResult, AppError> {
     let mut tx = match pool.begin().await {
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
@@ -191,8 +171,8 @@ async fn run_wrapped_read_only(pool: &sqlx::PgPool, inner_sql: &str, run_id: Opt
 }
 
 /// Runs caller SQL (see `run_pg_query`) — cancellable under `run_id` while it runs.
-pub(crate) async fn run_query_as(pool: &sqlx::PgPool, sql: &str, read_only: bool, run_id: Option<&str>) -> Result<PgQueryResult, AppError> {
-    let trimmed = super::statement::caller_sql(sql)?;
+pub(crate) async fn run_query_as(pool: &sqlx::PgPool, sql: &str, read_only: bool, run_id: Option<&str>) -> Result<SqlQueryResult, AppError> {
+    let trimmed = caller_sql(&PostgreSqlDialect {}, sql)?;
     if read_only {
         return run_wrapped_read_only(pool, trimmed, run_id).await;
     }
@@ -215,7 +195,7 @@ pub async fn run_pg_query(
     tx_id: Option<String>,
     database: Option<String>,
     txs: State<'_, super::PgTransactions>,
-) -> Result<PgQueryResult, AppError> {
+) -> Result<SqlQueryResult, AppError> {
     if let Some(tx_id) = tx_id {
         return txs.run(&tx_id, &sql, run_id.as_deref()).await;
     }
