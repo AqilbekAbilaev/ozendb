@@ -110,6 +110,7 @@ pub fn run() {
             app.manage(SyncStateStorage::new(data_dir.join("sync_state.json")));
             app.manage(SyncKeysStorage::new(data_dir.join("sync_keys.json")));
             app.manage(PendingSetup::default());
+            app.manage(keychain::AccountKeychain::new(keychain::OsKeychain));
             // The host-key trust store is shared between the pool (real connect)
             // and Test Connection's temporary tunnel, so both honor the same TOFU
             // record. Managed as an Arc so the pool can own a clone.

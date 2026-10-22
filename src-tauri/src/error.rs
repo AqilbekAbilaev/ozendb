@@ -29,6 +29,9 @@ pub enum AppError {
     #[error("Keychain error: {0}")]
     Keychain(String),
 
+    #[error("No keyring service was found: {0}")]
+    KeychainUnavailable(String),
+
     #[error("Shell error: {0}")]
     Shell(String),
 
@@ -111,6 +114,7 @@ impl AppError {
             AppError::ReadOnly { .. } => "read_only",
             AppError::Bson(_) => "bson",
             AppError::Keychain(_) => "keychain",
+            AppError::KeychainUnavailable(_) => "keychain_unavailable",
             AppError::Shell(_) => "shell",
             AppError::Ssh(_) => "ssh",
             AppError::Sql(_) => "sql",

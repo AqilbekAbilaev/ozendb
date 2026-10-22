@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::keychain::OsKeychain;
+use crate::keychain::{AccountKeychain, OsKeychain};
 use crate::sync::account::Device;
 use crate::sync::crypto::INTERACTIVE;
 use crate::sync::http::{client, HttpServer, PRODUCTION_URL};
@@ -16,7 +16,7 @@ use zeroize::Zeroizing;
 pub async fn sync_setup_status(app: AppHandle) -> Result<SetupStatus, AppError> {
     let sync = AppSync(app);
     let device = sync.device();
-    if device.keys.keys(&OsKeychain)?.is_some() {
+    if device.keys.keys(device.keychain)?.is_some() {
         return Ok(SetupStatus::SetUp);
     }
     server_status(&server(&device)?).await
@@ -52,7 +52,7 @@ pub async fn finish_sync_setup(app: AppHandle, pending: State<'_, PendingSetup>)
     sync.settle(&result).await;
     match result {
         Ok(_) => {
-            device.keys.save(&OsKeychain, &keys)?;
+            device.keys.save(device.keychain, &keys)?;
             // Refreshes the sync status, which still says sync is not set up.
             app.state::<SyncLoop>().sync_now();
             Ok(())
@@ -89,13 +89,13 @@ async fn unlock(app: AppHandle, secret: Secret) -> Result<(), AppError> {
     let keys = tokio::task::spawn_blocking(move || held.unlock(&secret))
         .await
         .map_err(|e| AppError::Crypto(format!("Unlocking the sync key failed: {e}.")))??;
-    device.keys.save(&OsKeychain, &keys)?;
+    device.keys.save(device.keychain, &keys)?;
     app.state::<SyncLoop>().sync_now();
     Ok(())
 }
 
 // The sync server, called as the signed-in account.
-fn server(device: &Device<'_, OsKeychain>) -> Result<HttpServer, AppError> {
+fn server(device: &Device<'_, AccountKeychain<OsKeychain>>) -> Result<HttpServer, AppError> {
     let session = device.session()?.ok_or(AppError::SignedOut)?;
     Ok(HttpServer::new(client()?, PRODUCTION_URL, session.to_string()))
 }
