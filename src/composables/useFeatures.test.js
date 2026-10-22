@@ -31,6 +31,7 @@ const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
 const { MENU_ALIASES } = await import('./useAppMenuActions')
 const { MENUS } = await import('../constants/contextMenus')
 const { PG_MENUS, PG_ACTIONS } = await import('../engines/postgresql/tree/contextMenus')
+const { MYSQL_MENUS } = await import('../engines/mysql/tree/contextMenus')
 const { contextMenu } = await import('../stores/contextMenu')
 const { treeSelection, setTreeSelection } = await import('../stores/connectionNavigation')
 
@@ -457,6 +458,13 @@ describe('context menu coverage', () => {
     const { knownActions } = makeFeatures()
     const pgOffered = Object.values(PG_MENUS).flatMap(actionsIn)
     expect(pgOffered.filter(a => !PG_ACTIONS[a] && !knownActions.has(a))).toEqual([])
+  })
+
+  it('can dispatch every action the MySQL menus offer with the shared handlers alone', () => {
+    const { knownActions } = makeFeatures()
+    const mysqlOffered = Object.values(MYSQL_MENUS).flatMap(actionsIn)
+    expect(mysqlOffered.length).toBeGreaterThan(0)
+    expect(mysqlOffered.filter(a => !knownActions.has(a))).toEqual([])
   })
 
   it('runs a PostgreSQL node\'s own action, not the MongoDB one of the same level', () => {

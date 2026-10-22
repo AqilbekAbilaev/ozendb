@@ -5,6 +5,7 @@ vi.mock('../stores/tabCreators', () => ({ openPostgresQuery: vi.fn(), openPostgr
 
 const { contextAction, connectionMenu } = await import('./contextActions.js')
 const { PG_ACTIONS, PG_MENUS } = await import('./postgresql/tree/contextMenus.js')
+const { MYSQL_MENUS } = await import('./mysql/tree/contextMenus.js')
 
 describe('contextAction', () => {
   it('finds an engine\'s own handler for a node of that engine', () => {
@@ -27,6 +28,15 @@ describe('connectionMenu', () => {
     })
     expect(menu.items).toBe(PG_MENUS.connection)
     expect(connectionMenu({ id: 'c1', name: 'pg', engine: 'postgresql', database: 'shop' }).node.database).toBe('shop')
+  })
+
+  it('gives a MySQL connection its own menu, with no database when none was named', () => {
+    const menu = connectionMenu({ id: 'c 1', name: 'Sales · MySQL', engine: 'mysql', database: '' })
+    expect(menu.node).toEqual({
+      connId: 'c 1', connName: 'Sales · MySQL', engine: 'mysql', database: null, resource: { connectionId: 'c 1', segments: [] },
+    })
+    expect(menu.items).toBe(MYSQL_MENUS.connection)
+    expect(connectionMenu({ id: 'c 1', name: 'Sales · MySQL', engine: 'mysql', database: 'продажи' }).node.database).toBe('продажи')
   })
 
   it('has none for MongoDB, which uses the shared connection menu', () => {
