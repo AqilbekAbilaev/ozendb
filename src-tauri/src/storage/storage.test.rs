@@ -352,3 +352,14 @@ fn record_and_secret_changes_never_interleave() {
     second.join().unwrap();
     assert!(entered.load(Ordering::SeqCst));
 }
+
+#[test]
+fn updating_a_removed_connection_is_an_unknown_connection() {
+    let (storage, _dir) = storage_in_tempdir();
+    storage.add(conn("c.1 ü", "Gone")).unwrap();
+    storage.remove("c.1 ü").unwrap();
+
+    let updated = storage.update(conn("c.1 ü", "Edited"));
+
+    assert!(matches!(updated, Err(AppError::UnknownConnection(id)) if id == "c.1 ü"));
+}

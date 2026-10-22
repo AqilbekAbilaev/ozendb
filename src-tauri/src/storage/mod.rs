@@ -343,8 +343,14 @@ impl Storage {
         self.update_with(|connections| connections.put(connections.len(), config))
     }
 
+    /// Fails with `UnknownConnection` when there is no such connection, or it was deleted.
     pub fn update(&self, config: ConnectionConfig) -> Result<(), AppError> {
-        self.update_with(|connections| connections.edit_where(|c| c.id == config.id, |c| *c = config.clone()))
+        let found = self.update_if(|connections| {
+            let found = connections.iter().any(|c| c.id == config.id && !c.stamp.deleted);
+            connections.edit_where(|c| c.id == config.id, |c| *c = config.clone());
+            found
+        })?;
+        if found { Ok(()) } else { Err(AppError::UnknownConnection(config.id)) }
     }
 
     pub fn remove(&self, id: &str) -> Result<(), AppError> {

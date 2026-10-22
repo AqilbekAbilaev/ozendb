@@ -23,6 +23,8 @@ use fields::ConnectionFields;
 mod purge;
 use purge::ConnectionData;
 
+mod edit;
+
 /// Test the connection the editor currently describes, without saving it. Dials
 /// through `uri::build_uri` (MongoDB) or `postgres::uri::build_options` (PostgreSQL) — the
 /// same functions the real connect paths use — so a green test means the connection
@@ -303,49 +305,9 @@ pub async fn update_connection(
     let folder_id = existing.as_ref().and_then(|c| c.folder_id.clone());
     let open = existing.as_ref().map(|c| c.open).unwrap_or(true);
 
-    let (password, ssh_password, ssh_passphrase) = fields.secrets();
+    let secrets = fields.secrets();
     let config = fields.into_config(id.clone(), existing.as_ref(), folder_id, last_accessed, open)?;
-
-    // The secrets and the record change together, so a sync can't slip in between.
-    ctx.storage.with_secrets_locked(|| {
-        // Update keychain only when a new secret is supplied; empty = keep existing.
-        let pw_ref = password.as_deref().filter(|s| !s.is_empty());
-        if let Some(pw) = pw_ref {
-            match crate::keychain::set(&id, pw) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-        }
-        if let Some(sp) = ssh_password.as_deref().filter(|s| !s.is_empty()) {
-            match crate::keychain::set(&format!("{}::ssh-pass", id), sp) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-        }
-        if let Some(pp) = ssh_passphrase.as_deref().filter(|s| !s.is_empty()) {
-            match crate::keychain::set(&format!("{}::ssh-key-pass", id), pp) {
-                Ok(val) => val,
-                Err(e) => return Err(e),
-            };
-        }
-
-        // Drop secrets the updated config can no longer use, so a credential doesn't
-        // outlive the setting that needed it. "Leave blank to keep existing" only holds
-        // while the field still applies — clearing the username, turning SSH off, or
-        // switching SSH auth retires the corresponding secret.
-        let (keep_password, keep_ssh_password, keep_ssh_passphrase) = usable_secrets(&config);
-        if !keep_password {
-            crate::keychain::delete(&id);
-        }
-        if !keep_ssh_password {
-            crate::keychain::delete(&format!("{}::ssh-pass", id));
-        }
-        if !keep_ssh_passphrase {
-            crate::keychain::delete(&format!("{}::ssh-key-pass", id));
-        }
-
-        ctx.storage.update(config.clone())
-    })?;
+    edit::save_edit(&ctx.storage, &crate::keychain::OsKeychain, &config, secrets)?;
 
     // Evict cached client so the next operation reconnects with updated credentials.
     ctx.pool.remove(&id).await;
