@@ -9,7 +9,7 @@ use super::query::run_wrapped_on;
 use crate::commands::sql::SqlQueryResult;
 use super::row_write::execute_write;
 use crate::commands::sql::statement::caller_sql;
-use sqlparser::dialect::PostgreSqlDialect;
+use super::DIALECT;
 use super::AppContext;
 
 // `failed`: PostgreSQL answers COMMIT of a transaction that hit an error by rolling
@@ -52,7 +52,7 @@ impl PgTransactions {
     }
 
     pub async fn run(&self, tx_id: &str, sql: &str, run_id: Option<&str>) -> Result<SqlQueryResult, AppError> {
-        let sql = caller_sql(&PostgreSqlDialect {}, sql)?;
+        let sql = caller_sql(&DIALECT, sql)?;
         let held = self.held(tx_id)?;
         let mut held = held.lock().await;
         let tx = held.tx.as_mut().ok_or_else(ended)?;

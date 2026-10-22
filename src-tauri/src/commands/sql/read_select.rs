@@ -25,7 +25,8 @@ pub struct TableSelect {
 }
 
 /// Postgres folds an unquoted name to lower case; a quoted one is taken as written.
-// TODO #392: MySQL folds no names; the folding belongs with the engine's dialect.
+// TODO #392: this reader knows PostgreSQL's ways — folding names, and writing "contains"
+// as `::text ILIKE` — which belong with the engine's dialect before MySQL reads back.
 fn name(ident: &Ident) -> String {
     match ident.quote_style {
         Some(_) => ident.value.clone(),
