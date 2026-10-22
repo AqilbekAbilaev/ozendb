@@ -46,6 +46,11 @@ describe('syncView: states', () => {
     expect(view.warning).toMatch(/could not be stored in the keychain/)
   })
 
+  it('says passwords are not synced on a system without a keyring service', () => {
+    const view = syncView(status({ keychain_error: { code: 'keychain_unavailable', message: 'No keyring service was found: Ozen DB/ü.' } }), 'premium', NOW)
+    expect(view.warning).toBe('Passwords are not synced: no keyring service was found.')
+  })
+
   it('explains that a lapsed account only receives, in a muted tone', () => {
     expect(syncView(status({ received_only: true }), 'expired', NOW)).toMatchObject({ tone: 'muted', detail: expect.stringMatching(/not uploaded/) })
   })

@@ -167,7 +167,12 @@ impl Snapshot {
     fn write_connections(&self, before: &Snapshot, stores: &SyncedStores, keychain: &impl Keychain) -> Result<Written, AppError> {
         let configs = |snapshot: &Snapshot| snapshot.connections.iter().cloned().map(SyncedConnection::into_config).collect::<Vec<_>>();
         let mut changed_connections = Vec::new();
-        let mut keychain_error = None;
+        // Without a keyring service, this device keeps none of the passwords it receives.
+        let mut keychain_error = before
+            .connections
+            .iter()
+            .any(SyncedConnection::passwords_unknown)
+            .then(|| AppError::KeychainUnavailable("passwords are not synced to this device".into()));
         let complete = stores.connections.replace_synced_if_unchanged(&configs(before), configs(self))?;
         if complete {
             // A connection the merge dropped altogether leaves as one with nothing stored.
@@ -199,7 +204,7 @@ impl Snapshot {
         self.connections.len() == other.connections.len()
             && self.connections.iter().all(|mine| {
                 let theirs = other.connections.iter().find(|c| c.id() == mine.id());
-                theirs.is_some() && !mine.secrets_differ(theirs)
+                theirs.is_some_and(|theirs| mine.secrets_agree(theirs))
             })
     }
 
@@ -278,11 +283,18 @@ impl Keyed {
 fn with_winning_secrets(config: ConnectionConfig, local: &[SyncedConnection], remote: &[SyncedConnection]) -> SyncedConnection {
     let shared = config.shared_part();
     let same_id = |c: &&SyncedConnection| c.id() == config.id;
-    let from = remote
+    let won = remote
         .iter()
         .find(|c| same_id(c) && c.shared_part() == shared)
         .or_else(|| local.iter().find(same_id))
         .or_else(|| remote.iter().find(same_id));
+    // A winner from a device without a keyring service doesn't know the passwords, so
+    // they come from the other side, which may.
+    let known = || remote.iter().chain(local).find(|c| same_id(c) && !c.passwords_unknown());
+    let from = match won {
+        Some(side) if side.passwords_unknown() => known().or(won),
+        won => won,
+    };
     match from {
         Some(side) => side.clone().with_config(config),
         None => unreachable!("a merged connection comes from one of the two sides"),

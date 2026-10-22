@@ -17,6 +17,10 @@ pub struct SyncedConnection {
     config: ConnectionConfig,
     #[serde(default)]
     secrets: ConnectionSecrets,
+    /// Read on a device without a keyring service, which can't know its passwords. Such
+    /// a record carries none, and that must never read as "the passwords were removed".
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    passwords_unknown: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -37,16 +41,18 @@ impl SyncedConnection {
     /// The record with the secrets this device holds for it. A deleted record carries none.
     pub fn collect(config: ConnectionConfig, keychain: &impl Keychain) -> Result<Self, AppError> {
         if config.stamp.deleted {
-            return Ok(Self { config, secrets: ConnectionSecrets::default() });
+            return Ok(Self { config, secrets: ConnectionSecrets::default(), passwords_unknown: false });
         }
         let [password, ssh_password, ssh_passphrase] = keys(&config.id);
         let read = |key: String| Ok::<_, AppError>(keychain.read(&key)?.map(Secret));
-        let secrets = ConnectionSecrets {
-            password: read(password)?,
-            ssh_password: read(ssh_password)?,
-            ssh_passphrase: read(ssh_passphrase)?,
+        let password = match read(password) {
+            Err(AppError::KeychainUnavailable(_)) => {
+                return Ok(Self { config, secrets: ConnectionSecrets::default(), passwords_unknown: true });
+            }
+            password => password?,
         };
-        Ok(Self { config, secrets })
+        let secrets = ConnectionSecrets { password, ssh_password: read(ssh_password)?, ssh_passphrase: read(ssh_passphrase)? };
+        Ok(Self { config, secrets, passwords_unknown: false })
     }
 
     /// Makes this device's keychain hold exactly the record's secrets: each one it
@@ -71,8 +77,19 @@ impl SyncedConnection {
     /// These secrets on `config`, which a merge may have changed. A deleted record
     /// carries none.
     pub fn with_config(self, config: ConnectionConfig) -> Self {
-        let secrets = if config.stamp.deleted { ConnectionSecrets::default() } else { self.secrets };
-        Self { config, secrets }
+        if config.stamp.deleted {
+            return Self { config, secrets: ConnectionSecrets::default(), passwords_unknown: false };
+        }
+        Self { config, ..self }
+    }
+
+    pub fn passwords_unknown(&self) -> bool {
+        self.passwords_unknown
+    }
+
+    /// Whether the two hold the same secrets, counting unknown ones as the same.
+    pub fn secrets_agree(&self, other: &SyncedConnection) -> bool {
+        self.passwords_unknown || other.passwords_unknown || !self.secrets_differ(Some(other))
     }
 
     /// Whether this record's secrets differ from what `previous` held, or from none.
@@ -89,8 +106,9 @@ impl SyncedConnection {
     }
 
     /// Whether this record's shared part or secrets differ from `previous`, or from none.
+    /// Unknown secrets count as unchanged.
     pub fn differs_from(&self, previous: Option<&SyncedConnection>) -> bool {
-        previous.is_none_or(|p| p.config.shared_part() != self.config.shared_part()) || self.secrets_differ(previous)
+        previous.is_none_or(|p| p.config.shared_part() != self.config.shared_part() || !self.secrets_agree(p))
     }
 
     /// The record without its secrets, as the connection store keeps it.
@@ -120,7 +138,7 @@ impl Record for SyncedConnection {
     }
 
     fn emptied(&self) -> Self {
-        Self { config: self.config.emptied(), secrets: ConnectionSecrets::default() }
+        Self { config: self.config.emptied(), secrets: ConnectionSecrets::default(), passwords_unknown: false }
     }
 }
 
