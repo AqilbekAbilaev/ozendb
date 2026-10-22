@@ -14,7 +14,7 @@ export function syncView(status, entitlementState, now) {
       if (status.received_only) return { ...view('muted', 'Receiving only', LAPSED), lastSynced }
       return {
         ...view('ok', `Synced ${ago(status.last_synced ?? status.time, now)}`),
-        warning: status.keychain_error ? KEYCHAIN_REFUSED : '',
+        warning: keychainWarning(status.keychain_error),
       }
     default:
       return { ...failure(status.error), lastSynced }
@@ -23,6 +23,12 @@ export function syncView(status, entitlementState, now) {
 
 const LAPSED = 'Premium has lapsed. Changes from your other devices still arrive, but edits made here are not uploaded.'
 const KEYCHAIN_REFUSED = 'A saved password could not be stored in the keychain. The next sync tries again.'
+const NO_KEYRING = 'Passwords are not synced: no keyring service was found.'
+
+function keychainWarning(error) {
+  if (!error) return ''
+  return error.code === 'keychain_unavailable' ? NO_KEYRING : KEYCHAIN_REFUSED
+}
 
 // Codes with wording of their own; any other shows the backend's message.
 const FAILURES = {

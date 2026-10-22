@@ -1,5 +1,5 @@
 use super::*;
-use crate::keychain::fake::{FakeKeychain, LockedKeychain, RefusingKeychain};
+use crate::keychain::fake::{FakeKeychain, LockedKeychain, RefusingKeychain, UnavailableKeychain};
 use crate::settings::Settings;
 use crate::sync::test_device::{connection, folder, Device};
 
@@ -282,4 +282,85 @@ fn the_upload_holds_one_key_per_store() {
         "connections", "default_queries", "folders", "format", "known_hosts", "node_tags", "pg_saved", "saved_queries", "settings",
     ];
     assert_eq!(keys, expected);
+}
+
+/// What a device without a keyring service sends: its connections, passwords unknown.
+fn read_without_keyring(device: &Device) -> Snapshot {
+    Snapshot::read(&device.stores(), &UnavailableKeychain).unwrap()
+}
+
+#[test]
+fn reading_without_a_keyring_service_still_reads_every_connection() {
+    let device = Device::new();
+    device.hold(connection("c.1 ü", "prod", 1));
+
+    let snapshot = read_without_keyring(&device);
+
+    assert_eq!(snapshot.connections.len(), 1);
+    assert!(decoded(&snapshot).connections[0].passwords_unknown());
+}
+
+#[test]
+fn a_newer_edit_from_a_device_without_a_keyring_keeps_the_passwords_held_elsewhere() {
+    let mine = Device::new();
+    mine.hold(connection("c.1 ü", "prod", 1));
+    mine.keychain.write("c.1 ü", "s3cret pässword").unwrap();
+    let theirs = Device::new();
+    theirs.hold(connection("c.1 ü", "prod renamed", 5));
+
+    let remote_won = mine.read().merged(decoded(&read_without_keyring(&theirs)), &merge());
+    let local_won = read_without_keyring(&theirs).merged(decoded(&mine.read()), &merge());
+
+    for merged in [remote_won, local_won] {
+        assert!(text(&merged).contains("prod renamed"));
+        assert!(text(&merged).contains("s3cret pässword"));
+        assert!(!merged.connections[0].passwords_unknown());
+    }
+}
+
+#[test]
+fn unknown_passwords_do_not_make_two_snapshots_differ() {
+    let mine = Device::new();
+    mine.hold(connection("c.1 ü", "prod", 1));
+    mine.keychain.write("c.1 ü", "s3cret").unwrap();
+    let theirs = Device::new();
+    theirs.hold(connection("c.1 ü", "prod", 1));
+
+    let unknown = read_without_keyring(&theirs);
+    let merged = unknown.clone().merged(decoded(&mine.read()), &merge());
+
+    assert!(merged.same_as(&unknown).unwrap());
+}
+
+#[test]
+fn passwords_that_cannot_be_kept_without_a_keyring_are_reported_as_such() {
+    let device = Device::new();
+    device.hold(connection("c.1 ü", "prod", 1));
+    let other = Device::new();
+    other.hold(connection("c.1 ü", "prod", 9));
+    other.keychain.write("c.1 ü", "s3cret").unwrap();
+
+    let before = read_without_keyring(&device);
+    let merged = before.clone().merged(decoded(&other.read()), &merge());
+    let written = merged.write_if_unchanged(&before, &device.stores(), &UnavailableKeychain).unwrap();
+
+    assert!(written.complete);
+    assert_eq!(written.keychain_error.map(|e| e.code()), Some("keychain_unavailable"));
+}
+
+
+#[test]
+fn unknown_passwords_alone_change_no_connection() {
+    let device = Device::new();
+    device.hold(connection("c.1 ü", "prod", 1));
+    let other = Device::new();
+    other.hold(connection("c.1 ü", "prod", 1));
+    other.keychain.write("c.1 ü", "s3cret").unwrap();
+
+    let before = read_without_keyring(&device);
+    let merged = before.clone().merged(decoded(&other.read()), &merge());
+    let written = merged.write_if_unchanged(&before, &device.stores(), &UnavailableKeychain).unwrap();
+
+    assert!(written.changed_connections.is_empty());
+    assert_eq!(written.keychain_error.map(|e| e.code()), Some("keychain_unavailable"));
 }

@@ -76,6 +76,8 @@ impl Job for AppSync {
         let keys = device.keys.keys(device.keychain)?.ok_or(AppError::SyncNotSetUp)?;
         let server = HttpServer::new(client()?, PRODUCTION_URL, session.to_string());
         let stores = self.stores();
+        // Connection passwords never fall back to memory: an empty memory would read as
+        // "no passwords" and remove them on every device.
         let local = Local { stores: &stores, keychain: &OsKeychain, state: device.state };
         let result = sync(&local, &server, &keys.keys(), now_epoch_ms()).await;
         self.settle(&result).await;
