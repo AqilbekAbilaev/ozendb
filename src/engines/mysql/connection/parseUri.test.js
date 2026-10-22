@@ -31,6 +31,16 @@ describe('parseMySqlUri', () => {
     expect(parseMySqlUri('mysql://h/db?ssl-mode=VERIFY_IDENTITY&ssl-ca=/etc/my%20ca.pem').tlsCaFile).toBe('/etc/my ca.pem')
   })
 
+  it('reads the sslMode and sslmode spellings of ssl-mode', () => {
+    expect(parseMySqlUri('mysql://h/db?sslMode=VERIFY_CA').tls).toBe(true)
+    expect(parseMySqlUri('mysql://h/db?sslmode=disabled').tls).toBe(false)
+  })
+
+  it('reads the sslca and ssl_ca spellings of ssl-ca', () => {
+    expect(parseMySqlUri('mysql://h/db?sslca=/etc/my%20ca.pem').tlsCaFile).toBe('/etc/my ca.pem')
+    expect(parseMySqlUri('mysql://h/db?ssl_ca=/etc/ca.pem').tlsCaFile).toBe('/etc/ca.pem')
+  })
+
   it('refuses another engine\'s connection string', () => {
     expect(parseMySqlUri('postgresql://localhost')).toBe(null)
   })
