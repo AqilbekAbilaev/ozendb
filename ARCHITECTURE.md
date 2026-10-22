@@ -127,6 +127,7 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
   matching, column-type kinds, which columns take a value), its `api` (the commands the tabs
   call), `readPlan` for its Explain output, and the names of its own export and row-history
   windows. A run carries its engine's name, so `runSql` finds the same commands.
+  `connection/` holds what their connection editors share: the authentication and SSL sections and the payload builder.
 
 A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
 screens still sit in the shared `components/` folders and its sidebar rows in
