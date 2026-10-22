@@ -30,6 +30,7 @@ mod menu;
 mod node_tags;
 mod operations;
 mod persist;
+mod mysql;
 mod postgres;
 mod pool;
 mod record;

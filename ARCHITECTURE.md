@@ -196,6 +196,7 @@ ResourceRefs.
 | `commands/mongo/`, `commands/postgres/` | Each engine's commands. The rest of `commands/` is engine-neutral: connections, persistence, folders, operations, the error log, the updater, and the CSV import/export helpers both engines' transfers use. `commands/access.rs` is the one lookup and read-only gate behind every `AppContext` resolver. |
 | `commands/sql/` | What every SQL engine's commands share without talking to a server: the filter, join and result shapes, the row cap, and reading SQL with `sqlparser` (format, read back into filters, refuse typed transaction control) in the dialect the engine passes in. |
 | `postgres/` | PostgreSQL outside the command layer: `uri.rs` (connect options) and the `query_library` / `row_history` stores. |
+| `mysql/` | MySQL outside the command layer: `uri.rs` (the Copy URI string). A MySQL connection can be saved but not yet dialled (#386). |
 | `live_tests/` | Tests against a live server, skipped unless `OZENDB_TEST_MONGODB` / `OZENDB_TEST_POSTGRES` is set. `cargo test live_tests::pg` runs just the PostgreSQL ones. |
 
 ## Native menu

@@ -208,6 +208,25 @@ fn a_saved_record_writes_its_engine_tag_back() {
 }
 
 #[test]
+fn a_mysql_record_round_trips_with_its_default_database() {
+    let config = ConnectionConfig {
+        engine: EngineConfig::MySql(MySqlConfig { database: Some(String::from("ведомость 2024")) }),
+        ..conn("1", "Local")
+    };
+    let json = serde_json::to_string(&config).unwrap();
+    assert!(json.contains(r#""engine":"mysql""#), "tag must round-trip: {json}");
+    assert_eq!(serde_json::from_str::<ConnectionConfig>(&json).unwrap(), config);
+}
+
+#[test]
+fn a_mysql_record_may_leave_out_its_database() {
+    let json = r#"{"id":"1","name":"Local","engine":"mysql"}"#;
+    let config: ConnectionConfig = serde_json::from_str(json).unwrap();
+    assert_eq!(config.engine_kind(), Engine::MySql);
+    assert_eq!(config.engine, EngineConfig::MySql(MySqlConfig { database: None }));
+}
+
+#[test]
 fn connection_kind_maps_known_strings() {
     assert_eq!(ConnectionKind::from_str("standalone"), ConnectionKind::Standalone);
     assert_eq!(ConnectionKind::from_str("srv"), ConnectionKind::Srv);
