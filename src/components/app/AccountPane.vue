@@ -14,8 +14,9 @@ import SyncSetupSection from './SyncSetupSection.vue'
 
 // The OzenDB account in Preferences. Signing in and out take effect at once, apart
 // from the dialog's Save and Cancel.
-const { step, account, code, notice, error, signingOut, start, cancel, signOut } = useAccountSignIn()
+const { step, account, code, notice, error, signingOut, deleting, start, cancel, signOut, deleteAccount } = useAccountSignIn()
 const email = ref('')
+const confirmingDelete = ref(false)
 const plan = computed(() => planText(entitlement.value, account.value?.subscription))
 
 function manageSubscription() {
@@ -35,6 +36,22 @@ function manageSubscription() {
         <BaseButton :disabled="signingOut" @click="signOut">Sign out</BaseButton>
       </div>
       <SyncSetupSection />
+      <div v-if="confirmingDelete" class="ac-delete">
+        <div class="ac-label">Delete your OzenDB account?</div>
+        <HintText class="ac-hint">
+          This deletes your account and your synced data on the server, and signs out every device.
+          Connections and queries stay on each computer. A subscription must be cancelled first. This cannot be undone.
+        </HintText>
+        <div class="ac-row">
+          <span class="ac-meta" />
+          <BaseButton :disabled="deleting" @click="confirmingDelete = false">Keep account</BaseButton>
+          <BaseButton variant="danger" :disabled="deleting" @click="deleteAccount">Delete account</BaseButton>
+        </div>
+      </div>
+      <div v-else class="ac-row">
+        <span class="ac-meta" />
+        <BaseButton @click="confirmingDelete = true">Delete account…</BaseButton>
+      </div>
     </template>
 
     <template v-else-if="step === 'waiting'">
@@ -83,6 +100,14 @@ function manageSubscription() {
 .ac-label { font-size: 13px; color: var(--text); }
 .ac-hint { margin-top: 2px; }
 .ac-email { flex: 1; min-width: 0; }
+.ac-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+}
 .ac-code {
   font-family: var(--mono);
   font-size: 24px;

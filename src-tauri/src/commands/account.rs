@@ -52,6 +52,17 @@ pub async fn sign_out(
     device.sign_out(&server()?).await
 }
 
+/// Deletes the account on the server and forgets it on this device.
+#[tauri::command]
+pub async fn delete_account(
+    entitlement: State<'_, EntitlementStorage>,
+    state: State<'_, SyncStateStorage>,
+    keys: State<'_, SyncKeysStorage>,
+) -> Result<(), AppError> {
+    let device = Device { keychain: &OsKeychain, entitlement: &entitlement, state: &state, keys: &keys };
+    device.delete_account(&server()?).await
+}
+
 fn server() -> Result<AccountServer, AppError> {
     Ok(AccountServer::new(client()?, PRODUCTION_URL))
 }

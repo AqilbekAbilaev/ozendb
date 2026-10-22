@@ -293,3 +293,60 @@ fn forgetting_the_account_drops_its_sync_key_from_the_keychain() {
 
     assert_nothing_kept(&keychain, &files);
 }
+
+#[tokio::test]
+async fn deleting_the_account_deletes_it_on_the_server_and_forgets_it_here() {
+    let (server, requests) = server(vec![reply("204 No Content", "", "")]).await;
+    let (keychain, files) = (signed_in(), files_of_another_account());
+
+    device(&keychain, &files).delete_account(&server).await.unwrap();
+
+    let request = received(requests).await.remove(0);
+    assert!(request.starts_with("delete /me "));
+    assert!(request.contains(&format!("authorization: bearer {}", SESSION.to_lowercase())));
+    assert_nothing_kept(&keychain, &files);
+}
+
+#[tokio::test]
+async fn deleting_after_an_old_sign_in_asks_to_sign_in_again_and_keeps_the_account() {
+    let (server, _requests) = server(vec![reply("403 Forbidden", "", "")]).await;
+    let (keychain, files) = (signed_in(), files());
+
+    let deleted = device(&keychain, &files).delete_account(&server).await;
+
+    assert!(matches!(deleted, Err(AppError::SignInAgain)));
+    assert_eq!(keychain.entries().get(SESSION_KEY).map(String::as_str), Some(SESSION));
+}
+
+#[tokio::test]
+async fn deleting_while_a_subscription_can_still_charge_says_to_cancel_it_first() {
+    let (server, _requests) = server(vec![reply("409 Conflict", "", "")]).await;
+    let (keychain, files) = (signed_in(), files());
+
+    let deleted = device(&keychain, &files).delete_account(&server).await;
+
+    assert!(matches!(deleted, Err(AppError::SubscriptionActive)));
+    assert_eq!(keychain.entries().get(SESSION_KEY).map(String::as_str), Some(SESSION));
+}
+
+#[tokio::test]
+async fn deleting_with_a_session_the_server_no_longer_knows_forgets_it_here() {
+    let (server, _requests) = server(vec![reply("401 Unauthorized", "", "")]).await;
+    let (keychain, files) = (signed_in(), files_of_another_account());
+
+    let deleted = device(&keychain, &files).delete_account(&server).await;
+
+    assert!(matches!(deleted, Err(AppError::SignedOut)));
+    assert_nothing_kept(&keychain, &files);
+}
+
+#[tokio::test]
+async fn deleting_without_a_session_asks_nothing_of_the_server() {
+    let (server, requests) = server(vec![reply("204 No Content", "", "")]).await;
+    let (keychain, files) = (FakeKeychain::default(), files());
+
+    let deleted = device(&keychain, &files).delete_account(&server).await;
+
+    assert!(matches!(deleted, Err(AppError::SignedOut)));
+    assert!(timeout(Duration::from_millis(200), requests).await.is_err(), "expected no request");
+}

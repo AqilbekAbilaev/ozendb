@@ -7,9 +7,10 @@ vi.mock('../appApi/account', () => ({
   startSignIn: vi.fn(),
   pollSignIn: vi.fn(),
   signOut: vi.fn(),
+  deleteAccount: vi.fn(),
 }))
 
-import { getAccount, getEntitlement, startSignIn, pollSignIn, signOut } from '../appApi/account'
+import { getAccount, getEntitlement, startSignIn, pollSignIn, signOut, deleteAccount } from '../appApi/account'
 import { entitlement, resetPremium } from '../stores/premium'
 import { POLL_MS, RATE_LIMITED_MS, useAccountSignIn } from './useAccountSignIn'
 
@@ -177,5 +178,35 @@ describe('useAccountSignIn', () => {
     expect(signOut).toHaveBeenCalled()
     expect([account.step.value, account.account.value]).toEqual(['signed_out', null])
     expect(entitlement.value).toEqual(FREE)
+  })
+  it('deletes the account, signs out here and refreshes Premium', async () => {
+    getAccount.mockResolvedValue(ACCOUNT)
+    entitlement.value = { state: 'premium', until: 1760000000002 }
+    const account = signIn()
+    await vi.advanceTimersByTimeAsync(0)
+    await account.deleteAccount()
+    expect(deleteAccount).toHaveBeenCalled()
+    expect([account.step.value, account.account.value]).toEqual(['signed_out', null])
+    expect(entitlement.value).toEqual(FREE)
+  })
+
+  it('keeps the account and asks to sign in again when the sign-in is too old to delete it', async () => {
+    getAccount.mockResolvedValue(ACCOUNT)
+    deleteAccount.mockReturnValue(failure('sign_in_again'))
+    const account = signIn()
+    await vi.advanceTimersByTimeAsync(0)
+    await account.deleteAccount()
+    expect(account.step.value).toBe('signed_in')
+    expect(account.error.value).toMatch(/sign out, sign in again/i)
+  })
+
+  it('keeps the account and says to cancel the subscription before deleting it', async () => {
+    getAccount.mockResolvedValue(ACCOUNT)
+    deleteAccount.mockReturnValue(failure('subscription_active'))
+    const account = signIn()
+    await vi.advanceTimersByTimeAsync(0)
+    await account.deleteAccount()
+    expect(account.step.value).toBe('signed_in')
+    expect(account.error.value).toMatch(/cancel your subscription/i)
   })
 })

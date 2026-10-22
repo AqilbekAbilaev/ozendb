@@ -86,6 +86,12 @@ pub enum AppError {
     #[error("The OzenDB server answered with an error ({0}).")]
     AccountServer(u16),
 
+    #[error("For your safety, sign in again before deleting the account.")]
+    SignInAgain,
+
+    #[error("Cancel the subscription before deleting the account.")]
+    SubscriptionActive,
+
     #[error("{0}")]
     Validation(String),
 }
@@ -124,6 +130,8 @@ impl AppError {
             AppError::SignInExpired => "sign_in_expired",
             AppError::AccountRateLimited => "account_rate_limited",
             AppError::AccountServer(_) => "account_server",
+            AppError::SignInAgain => "sign_in_again",
+            AppError::SubscriptionActive => "subscription_active",
             AppError::Validation(_) => "validation",
         }
     }

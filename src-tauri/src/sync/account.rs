@@ -98,6 +98,19 @@ impl AccountServer {
         }
     }
 
+    /// Deletes the account and everything the server holds about it. The server refuses a
+    /// session older than ten minutes, and an account whose subscription could still charge.
+    pub async fn delete_account(&self, session: &str) -> Result<(), AppError> {
+        let response = self.send(self.client.delete(format!("{}/me", self.url)).header(AUTHORIZATION, bearer(session)?)).await?;
+        match response.status() {
+            status if status.is_success() => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(AppError::SignedOut),
+            StatusCode::FORBIDDEN => Err(AppError::SignInAgain),
+            StatusCode::CONFLICT => Err(AppError::SubscriptionActive),
+            status => Err(AppError::AccountServer(status.as_u16())),
+        }
+    }
+
     async fn send(&self, request: RequestBuilder) -> Result<Response, AppError> {
         let response = request.send().await.map_err(|e| unreachable(&e, &self.url))?;
         match response.status() {
@@ -173,6 +186,19 @@ impl<K: Keychain> Device<'_, K> {
             let _ = server.sign_out(&session).await;
         }
         Ok(())
+    }
+
+    /// Deletes the account on the server, then forgets it here as signing out does.
+    pub async fn delete_account(&self, server: &AccountServer) -> Result<(), AppError> {
+        let session = self.session()?.ok_or(AppError::SignedOut)?;
+        match server.delete_account(&session).await {
+            Ok(()) => self.forget(),
+            Err(AppError::SignedOut) => {
+                self.forget()?;
+                Err(AppError::SignedOut)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Drops the session and everything this device learned with it, as after the
