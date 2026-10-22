@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::record::RecordList;
-use crate::storage::{ConnectionConfig, EngineConfig, MongoConfig};
+use crate::storage::{ConnectionConfig, Engine, EngineConfig, MongoConfig};
 use super::AppContext;
 use crate::known_hosts::KnownHostsStore;
 use crate::ssh::HostKeyPrompts;
@@ -51,6 +51,11 @@ pub async fn test_connection(
     let ssh_password = typed_or_stored(fields.ssh_password.clone(), id.as_ref().map(|v| format!("{v}::ssh-pass")));
     let ssh_passphrase = typed_or_stored(fields.ssh_passphrase.clone(), id.as_ref().map(|v| format!("{v}::ssh-key-pass")));
     let config = fields.into_config(id.unwrap_or_default(), existing.as_ref(), None, None, false)?;
+    // Refused before the tunnel opens, so no SSH prompt asks about a test that can't run.
+    // TODO #386: drop this once MySQL connects.
+    if config.engine_kind() == Engine::MySql {
+        return Err(crate::mysql::not_available());
+    }
 
     let tunnel = open_test_tunnel(app, known_hosts.inner(), prompts.inner(), &config, ssh_password, ssh_passphrase).await?;
     let via = tunnel.as_ref().map(|t| t.local_addr.port());
@@ -64,6 +69,7 @@ pub async fn test_connection(
         EngineConfig::Mongo(mongo) => {
             test_mongo_connection(&config, mongo, password.as_deref(), via).await
         }
+        EngineConfig::MySql(_) => Err(crate::mysql::not_available()),
     }
 }
 
@@ -171,6 +177,9 @@ pub async fn save_connection(
     let warm = match &config.engine {
         EngineConfig::Postgres(_) => ctx.pool.connect_postgres(&config, None).await.map(|_| ()),
         EngineConfig::Mongo(_) => ctx.pool.connect(&config).await.map(|_| ()),
+        // Saving must still succeed while there is nothing to warm.
+        // TODO #386: warm a MySQL pool here once one can connect.
+        EngineConfig::MySql(_) => Ok(()),
     };
     warm?;
 
@@ -191,13 +200,11 @@ pub fn connection_uri(ctx: State<'_, AppContext>, id: String) -> Result<String, 
         Some(val) => val,
         None => return Err(AppError::UnknownConnection(id)),
     };
-    if let Some(postgres) = config.engine.as_postgres() {
-        return Ok(crate::postgres::uri::connection_string(&config, postgres));
-    }
-    match config.engine.as_mongo() {
-        Some(mongo) => Ok(crate::uri::build_uri(&config, mongo, None)),
-        None => Err(AppError::Validation("This connection's engine has no connection string.".to_string())),
-    }
+    Ok(match &config.engine {
+        EngineConfig::Mongo(mongo) => crate::uri::build_uri(&config, mongo, None),
+        EngineConfig::Postgres(postgres) => crate::postgres::uri::connection_string(&config, postgres),
+        EngineConfig::MySql(mysql) => crate::mysql::uri::connection_string(&config, mysql),
+    })
 }
 
 /// The three keychain keys a connection may hold a secret under. Secrets are keyed by

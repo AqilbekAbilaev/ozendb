@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::record::Stamp;
-use crate::storage::{ConnectionConfig, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
+use crate::storage::{ConnectionConfig, EngineConfig, HostEntry, MongoConfig, MySqlConfig, PostgresConfig};
 
 /// The connection editor's form, exactly as the frontend sends it. `save_connection`
 /// and `update_connection` take the same payload; the fields the editor doesn't own
@@ -40,6 +40,8 @@ pub enum EngineFields {
     Mongo(MongoFields),
     #[serde(rename = "postgresql", alias = "postgres")]
     Postgres(PostgresFields),
+    #[serde(rename = "mysql")]
+    MySql(MySqlFields),
 }
 
 #[derive(serde::Deserialize)]
@@ -56,6 +58,13 @@ pub struct MongoFields {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PostgresFields {
+    #[serde(default)]
+    pub database: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MySqlFields {
     #[serde(default)]
     pub database: Option<String>,
 }
@@ -86,6 +95,9 @@ impl ConnectionFields {
             }
             (EngineFields::Postgres(postgres), None | Some(EngineConfig::Postgres(_))) => {
                 EngineConfig::Postgres(PostgresConfig { database: postgres.database })
+            }
+            (EngineFields::MySql(mysql), None | Some(EngineConfig::MySql(_))) => {
+                EngineConfig::MySql(MySqlConfig { database: mysql.database })
             }
             _ => {
                 return Err(AppError::Validation(

@@ -7,6 +7,7 @@ fn default_connection_type() -> String { String::from("standalone") }
 /// and the value `EngineConfig`'s tag is read from and written as.
 const MONGODB: &str = "mongodb";
 const POSTGRESQL: &str = "postgresql";
+const MYSQL: &str = "mysql";
 
 /// The driver-specific half of a connection: one variant per driver, each owning
 /// only the settings that driver actually reads.
@@ -25,6 +26,7 @@ const POSTGRESQL: &str = "postgresql";
 pub enum EngineConfig {
     Mongo(MongoConfig),
     Postgres(PostgresConfig),
+    MySql(MySqlConfig),
 }
 
 /// MongoDB's own settings. `options` and `tls_cert_key_file` live here rather than
@@ -55,6 +57,15 @@ pub struct MongoConfig {
 pub struct PostgresConfig {
     /// A Postgres connection must name one database up front, unlike MongoDB, which
     /// connects at the server level and picks a database per query.
+    #[serde(default)]
+    pub database: Option<String>,
+}
+
+/// MySQL's own settings.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct MySqlConfig {
+    /// Only the database a session starts in: unlike PostgreSQL, one MySQL connection
+    /// reaches every database on the server, so this may be left out.
     #[serde(default)]
     pub database: Option<String>,
 }
@@ -100,6 +111,8 @@ impl<'de> Deserialize<'de> for EngineConfig {
                 serde_json::from_value(serde_json::Value::Object(map.clone()))
                     .map(EngineConfig::Postgres)
             }
+            MYSQL => serde_json::from_value(serde_json::Value::Object(map.clone()))
+                .map(EngineConfig::MySql),
             other => return Err(D::Error::custom(format!("unknown connection engine \"{other}\""))),
         };
         variant.map_err(D::Error::custom)
@@ -114,6 +127,7 @@ impl Serialize for EngineConfig {
         let (tag, value) = match self {
             EngineConfig::Mongo(config) => (MONGODB, serde_json::to_value(config)),
             EngineConfig::Postgres(config) => (POSTGRESQL, serde_json::to_value(config)),
+            EngineConfig::MySql(config) => (MYSQL, serde_json::to_value(config)),
         };
         let mut map = match value.map_err(S::Error::custom)? {
             serde_json::Value::Object(map) => map,
@@ -132,6 +146,7 @@ impl Serialize for EngineConfig {
 pub enum Engine {
     Mongo,
     Postgres,
+    MySql,
 }
 
 impl EngineConfig {
@@ -140,25 +155,26 @@ impl EngineConfig {
         match self {
             EngineConfig::Mongo(_) => Engine::Mongo,
             EngineConfig::Postgres(_) => Engine::Postgres,
+            EngineConfig::MySql(_) => Engine::MySql,
         }
     }
 
-    /// The MongoDB settings, or `None` on a Postgres connection. Callers that have
+    /// The MongoDB settings, or `None` on any other connection. Callers that have
     /// already established the driver (the Mongo URI builder, reached only from the
     /// Mongo arm of the pool) still go through this rather than unwrapping, so a
     /// mismatch surfaces as a handled error instead of a panic.
     pub fn as_mongo(&self) -> Option<&MongoConfig> {
         match self {
             EngineConfig::Mongo(config) => Some(config),
-            EngineConfig::Postgres(_) => None,
+            _ => None,
         }
     }
 
-    /// The PostgreSQL settings, or `None` on a MongoDB connection.
+    /// The PostgreSQL settings, or `None` on any other connection.
     pub fn as_postgres(&self) -> Option<&PostgresConfig> {
         match self {
             EngineConfig::Postgres(config) => Some(config),
-            EngineConfig::Mongo(_) => None,
+            _ => None,
         }
     }
 }

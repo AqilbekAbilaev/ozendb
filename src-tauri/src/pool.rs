@@ -273,7 +273,7 @@ fn mongo_config(config: &ConnectionConfig) -> Result<&MongoConfig, AppError> {
     match config.engine.as_mongo() {
         Some(mongo) => Ok(mongo),
         None => Err(AppError::Validation(
-            "This connection is configured for PostgreSQL, not MongoDB.".to_string(),
+            "This connection is not configured for MongoDB.".to_string(),
         )),
     }
 }
@@ -284,7 +284,7 @@ fn postgres_config(config: &ConnectionConfig) -> Result<&PostgresConfig, AppErro
     match config.engine.as_postgres() {
         Some(postgres) => Ok(postgres),
         None => Err(AppError::Validation(
-            "This connection is configured for MongoDB, not PostgreSQL.".to_string(),
+            "This connection is not configured for PostgreSQL.".to_string(),
         )),
     }
 }
@@ -327,6 +327,7 @@ fn default_port_for(config: &ConnectionConfig) -> u16 {
     match config.engine_kind() {
         Engine::Postgres => pg_uri::DEFAULT_PORT,
         Engine::Mongo => 27017,
+        Engine::MySql => crate::mysql::uri::DEFAULT_PORT,
     }
 }
 
@@ -344,7 +345,7 @@ fn default_port_for(config: &ConnectionConfig) -> u16 {
 mod tests {
     use super::{default_port_for, mongo_config, postgres_config, tunnel_params};
     use crate::ssh::SshAuth;
-    use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoConfig, PostgresConfig};
+    use crate::storage::{ConnectionConfig, Engine, EngineConfig, HostEntry, MongoConfig, MySqlConfig, PostgresConfig};
 
     fn config(engine: Engine) -> ConnectionConfig {
         ConnectionConfig {
@@ -353,6 +354,7 @@ mod tests {
             engine: match engine {
                 Engine::Mongo => EngineConfig::Mongo(MongoConfig::default()),
                 Engine::Postgres => EngineConfig::Postgres(PostgresConfig::default()),
+                Engine::MySql => EngineConfig::MySql(MySqlConfig::default()),
             },
             ..Default::default()
         }
@@ -362,18 +364,21 @@ mod tests {
     fn mongo_config_passes_mongo_and_rejects_postgres() {
         assert!(mongo_config(&config(Engine::Mongo)).is_ok());
         assert_eq!(mongo_config(&config(Engine::Postgres)).unwrap_err().code(), "validation");
+        assert_eq!(mongo_config(&config(Engine::MySql)).unwrap_err().code(), "validation");
     }
 
     #[test]
     fn postgres_config_passes_postgres_and_rejects_mongo() {
         assert!(postgres_config(&config(Engine::Postgres)).is_ok());
         assert_eq!(postgres_config(&config(Engine::Mongo)).unwrap_err().code(), "validation");
+        assert_eq!(postgres_config(&config(Engine::MySql)).unwrap_err().code(), "validation");
     }
 
     #[test]
     fn default_port_for_matches_the_configs_own_engine() {
         assert_eq!(default_port_for(&config(Engine::Mongo)), 27017);
         assert_eq!(default_port_for(&config(Engine::Postgres)), 5432);
+        assert_eq!(default_port_for(&config(Engine::MySql)), 3306);
     }
 
     #[test]
