@@ -38,6 +38,11 @@ async fn pets(config: &ConnectionConfig, database: &str) -> i64 {
     sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) FROM {database}.pets"))).fetch_one(&mut connect(config, "").await).await.unwrap()
 }
 
+/// Whether the plan carries what running the statement found, in any of MySQL's formats.
+fn ran(plan: &Value) -> bool {
+    plan.to_string().contains("actual")
+}
+
 /// Every step's `operation`, depth-first.
 fn operations(node: &Value) -> Vec<String> {
     let children = node["inputs"].as_array().into_iter().flatten();
@@ -82,13 +87,13 @@ async fn a_write_is_explained_without_running() {
     let pool = pool(&config).await;
     let joined = format!("UPDATE {database}.pets p JOIN {database}.owners o ON o.id = p.owner_id SET p.kind = 'owl' WHERE o.name = 'Åsa'");
     let plan = explain_mysql_sql(&pool, &joined, false, None, LIMIT).await.unwrap();
-    assert!(plan["operation"].as_str().unwrap().starts_with("Update"), "{plan}");
-    assert!(plan["actual_rows"].is_null(), "{plan}");
-    let single = explain_mysql_sql(&pool, &format!("DELETE FROM {database}.pets WHERE owner_id = 1"), false, None, LIMIT).await.unwrap_err();
-    assert!(single.to_string().contains("as steps"), "{single}");
+    assert!(plan.to_string().to_lowercase().contains("update") && !ran(&plan), "{plan}");
+    // MySQL 8.3 and later can't show a single-table DELETE as steps; the classic format can.
+    let single = explain_mysql_sql(&pool, &format!("DELETE FROM {database}.pets WHERE owner_id = 1"), false, None, LIMIT).await;
+    assert!(single.as_ref().map_or_else(|e| e.to_string().contains("as steps"), |plan| plan["query_block"]["table"]["delete"] == true), "{single:?}");
     let with = format!("WITH x AS (SELECT 1 AS n) DELETE FROM {database}.pets WHERE id IN (SELECT n FROM x)");
     let plan = explain_mysql_sql(&pool, &with, false, None, LIMIT).await.unwrap();
-    assert!(plan["actual_rows"].is_null(), "{plan}");
+    assert!(!ran(&plan), "{plan}");
     assert_eq!(pets(&config, &database).await, 4);
     let owls: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) FROM {database}.pets WHERE kind = 'owl'"))).fetch_one(&mut connect(&config, "").await).await.unwrap();
     assert_eq!(owls, 0);

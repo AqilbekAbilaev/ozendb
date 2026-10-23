@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { planRows } from './planRows.js'
-import { analyzedPlan, estimatedPlan } from './planRows.fixtures.js'
+import { analyzedPlan, estimatedPlan, classicJoin, classicUnion, classicDerived, classicSubqueries, classicDelete } from './planRows.fixtures.js'
 
 describe('planRows of an analyzed plan', () => {
   const { rows, planningMs, executionMs, estimated } = planRows(analyzedPlan)
@@ -50,5 +50,78 @@ describe('planRows of a plan MySQL did not run', () => {
     expect(rows[1].share).toBe(1)
     expect(rows[3].share).toBeCloseTo(0.4667 / 0.8167, 3)
     expect(rows.filter(r => r.hot).map(r => r.node)).toEqual(['Index lookup on p using by_owner (owner_id=o.id)'])
+  })
+})
+
+describe('planRows of a plan in the classic format', () => {
+  const steps = (plan) => planRows(plan).rows.map(r => [r.depth, r.node])
+  const pets = 'Filter: ((`explain probe`.`pets`.`owner_id` = `explain probe`.`o`.`id`) and (`explain probe`.`pets`.`kind` = \'cat\'))'
+
+  it('lists the sort, the grouping and the join around the tables they read', () => {
+    expect(steps(classicJoin)).toEqual([
+      [0, 'Sort'],
+      [1, 'Aggregate using temporary table'],
+      [2, 'Nested loop join'],
+      [3, 'Covering index scan on o using by_name'],
+      [3, pets],
+      [4, 'Table scan on pets'],
+      [3, 'Covering index lookup on p using by_owner'],
+    ])
+  })
+
+  it('is always estimated: MySQL ran nothing', () => {
+    const { rows, executionMs, estimated } = planRows(classicJoin)
+    expect([estimated, executionMs]).toEqual([true, null])
+    expect(rows.map(r => r.ms)).toEqual(Array(7).fill(null))
+  })
+
+  it('reads each table\'s rows per scan, and a filter\'s as the share of them it keeps', () => {
+    const { rows } = planRows(classicJoin)
+    expect(rows.map(r => r.rows)).toEqual([null, null, null, 3, 1, 4, 1])
+  })
+
+  it('costs each table by its own reading and each step by its inputs, marking the costliest table', () => {
+    const { rows } = planRows(classicJoin)
+    expect(rows[0].share).toBe(1)
+    expect(rows[6].share).toBeCloseTo(1.15 / 2.55, 5)
+    expect(rows.filter(r => r.hot).map(r => r.node)).toEqual(['Covering index lookup on p using by_owner'])
+  })
+
+  it('shows a union as its two halves', () => {
+    expect(steps(classicUnion)).toEqual([
+      [0, 'Union materialize with deduplication'],
+      [1, 'Covering index scan on owners using by_name'],
+      [1, 'Table scan on pets'],
+    ])
+  })
+
+  it('reads a derived table from what it was materialized from, and adds the sort\'s own cost', () => {
+    expect(steps(classicDerived)).toEqual([
+      [0, 'Sort'],
+      [1, 'Table scan on d'],
+      [2, 'Materialize'],
+      [3, 'Group aggregate'],
+      [4, 'Covering index scan on pets using by_owner'],
+    ])
+    expect(planRows(classicDerived).rows.filter(r => r.hot).map(r => r.node)).toEqual(['Sort'])
+  })
+
+  it('puts a select-list subquery beside the query, and a WHERE subquery under its filter', () => {
+    expect(steps(classicSubqueries)).toEqual([
+      [0, 'Filter: (`explain probe`.`o`.`id` > (/* select#3 */ select min(`explain probe`.`pets`.`id`) from `explain probe`.`pets`))'],
+      [1, 'Covering index scan on o using by_name'],
+      [1, 'Select #3 (subquery)'],
+      [2, 'Select tables optimized away'],
+      [0, 'Select #2 (subquery, dependent)'],
+      [1, 'Covering index lookup on p using by_owner'],
+    ])
+  })
+
+  it('shows a single-table DELETE above the read that finds its rows', () => {
+    expect(steps(classicDelete)).toEqual([
+      [0, 'Delete from pets'],
+      [1, 'Filter: (`explain probe`.`pets`.`owner_id` = 1)'],
+      [2, 'Index range scan on pets using by_owner'],
+    ])
   })
 })
