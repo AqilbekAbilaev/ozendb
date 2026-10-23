@@ -164,6 +164,9 @@ impl AppError {
             AppError::Postgres(e) => postgres_message(e),
             // The server's own message, or the driver's sentence, without "MySQL error:".
             AppError::MySql(sqlx::Error::Database(db_err)) => db_err.message().to_string(),
+            AppError::MySql(e) if needs_tls(e) => String::from(
+                "This MySQL login needs TLS: turn on TLS for the connection, even when it goes through an SSH tunnel.",
+            ),
             AppError::MySql(e) => e.to_string(),
             _ => self.to_string(),
         }
@@ -290,6 +293,7 @@ fn postgres_code(e: &sqlx::Error) -> &'static str {
 /// `postgres_code` for MySQL. Only the server's own errors differ between the two.
 fn mysql_code(e: &sqlx::Error) -> &'static str {
     match e {
+        _ if needs_tls(e) => "tls",
         // SQLSTATE 28000 is MySQL's access-denied class too (error 1045 among them).
         sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("28000") => "auth",
         // MySQL files both under SQLSTATE 42000, so its own error numbers tell them apart:
@@ -301,6 +305,14 @@ fn mysql_code(e: &sqlx::Error) -> &'static str {
         },
         _ => sqlx_code(e).unwrap_or("mysql"),
     }
+}
+
+/// A MySQL 8 login (caching_sha2_password) without TLS, which sqlx would complete only by
+/// fetching the server's public key over the open connection and trusting whatever key
+/// comes back. Its `mysql-rsa` feature is left off on purpose (#413), so the login fails;
+/// sqlx says so only in its message.
+fn needs_tls(e: &sqlx::Error) -> bool {
+    matches!(e, sqlx::Error::Configuration(cause) if cause.to_string().starts_with("RSA auth backend disabled"))
 }
 
 /// The code for a sqlx error that never reached the server, whichever engine it was dialling.
