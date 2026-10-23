@@ -49,7 +49,7 @@ export function useTableSqlMode(t) {
     const [shown, order] = [readShown.map(own), readOrder.map(own)]
     const keyOf = ({ table, column }) => (table ? `${nextJoins[table - 1].key}.${column}` : column)
     const infoOf = ({ table, column }) => columnsOf(table).find(c => c.name === column)
-    const read = readFilters.map(own).map(f => (f.value == null ? f : { ...f, value: dialect.readFilterText(f.value, infoOf(f)?.dataType) }))
+    const read = readFilters.map(own).map(f => (f.value == null ? f : { ...f, value: dialect.readFilterText(f.value, infoOf(f)?.dataType, f.op) }))
     const keys = keyColumns.value
     const byKey = order.length === keys.length && order.every((c, i) => !c.table && c.column === keys[i])
     if (order.length > 1 && !byKey) return 'the filter view sorts by one column at a time.'

@@ -6,6 +6,7 @@
 const EXACT_NUMBER = /^(tinyint|smallint|mediumint|int|bigint|decimal|bit)\b/
 const BOOLEAN = /^tinyint\(1\)( |$)/
 const NUMBER = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d{1,3}))?$/
+const WHOLE_DATE_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/
 const DATE_TIME = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:([+-])(\d{2}):(\d{2}))?$/
 
 // On an exact-number column (TINYINT(1)'s true and false as its 1 and 0), the value as
@@ -54,10 +55,12 @@ export function inUtc(value, digits) {
   return new Date(at).toISOString().slice(0, 19).replace('T', ' ') + (digits ? `.${micros.slice(0, digits)}` : '')
 }
 
-// A value read back from SQL mode's text as its box would hold it: on a TIMESTAMP, each
-// whole date and time (one per item of an any-of list) marked as the UTC that filterText
-// wrote it in, which is also how MySQL reads hand-written SQL in a session in UTC.
-export function readFilterText(value, dataType = '') {
+// A value read back from SQL mode's text as its box would hold it: on a TIMESTAMP, a whole
+// date and time (each item of an any-of list, trimmed) marked as the UTC that filterText
+// wrote it in, which is also how MySQL reads hand-written SQL in a session in UTC. A
+// contains or starts-with is marked too, since filterText converts its text as well.
+export function readFilterText(value, dataType, op) {
   if (!/^timestamp\b/.test(dataType ?? '')) return value
-  return value.split(',').map(item => (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(item.trim()) ? `${item}+00:00` : item)).join(',')
+  const marked = (item) => (WHOLE_DATE_TIME.test(item) ? `${item}+00:00` : item)
+  return op === 'in' ? value.split(',').map(item => marked(item.trim())).join(', ') : marked(value)
 }

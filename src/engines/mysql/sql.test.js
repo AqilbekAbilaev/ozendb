@@ -34,20 +34,27 @@ describe('like', () => {
 
 describe('readFilterText', () => {
   it('marks a TIMESTAMP\'s whole date and time as the UTC SQL mode wrote it in', () => {
-    expect(readFilterText('2024-01-01 00:00:00', 'timestamp')).toBe('2024-01-01 00:00:00+00:00')
-    expect(readFilterText('2024-01-01 00:00:00.120, 2024-06', 'timestamp(3)')).toBe('2024-01-01 00:00:00.120+00:00, 2024-06')
+    expect(readFilterText('2024-01-01 00:00:00', 'timestamp', 'eq')).toBe('2024-01-01 00:00:00+00:00')
+    expect(readFilterText('2024-01-01 00:00:00', 'timestamp', 'lte')).toBe('2024-01-01 00:00:00+00:00')
   })
 
-  it('reads back to the filter SQL mode wrote', () => {
+  it('marks each whole date and time of an any-of list, trimmed, and only a list\'s', () => {
+    expect(readFilterText('2024-01-01 00:00:00, 1', 'timestamp', 'contains')).toBe('2024-01-01 00:00:00, 1')
+    expect(readFilterText('2024-06,  2024-01-01 00:00:00.120 ', 'timestamp(3)', 'in')).toBe('2024-06, 2024-01-01 00:00:00.120+00:00')
+  })
+
+  it('reads back to the filter SQL mode wrote, under every operator', () => {
     const typed = '2024-07-01 03:59:59.5+05:00'
     const written = filterText(typed, 'timestamp(1)')
-    expect(filterText(readFilterText(written, 'timestamp(1)'), 'timestamp(1)')).toBe(written)
+    for (const op of ['gt', 'in', 'contains', 'startsWith']) {
+      expect(filterText(readFilterText(written, 'timestamp(1)', op), 'timestamp(1)')).toBe(written)
+    }
   })
 
   it('leaves any other value as it is', () => {
-    expect(readFilterText('2024-01-01 00:00:00', 'datetime')).toBe('2024-01-01 00:00:00')
-    expect(readFilterText('59:59', 'timestamp')).toBe('59:59')
-    expect(readFilterText('2024-01-01 00:00:00+05:00', 'timestamp')).toBe('2024-01-01 00:00:00+05:00')
+    expect(readFilterText('2024-01-01 00:00:00', 'datetime', 'eq')).toBe('2024-01-01 00:00:00')
+    expect(readFilterText('59:59', 'timestamp', 'eq')).toBe('59:59')
+    expect(readFilterText('2024-01-01 00:00:00+05:00', 'timestamp', 'eq')).toBe('2024-01-01 00:00:00+05:00')
   })
 })
 
