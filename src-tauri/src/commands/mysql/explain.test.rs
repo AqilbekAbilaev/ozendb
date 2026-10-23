@@ -1,4 +1,5 @@
-use super::{only_reads, plans_in_json_v2};
+use super::{only_reads, plan, plans_in_json_v2};
+use crate::error::AppError;
 
 #[test]
 fn a_select_in_any_of_its_forms_only_reads() {
@@ -55,4 +56,15 @@ fn json_plans_with_iterators_arrive_in_mysql_8_3() {
     assert!(!plans_in_json_v2("8.0.36"));
     assert!(!plans_in_json_v2("8.2.0"));
     assert!(!plans_in_json_v2("not a version"));
+}
+
+#[test]
+fn a_plan_mysql_cannot_show_as_steps_is_refused_without_guessing_the_statement() {
+    let refused = plan(String::from(r#"{"operation": "<not executable by iterator executor>"}"#)).unwrap_err();
+    assert!(matches!(&refused, AppError::Validation(why) if why.contains("this statement") && !why.contains("single-table")), "{refused}");
+}
+
+#[test]
+fn any_other_plan_is_read_as_json() {
+    assert_eq!(plan(String::from(r#"{"operation": "Insert into `ä b`"}"#)).unwrap()["operation"], "Insert into `ä b`");
 }

@@ -82,7 +82,7 @@ async fn a_write_is_explained_without_running() {
     assert!(plan["operation"].as_str().unwrap().starts_with("Update"), "{plan}");
     assert!(plan["actual_rows"].is_null(), "{plan}");
     let single = explain_mysql_sql(&pool, &format!("DELETE FROM {database}.pets WHERE owner_id = 1"), false, LIMIT).await.unwrap_err();
-    assert!(single.to_string().contains("single-table"), "{single}");
+    assert!(single.to_string().contains("as steps"), "{single}");
     let with = format!("WITH x AS (SELECT 1 AS n) DELETE FROM {database}.pets WHERE id IN (SELECT n FROM x)");
     let plan = explain_mysql_sql(&pool, &with, false, LIMIT).await.unwrap();
     assert!(plan["actual_rows"].is_null(), "{plan}");

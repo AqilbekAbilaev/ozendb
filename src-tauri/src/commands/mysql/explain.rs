@@ -16,7 +16,8 @@ use super::AppContext;
 use crate::error::AppError;
 use crate::mysql::session::QUERY_TIME_LIMIT;
 
-/// The whole plan MySQL gives a single-table UPDATE or DELETE, which its iterators don't run.
+/// The whole plan MySQL gives a statement its iterators don't run, a single-table UPDATE
+/// or DELETE among them.
 const NOT_ITERATED: &str = "<not executable by iterator executor>";
 
 /// Whether running `sql` can only read: one query made only of SELECTs that write into
@@ -67,12 +68,17 @@ pub(crate) async fn explain_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bo
     // `statement` is the caller's own SQL, run as-is: the same trust as run_mysql_query.
     let explain = format!("EXPLAIN {}FORMAT=JSON {statement}", if analyze { "ANALYZE " } else { "" });
     let run = Run::new(None);
-    let plan: String = run
+    let answer: String = run
         .on(connection, run.limited(pool, limit, async { sqlx::query_scalar(sqlx::AssertSqlSafe(explain)).fetch_one(&mut *conn).await.map_err(AppError::MySql) }))
         .await?;
-    let plan: serde_json::Value = serde_json::from_str(&plan)?;
+    plan(answer)
+}
+
+/// The plan in MySQL's `answer` to EXPLAIN FORMAT=JSON.
+fn plan(answer: String) -> Result<serde_json::Value, AppError> {
+    let plan: serde_json::Value = serde_json::from_str(&answer)?;
     if plan["operation"] == NOT_ITERATED {
-        return Err(AppError::Validation(String::from("MySQL can't show a single-table UPDATE or DELETE as steps; explain a SELECT with its WHERE instead.")));
+        return Err(AppError::Validation(String::from("MySQL can't show this statement's plan as steps; explain a SELECT with the same WHERE instead.")));
     }
     Ok(plan)
 }
