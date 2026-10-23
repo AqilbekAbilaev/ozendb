@@ -11,6 +11,7 @@ use sqlx::pool::PoolConnection;
 use sqlx::{MySql, MySqlPool};
 use tauri::State;
 
+use super::cancel::Run;
 use super::query::run_on;
 use super::script::statements;
 use super::AppContext;
@@ -54,9 +55,10 @@ impl MySqlTransactions {
     /// `pool` is the one Cancel and the time limit stop a statement through.
     pub async fn run(&self, tx_id: &str, pool: &MySqlPool, sql: &str, read_only: bool, run_id: Option<&str>) -> Result<Vec<SqlQueryResult>, AppError> {
         let statements = statements(sql, read_only)?;
+        let run = Run::new(run_id);
         let held = self.held(tx_id)?;
         let mut conn = held.lock().await;
-        run_on(&mut conn, pool, &statements, run_id, QUERY_TIME_LIMIT, read_only, true).await
+        run_on(&mut conn, pool, &run, &statements, QUERY_TIME_LIMIT, read_only, true).await
     }
 
     pub async fn finish(&self, tx_id: &str, commit: bool) -> Result<(), AppError> {

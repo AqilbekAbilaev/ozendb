@@ -1,6 +1,7 @@
-//! Stopping a running SQL run: Cancel, or the time limit. While one runs, its session's
-//! connection id is kept under the run id the frontend chose for it, and stopping it
-//! sends `KILL QUERY` from a second connection. A statement is checked against the stop
+//! Stopping a running SQL run: Cancel, or the time limit. A run is kept under the run id
+//! the frontend chose for it from before it has a session, so a Cancel that comes while
+//! it waits for one still stops it; once it has one, stopping it also sends `KILL QUERY`
+//! for that session from a second connection. A statement is checked against the stop
 //! itself, since `SELECT SLEEP(30)` stopped that way returns 1 rather than an error.
 use std::collections::HashMap;
 use std::future::Future;
@@ -22,9 +23,9 @@ enum Stop {
     TimedOut,
 }
 
-/// A run's session, and what stopped it, if anything has.
+/// A run's session, once it has one, and what stopped it, if anything has.
 struct Running {
-    connection: u64,
+    connection: Mutex<Option<u64>>,
     stop: Mutex<Option<Stop>>,
 }
 
@@ -35,7 +36,10 @@ impl Running {
         if self.stop.lock().unwrap().replace(why).is_some() {
             return Ok(false);
         }
-        sqlx::raw_sql(sqlx::AssertSqlSafe(format!("KILL QUERY {}", self.connection))).execute(pool).await.map_err(AppError::MySql)?;
+        let connection = *self.connection.lock().unwrap();
+        if let Some(connection) = connection {
+            sqlx::raw_sql(sqlx::AssertSqlSafe(format!("KILL QUERY {connection}"))).execute(pool).await.map_err(AppError::MySql)?;
+        }
         Ok(true)
     }
 
@@ -53,20 +57,29 @@ fn running() -> &'static Mutex<HashMap<String, Arc<Running>>> {
     RUNNING.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// One run on the session `connection`, findable by Cancel under its run id, if it has
-/// one, for as long as it lives.
+/// One run, findable by Cancel under its run id, if it has one, for as long as it lives.
 pub(super) struct Run {
     id: Option<String>,
     running: Arc<Running>,
 }
 
 impl Run {
-    pub(super) fn new(id: Option<&str>, connection: u64) -> Run {
-        let run = Run { id: id.map(str::to_string), running: Arc::new(Running { connection, stop: Mutex::new(None) }) };
+    pub(super) fn new(id: Option<&str>) -> Run {
+        let run = Run { id: id.map(str::to_string), running: Arc::new(Running { connection: Mutex::new(None), stop: Mutex::new(None) }) };
         if let Some(id) = &run.id {
             running().lock().unwrap().insert(id.clone(), run.running.clone());
         }
         run
+    }
+
+    /// The run's session, `connection`, which stopping it from now on stops on the server too.
+    pub(super) fn attach(&self, connection: u64) {
+        *self.running.connection.lock().unwrap() = Some(connection);
+    }
+
+    /// An error if the run was stopped.
+    pub(super) fn stopped(&self) -> Result<(), AppError> {
+        self.running.stopped()
     }
 
     /// `statement`'s outcome, unless the run was stopped before or while it ran: past
