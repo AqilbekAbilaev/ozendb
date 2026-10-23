@@ -7,7 +7,7 @@ import { engineLabel } from '../../../data/connectionOptions.js'
 // The Explain tab: the query plan as an indented list, each node's time as a bar
 // against the whole query's, the slowest step marked. `plan` is the backend's Explain
 // output, which `engine` reads (engineOf(x).sql.readPlan). A plan the server didn't run
-// is `estimated`: its bars are costs, and it has no times.
+// is `estimated`: its bars are costs, and it has no times, so no ms column.
 const props = defineProps({
   engine:     { type: String,  required: true },
   plan:       { type: [Array, Object, String], default: null },
@@ -23,15 +23,15 @@ const ms = (value) => (value < 10 ? value.toFixed(3) : value.toFixed(1))
   <StateMessage v-if="error" mode="error" :message="error" />
   <StateMessage v-else-if="explaining" mode="loading" />
   <StateMessage v-else-if="!view" mode="empty" :label="`Press Explain to see how ${engineLabel(engine)} runs this query`" />
-  <div v-else class="plan">
-    <div class="plan-row plan-head"><span>Step</span><span>{{ view.estimated ? 'Cost' : 'Time' }}</span><span>Rows</span><span>ms</span></div>
+  <div v-else class="plan" :class="{ estimated: view.estimated }">
+    <div class="plan-row plan-head"><span>Step</span><span>{{ view.estimated ? 'Cost' : 'Time' }}</span><span>Rows</span><span v-if="!view.estimated">ms</span></div>
     <div v-for="(r, i) in view.rows" :key="i" class="plan-row">
       <span class="plan-node" :style="{ paddingLeft: r.depth * 18 + 'px' }">
         <b>{{ r.node }}</b><span v-if="r.detail">{{ r.detail }}</span>
       </span>
       <span class="plan-bar"><i :class="{ hot: r.hot }" :style="{ width: Math.max(r.share * 100, 1) + '%' }"></i></span>
       <span class="plan-num">{{ r.rows }}</span>
-      <span class="plan-num">{{ r.ms == null ? '' : ms(r.ms) }}</span>
+      <span v-if="!view.estimated" class="plan-num">{{ r.ms == null ? '' : ms(r.ms) }}</span>
     </div>
     <div v-if="view.estimated" class="plan-foot">Estimated: {{ engineLabel(engine) }} didn't run this statement</div>
     <div v-else class="plan-foot"><template v-if="view.planningMs != null">Planning {{ ms(view.planningMs) }} ms · </template>Execution {{ ms(view.executionMs) }} ms</div>
@@ -44,6 +44,7 @@ const ms = (value) => (value < 10 ? value.toFixed(3) : value.toFixed(1))
   display: grid; grid-template-columns: minmax(0, 1fr) 180px 70px 80px; align-items: center; gap: 14px;
   padding: 6px 14px; font-size: 12.5px; border-bottom: 1px solid var(--grid-line);
 }
+.estimated .plan-row { grid-template-columns: minmax(0, 1fr) 180px 70px; }
 .plan-head {
   color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
   background: var(--bg-panel-2); border-bottom: 1px solid var(--border);
