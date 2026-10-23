@@ -16,8 +16,8 @@ const INTEGERS: [&str; 5] = ["TINYINT", "SMALLINT", "MEDIUMINT", "INT", "BIGINT"
 
 /// One cell as every prepared `sqlx::query` reads it. `declared` is the table column's
 /// own `COLUMN_TYPE`, when the cell comes from a table: sqlx names a text column with a
-/// binary collation (`utf8mb4_bin`) VARBINARY or BLOB, calls TINYINT(1) BOOLEAN whatever
-/// its sign, and doesn't say how many fraction digits a time keeps. Binary strings,
+/// binary collation (`utf8mb4_bin`) VARBINARY or BLOB, and doesn't say how many fraction
+/// digits a time keeps. Binary strings,
 /// GEOMETRY and any value that can't be read show as MySQL's own hex literal: exact to
 /// the byte, where text would hide which bytes they are. A geometry's text (WKT) would
 /// need `ST_AsText` in the SELECT.
@@ -25,18 +25,17 @@ pub(crate) fn cell(value: MySqlValueRef<'_>, declared: Option<&str>) -> Value {
     // Not `is_null`, which also answers true for a zero date (0000-00-00).
     let Some(bytes) = decode::<&[u8]>(value.clone()) else { return Value::Null };
     let protocol = value.type_info().into_owned();
-    read(protocol.name(), declared, value).unwrap_or_else(|| hex(bytes))
+    // sqlx names TINYINT(1) BOOLEAN whatever its sign, so the sign is read off the column's flags.
+    let unsigned = <u64 as sqlx::Type<MySql>>::compatible(&protocol);
+    read(protocol.name(), unsigned, declared, value).unwrap_or_else(|| hex(bytes))
 }
 
 fn decode<'r, T: Decode<'r, MySql>>(value: MySqlValueRef<'r>) -> Option<T> {
     T::decode(value).ok()
 }
 
-fn read(protocol: &str, declared: Option<&str>, value: MySqlValueRef<'_>) -> Option<Value> {
-    let (name, unsigned) = match protocol.strip_suffix(" UNSIGNED") {
-        Some(name) => (name, true),
-        None => (protocol, declared.is_some_and(|t| t.contains("unsigned"))),
-    };
+fn read(protocol: &str, unsigned: bool, declared: Option<&str>, value: MySqlValueRef<'_>) -> Option<Value> {
+    let name = protocol.strip_suffix(" UNSIGNED").unwrap_or(protocol);
     match name {
         "BOOLEAN" => integer(value, unsigned).map(boolean),
         _ if INTEGERS.contains(&name) => integer(value, unsigned),
