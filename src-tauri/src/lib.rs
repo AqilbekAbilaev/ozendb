@@ -227,6 +227,7 @@ pub fn run() {
             begin_mysql_transaction,
             commit_mysql_transaction,
             rollback_mysql_transaction,
+            format_mysql_sql,
             list_pg_databases,
             list_pg_schemas,
             list_pg_tables,

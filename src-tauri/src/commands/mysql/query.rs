@@ -3,6 +3,8 @@
 use std::time::Duration;
 
 use futures_util::TryStreamExt;
+use sqlparser::dialect::MySqlDialect;
+use sqlparser::tokenizer::{Token, Tokenizer};
 use sqlx::mysql::MySqlConnection;
 use sqlx::{Column, Either, Executor, MySqlPool, Row, SqlSafeStr, Statement};
 use tauri::State;
@@ -12,6 +14,7 @@ use super::cell::cell;
 use super::script::statements;
 use super::transaction::MySqlTransactions;
 use super::AppContext;
+use crate::commands::sql::format::format_sql;
 use crate::commands::sql::{SqlQueryResult, ROW_RESULT_CAP};
 use crate::error::AppError;
 use crate::mysql::session::QUERY_TIME_LIMIT;
@@ -120,3 +123,22 @@ pub async fn run_mysql_query(
         None => run_mysql_sql(&pool, &sql, read_only, run_id.as_deref(), QUERY_TIME_LIMIT).await,
     }
 }
+
+/// The SQL laid out one clause per line (see `format_sql`). A string holding a backslash
+/// is refused: sqlparser writes it back bare, which MySQL reads as an escape, so
+/// `'a\\b'` would come back as `'a\b'`, a different string.
+// A sqlparser bug, not yet reported upstream: a string's Display doesn't escape
+// backslashes for a dialect whose strings take them.
+#[tauri::command(async)]
+pub fn format_mysql_sql(sql: String) -> Result<String, AppError> {
+    let dialect = MySqlDialect {};
+    let tokens = Tokenizer::new(&dialect, &sql).tokenize().map_err(|e| AppError::Sql(e.to_string()))?;
+    if tokens.iter().any(|t| matches!(t, Token::SingleQuotedString(text) | Token::DoubleQuotedString(text) if text.contains('\\'))) {
+        return Err(AppError::Sql(String::from("SQL with a backslash in a string isn't formatted, since formatting would change the string.")));
+    }
+    format_sql(&dialect, &sql).map_err(AppError::Sql)
+}
+
+#[cfg(test)]
+#[path = "query.test.rs"]
+mod tests;
