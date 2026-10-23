@@ -205,13 +205,16 @@ pub async fn list_mysql_columns(
 }
 
 /// One foreign key: `from_columns` hold the key, `to_columns` the columns they reference,
-/// pairwise in the key's order. The table it points at may be in another database.
+/// pairwise in the key's order. The table it points at may be in another database. Each
+/// database goes as a schema, as the shared table tab names it (engines/sql).
 #[derive(Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MySqlForeignKey {
+    #[serde(rename = "fromSchema")]
     pub from_database: String,
     pub from_table: String,
     pub from_columns: Vec<String>,
+    #[serde(rename = "toSchema")]
     pub to_database: String,
     pub to_table: String,
     pub to_columns: Vec<String>,

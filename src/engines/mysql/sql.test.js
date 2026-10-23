@@ -147,10 +147,9 @@ describe('api', () => {
   })
 
   it('offers foreign keys by the databases they link, as the table tab\'s schemas', async () => {
-    invoke.mockResolvedValue([{ fromDatabase: 'shop.eu', fromTable: 'order items', fromColumns: ['at slot', 'at zone'], toDatabase: 'склад', toTable: 'bins', toColumns: ['slot', 'zone'] }])
-    expect(await api.listForeignKeys({ connectionId: 'c1', schema: 'shop.eu', table: 'order items' })).toEqual([
-      { fromSchema: 'shop.eu', fromTable: 'order items', fromColumns: ['at slot', 'at zone'], toSchema: 'склад', toTable: 'bins', toColumns: ['slot', 'zone'] },
-    ])
+    const keys = [{ fromSchema: 'shop.eu', fromTable: 'order items', fromColumns: ['at slot', 'at zone'], toSchema: 'склад', toTable: 'bins', toColumns: ['slot', 'zone'] }]
+    invoke.mockResolvedValue(keys)
+    expect(await api.listForeignKeys({ connectionId: 'c1', schema: 'shop.eu', table: 'order items' })).toEqual(keys)
     expect(invoke).toHaveBeenCalledWith('list_mysql_foreign_keys', { id: 'c1', database: 'shop.eu', table: 'order items' })
   })
 
