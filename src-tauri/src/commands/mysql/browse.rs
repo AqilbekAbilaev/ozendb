@@ -1,5 +1,6 @@
-//! The table tab's page and row count over one MySQL table. Names are quoted with
-//! backticks and every filter value is bound, never written into the SQL.
+//! The table tab's page and row count over one MySQL table and the tables joined to it.
+//! Names are quoted with backticks and every filter value is bound, never written into
+//! the SQL. A join's `schema` is the database its table is in.
 use sqlx::{Column, Executor, MySqlPool, Row, SqlSafeStr, Statement};
 use tauri::State;
 
@@ -8,7 +9,7 @@ use chrono::{DateTime, NaiveDateTime, TimeZone};
 use std::borrow::Cow;
 use super::schema::{mysql_columns, MySqlColumnInfo};
 use super::{quote_name, AppContext};
-use crate::commands::sql::{ColumnFilter, FilterOp, SqlQueryResult, ROW_RESULT_CAP};
+use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, SqlQueryResult, TableJoin, ROW_RESULT_CAP};
 use crate::error::AppError;
 
 /// The page size when the caller sends a non-positive `limit`, as PostgreSQL's browse does.
@@ -128,16 +129,45 @@ fn decimal(value: &str) -> Option<(usize, usize)> {
     Some((usize::try_from(point.max(0) + scale).ok()?, usize::try_from(scale).ok()?))
 }
 
+/// `` `t<table>`.`column` `` and its info, refused when `table` names none of `tables`
+/// or has no such column.
+fn column_in<'a>(tables: &'a [Vec<MySqlColumnInfo>], r: &ColumnRef) -> Result<(String, &'a MySqlColumnInfo), AppError> {
+    let columns = tables.get(r.table).ok_or_else(|| AppError::Validation(format!("\"{}\" names a table that isn't in this browse.", r.column)))?;
+    Ok((format!("`t{}`.{}", r.table, quote_name(&r.column)?), column(columns, &r.column)?))
+}
+
+/// The browsed table as `t0` and each join as `t1`, `t2`…, so a table joined to itself
+/// still has a name of its own.
+pub(super) fn from_clause(database: &str, table: &str, joins: &[TableJoin]) -> Result<String, AppError> {
+    let mut sql = format!("{}.{} AS `t0`", quote_name(database)?, quote_name(table)?);
+    for (i, join) in joins.iter().enumerate() {
+        let n = i + 1;
+        if join.on.is_empty() {
+            return Err(AppError::Validation(format!("The join to \"{}\" matches on no columns.", join.table)));
+        }
+        let mut pairs = Vec::with_capacity(join.on.len());
+        for pair in &join.on {
+            if pair.equals.table >= n {
+                return Err(AppError::Validation(String::from("A join can only match a table that comes before it.")));
+            }
+            pairs.push(format!("`t{n}`.{} = `t{}`.{}", quote_name(&pair.column)?, pair.equals.table, quote_name(&pair.equals.column)?));
+        }
+        let kind = match join.kind {
+            JoinKind::Left => "LEFT JOIN",
+            JoinKind::Inner => "JOIN",
+        };
+        sql.push_str(&format!(" {kind} {}.{} AS `t{n}` ON {}", quote_name(&join.schema)?, quote_name(&join.table)?, pairs.join(" AND ")));
+    }
+    Ok(sql)
+}
+
 /// The ` WHERE …` clause (empty for no filters) and the values its placeholders take.
-pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]) -> Result<(String, Vec<String>), AppError> {
+/// `tables` holds each table's columns, the browsed table's first, then each join's.
+pub(super) fn where_clause(filters: &[ColumnFilter], tables: &[Vec<MySqlColumnInfo>]) -> Result<(String, Vec<String>), AppError> {
     let mut conditions = Vec::with_capacity(filters.len());
     let mut binds = Vec::new();
     for f in filters {
-        if f.table != 0 {
-            return Err(AppError::Validation(format!("\"{}\" names a table that isn't in this browse.", f.column)));
-        }
-        let info = column(columns, &f.column)?;
-        let name = quote_name(&f.column)?;
+        let (name, info) = column_in(tables, &ColumnRef { table: f.table, column: f.column.clone() })?;
         let value = || f.value.as_deref().ok_or_else(|| AppError::Validation(format!("The filter on \"{}\" needs a value.", f.column)));
         // LIKE's default escape character is a backslash.
         let like = |value: &str| unzoned(&info.data_type, value).replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
@@ -176,48 +206,64 @@ pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]
     Ok((format!(" WHERE {}", conditions.join(" AND ")), binds))
 }
 
-/// ` ORDER BY …` on `order_by`, or else on the primary key so pages don't overlap or skip
-/// rows (see PostgreSQL's browse); empty for a table with neither.
-pub(super) fn order_clause(order_by: Option<&str>, descending: bool, columns: &[MySqlColumnInfo]) -> Result<String, AppError> {
-    let names: Vec<&str> = match order_by.filter(|name| !name.is_empty()) {
-        Some(name) => vec![column(columns, name)?.name.as_str()],
-        None => columns.iter().filter(|c| c.is_primary_key).map(|c| c.name.as_str()).collect(),
+/// ` ORDER BY …` on `order_by`, a column of any of `tables`, or else on the browsed
+/// table's primary key so pages don't overlap or skip rows (see PostgreSQL's browse);
+/// empty for a table with neither.
+pub(super) fn order_clause(order_by: Option<&ColumnRef>, descending: bool, tables: &[Vec<MySqlColumnInfo>]) -> Result<String, AppError> {
+    let names: Vec<String> = match order_by.filter(|r| !r.column.is_empty()) {
+        Some(r) => vec![column_in(tables, r)?.0],
+        None => {
+            let keys = tables[0].iter().filter(|c| c.is_primary_key);
+            keys.map(|c| Ok(format!("`t0`.{}", quote_name(&c.name)?))).collect::<Result<_, AppError>>()?
+        }
     };
     if names.is_empty() {
         return Ok(String::new());
     }
     let direction = if descending { "DESC" } else { "ASC" };
-    let ordered: Result<Vec<String>, AppError> = names.iter().map(|name| Ok(format!("{} {direction}", quote_name(name)?))).collect();
-    Ok(format!(" ORDER BY {}", ordered?.join(", ")))
+    Ok(format!(" ORDER BY {}", names.iter().map(|name| format!("{name} {direction}")).collect::<Vec<_>>().join(", ")))
 }
 
-/// `FROM` the table, with its `WHERE` and the values that clause binds.
-fn from_where(database: &str, table: &str, filters: &[ColumnFilter], columns: &[MySqlColumnInfo]) -> Result<(String, Vec<String>), AppError> {
-    let (where_sql, binds) = where_clause(filters, columns)?;
-    Ok((format!("FROM {}.{}{where_sql}", quote_name(database)?, quote_name(table)?), binds))
+/// Each table's columns: the browsed table's, then each join's, from whichever database it is in.
+async fn tables_columns(pool: &MySqlPool, database: &str, table: &str, joins: &[TableJoin]) -> Result<Vec<Vec<MySqlColumnInfo>>, AppError> {
+    let mut tables = vec![mysql_columns(pool, database, table).await?];
+    for join in joins {
+        tables.push(mysql_columns(pool, &join.schema, &join.table).await?);
+    }
+    Ok(tables)
+}
+
+/// `FROM` the tables, with the `WHERE` and the values that clause binds.
+fn from_where(database: &str, table: &str, joins: &[TableJoin], filters: &[ColumnFilter], tables: &[Vec<MySqlColumnInfo>]) -> Result<(String, Vec<String>), AppError> {
+    let (where_sql, binds) = where_clause(filters, tables)?;
+    Ok((format!("FROM {}{where_sql}", from_clause(database, table, joins)?), binds))
 }
 
 pub(crate) async fn mysql_browse(
     pool: &MySqlPool,
     database: &str,
     table: &str,
+    joins: &[TableJoin],
     filters: &[ColumnFilter],
-    order_by: Option<&str>,
+    order_by: Option<&ColumnRef>,
     descending: bool,
     limit: i64,
     offset: i64,
 ) -> Result<SqlQueryResult, AppError> {
-    let columns = mysql_columns(pool, database, table).await?;
-    let (from_where, binds) = from_where(database, table, filters, &columns)?;
+    let tables = tables_columns(pool, database, table, joins).await?;
+    let (from_where, binds) = from_where(database, table, joins, filters, &tables)?;
     let limit = if limit <= 0 { BROWSE_LIMIT_FALLBACK } else { limit.min(ROW_RESULT_CAP) };
-    let sql = format!("SELECT * {from_where}{} LIMIT ? OFFSET ?", order_clause(order_by, descending, &columns)?);
+    // Each table's columns in its own order, so a caller can tell `t0.id` from `t1.id` by position.
+    let select: Vec<String> = (0..tables.len()).map(|i| format!("`t{i}`.*")).collect();
+    let sql = format!("SELECT {} {from_where}{} LIMIT ? OFFSET ?", select.join(", "), order_clause(order_by, descending, &tables)?);
 
     let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
     // The statement's own columns name the result, so an empty page still has a header.
     let statement = (&mut *conn).prepare(sqlx::AssertSqlSafe(sql.clone()).into_sql_str()).await.map_err(AppError::MySql)?;
     let names: Vec<String> = statement.columns().iter().map(|c| c.name().to_string()).collect();
-    let declared: Vec<Option<&str>> =
-        names.iter().map(|name| columns.iter().find(|c| &c.name == name).map(|c| c.data_type.as_str())).collect();
+    // By place, as the tab lines its columns up: a column's origin can't tell a table
+    // joined to itself from the browsed one.
+    let declared: Vec<&str> = tables.iter().flatten().map(|c| c.data_type.as_str()).collect();
     let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
     for bind in binds {
         query = query.bind(bind);
@@ -230,35 +276,41 @@ pub(crate) async fn mysql_browse(
     for row in &fetched {
         let mut cells = Vec::with_capacity(names.len());
         for i in 0..row.len() {
-            cells.push(cell(row.try_get_raw(i).map_err(AppError::MySql)?, declared.get(i).copied().flatten()));
+            cells.push(cell(row.try_get_raw(i).map_err(AppError::MySql)?, declared.get(i).copied()));
         }
         rows.push(cells);
     }
     Ok(SqlQueryResult { columns: names, rows, truncated: false, elapsed_ms, rows_affected: None })
 }
 
-/// A page of one table or view: `filters` must all hold, `order_by` names one of its
-/// columns (the primary key when absent). Read through the connection's own pool, as the
-/// catalog is: the SQL names the database, so no pool opens per database.
+/// A page of one table or view and the tables joined to it: `filters` must all hold,
+/// `order_by` (with `order_table`, 0 for the browsed table) names a column (the primary
+/// key when absent). Read through the connection's own pool, as the catalog is: the SQL
+/// names each database, so no pool opens per database.
 #[tauri::command]
 pub async fn browse_mysql_table(
     ctx: State<'_, AppContext>,
     id: String,
     database: String,
     table: String,
+    joins: Option<Vec<TableJoin>>,
     filters: Option<Vec<ColumnFilter>>,
     order_by: Option<String>,
+    order_table: Option<usize>,
     descending: bool,
     limit: i64,
     offset: i64,
 ) -> Result<SqlQueryResult, AppError> {
     let pool = ctx.mysql_pool(&id, None).await?;
-    mysql_browse(&pool, &database, &table, &filters.unwrap_or_default(), order_by.as_deref(), descending, limit, offset).await
+    let order = order_by.map(|column| ColumnRef { table: order_table.unwrap_or(0), column });
+    let (joins, filters) = (joins.unwrap_or_default(), filters.unwrap_or_default());
+    mysql_browse(&pool, &database, &table, &joins, &filters, order.as_ref(), descending, limit, offset).await
 }
 
-pub(crate) async fn mysql_count(pool: &MySqlPool, database: &str, table: &str, filters: &[ColumnFilter]) -> Result<i64, AppError> {
-    let columns = if filters.is_empty() { Vec::new() } else { mysql_columns(pool, database, table).await? };
-    let (from_where, binds) = from_where(database, table, filters, &columns)?;
+pub(crate) async fn mysql_count(pool: &MySqlPool, database: &str, table: &str, joins: &[TableJoin], filters: &[ColumnFilter]) -> Result<i64, AppError> {
+    // Column types are only needed, and so only fetched, when there is something to filter.
+    let tables = if filters.is_empty() { Vec::new() } else { tables_columns(pool, database, table, joins).await? };
+    let (from_where, binds) = from_where(database, table, joins, filters, &tables)?;
     let mut query = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) {from_where}")));
     for bind in binds {
         query = query.bind(bind);
@@ -266,18 +318,19 @@ pub(crate) async fn mysql_count(pool: &MySqlPool, database: &str, table: &str, f
     query.fetch_one(pool).await.map_err(AppError::MySql)
 }
 
-/// The row count `browse_mysql_table`'s paging reads, asked for separately so turning a
-/// page doesn't count the table again.
+/// The row count `browse_mysql_table`'s paging reads, joins included, asked for
+/// separately so turning a page doesn't count the table again.
 #[tauri::command]
 pub async fn count_mysql_table(
     ctx: State<'_, AppContext>,
     id: String,
     database: String,
     table: String,
+    joins: Option<Vec<TableJoin>>,
     filters: Option<Vec<ColumnFilter>>,
 ) -> Result<i64, AppError> {
     let pool = ctx.mysql_pool(&id, None).await?;
-    mysql_count(&pool, &database, &table, &filters.unwrap_or_default()).await
+    mysql_count(&pool, &database, &table, &joins.unwrap_or_default(), &filters.unwrap_or_default()).await
 }
 
 #[cfg(test)]
