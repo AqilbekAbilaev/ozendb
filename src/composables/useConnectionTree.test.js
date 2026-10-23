@@ -9,17 +9,23 @@ vi.mock('vue', async importOriginal => ({
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }))
 vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases: vi.fn() }))
 vi.mock('../engines/postgresql/api/resources', async (original) => ({ ...(await original()), listSchemas: vi.fn() }))
+vi.mock('../engines/mysql/api/resources', async (original) => ({ ...(await original()), listDatabases: vi.fn() }))
 vi.mock('../appApi/connectionState', () => ({ setConnectionOpen: vi.fn() }))
 
 import { onMounted, onUnmounted } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { listSchemas } from '../engines/postgresql/api/resources'
+import { listDatabases as listMySqlDatabases } from '../engines/mysql/api/resources'
+import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 import { connDatabases, clearConnectionResources, invalidateConnectionResources, refreshConnectionResources } from '../stores/connectionData'
 import { consumeConnectionOpenRequest, requestConnectionOpen, setTreeSelection, treeSelection } from '../stores/connectionNavigation'
 import { tabs, activeTabId } from '../stores/tabs'
 import { useConnectionTree } from './useConnectionTree'
 import { createResourceRef, resourceName } from '../utils/resourceRef'
+
+// The tree asks each tab's definition whether it browses a table.
+registerWorkspaceDefinitions()
 
 let scope
 let tree
@@ -64,6 +70,20 @@ it('expands the connection of an active PostgreSQL table tab', async () => {
   activeTabId.value = 'pg'
   await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
   expect(listSchemas).toHaveBeenCalledWith('a')
+})
+
+// The tree asks the tab's definition, not its engine, so every SQL engine's table tab counts.
+it('expands and names the connection of an active MySQL table tab', async () => {
+  listMySqlDatabases.mockResolvedValue([])
+  tree.connections.value = [{ id: 'a', name: 'Connection', engine: 'mysql' }]
+  tabs.value = [{
+    id: 'my', type: 'mysql.table_browse',
+    target: createResourceRef('a', [{ kind: 'database', name: 'shop.eu' }, { kind: 'table', name: 'order items' }]),
+  }]
+  activeTabId.value = 'my'
+  await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
+  expect(tree.activeConnectionId.value).toBe('a')
+  expect(listMySqlDatabases).toHaveBeenCalledWith('a')
 })
 
 // The same watcher serves both engines; MongoDB also gets its database opened, which
@@ -282,8 +302,6 @@ it('keeps the selection while the active tab stays put', async () => {
 // all go through openPostgresTable, which always opens a new tab, so none may leave the
 // clicked row selected for the menu to act on.
 it('clears a PostgreSQL selection when a table is opened by any route', async () => {
-  const { registerWorkspaceDefinitions } = await import('../workspaces/registerDefinitions')
-  registerWorkspaceDefinitions()
   const { openPostgresTable } = await import('../stores/tabCreators')
   setTreeSelection({
     resource: createResourceRef('a', [

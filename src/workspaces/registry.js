@@ -17,6 +17,11 @@ export function workspacePaneKind(tab) {
   return definitions.get(tab.type)?.paneKind ?? null
 }
 
+// Whether the tab browses one table, so the sidebar highlights and opens its connection.
+export function workspaceBrowsesTable(tab) {
+  return Boolean(definitions.get(tab?.type)?.browsesTable)
+}
+
 // Definition registry. Populated once at startup by registerDefinitions();
 // a duplicate type throws, so a definition file can never silently shadow another.
 // Definitions are kept separate from components on purpose: registerDefinitions
