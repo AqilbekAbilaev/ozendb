@@ -106,6 +106,8 @@ pub struct MySqlColumnInfo {
     pub nullable: bool,
     pub is_primary_key: bool,
     pub default: Option<String>,
+    /// A generated column, virtual or stored, which MySQL refuses a value for.
+    pub generated: bool,
     /// An ENUM column's labels, in their declared order; None for any other type.
     pub enum_values: Option<Vec<String>>,
     /// The first foreign key on this column, by constraint name; None for most columns.
@@ -115,13 +117,16 @@ pub struct MySqlColumnInfo {
 pub(crate) async fn mysql_columns(pool: &MySqlPool, database: &str, table: &str) -> Result<Vec<MySqlColumnInfo>, AppError> {
     // The primary key is read from its constraint rather than `COLUMN_KEY = 'PRI'`, which
     // MySQL also reports for a unique, not-null column on a table that has no primary key.
-    let mut rows: Vec<(String, String, bool, bool, Option<String>, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
+    let mut rows: Vec<(String, String, bool, bool, Option<String>, bool, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
         r#"
         SELECT c.COLUMN_NAME, c.COLUMN_TYPE, c.IS_NULLABLE = 'YES',
             EXISTS (SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k
                 WHERE k.TABLE_SCHEMA = c.TABLE_SCHEMA AND k.TABLE_NAME = c.TABLE_NAME
                     AND k.COLUMN_NAME = c.COLUMN_NAME AND k.CONSTRAINT_NAME = 'PRIMARY'),
-            c.COLUMN_DEFAULT, f.REFERENCED_TABLE_SCHEMA, f.REFERENCED_TABLE_NAME, f.REFERENCED_COLUMN_NAME
+            c.COLUMN_DEFAULT,
+            -- Not DEFAULT_GENERATED, which marks a default expression such as CURRENT_TIMESTAMP.
+            c.EXTRA REGEXP '(VIRTUAL|STORED) GENERATED',
+            f.REFERENCED_TABLE_SCHEMA, f.REFERENCED_TABLE_NAME, f.REFERENCED_COLUMN_NAME
         FROM information_schema.COLUMNS c
         LEFT JOIN information_schema.KEY_COLUMN_USAGE f
             ON f.TABLE_SCHEMA = c.TABLE_SCHEMA AND f.TABLE_NAME = c.TABLE_NAME
@@ -139,13 +144,14 @@ pub(crate) async fn mysql_columns(pool: &MySqlPool, database: &str, table: &str)
     rows.dedup_by(|next, kept| next.0 == kept.0);
     Ok(rows
         .into_iter()
-        .map(|(name, data_type, nullable, is_primary_key, default, to_database, to_table, to_column)| MySqlColumnInfo {
+        .map(|(name, data_type, nullable, is_primary_key, default, generated, to_database, to_table, to_column)| MySqlColumnInfo {
             name,
             enum_values: enum_values(&data_type),
             data_type,
             nullable,
             is_primary_key,
             default,
+            generated,
             references: match (to_database, to_table, to_column) {
                 (Some(database), Some(table), Some(column)) => Some(MySqlReference { database, table, column }),
                 _ => None,
