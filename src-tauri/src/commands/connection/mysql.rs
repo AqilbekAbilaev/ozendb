@@ -13,6 +13,7 @@ pub(super) async fn test_mysql_connection(
 ) -> Result<(), AppError> {
     let options = mysql_uri::build_options(config, password, mysql_uri::own_database(mysql), via)?;
     mysql_uri::tcp_probe(&options).await?;
-    let connection = sqlx::mysql::MySqlConnection::connect_with(&options).await.map_err(AppError::MySql)?;
-    connection.close().await.map_err(AppError::MySql)
+    // Dropped rather than closed: the login is what was tested, and a failed goodbye
+    // would only turn a working connection red.
+    sqlx::mysql::MySqlConnection::connect_with(&options).await.map(drop).map_err(AppError::MySql)
 }
