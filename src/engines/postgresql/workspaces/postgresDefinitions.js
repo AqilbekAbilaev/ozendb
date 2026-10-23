@@ -1,23 +1,15 @@
-// PostgreSQL workspace definitions. A tab is plain data: what the user built as `state`,
-// a table tab's panel as `ui`, and what it loaded or is running as `runtime`
-// (tableState.js). A session saves the state; runtime starts fresh and loads again.
+// PostgreSQL workspace definitions: the shared table tab (tableDefinition.js), and a
+// query and a search tab whose typed text is their `state` and whose results are
+// `runtime`. A session saves the state; runtime starts fresh.
 import { defineAsyncComponent } from 'vue'
 import PostgresSearchWorkspace from './PostgresSearchWorkspace.vue'
 import { createResourceRef, segmentName } from '../../../utils/resourceRef'
-import { createTableState, createTableUi, createTableRuntime, migrateTableState } from '../../sql/workspaces/tableState.js'
-import { abandonTransaction, createSqlRun } from '../../sql/workspaces/runSql.js'
+import { rollBackOnClose, tableDefinition } from '../../sql/workspaces/tableDefinition.js'
+import { createSqlRun } from '../../sql/workspaces/runSql.js'
 import { createSearchState, createSearchRuntime, cancelSearch } from './searchRun.js'
-import { showToast } from '../../../stores/toast'
 
-// A closing tab can't ask first (closes are synchronous), so the safe side wins:
-// its open transaction is rolled back, and a message says so.
-async function rollBackOnClose(run) {
-  if (await abandonTransaction(run)) showToast('The closed tab had a transaction open; it was rolled back.')
-}
-
-// Both carry the SQL editor (CodeMirror), so they load when the first tab opens rather
-// than at launch. Module scope keeps each one a single component identity.
-const SqlTableWorkspace = defineAsyncComponent(() => import('../../sql/workspaces/SqlTableWorkspace.vue'))
+// It carries the SQL editor (CodeMirror), so it loads when the first tab opens rather
+// than at launch. Module scope keeps it a single component identity.
 const SqlQueryWorkspace = defineAsyncComponent(() => import('../../sql/workspaces/SqlQueryWorkspace.vue'))
 
 const ENGINE = 'postgresql'
@@ -39,17 +31,6 @@ function openedRef({ connectionId, database, schema, table }) {
 // context's flat fields become a ref here; a live workspace or a saved record already
 // carries one.
 const fromOpened = (opened) => ({ target: openedRef(opened), connectionName: opened.connectionName })
-
-function tableWorkspace({ target, connectionName }, state = createTableState(), ui = createTableUi()) {
-  return {
-    title: segmentName(target, 'table'),
-    target,
-    fields: {
-      connectionName: connectionName ?? null,
-      state, ui, runtime: createTableRuntime(ENGINE, target.connectionId),
-    },
-  }
-}
 
 // The SQL is the tab's state; its runs are runtime, so a duplicate starts without them.
 function queryWorkspace({ target, connectionName }, sql = '') {
@@ -79,19 +60,7 @@ function searchWorkspace({ target, connectionName }, state = createSearchState()
 }
 
 export const postgresDefinitions = [
-  {
-    type: 'postgresql.table_browse',
-    engine: ENGINE,
-    component: SqlTableWorkspace,
-    create: (ctx) => tableWorkspace(fromOpened(ctx.target), createTableState({ rowKey: ctx.options?.rowKey })),
-    // Filter mode only reads; SQL mode runs whatever SQL the user wrote.
-    canRefresh: (workspace) => workspace.state.mode === 'filter',
-    // A copy keeps the query and the panel; rows load again.
-    duplicate: (workspace) => tableWorkspace(workspace, copy(workspace.state), copy(workspace.ui)),
-    serialize: (workspace) => copy({ state: workspace.state, ui: workspace.ui }),
-    restore: (saved) => tableWorkspace(saved, migrateTableState(saved), { ...createTableUi(), ...saved.ui }),
-    dispose: (workspace) => rollBackOnClose(workspace.runtime.sqlRun),
-  },
+  tableDefinition(ENGINE, openedRef),
   {
     type: 'postgresql.query',
     engine: ENGINE,
