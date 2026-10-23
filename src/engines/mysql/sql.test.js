@@ -43,7 +43,12 @@ describe('cellKind', () => {
     expect(cellKind('datetime(6)')).toBe('date')
     expect(cellKind('timestamp')).toBe('date')
     expect(cellKind('time')).toBe('date')
-    expect(cellKind("enum('new','paid')")).toBe('enum')
+  })
+
+  it('treats a column as an enum only when it lists its labels', () => {
+    expect(cellKind("enum('new','paid')", ['new', 'paid'])).toBe('enum')
+    expect(cellKind("enum('new','paid')", [])).toBe(null)
+    expect(cellKind("enum('new','paid')", undefined)).toBe(null)
   })
 
   it('treats TINYINT(1) as the number it holds', () => {
