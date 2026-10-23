@@ -253,13 +253,14 @@ async fn session_setup_turns_backslash_escapes_back_on_and_keeps_the_rest_of_the
 #[tokio::test]
 async fn a_new_user_logs_in_without_tls() {
     let Some(mut config) = test_config() else { return eprintln!("{SKIP}") };
-    let user = "ozendb_it_plain";
-    let mut admin = connect(&config, "").await;
-    run(&mut admin, &format!("DROP USER IF EXISTS '{user}'@'%'")).await;
-    run(&mut admin, &format!("CREATE USER '{user}'@'%' IDENTIFIED WITH caching_sha2_password BY 'pa ss'")).await;
+    let (user, secret) = ("ozendb_it_plain", "pa ss");
     config.username = Some(String::from(user));
     config.tls = false;
-    let options = build_options(&config, Some("pa ss"), "", None).unwrap();
+    let options = build_options(&config, Some(secret), "", None).unwrap();
+    let mut admin = connect(&test_config().unwrap(), "").await;
+    run(&mut admin, &format!("DROP USER IF EXISTS '{user}'@'%'")).await;
+    run(&mut admin, &format!("CREATE USER '{user}'@'%' IDENTIFIED WITH caching_sha2_password BY '{secret}'")).await;
+    // The user is dropped before the login is checked, so a failed login leaves no account.
     let login = MySqlConnection::connect_with(&options).await;
     run(&mut admin, &format!("DROP USER '{user}'@'%'")).await;
     admin.close().await.unwrap();
