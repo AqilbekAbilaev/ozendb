@@ -4,7 +4,7 @@
 import { defineAsyncComponent } from 'vue'
 import PostgresSearchWorkspace from './PostgresSearchWorkspace.vue'
 import { createResourceRef, segmentName } from '../../../utils/resourceRef'
-import { rollBackOnClose, tableDefinition } from '../../sql/workspaces/tableDefinition.js'
+import { copy, rollBackOnClose, tableDefinition } from '../../sql/workspaces/tableDefinition.js'
 import { createSqlRun } from '../../sql/workspaces/runSql.js'
 import { createSearchState, createSearchRuntime, cancelSearch } from './searchRun.js'
 
@@ -13,9 +13,6 @@ import { createSearchState, createSearchRuntime, cancelSearch } from './searchRu
 const SqlQueryWorkspace = defineAsyncComponent(() => import('../../sql/workspaces/SqlQueryWorkspace.vue'))
 
 const ENGINE = 'postgresql'
-
-// Tabs are reactive, which structuredClone can't copy; state and ui are JSON-only.
-const copy = (value) => JSON.parse(JSON.stringify(value))
 
 // The PostgreSQL openers still pass flat fields (connectionId, database, schema, table);
 // this is the one place they become the tab's ref. A tab's identity is that `target`
