@@ -14,19 +14,29 @@ const MAX_EXECUTION_TIME_MS: u32 = 300_000;
 // NO_BACKSLASH_ESCAPES is dropped because the filters' LIKE patterns (commands/mysql/
 // browse.rs) and the SQL the table tab writes (engines/mysql/sql.js) escape with
 // backslashes; a server that sets it would read them as literal text. MySQL accepts the
-// empty mode or stray comma REPLACE can leave. The time zone is UTC so that a TIMESTAMP,
-// stored in UTC and read in the session's zone, reads as itself: every instant once,
-// even across a daylight-saving change, and marked as UTC (commands/mysql/cell.rs).
+// empty mode or stray comma REPLACE can leave. The time zone is the user's own (`zone`),
+// so NOW() reads their clock and a TIMESTAMP shows in their time, marked with its offset
+// (commands/mysql/cell.rs).
 pub(crate) fn setup_statement(read_only: bool) -> String {
     let mut statement = format!(
         "SET SESSION max_execution_time = {MAX_EXECUTION_TIME_MS}, \
          SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_BACKSLASH_ESCAPES', ''), \
-         SESSION time_zone = '+00:00'"
+         SESSION time_zone = '{}'",
+        zone()
     );
     if read_only {
         statement.push_str(", SESSION transaction_read_only = ON");
     }
     statement
+}
+
+/// The user's UTC offset, as MySQL takes it for `time_zone` and the grid shows it after a
+/// TIMESTAMP: `+05:00`. A fixed offset rather than a named zone, since a server only knows
+/// zone names once its time zone tables are loaded.
+// ponytail: read at connect time, so a session opened before a daylight-saving change keeps
+// the old offset until it reconnects; every value it shows still names its true instant.
+pub(crate) fn zone() -> String {
+    chrono::Local::now().offset().to_string()
 }
 
 pub(crate) async fn prepare(connection: &mut MySqlConnection, read_only: bool) -> Result<(), sqlx::Error> {

@@ -1,7 +1,9 @@
 //! The bytes MySQL's binary protocol sends for a date or a BIT, read by hand, and the
 //! rules each type's text follows. Every other type is decoded by sqlx, whose values
 //! can't be built outside it, so those cases are in the live tests (live_tests/mysql_browse.rs).
-use super::{bits, boolean, date, date_time, digits, fraction, hex, is_text_type, UTC};
+use super::{bits, boolean, date, date_time, digits, fraction, hex, is_text_type};
+
+const UTC: &str = "+00:00";
 use serde_json::json;
 
 #[test]

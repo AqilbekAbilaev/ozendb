@@ -12,9 +12,6 @@ const SAFE_INTEGER: i128 = (1 << 53) - 1;
 
 const INTEGERS: [&str; 5] = ["TINYINT", "SMALLINT", "MEDIUMINT", "INT", "BIGINT"];
 
-/// What a TIMESTAMP's text ends with. Every session reads them in UTC (mysql/session.rs).
-pub(super) const UTC: &str = "+00:00";
-
 /// One cell as every prepared `sqlx::query` reads it. `declared` is the table column's
 /// own `COLUMN_TYPE`, when the cell comes from a table: sqlx names a text column with a
 /// binary collation (`utf8mb4_bin`) VARBINARY or BLOB, calls TINYINT(1) BOOLEAN whatever
@@ -49,7 +46,7 @@ fn read(protocol: &str, declared: Option<&str>, value: MySqlValueRef<'_>) -> Opt
         "DECIMAL" | "CHAR" | "VARCHAR" | "TINYTEXT" | "TEXT" | "MEDIUMTEXT" | "LONGTEXT" | "ENUM" | "SET" => decode(value).map(Value::String),
         "DATE" => date(decode(value)?),
         "DATETIME" => date_time(decode(value)?, digits(declared), ""),
-        "TIMESTAMP" => date_time(decode(value)?, digits(declared), UTC),
+        "TIMESTAMP" => date_time(decode(value)?, digits(declared), &crate::mysql::session::zone()),
         "TIME" => decode(value).map(|span| time(span, digits(declared))),
         "JSON" => decode::<Json<Value>>(value).map(|json| json.0),
         "BINARY" | "VARBINARY" | "TINYBLOB" | "BLOB" | "MEDIUMBLOB" | "LONGBLOB" if declared.is_some_and(is_text_type) => {

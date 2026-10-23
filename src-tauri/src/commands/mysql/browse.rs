@@ -3,7 +3,7 @@
 use sqlx::{Column, Executor, MySqlPool, Row, SqlSafeStr, Statement};
 use tauri::State;
 
-use super::cell::{cell, UTC};
+use super::cell::cell;
 use super::schema::{mysql_columns, MySqlColumnInfo};
 use super::{quote_name, AppContext};
 use crate::commands::sql::{ColumnFilter, FilterOp, SqlQueryResult, ROW_RESULT_CAP};
@@ -80,10 +80,10 @@ pub(super) fn flag(data_type: &str, value: &str) -> Option<&'static str> {
     }
 }
 
-/// `value` as MySQL writes the column: the grid shows a TIMESTAMP in the session's UTC
-/// (cell.rs), and MySQL's own text of one, which every filter compares, has no zone.
+/// `value` as MySQL writes the column: the grid shows a TIMESTAMP with the session's zone
+/// (cell.rs), and MySQL's own text of one, which every filter compares, has none.
 pub(super) fn unzoned<'a>(data_type: &str, value: &'a str) -> &'a str {
-    if data_type.starts_with("timestamp") { value.strip_suffix(UTC).unwrap_or(value) } else { value }
+    if data_type.starts_with("timestamp") { value.strip_suffix(crate::mysql::session::zone().as_str()).unwrap_or(value) } else { value }
 }
 
 /// The precision and scale of the smallest DECIMAL that holds `value` exactly, or None

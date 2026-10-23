@@ -117,12 +117,13 @@ fn compares_text_dates_and_floats_against_the_bound_value_as_it_is() {
 }
 
 #[test]
-fn reads_a_timestamp_value_without_the_utc_zone_the_grid_shows_it_with() {
+fn reads_a_timestamp_value_without_the_zone_the_grid_shows_it_with() {
+    let zone = crate::mysql::session::zone();
     let (sql, binds) = clause(&[
-        filter("stamp", FilterOp::Eq, Some("2024-06-30 18:59:59.120+00:00")),
-        filter("stamp", FilterOp::Contains, Some("59.120+00:00")),
-        filter("stamp", FilterOp::StartsWith, Some("2024-06-30 18:59:59.120+00:00")),
-        filter("stamp", FilterOp::In, Some("2024-01-01 00:00:00+00:00, 2024-01-02")),
+        filter("stamp", FilterOp::Eq, Some(&format!("2024-06-30 18:59:59.120{zone}"))),
+        filter("stamp", FilterOp::Contains, Some(&format!("59.120{zone}"))),
+        filter("stamp", FilterOp::StartsWith, Some(&format!("2024-06-30 18:59:59.120{zone}"))),
+        filter("stamp", FilterOp::In, Some(&format!("2024-01-01 00:00:00{zone}, 2024-01-02"))),
     ]);
     assert_eq!(sql.matches('?').count(), 5);
     assert_eq!(binds, vec!["2024-06-30 18:59:59.120", "59.120", "2024-06-30 18:59:59.120", "2024-01-01 00:00:00", "2024-01-02"]);
