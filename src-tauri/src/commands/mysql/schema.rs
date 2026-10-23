@@ -3,7 +3,8 @@ use serde::Serialize;
 use sqlparser::ast::{DataType, EnumMember};
 use sqlparser::dialect::MySqlDialect;
 use sqlparser::parser::Parser;
-use sqlx::MySqlPool;
+use sqlx::mysql::MySqlRow;
+use sqlx::{MySqlPool, Row};
 use tauri::State;
 
 use super::AppContext;
@@ -116,53 +117,81 @@ pub struct MySqlColumnInfo {
     pub references: Option<MySqlReference>,
 }
 
-pub(crate) async fn mysql_columns(pool: &MySqlPool, database: &str, table: &str) -> Result<Vec<MySqlColumnInfo>, AppError> {
+/// One query for every table's columns: a UNION ALL branch per table, named by its place
+/// in the list, since MySQL finds a table in its catalog only by equality on its name. A
+/// row-constructor IN or an OR of pairs reads every table of each database instead.
+fn columns_sql(tables: usize) -> String {
     // The primary key is read from its constraint rather than `COLUMN_KEY = 'PRI'`, which
     // MySQL also reports for a unique, not-null column on a table that has no primary key.
-    let mut rows: Vec<(String, String, bool, bool, Option<String>, bool, bool, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
-        r#"
-        SELECT c.COLUMN_NAME, c.COLUMN_TYPE, c.IS_NULLABLE = 'YES',
+    let branch = |place: usize| {
+        format!(
+            r#"
+        SELECT {place} AS place, c.ORDINAL_POSITION AS position, f.CONSTRAINT_NAME AS constraint_name,
+            c.COLUMN_NAME AS name, c.COLUMN_TYPE AS data_type, c.IS_NULLABLE = 'YES' AS nullable,
             EXISTS (SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k
                 WHERE k.TABLE_SCHEMA = c.TABLE_SCHEMA AND k.TABLE_NAME = c.TABLE_NAME
-                    AND k.COLUMN_NAME = c.COLUMN_NAME AND k.CONSTRAINT_NAME = 'PRIMARY'),
-            c.COLUMN_DEFAULT,
+                    AND k.COLUMN_NAME = c.COLUMN_NAME AND k.CONSTRAINT_NAME = 'PRIMARY') AS is_primary_key,
+            c.COLUMN_DEFAULT AS default_value,
             -- Not DEFAULT_GENERATED, which marks a default expression such as CURRENT_TIMESTAMP.
-            c.EXTRA REGEXP '(VIRTUAL|STORED) GENERATED',
-            c.EXTRA LIKE '%auto_increment%',
-            f.REFERENCED_TABLE_SCHEMA, f.REFERENCED_TABLE_NAME, f.REFERENCED_COLUMN_NAME
+            c.EXTRA REGEXP '(VIRTUAL|STORED) GENERATED' AS is_generated,
+            c.EXTRA LIKE '%auto_increment%' AS is_auto_increment,
+            f.REFERENCED_TABLE_SCHEMA AS to_database, f.REFERENCED_TABLE_NAME AS to_table, f.REFERENCED_COLUMN_NAME AS to_column
         FROM information_schema.COLUMNS c
         LEFT JOIN information_schema.KEY_COLUMN_USAGE f
             ON f.TABLE_SCHEMA = c.TABLE_SCHEMA AND f.TABLE_NAME = c.TABLE_NAME
                 AND f.COLUMN_NAME = c.COLUMN_NAME AND f.REFERENCED_TABLE_NAME IS NOT NULL
         -- `SELECT *` leaves an INVISIBLE column out, and the tab lines its rows up by place.
-        WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ? AND c.EXTRA NOT LIKE '%INVISIBLE%'
-        ORDER BY c.ORDINAL_POSITION, f.CONSTRAINT_NAME
-        "#,
-    )
-    .bind(database)
-    .bind(table)
-    .fetch_all(pool)
-    .await
-    .map_err(AppError::MySql)?;
-    // A column in two foreign keys comes back twice, side by side; the first one stays.
-    rows.dedup_by(|next, kept| next.0 == kept.0);
-    Ok(rows
-        .into_iter()
-        .map(|(name, data_type, nullable, is_primary_key, default, generated, auto_increment, to_database, to_table, to_column)| MySqlColumnInfo {
-            name,
-            enum_values: enum_values(&data_type),
-            data_type,
-            nullable,
-            is_primary_key,
-            default,
-            generated,
-            auto_increment,
-            references: match (to_database, to_table, to_column) {
-                (Some(database), Some(table), Some(column)) => Some(MySqlReference { database, table, column }),
-                _ => None,
-            },
-        })
-        .collect())
+        WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ? AND c.EXTRA NOT LIKE '%INVISIBLE%'"#
+        )
+    };
+    let branches: Vec<String> = (0..tables).map(branch).collect();
+    format!("{}\n        ORDER BY place, position, constraint_name\n", branches.join("\n        UNION ALL"))
+}
+
+fn column_info(row: &MySqlRow) -> Result<MySqlColumnInfo, sqlx::Error> {
+    let data_type: String = row.try_get("data_type")?;
+    let references = match (row.try_get("to_database")?, row.try_get("to_table")?, row.try_get("to_column")?) {
+        (Some(database), Some(table), Some(column)) => Some(MySqlReference { database, table, column }),
+        _ => None,
+    };
+    Ok(MySqlColumnInfo {
+        name: row.try_get("name")?,
+        enum_values: enum_values(&data_type),
+        data_type,
+        nullable: row.try_get("nullable")?,
+        is_primary_key: row.try_get("is_primary_key")?,
+        default: row.try_get("default_value")?,
+        generated: row.try_get("is_generated")?,
+        auto_increment: row.try_get("is_auto_increment")?,
+        references,
+    })
+}
+
+/// Each of `tables`' columns, as `(database, table)`, in the order asked.
+pub(crate) async fn mysql_tables_columns(pool: &MySqlPool, tables: &[(&str, &str)]) -> Result<Vec<Vec<MySqlColumnInfo>>, AppError> {
+    let mut columns: Vec<Vec<MySqlColumnInfo>> = tables.iter().map(|_| Vec::new()).collect();
+    if tables.is_empty() {
+        return Ok(columns);
+    }
+    let sql = columns_sql(tables.len());
+    let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
+    for (database, table) in tables {
+        query = query.bind(*database).bind(*table);
+    }
+    for row in query.fetch_all(pool).await.map_err(AppError::MySql)? {
+        let place: i64 = row.try_get("place").map_err(AppError::MySql)?;
+        let table = &mut columns[usize::try_from(place).expect("a place this query numbered")];
+        let info = column_info(&row).map_err(AppError::MySql)?;
+        // A column in two foreign keys comes back twice, side by side; the first one stays.
+        if table.last().is_none_or(|kept| kept.name != info.name) {
+            table.push(info);
+        }
+    }
+    Ok(columns)
+}
+
+pub(crate) async fn mysql_columns(pool: &MySqlPool, database: &str, table: &str) -> Result<Vec<MySqlColumnInfo>, AppError> {
+    Ok(mysql_tables_columns(pool, &[(database, table)]).await?.pop().unwrap_or_default())
 }
 
 #[tauri::command]

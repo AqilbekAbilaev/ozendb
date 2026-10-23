@@ -1,7 +1,7 @@
 //! Live tests of the MySQL sidebar's catalog reads, against the server `mysql.rs` describes.
 
 use super::mysql::{connect, password, run, test_config, SKIP};
-use crate::commands::{mysql_columns, mysql_databases, mysql_foreign_keys, mysql_tables, MySqlForeignKey, MySqlReference};
+use crate::commands::{mysql_columns, mysql_databases, mysql_foreign_keys, mysql_tables, mysql_tables_columns, MySqlForeignKey, MySqlReference};
 use crate::mysql::uri::build_options;
 use sqlx::{Connection, MySqlPool};
 
@@ -123,6 +123,21 @@ async fn only_a_generated_column_is_flagged_generated() {
     let numbered: Vec<bool> = columns.iter().map(|c| c.auto_increment).collect();
     assert_eq!(numbered, [true, false, false, false, false]);
     admin.close().await.unwrap();
+    drop_seeded(&config, pool, &name).await;
+}
+
+#[tokio::test]
+async fn several_tables_columns_come_back_in_the_order_asked_a_repeated_one_included() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let name = database("several");
+    let pool = seeded(&config, &name).await;
+    let names = |tables: Vec<Vec<crate::commands::MySqlColumnInfo>>| -> Vec<Vec<String>> {
+        tables.into_iter().map(|columns| columns.into_iter().map(|c| c.name).collect()).collect()
+    };
+    let asked = [(name.as_str(), "клиенты ü"), ("mysql", "no such table"), (name.as_str(), "order items"), (name.as_str(), "клиенты ü")];
+    let (buyers, items) = (vec!["id key", "email"], vec!["id", "buyer `id`", "status"]);
+    assert_eq!(names(mysql_tables_columns(&pool, &asked).await.unwrap()), [buyers.clone(), vec![], items, buyers]);
+    assert!(mysql_tables_columns(&pool, &[]).await.unwrap().is_empty());
     drop_seeded(&config, pool, &name).await;
 }
 

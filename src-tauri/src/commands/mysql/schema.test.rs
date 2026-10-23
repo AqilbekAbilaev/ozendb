@@ -1,4 +1,4 @@
-use super::{enum_values, foreign_keys, is_system_database, table_kind, MySqlForeignKey};
+use super::{columns_sql, enum_values, foreign_keys, is_system_database, table_kind, MySqlForeignKey};
 
 #[test]
 fn flags_mysql_s_own_databases_as_system() {
@@ -64,4 +64,13 @@ fn gathers_a_key_s_columns_in_order_and_keeps_keys_apart() {
         keys,
         [key("shelf ü", &["at slot", "at zone"], &["slot", "zone"]), key("shelf ü", &["at slot"], &["slot"]), key("rack", &["at slot"], &["slot"])]
     );
+}
+
+#[test]
+fn reads_every_table_s_columns_in_one_query_each_table_looked_up_by_equality() {
+    let sql = columns_sql(2);
+    assert_eq!(sql.matches("WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ?").count(), 2);
+    assert_eq!(sql.matches("UNION ALL").count(), 1);
+    assert!(sql.contains("SELECT 0 AS place,") && sql.contains("SELECT 1 AS place,"));
+    assert!(sql.trim_end().ends_with("ORDER BY place, position, constraint_name"));
 }

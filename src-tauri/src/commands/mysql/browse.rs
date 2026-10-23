@@ -7,7 +7,7 @@ use tauri::State;
 use super::cell::{cell, digits, fraction};
 use chrono::{DateTime, NaiveDateTime, TimeZone};
 use std::borrow::Cow;
-use super::schema::{mysql_columns, MySqlColumnInfo};
+use super::schema::{mysql_tables_columns, MySqlColumnInfo};
 use super::{quote_name, AppContext};
 use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, SqlQueryResult, TableJoin, ROW_RESULT_CAP};
 use crate::error::AppError;
@@ -224,11 +224,21 @@ pub(super) fn order_clause(order_by: Option<&ColumnRef>, descending: bool, table
     Ok(format!(" ORDER BY {}", names.iter().map(|name| format!("{name} {direction}")).collect::<Vec<_>>().join(", ")))
 }
 
-/// Each table's columns: the browsed table's, then each join's, from whichever database it is in.
-async fn tables_columns(pool: &MySqlPool, database: &str, table: &str, joins: &[TableJoin]) -> Result<Vec<Vec<MySqlColumnInfo>>, AppError> {
-    let mut tables = vec![mysql_columns(pool, database, table).await?];
-    for join in joins {
-        tables.push(mysql_columns(pool, &join.schema, &join.table).await?);
+/// The tables of a browse that `wanted` names by place (0 the browsed table, then each
+/// join), each once and in place order, as `(place, (database, table))`.
+fn requested<'a>(database: &'a str, table: &'a str, joins: &'a [TableJoin], wanted: &[usize]) -> Vec<(usize, (&'a str, &'a str))> {
+    let all = std::iter::once((database, table)).chain(joins.iter().map(|j| (j.schema.as_str(), j.table.as_str())));
+    all.enumerate().filter(|(place, _)| wanted.contains(place)).collect()
+}
+
+/// Each table's columns, the browsed table's first, then each join's: fetched in one
+/// query for the tables `wanted` names (see `requested`), and empty for the rest.
+async fn tables_columns(pool: &MySqlPool, database: &str, table: &str, joins: &[TableJoin], wanted: &[usize]) -> Result<Vec<Vec<MySqlColumnInfo>>, AppError> {
+    let asked = requested(database, table, joins, wanted);
+    let names: Vec<(&str, &str)> = asked.iter().map(|&(_, name)| name).collect();
+    let mut tables: Vec<Vec<MySqlColumnInfo>> = (0..=joins.len()).map(|_| Vec::new()).collect();
+    for ((place, _), columns) in asked.into_iter().zip(mysql_tables_columns(pool, &names).await?) {
+        tables[place] = columns;
     }
     Ok(tables)
 }
@@ -250,7 +260,8 @@ pub(crate) async fn mysql_browse(
     limit: i64,
     offset: i64,
 ) -> Result<SqlQueryResult, AppError> {
-    let tables = tables_columns(pool, database, table, joins).await?;
+    let every_table: Vec<usize> = (0..=joins.len()).collect();
+    let tables = tables_columns(pool, database, table, joins, &every_table).await?;
     let (from_where, binds) = from_where(database, table, joins, filters, &tables)?;
     let limit = if limit <= 0 { BROWSE_LIMIT_FALLBACK } else { limit.min(ROW_RESULT_CAP) };
     // Each table's columns in its own order, so a caller can tell `t0.id` from `t1.id` by position.
@@ -308,8 +319,9 @@ pub async fn browse_mysql_table(
 }
 
 pub(crate) async fn mysql_count(pool: &MySqlPool, database: &str, table: &str, joins: &[TableJoin], filters: &[ColumnFilter]) -> Result<i64, AppError> {
-    // Column types are only needed, and so only fetched, when there is something to filter.
-    let tables = if filters.is_empty() { Vec::new() } else { tables_columns(pool, database, table, joins).await? };
+    // Column types are only needed, and so only fetched, for the tables the filters name.
+    let filtered: Vec<usize> = filters.iter().map(|f| f.table).collect();
+    let tables = tables_columns(pool, database, table, joins, &filtered).await?;
     let (from_where, binds) = from_where(database, table, joins, filters, &tables)?;
     let mut query = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) {from_where}")));
     for bind in binds {
