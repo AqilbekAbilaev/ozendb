@@ -160,7 +160,7 @@ const { tip, ...statsTip } = useStatsTip()
           :is="TREE_NODES[conn.engine]"
           v-if="expandedConns[conn.id] && connDatabases[conn.id] && TREE_NODES[conn.engine]"
           :conn="conn"
-          :schemas="connDatabases[conn.id]"
+          :resources="connDatabases[conn.id]"
           :stats-tip="statsTip"
         />
         <template v-else-if="expandedConns[conn.id] && connDatabases[conn.id]">
