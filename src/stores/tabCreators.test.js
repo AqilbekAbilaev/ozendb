@@ -426,3 +426,14 @@ describe('PostgreSQL queries', () => {
     expect(activeTabId.value).toBe(lastTab().id)
   })
 })
+
+describe('MySQL queries', () => {
+  it('opens a query tab in the database of the row it was opened on, and activates it', () => {
+    const c = harness()
+    const table = createResourceRef('m1', [{ kind: 'database', name: 'shop `2024` ü' }, { kind: 'table', name: 'order items' }])
+    c.openMySqlQuery({ resource: table, connectionName: 'Shop MySQL' })
+    expect(lastTab()).toMatchObject({ type: 'mysql.query', engine: 'mysql', title: 'SQL: shop `2024` ü', state: { sql: '' } })
+    expect(lastTab().target.segments).toEqual([{ kind: 'database', name: 'shop `2024` ü' }])
+    expect(activeTabId.value).toBe(lastTab().id)
+  })
+})

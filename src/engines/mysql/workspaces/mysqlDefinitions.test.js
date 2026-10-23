@@ -5,11 +5,13 @@ const browseTable = vi.fn()
 const countTable = vi.fn()
 const listColumns = vi.fn()
 const saveRows = vi.fn()
-vi.mock('../api/queries', () => ({ browseTable, countTable, saveRows }))
+const runQuery = vi.fn()
+vi.mock('../api/queries', () => ({ browseTable, countTable, saveRows, runQuery, cancelQuery: vi.fn(), formatQuery: vi.fn(), beginTransaction: vi.fn(), commitTransaction: vi.fn(), rollbackTransaction: vi.fn() }))
 vi.mock('../api/resources', async (original) => ({ ...(await original()), listColumns }))
 
 const { mysqlDefinitions } = await import('./mysqlDefinitions.js')
 const { createTableRuntime } = await import('../../sql/workspaces/tableState.js')
+const { createSqlRun } = await import('../../sql/workspaces/runSql.js')
 const { useSqlTable } = await import('../../sql/workspaces/useSqlTable.js')
 const { createResourceRef } = await import('../../../utils/resourceRef')
 
@@ -24,6 +26,7 @@ const COLUMNS = [
 beforeEach(() => {
   vi.resetAllMocks()
   listColumns.mockResolvedValue(COLUMNS)
+  runQuery.mockResolvedValue({ columns: ['VERSION()', '@@character_set_server'], rows: [['8.4.13', 'utf8mb4']], truncated: false, elapsedMs: 1, rowsAffected: null })
   countTable.mockResolvedValue(1)
   browseTable.mockResolvedValue({ columns: ['id', 'note'], rows: [['18446744073709551615', 'a']], truncated: false, elapsedMs: 2 })
 })
@@ -48,6 +51,8 @@ describe('mysql.table_browse', () => {
     expect(t.rows.value).toEqual([['18446744073709551615', 'a']])
     expect(t.total.value).toBe(1)
     expect(t.currentSql.value).toBe('SELECT *\nFROM `shop ``2024`` ü`.`order items`\nORDER BY `id` ASC\nLIMIT 100;')
+    expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT VERSION(), @@character_set_server')
+    expect(t.server.value).toEqual({ version: '8.4.13', encoding: 'utf8mb4' })
   })
 
   it('saves an edited cell by its row\'s primary key, in the table\'s database', async () => {
@@ -76,5 +81,30 @@ describe('mysql.table_browse', () => {
     const readOnly = useSqlTable(reactive({ ...opened().fields, target: created.target, engine: 'mysql' }), { readOnly: true })
     await readOnly.load()
     expect(readOnly.canEdit('note', 0)).toBe(false)
+  })
+})
+
+describe('mysql.query', () => {
+  const query = mysqlDefinitions.find(d => d.type === 'mysql.query')
+  const created = (target) => query.create({ target: { resource: target, connectionName: 'local' } })
+
+  it('opens in the database of the row it was opened on, its session starting there', () => {
+    const tab = created(resource)
+    expect(tab.title).toBe('SQL: shop `2024` ü')
+    expect(tab.target.segments).toEqual([{ kind: 'database', name: 'shop `2024` ü' }])
+    expect(tab.fields.runtime.run).toEqual(createSqlRun('mysql', 'c1', 'shop `2024` ü'))
+  })
+
+  it('opens on a connection in the database its session starts in by default', () => {
+    const tab = created(createResourceRef('c1', []))
+    expect(tab.title).toBe('SQL: local')
+    expect(tab.fields.runtime.run).toEqual(createSqlRun('mysql', 'c1', null))
+  })
+
+  it('keeps its SQL when duplicated, but not its runs', () => {
+    const tab = created(resource)
+    const copy = query.duplicate({ target: tab.target, connectionName: 'local', state: { sql: 'SELECT `ü`' } })
+    expect(copy.fields.state.sql).toBe('SELECT `ü`')
+    expect(copy.fields.runtime.run).toEqual(createSqlRun('mysql', 'c1', 'shop `2024` ü'))
   })
 })

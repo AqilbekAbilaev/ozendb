@@ -34,7 +34,8 @@ export async function runSql(run, sql) {
   try {
     if (run.txn === 'manual' && !run.txId) await begin(run)
     run.result = await apiOf(run).runQuery(run.connectionId, sql, run.runId, run.txId ?? null, run.database)
-    log(run, true, outcome(run.result), run.result.elapsedMs)
+    // A script answers with its last statement's result, and each statement's in `statements`.
+    for (const done of run.result.statements ?? [run.result]) log(run, true, outcome(done), done.elapsedMs)
     apiOf(run).pushHistory(run.connectionId, sql).catch(() => {})
   } catch (e) {
     run.error = errMessage(e)
