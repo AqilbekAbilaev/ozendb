@@ -187,14 +187,21 @@ MySQL has no schema level, and one connection reaches every database on its serv
 
 - **Frontend: `src/engines/mysql/`.** `connection/` holds the URI parsing, `tree/` the sidebar's
   database → table → columns rows and their menus, `sql.js` its `sql` entry for the shared table
-  tab, `workspaces/` that tab's definition (`mysql.table_browse`), and `api/` its half of the Tauri
-  boundary. The shared tab qualifies a table by its `schema`; on MySQL that is the database.
+  and SQL tabs (with `filterValues.js`, how SQL mode writes a filter's value), `workspaces/` their
+  definitions (`mysql.table_browse`, `mysql.query`), and `api/` its half of the Tauri boundary.
+  The shared tab qualifies a table by its `schema`; on MySQL that is the database.
 - **Backend: `src-tauri/src/commands/mysql/`**, resolving a pool through `ctx.mysql_pool` (or
   `ctx.mysql_pool_for_write` to change data), and the `src-tauri/src/mysql/` modules described
   below. `browse.rs` reads the table tab's page and count; `cell.rs` turns each cell into the
   grid's JSON by its column type, since MySQL can't wrap a row as JSON server-side the way
   PostgreSQL does; `row_write.rs` saves the tab's staged rows, writing each value back from what
   the grid shows, in one transaction inside one command rather than one held open between calls.
+  The SQL tab's runs are `query.rs`: `script.rs` splits a script into its statements (MySQL
+  prepares one at a time) and refuses typed transaction control and, on a read-only connection,
+  SQL that would lift the session's read-only mode; each run gets a session of its own, closed
+  afterwards so nothing it set reaches the next. `cancel.rs` stops a run with `KILL QUERY` from a
+  second session, on Cancel or past the time limit, which MySQL itself applies to SELECTs only;
+  `transaction.rs` holds Manual mode's transactions, each on its own session.
 - **Tests:** the `live_tests/mysql*.rs` files run when `OZENDB_TEST_MYSQL` is set.
 
 ## Rust backend (`src-tauri/src/`)
