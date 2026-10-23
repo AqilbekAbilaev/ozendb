@@ -44,7 +44,9 @@ impl Running {
             // A connection of its own rather than the pool's: held transactions can fill the pool.
             let mut killing = MySqlConnection::connect_with(&pool.connect_options()).await.map_err(AppError::MySql)?;
             sqlx::raw_sql(sqlx::AssertSqlSafe(format!("KILL QUERY {connection}"))).execute(&mut killing).await.map_err(AppError::MySql)?;
-            killing.close().await.map_err(AppError::MySql)?;
+            // Dropped rather than closed: the KILL is what mattered, and a failed goodbye
+            // would only report a Cancel that worked as an error.
+            drop(killing);
         }
         Ok(true)
     }
