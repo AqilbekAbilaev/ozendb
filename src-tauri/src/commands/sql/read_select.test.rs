@@ -1,9 +1,9 @@
 use super::{read_table_select, TableSelect};
 use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind};
-use sqlparser::dialect::PostgreSqlDialect;
+use crate::commands::postgres::read_select::PgTableDialect;
 
 fn read(sql: &str) -> Result<TableSelect, String> {
-    read_table_select(&PostgreSqlDialect {}, sql, "public", "users")
+    read_table_select(&PgTableDialect, sql, "public", "users")
 }
 
 fn f(column: &str, op: FilterOp, value: Option<&str>) -> ColumnFilter {
