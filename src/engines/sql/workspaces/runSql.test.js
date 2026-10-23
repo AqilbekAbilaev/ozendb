@@ -38,7 +38,7 @@ describe('runSql', () => {
     expect(runQuery).toHaveBeenCalledWith('c1', 'SELECT 1', expect.any(String), t.txId, 'otherdb')
 
     await explainSql(t, 'SELECT 1')
-    expect(explainQuery).toHaveBeenCalledWith('c1', 'SELECT 1', 'otherdb')
+    expect(explainQuery).toHaveBeenCalledWith('c1', 'SELECT 1', expect.any(String), 'otherdb')
   })
 
   it('keeps the result on the tab', async () => {
@@ -141,11 +141,38 @@ describe('runSql', () => {
     expect(runQuery).not.toHaveBeenCalled()
   })
 
+  it('cancels an Explain in flight by its own id, and does nothing once it has ended', async () => {
+    let finish
+    explainQuery.mockImplementation(() => new Promise((resolve, reject) => { finish = reject }))
+    const t = newRun()
+    const explaining = explainSql(t, 'SELECT pg_sleep(30)')
+    const explainId = explainQuery.mock.calls[0][2]
+    await cancelSql(t)
+    expect(cancelQuery.mock.calls).toEqual([['c1', explainId]])
+    finish({ code: 'cancelled', message: 'The query was cancelled.' })
+    await explaining
+    expect(t).toMatchObject({ explaining: false, explainId: null, planError: 'The query was cancelled.' })
+
+    cancelQuery.mockClear()
+    await cancelSql(t)
+    expect(cancelQuery).not.toHaveBeenCalled()
+  })
+
+  it('cancels a run and an Explain in flight together', async () => {
+    runQuery.mockReturnValue(new Promise(() => {}))
+    explainQuery.mockReturnValue(new Promise(() => {}))
+    const t = newRun()
+    runSql(t, 'SELECT 1')
+    explainSql(t, 'SELECT 2')
+    await cancelSql(t)
+    expect(cancelQuery.mock.calls).toEqual([['c1', runQuery.mock.calls[0][2]], ['c1', explainQuery.mock.calls[0][2]]])
+  })
+
   it('keeps a plan on the tab, or the reason there isn\'t one', async () => {
     const t = newRun({ plan: 'old' })
     explainQuery.mockResolvedValueOnce([{ Plan: {} }])
     await explainSql(t, 'SELECT 2')
-    expect(explainQuery).toHaveBeenCalledWith('c1', 'SELECT 2', null)
+    expect(explainQuery).toHaveBeenCalledWith('c1', 'SELECT 2', expect.any(String), null)
     expect(t).toMatchObject({ plan: [{ Plan: {} }], planError: null, explaining: false })
 
     explainQuery.mockRejectedValueOnce({ code: 'command', message: 'syntax error' })
