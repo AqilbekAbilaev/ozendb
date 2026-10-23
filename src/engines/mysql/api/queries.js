@@ -59,6 +59,12 @@ export function rollbackTransaction(txId) {
   return invoke('rollback_mysql_transaction', { txId })
 }
 
+// The plan MySQL chose for one statement, as EXPLAIN FORMAT=JSON's second version: run
+// with ANALYZE, adding real rows and times, when it only reads. `database` as in `runQuery`.
+export function explainQuery(connectionId, sql, database = null) {
+  return invoke('explain_mysql_query', { id: connectionId, sql, database })
+}
+
 // The SQL laid out one clause per line; refused (with why) for SQL it can't read, or
 // that formatting would change.
 export function formatQuery(sql) {
