@@ -101,6 +101,18 @@ pub enum AppError {
 
     #[error("{0}")]
     Validation(String),
+
+    /// A running query stopped by Cancel.
+    #[error("The query was cancelled.")]
+    Cancelled,
+
+    /// A running query stopped by the time limit.
+    #[error("The query ran past its time limit and was stopped.")]
+    TimedOut,
+
+    /// A statement after the first in a script failed; the ones before it ran.
+    #[error("Statement {number} failed (the ones before it ran): {source}")]
+    InScript { number: usize, source: Box<AppError> },
 }
 
 impl AppError {
@@ -142,6 +154,8 @@ impl AppError {
             AppError::SignInAgain => "sign_in_again",
             AppError::SubscriptionActive => "subscription_active",
             AppError::Validation(_) => "validation",
+            AppError::Cancelled | AppError::TimedOut => "cancelled",
+            AppError::InScript { source, .. } => source.code(),
         }
     }
 }
@@ -168,6 +182,7 @@ impl AppError {
                 "This MySQL login needs TLS: turn on TLS for the connection, even when it goes through an SSH tunnel.",
             ),
             AppError::MySql(e) => e.to_string(),
+            AppError::InScript { number, source } => format!("Statement {number} failed (the ones before it ran): {}", source.user_message()),
             _ => self.to_string(),
         }
     }

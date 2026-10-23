@@ -221,6 +221,8 @@ pub fn run() {
             browse_mysql_table,
             count_mysql_table,
             save_mysql_rows,
+            run_mysql_query,
+            cancel_mysql_query,
             list_pg_databases,
             list_pg_schemas,
             list_pg_tables,
