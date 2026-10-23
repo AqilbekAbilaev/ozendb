@@ -3,11 +3,11 @@
 import * as queries from './api/queries.js'
 import * as resources from './api/resources.js'
 
-// How a column's cells are styled, from its COLUMN_TYPE. TINYINT(1), MySQL's BOOLEAN, is
-// a boolean (the backend shows a value other than 0 or 1 as its number, and filters
-// `true` as 1); BIT reads as the number its bits make (commands/mysql/cell.rs).
+// How a column's cells are styled and filtered, from its COLUMN_TYPE. TINYINT(1), MySQL's
+// BOOLEAN, is a number: it can hold any small integer, though its 0 and 1 show as false
+// and true (and filter `true` as 1); BIT reads as the number its bits make
+// (commands/mysql/cell.rs).
 const KINDS = [
-  [/^tinyint\(1\)/, 'bool'],
   [/^(tinyint|smallint|mediumint|int|bigint|decimal|float|double|year|bit)\b/, 'num'],
   [/^(char|varchar|tinytext|text|mediumtext|longtext|set)\b/, 'str'],
   [/^(date|datetime|timestamp|time)\b/, 'date'],
