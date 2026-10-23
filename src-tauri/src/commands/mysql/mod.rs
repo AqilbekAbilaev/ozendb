@@ -6,6 +6,7 @@ pub(super) use super::AppContext;
 pub mod browse;
 pub mod cancel;
 mod cell;
+pub mod explain;
 pub mod query;
 pub mod read_select;
 pub mod row_write;
@@ -15,6 +16,7 @@ pub mod transaction;
 
 pub use browse::*;
 pub use cancel::*;
+pub use explain::*;
 pub use query::*;
 pub use read_select::*;
 pub use row_write::*;
