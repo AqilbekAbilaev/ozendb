@@ -35,15 +35,21 @@ export function useTableSqlMode(t) {
   // Takes SQL read back by the backend as the tab's joins, filters, sort and page, or
   // returns why the grid can't show it. Columns arrive as `{ table, column }`; the joins
   // are rebuilt, each with its columns fetched afresh.
-  async function adopt({ joins: readJoins, columns: shown, filters: readFilters, orderBy: order, descending: desc, limit: rowsPerPage, offset: at }) {
+  async function adopt({ joins: readJoins, columns: readShown, filters: readFilters, orderBy: readOrder, descending: desc, limit: rowsPerPage, offset: at }) {
     if (rowsPerPage == null) return 'the filter view shows a page at a time, so it needs a LIMIT.'
-    const nextJoins = await Promise.all(readJoins.map(async ({ schema, table, kind, on }) => ({
+    const fetched = await Promise.all(readJoins.map(async ({ schema, table, kind, on }) => ({
       key: nextJoinKey(), schema, table, kind, on,
       columns: await api.listColumns({ connectionId: target.connectionId, schema, table }),
     })))
+    const columnsOf = (table) => (table ? fetched[table - 1].columns : mainColumns.value)
+    // A name as the column's own, where the engine matches it in another case; an unknown
+    // one stays as written, for the backend to refuse.
+    const own = (ref) => ({ ...ref, column: columnsOf(ref.table).find(c => dialect.sameColumn(c.name, ref.column))?.name ?? ref.column })
+    const nextJoins = fetched.map((j, i) => ({ ...j, on: j.on.map(p => ({ column: own({ table: i + 1, column: p.column }).column, equals: own(p.equals) })) }))
+    const [shown, order] = [readShown.map(own), readOrder.map(own)]
     const keyOf = ({ table, column }) => (table ? `${nextJoins[table - 1].key}.${column}` : column)
-    const infoOf = ({ table, column }) => (table ? nextJoins[table - 1].columns : mainColumns.value).find(c => c.name === column)
-    const read = readFilters.map(f => (f.value == null ? f : { ...f, value: dialect.readFilterText(f.value, infoOf(f)?.dataType) }))
+    const infoOf = ({ table, column }) => columnsOf(table).find(c => c.name === column)
+    const read = readFilters.map(own).map(f => (f.value == null ? f : { ...f, value: dialect.readFilterText(f.value, infoOf(f)?.dataType) }))
     const keys = keyColumns.value
     const byKey = order.length === keys.length && order.every((c, i) => !c.table && c.column === keys[i])
     if (order.length > 1 && !byKey) return 'the filter view sorts by one column at a time.'

@@ -6,8 +6,10 @@ const countTable = vi.fn()
 const listColumns = vi.fn()
 const saveRows = vi.fn()
 const runQuery = vi.fn()
-vi.mock('../api/queries', () => ({ browseTable, countTable, saveRows, runQuery, cancelQuery: vi.fn(), formatQuery: vi.fn(), beginTransaction: vi.fn(), commitTransaction: vi.fn(), rollbackTransaction: vi.fn() }))
-vi.mock('../api/resources', async (original) => ({ ...(await original()), listColumns }))
+const readTableSelect = vi.fn()
+const listForeignKeys = vi.fn()
+vi.mock('../api/queries', () => ({ browseTable, countTable, saveRows, runQuery, readTableSelect, cancelQuery: vi.fn(), formatQuery: vi.fn(), beginTransaction: vi.fn(), commitTransaction: vi.fn(), rollbackTransaction: vi.fn() }))
+vi.mock('../api/resources', async (original) => ({ ...(await original()), listColumns, listForeignKeys }))
 
 const { mysqlDefinitions } = await import('./mysqlDefinitions.js')
 const { createTableRuntime } = await import('../../sql/workspaces/tableState.js')
@@ -26,6 +28,7 @@ const COLUMNS = [
 beforeEach(() => {
   vi.resetAllMocks()
   listColumns.mockResolvedValue(COLUMNS)
+  listForeignKeys.mockResolvedValue([])
   runQuery.mockResolvedValue({ columns: ['VERSION()', '@@character_set_server'], rows: [['8.4.13', 'utf8mb4']], truncated: false, elapsedMs: 1, rowsAffected: null })
   countTable.mockResolvedValue(1)
   browseTable.mockResolvedValue({ columns: ['id', 'note'], rows: [['18446744073709551615', 'a']], truncated: false, elapsedMs: 2 })
@@ -62,6 +65,31 @@ describe('mysql.table_browse', () => {
     await t.load()
     tab.state.query.filters = [{ key: 'id', op: 'gte', value: '18446744073709551615' }, { key: 'note', op: 'eq', value: '5' }]
     expect(t.currentSql.value).toBe('SELECT *\nFROM `shop ``2024`` ü`.`order items`\nWHERE `id` >= 18446744073709551615\n  AND `note` = \'5\'\nORDER BY `id` ASC\nLIMIT 100;')
+  })
+
+  it('reads names back from SQL mode as the columns they name, in any case, as MySQL does', async () => {
+    const created = opened()
+    const tab = reactive({ ...created.fields, target: created.target, engine: 'mysql' })
+    const t = useSqlTable(tab, { readOnly: false })
+    await t.load()
+    await t.toSql()
+    t.sql.value = 'edited'
+    readTableSelect.mockResolvedValue({
+      joins: [{ schema: 'shop `2024` ü', table: 'order items', kind: 'left', on: [{ column: 'ID', equals: { table: 0, column: 'Id' } }] }],
+      columns: [{ table: 0, column: 'NOTE' }, { table: 1, column: 'Note' }],
+      filters: [{ table: 1, column: 'NoTe', op: 'eq', value: 'paid' }],
+      orderBy: [{ table: 0, column: 'NOTE' }], descending: false, limit: 100, offset: 0,
+    })
+    await t.toFilters()
+    expect(t.filterRefusal.value).toBe(null)
+    const [join] = t.joins.value
+    expect(t.shownColumns.value).toEqual(['note', `${join.key}.note`])
+    expect(t.filterText.value).toEqual({ [`${join.key}.note`]: '=paid' })
+    expect(browseTable).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
+      joins: [{ schema: 'shop `2024` ü', table: 'order items', kind: 'left', on: [{ column: 'id', equals: { table: 0, column: 'id' } }] }],
+      filters: [{ table: 1, column: 'note', op: 'eq', value: 'paid' }],
+      orderBy: { table: 0, column: 'note' },
+    }))
   })
 
   it('saves an edited cell by its row\'s primary key, in the table\'s database', async () => {

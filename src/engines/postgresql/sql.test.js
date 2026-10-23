@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { dialect } from './sql.js'
 
-const { quoteName, quoteText, like, cellKind, jsonShape, takesValue, fillsItself } = dialect
+const { quoteName, quoteText, like, sameColumn, cellKind, jsonShape, takesValue, fillsItself } = dialect
 
 describe('quoting', () => {
   it('double-quotes a name, doubling any quote inside it', () => {
@@ -18,6 +18,13 @@ describe('quoting', () => {
 describe('like', () => {
   it('matches a column read as text, ignoring case', () => {
     expect(like('"Straße"', '%ö%')).toBe('"Straße"::text ILIKE \'%ö%\'')
+  })
+})
+
+describe('sameColumn', () => {
+  it('matches a column\'s name exactly, as the reader has already folded an unquoted one', () => {
+    expect(sameColumn('Straße', 'Straße')).toBe(true)
+    expect(sameColumn('Straße', 'straße')).toBe(false)
   })
 })
 
