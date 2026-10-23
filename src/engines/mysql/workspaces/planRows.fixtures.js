@@ -195,3 +195,370 @@ export const estimatedPlan = {
   "operation": "Update p (buffered)",
   "query_type": "update"
 }
+
+// Real plans in the classic EXPLAIN FORMAT=JSON, captured from MySQL 8.0 on the same
+// tables. MySQL 8.0 – 8.2 explains this way, without running.
+
+// A join with an IN subquery, a GROUP BY and an ORDER BY.
+export const classicJoin = {
+  "query_block": {
+    "select_id": 1,
+    "cost_info": {
+      "query_cost": "2.55"
+    },
+    "ordering_operation": {
+      "using_filesort": true,
+      "grouping_operation": {
+        "using_temporary_table": true,
+        "using_filesort": false,
+        "nested_loop": [
+          {
+            "table": {
+              "table_name": "o",
+              "access_type": "index",
+              "possible_keys": [
+                "PRIMARY",
+                "by_name"
+              ],
+              "key": "by_name",
+              "used_key_parts": [
+                "name"
+              ],
+              "key_length": "163",
+              "rows_examined_per_scan": 3,
+              "rows_produced_per_join": 3,
+              "filtered": "100.00",
+              "using_index": true,
+              "cost_info": {
+                "read_cost": "0.25",
+                "eval_cost": "0.30",
+                "prefix_cost": "0.55",
+                "data_read_per_join": "504"
+              },
+              "used_columns": [
+                "id",
+                "name"
+              ]
+            }
+          },
+          {
+            "table": {
+              "table_name": "pets",
+              "access_type": "ALL",
+              "possible_keys": [
+                "by_owner"
+              ],
+              "rows_examined_per_scan": 4,
+              "rows_produced_per_join": 3,
+              "filtered": "25.00",
+              "first_match": "o",
+              "using_join_buffer": "hash join",
+              "cost_info": {
+                "read_cost": "0.55",
+                "eval_cost": "0.30",
+                "prefix_cost": "1.40",
+                "data_read_per_join": "288"
+              },
+              "used_columns": [
+                "id",
+                "owner_id",
+                "kind"
+              ],
+              "attached_condition": "((`explain probe`.`pets`.`owner_id` = `explain probe`.`o`.`id`) and (`explain probe`.`pets`.`kind` = 'cat'))"
+            }
+          },
+          {
+            "table": {
+              "table_name": "p",
+              "access_type": "ref",
+              "possible_keys": [
+                "by_owner"
+              ],
+              "key": "by_owner",
+              "used_key_parts": [
+                "owner_id"
+              ],
+              "key_length": "5",
+              "ref": [
+                "explain probe.o.id"
+              ],
+              "rows_examined_per_scan": 1,
+              "rows_produced_per_join": 4,
+              "filtered": "100.00",
+              "using_index": true,
+              "cost_info": {
+                "read_cost": "0.75",
+                "eval_cost": "0.40",
+                "prefix_cost": "2.55",
+                "data_read_per_join": "384"
+              },
+              "used_columns": [
+                "id",
+                "owner_id"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
+// A UNION, which removes duplicates in a temporary table.
+export const classicUnion = {
+  "query_block": {
+    "union_result": {
+      "using_temporary_table": true,
+      "select_id": 3,
+      "table_name": "<union1,2>",
+      "access_type": "ALL",
+      "query_specifications": [
+        {
+          "dependent": false,
+          "cacheable": true,
+          "query_block": {
+            "select_id": 1,
+            "cost_info": {
+              "query_cost": "0.55"
+            },
+            "table": {
+              "table_name": "owners",
+              "access_type": "index",
+              "key": "by_name",
+              "used_key_parts": [
+                "name"
+              ],
+              "key_length": "163",
+              "rows_examined_per_scan": 3,
+              "rows_produced_per_join": 3,
+              "filtered": "100.00",
+              "using_index": true,
+              "cost_info": {
+                "read_cost": "0.25",
+                "eval_cost": "0.30",
+                "prefix_cost": "0.55",
+                "data_read_per_join": "504"
+              },
+              "used_columns": [
+                "name"
+              ]
+            }
+          }
+        },
+        {
+          "dependent": false,
+          "cacheable": true,
+          "query_block": {
+            "select_id": 2,
+            "cost_info": {
+              "query_cost": "0.65"
+            },
+            "table": {
+              "table_name": "pets",
+              "access_type": "ALL",
+              "rows_examined_per_scan": 4,
+              "rows_produced_per_join": 4,
+              "filtered": "100.00",
+              "cost_info": {
+                "read_cost": "0.25",
+                "eval_cost": "0.40",
+                "prefix_cost": "0.65",
+                "data_read_per_join": "384"
+              },
+              "used_columns": [
+                "kind"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+// A derived table, grouped, then sorted.
+export const classicDerived = {
+  "query_block": {
+    "select_id": 1,
+    "cost_info": {
+      "query_cost": "6.95"
+    },
+    "ordering_operation": {
+      "using_filesort": true,
+      "cost_info": {
+        "sort_cost": "4.00"
+      },
+      "table": {
+        "table_name": "d",
+        "access_type": "ALL",
+        "rows_examined_per_scan": 4,
+        "rows_produced_per_join": 4,
+        "filtered": "100.00",
+        "cost_info": {
+          "read_cost": "2.55",
+          "eval_cost": "0.40",
+          "prefix_cost": "2.95",
+          "data_read_per_join": "96"
+        },
+        "used_columns": [
+          "owner_id",
+          "n"
+        ],
+        "materialized_from_subquery": {
+          "using_temporary_table": true,
+          "dependent": false,
+          "cacheable": true,
+          "query_block": {
+            "select_id": 2,
+            "cost_info": {
+              "query_cost": "0.65"
+            },
+            "grouping_operation": {
+              "using_filesort": false,
+              "table": {
+                "table_name": "pets",
+                "access_type": "index",
+                "possible_keys": [
+                  "by_owner"
+                ],
+                "key": "by_owner",
+                "used_key_parts": [
+                  "owner_id"
+                ],
+                "key_length": "5",
+                "rows_examined_per_scan": 4,
+                "rows_produced_per_join": 4,
+                "filtered": "100.00",
+                "using_index": true,
+                "cost_info": {
+                  "read_cost": "0.25",
+                  "eval_cost": "0.40",
+                  "prefix_cost": "0.65",
+                  "data_read_per_join": "384"
+                },
+                "used_columns": [
+                  "id",
+                  "owner_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// A subquery in the select list, and one in the WHERE that MySQL answers before running.
+export const classicSubqueries = {
+  "query_block": {
+    "select_id": 1,
+    "cost_info": {
+      "query_cost": "0.55"
+    },
+    "table": {
+      "table_name": "o",
+      "access_type": "index",
+      "possible_keys": [
+        "PRIMARY",
+        "by_name"
+      ],
+      "key": "by_name",
+      "used_key_parts": [
+        "name"
+      ],
+      "key_length": "163",
+      "rows_examined_per_scan": 3,
+      "rows_produced_per_join": 2,
+      "filtered": "66.67",
+      "using_index": true,
+      "cost_info": {
+        "read_cost": "0.35",
+        "eval_cost": "0.20",
+        "prefix_cost": "0.55",
+        "data_read_per_join": "336"
+      },
+      "used_columns": [
+        "id",
+        "name"
+      ],
+      "attached_condition": "(`explain probe`.`o`.`id` > (/* select#3 */ select min(`explain probe`.`pets`.`id`) from `explain probe`.`pets`))",
+      "attached_subqueries": [
+        {
+          "dependent": false,
+          "cacheable": true,
+          "query_block": {
+            "select_id": 3,
+            "message": "Select tables optimized away"
+          }
+        }
+      ]
+    },
+    "select_list_subqueries": [
+      {
+        "dependent": true,
+        "cacheable": false,
+        "query_block": {
+          "select_id": 2,
+          "cost_info": {
+            "query_cost": "0.38"
+          },
+          "table": {
+            "table_name": "p",
+            "access_type": "ref",
+            "possible_keys": [
+              "by_owner"
+            ],
+            "key": "by_owner",
+            "used_key_parts": [
+              "owner_id"
+            ],
+            "key_length": "5",
+            "ref": [
+              "explain probe.o.id"
+            ],
+            "rows_examined_per_scan": 1,
+            "rows_produced_per_join": 1,
+            "filtered": "100.00",
+            "using_index": true,
+            "cost_info": {
+              "read_cost": "0.25",
+              "eval_cost": "0.13",
+              "prefix_cost": "0.38",
+              "data_read_per_join": "128"
+            },
+            "used_columns": [
+              "owner_id"
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
+
+// A single-table DELETE, which the classic format shows as the read that finds its rows.
+export const classicDelete = {
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": true,
+      "table_name": "pets",
+      "access_type": "range",
+      "possible_keys": [
+        "by_owner"
+      ],
+      "key": "by_owner",
+      "used_key_parts": [
+        "owner_id"
+      ],
+      "key_length": "5",
+      "ref": [
+        "const"
+      ],
+      "rows_examined_per_scan": 2,
+      "filtered": "100.00",
+      "attached_condition": "(`explain probe`.`pets`.`owner_id` = 1)"
+    }
+  }
+}

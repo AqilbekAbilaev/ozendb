@@ -1,7 +1,8 @@
-//! Explain: the plan MySQL chose for one statement, as `EXPLAIN FORMAT=JSON` in its
-//! second version (MySQL 8.3 and later), which lists the same steps as EXPLAIN ANALYZE's
-//! tree. For a statement that only reads, ANALYZE runs it and adds the real rows and
-//! times; anything else is explained without running.
+//! Explain: the plan MySQL chose for one statement, as `EXPLAIN FORMAT=JSON`: in its
+//! second version on MySQL 8.3 and later, which lists the same steps as EXPLAIN
+//! ANALYZE's tree, and in the classic one before. On 8.3 and later, ANALYZE runs a
+//! statement that only reads and adds the real rows and times; anything else is
+//! explained without running.
 use std::time::Duration;
 
 use sqlparser::ast::{Query, SetExpr, Statement};
@@ -42,10 +43,46 @@ fn body_reads(body: &SetExpr) -> bool {
     }
 }
 
-/// Whether a server reporting `version` (`SELECT VERSION()`) has the second JSON format.
-fn plans_in_json_v2(version: &str) -> bool {
-    let mut parts = version.split(['.', '-']).map(|part| part.parse::<u32>().ok());
-    matches!((parts.next().flatten(), parts.next().flatten()), (Some(major), Some(minor)) if (major, minor) >= (8, 3))
+/// How a server explains a statement, by its version. ANALYZE runs it and adds the real
+/// rows and times.
+#[derive(Debug, PartialEq)]
+enum Explain {
+    /// EXPLAIN FORMAT=JSON in its second version, which lists ANALYZE's steps: MySQL 8.3
+    /// and later, analyzing a statement that only reads.
+    Iterators { analyze: bool },
+    /// The classic EXPLAIN FORMAT=JSON, never run.
+    Classic,
+}
+
+impl Explain {
+    /// For a statement that `reads` only, or not, on a server reporting `version`
+    /// (`SELECT VERSION()`).
+    fn of(version: &str, reads: bool) -> Explain {
+        let mut parts = version.split(['.', '-']).map(|part| part.parse::<u32>().unwrap_or(0));
+        let (major, minor) = (parts.next().unwrap_or(0), parts.next().unwrap_or(0));
+        if (major, minor) >= (8, 3) {
+            Explain::Iterators { analyze: reads }
+        } else {
+            Explain::Classic
+        }
+    }
+
+    /// What readies the session first, if anything does.
+    fn setup(&self) -> Option<&'static str> {
+        match self {
+            Explain::Iterators { analyze: true } => Some("SET SESSION explain_json_format_version = 2; START TRANSACTION READ ONLY"),
+            Explain::Iterators { analyze: false } => Some("SET SESSION explain_json_format_version = 2"),
+            Explain::Classic => None,
+        }
+    }
+
+    /// The EXPLAIN of `statement`.
+    fn statement(&self, statement: &str) -> String {
+        match self {
+            Explain::Iterators { analyze: true } => format!("EXPLAIN ANALYZE FORMAT=JSON {statement}"),
+            Explain::Iterators { analyze: false } | Explain::Classic => format!("EXPLAIN FORMAT=JSON {statement}"),
+        }
+    }
 }
 
 /// The plan for `sql`, which must be one statement, as MySQL's JSON. It runs on a session
@@ -69,17 +106,15 @@ pub(crate) async fn explain_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bo
     })
     .await
     .map_err(|_| AppError::TimedOut)??;
-    if !plans_in_json_v2(&version) {
-        return Err(AppError::Validation(format!("Explain needs MySQL 8.3 or later; this server runs {version}.")));
-    }
-    let analyze = only_reads(statement);
-    let setup = if analyze { "SET SESSION explain_json_format_version = 2; START TRANSACTION READ ONLY" } else { "SET SESSION explain_json_format_version = 2" };
+    let explain = Explain::of(&version, only_reads(statement));
     // `statement` is the caller's own SQL, run as-is: the same trust as run_mysql_query.
-    let explain = format!("EXPLAIN {}FORMAT=JSON {statement}", if analyze { "ANALYZE " } else { "" });
+    let explaining = explain.statement(statement);
     let answer: String = run
         .on(connection, async {
-            run.limited(pool, left(), async { sqlx::raw_sql(setup).execute(&mut *conn).await.map_err(AppError::MySql) }).await?;
-            run.limited(pool, left(), async { sqlx::query_scalar(sqlx::AssertSqlSafe(explain)).fetch_one(&mut *conn).await.map_err(AppError::MySql) }).await
+            if let Some(setup) = explain.setup() {
+                run.limited(pool, left(), async { sqlx::raw_sql(setup).execute(&mut *conn).await.map_err(AppError::MySql) }).await?;
+            }
+            run.limited(pool, left(), async { sqlx::query_scalar(sqlx::AssertSqlSafe(explaining)).fetch_one(&mut *conn).await.map_err(AppError::MySql) }).await
         })
         .await?;
     plan(answer)

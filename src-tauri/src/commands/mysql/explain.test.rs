@@ -1,4 +1,4 @@
-use super::{only_reads, plan, plans_in_json_v2};
+use super::{only_reads, plan, Explain};
 use crate::error::AppError;
 
 #[test]
@@ -49,13 +49,32 @@ fn sql_sqlparser_cannot_read_does_not_only_read() {
 }
 
 #[test]
-fn json_plans_with_iterators_arrive_in_mysql_8_3() {
-    assert!(plans_in_json_v2("8.4.13"));
-    assert!(plans_in_json_v2("8.3.0-log"));
-    assert!(plans_in_json_v2("9.1.0"));
-    assert!(!plans_in_json_v2("8.0.36"));
-    assert!(!plans_in_json_v2("8.2.0"));
-    assert!(!plans_in_json_v2("not a version"));
+fn mysql_8_3_and_later_explain_in_the_second_json_version_and_analyze_a_read() {
+    assert_eq!(Explain::of("8.4.13", true), Explain::Iterators { analyze: true });
+    assert_eq!(Explain::of("8.3.0-log", false), Explain::Iterators { analyze: false });
+    assert_eq!(Explain::of("9.1.0", true), Explain::Iterators { analyze: true });
+}
+
+#[test]
+fn older_servers_explain_in_the_classic_json_without_running() {
+    for version in ["8.2.0", "8.0.46", "5.7.44-log", "not a version"] {
+        assert_eq!(Explain::of(version, false), Explain::Classic, "{version}");
+    }
+}
+
+#[test]
+fn each_way_of_explaining_readies_the_session_it_needs() {
+    assert_eq!(Explain::Iterators { analyze: true }.setup(), Some("SET SESSION explain_json_format_version = 2; START TRANSACTION READ ONLY"));
+    assert_eq!(Explain::Iterators { analyze: false }.setup(), Some("SET SESSION explain_json_format_version = 2"));
+    assert_eq!(Explain::Classic.setup(), None);
+}
+
+#[test]
+fn each_way_of_explaining_asks_for_its_own_format() {
+    let statement = "SELECT `ü` FROM `a b`";
+    assert_eq!(Explain::Iterators { analyze: true }.statement(statement), "EXPLAIN ANALYZE FORMAT=JSON SELECT `ü` FROM `a b`");
+    assert_eq!(Explain::Iterators { analyze: false }.statement(statement), "EXPLAIN FORMAT=JSON SELECT `ü` FROM `a b`");
+    assert_eq!(Explain::Classic.statement(statement), "EXPLAIN FORMAT=JSON SELECT `ü` FROM `a b`");
 }
 
 #[test]
