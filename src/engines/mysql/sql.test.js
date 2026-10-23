@@ -114,9 +114,16 @@ describe('api', () => {
   })
 
   it('says what is not available yet rather than calling a command that does not exist', async () => {
-    await expect(api.runQuery('c1', 'SELECT 1')).rejects.toEqual({ code: 'not_available', message: "Running SQL isn't available for MySQL yet." })
-    await expect(api.beginTransaction('c1', 'tx')).rejects.toMatchObject({ message: "Running SQL isn't available for MySQL yet." })
+    await expect(api.explainQuery('c1', 'SELECT 1')).rejects.toEqual({ code: 'not_available', message: "Explain isn't available for MySQL yet." })
+    await expect(api.pushHistory('c1', 'SELECT 1')).rejects.toMatchObject({ message: "Query history isn't available for MySQL yet." })
     expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('runs SQL through MySQL\'s own command', async () => {
+    invoke.mockResolvedValue([{ columns: ['VERSION()'], rows: [['8.4.13']], truncated: false, elapsedMs: 1, rowsAffected: null }])
+    const { rows } = await api.runQuery('c1', dialect.serverSql)
+    expect(rows).toEqual([['8.4.13']])
+    expect(invoke).toHaveBeenCalledWith('run_mysql_query', expect.objectContaining({ id: 'c1', sql: dialect.serverSql }))
   })
 
   it('saves a table\'s changes in one command, by the table\'s database', async () => {

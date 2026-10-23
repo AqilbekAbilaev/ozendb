@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { browseTable, countTable } from './queries'
+import { browseTable, countTable, runQuery, cancelQuery, beginTransaction, commitTransaction, rollbackTransaction, formatQuery } from './queries'
 
 const target = { connectionId: 'c1', database: 'shop `2024` ü', table: 'order items' }
 
@@ -31,5 +31,36 @@ describe('MySQL queries', () => {
     expect(invoke).toHaveBeenCalledWith('count_mysql_table', {
       id: 'c1', database: 'shop `2024` ü', table: 'order items', filters: [{ table: 0, column: 'qty', op: 'isNull' }],
     })
+  })
+})
+
+describe('running MySQL SQL', () => {
+  it('runs a script in the run\'s transaction and database, answering with its last result', async () => {
+    const statements = [
+      { columns: [], rows: [], truncated: false, elapsedMs: 1, rowsAffected: 2 },
+      { columns: ['ü'], rows: [['a']], truncated: false, elapsedMs: 3, rowsAffected: null },
+    ]
+    invoke.mockResolvedValue(statements)
+    expect(await runQuery('c1', 'UPDATE t SET a = 1; SELECT 1', 'run 1', 'tx 1', 'shop `2024` ü')).toEqual({ ...statements[1], statements })
+    expect(invoke).toHaveBeenCalledWith('run_mysql_query', { id: 'c1', sql: 'UPDATE t SET a = 1; SELECT 1', runId: 'run 1', txId: 'tx 1', database: 'shop `2024` ü' })
+  })
+
+  it('cancels a run by its id', async () => {
+    await cancelQuery('c1', 'run 1')
+    expect(invoke).toHaveBeenCalledWith('cancel_mysql_query', { id: 'c1', runId: 'run 1' })
+  })
+
+  it('begins, commits and rolls back a held transaction', async () => {
+    await beginTransaction('c1', 'tx 1', 'shop `2024` ü')
+    expect(invoke).toHaveBeenCalledWith('begin_mysql_transaction', { id: 'c1', txId: 'tx 1', database: 'shop `2024` ü' })
+    await commitTransaction('tx 1')
+    expect(invoke).toHaveBeenCalledWith('commit_mysql_transaction', { txId: 'tx 1' })
+    await rollbackTransaction('tx 2')
+    expect(invoke).toHaveBeenCalledWith('rollback_mysql_transaction', { txId: 'tx 2' })
+  })
+
+  it('formats SQL', async () => {
+    await formatQuery('select 1')
+    expect(invoke).toHaveBeenCalledWith('format_mysql_sql', { sql: 'select 1' })
   })
 })

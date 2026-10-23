@@ -52,30 +52,29 @@ export const api = Object.freeze({
   listColumns: (target) => resources.listColumns(inDatabase(target)),
   // TODO #392: the foreign keys a join is offered on.
   listForeignKeys: notYet('Joining tables'),
-  // TODO #391: running SQL, which the table tab's SQL mode, Explain, status line and
-  // query library share with the SQL tab.
-  runQuery: notYet('Running SQL'),
-  cancelQuery: notYet('Running SQL'),
+  runQuery: queries.runQuery,
+  cancelQuery: queries.cancelQuery,
+  // TODO #393: Explain.
   explainQuery: notYet('Explain'),
-  formatQuery: notYet('Formatting SQL'),
+  formatQuery: queries.formatQuery,
   readTableSelect: notYet('Reading SQL back into filters'),
+  // TODO #397: the query library, history and saved queries.
   pushHistory: notYet('Query history'),
   listHistory: notYet('Query history'),
   clearHistory: notYet('Query history'),
   listSaved: notYet('Saved queries'),
   saveQuery: notYet('Saved queries'),
   deleteSaved: notYet('Saved queries'),
-  // SQL mode's transactions (runSql.js), part of running SQL.
-  beginTransaction: notYet('Running SQL'),
-  commitTransaction: notYet('Running SQL'),
-  rollbackTransaction: notYet('Running SQL'),
+  beginTransaction: queries.beginTransaction,
+  commitTransaction: queries.commitTransaction,
+  rollbackTransaction: queries.rollbackTransaction,
   saveRows: (target, changes) => queries.saveRows(inDatabase(target), changes),
 })
 
 export const mysqlSql = Object.freeze({
   dialect,
   api,
-  // TODO #391: an Explain reader (readPlan) and an export window. TODO #417:
+  // TODO #393: an Explain reader (readPlan). TODO #396: an export window. TODO #417:
   // a row-history window, once saves record history.
   modals: Object.freeze({}),
 })

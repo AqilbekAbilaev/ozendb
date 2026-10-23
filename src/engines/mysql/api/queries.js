@@ -1,5 +1,5 @@
-// Reading a table's rows. Results come back as `{ columns, rows, truncated, elapsedMs }`,
-// each row an array aligned to `columns`.
+// Running SQL and reading a table's rows. Results come back as
+// `{ columns, rows, truncated, elapsedMs }`, each row an array aligned to `columns`.
 
 import { invoke } from '@tauri-apps/api/core'
 
@@ -19,4 +19,37 @@ export function countTable({ connectionId, database, table }, filters = []) {
 // inside one command: any failure, or a row changed since it was loaded, saves none.
 export function saveRows({ connectionId, database, table }, changes) {
   return invoke('save_mysql_rows', { id: connectionId, database, table, changes })
+}
+
+// Runs a script, its statements one after another. `runId` names the run so cancelQuery
+// can stop it; `txId` runs it in a transaction held open by beginTransaction;
+// `database`, when given, is the one the session starts in. Resolves to the last
+// statement's result, with every statement's in `statements`.
+export async function runQuery(connectionId, sql, runId = null, txId = null, database = null) {
+  const statements = await invoke('run_mysql_query', { id: connectionId, sql, runId, txId, database })
+  return { ...statements.at(-1), statements }
+}
+
+export function cancelQuery(connectionId, runId) {
+  return invoke('cancel_mysql_query', { id: connectionId, runId })
+}
+
+// Manual mode: a transaction held open on its own session, under an id the caller
+// picks, until committed or rolled back. `database` as in `runQuery`.
+export function beginTransaction(connectionId, txId, database = null) {
+  return invoke('begin_mysql_transaction', { id: connectionId, txId, database })
+}
+
+export function commitTransaction(txId) {
+  return invoke('commit_mysql_transaction', { txId })
+}
+
+export function rollbackTransaction(txId) {
+  return invoke('rollback_mysql_transaction', { txId })
+}
+
+// The SQL laid out one clause per line; refused (with why) for SQL it can't read, or
+// that formatting would change.
+export function formatQuery(sql) {
+  return invoke('format_mysql_sql', { sql })
 }

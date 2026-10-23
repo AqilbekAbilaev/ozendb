@@ -240,6 +240,14 @@ export function openMySqlTable({ resource, connectionName }) {
   activateTab(tab.id)
 }
 
+// A SQL editor in the database of a MySQL row (any database or table row, or the
+// connection's for its own row); a new tab every time.
+export function openMySqlQuery({ resource, connectionName }) {
+  const tab = newWorkspace('mysql.query', { target: { resource, connectionName } })
+  tabs.value.push(tab)
+  activateTab(tab.id)
+}
+
 // Search in Schema, a new tab every time, as MongoDB's Search in… is (#180).
 export function openPostgresSearch({ connectionId, connectionName, database, schema }) {
   const tab = newWorkspace('postgresql.search', {

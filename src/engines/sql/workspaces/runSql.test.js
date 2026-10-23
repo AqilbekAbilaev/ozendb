@@ -107,6 +107,18 @@ describe('runSql', () => {
     expect(t.messages.map(m => m.text)).toEqual(['1 row affected', '3 rows affected'])
   })
 
+  it('logs a line for each statement of a script and keeps the last one\'s result', async () => {
+    const statements = [
+      { columns: [], rows: [], truncated: false, elapsedMs: 3, rowsAffected: 2 },
+      { columns: ['Straße ü'], rows: [[1]], truncated: false, elapsedMs: 5, rowsAffected: null },
+    ]
+    runQuery.mockResolvedValueOnce({ ...statements[1], statements })
+    const t = newRun()
+    await runSql(t, 'UPDATE t SET a = 1; SELECT 1')
+    expect(t.messages.map(m => [m.text, m.ms])).toEqual([['2 rows affected', 3], ['SELECT 1', 5]])
+    expect(t.result.rows).toEqual([[1]])
+  })
+
   it('cancels the run in flight by its id, and does nothing once it has ended', async () => {
     let finish
     runQuery.mockImplementation(() => new Promise((resolve, reject) => { finish = reject }))
