@@ -59,9 +59,9 @@ export function rollbackTransaction(txId) {
   return invoke('rollback_mysql_transaction', { txId })
 }
 
-// The plan MySQL chose for one statement, as EXPLAIN FORMAT=JSON's second version: run
-// with ANALYZE, adding real rows and times, when it only reads. `runId` and `database` as
-// in `runQuery`.
+// The plan MySQL chose for one statement, as workspaces/planRows.js reads it: run with
+// ANALYZE, adding real rows and times, when it only reads and the server is 8.0.18 or
+// later. `runId` and `database` as in `runQuery`.
 export function explainQuery(connectionId, sql, runId = null, database = null) {
   return invoke('explain_mysql_query', { id: connectionId, sql, runId, database })
 }
