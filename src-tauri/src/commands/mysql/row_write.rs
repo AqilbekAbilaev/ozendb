@@ -211,7 +211,7 @@ pub(crate) async fn mysql_save_rows(pool: &MySqlPool, database: &str, table: &st
 
 /// Saves a table tab's staged rows (see the note at the top). A read-only connection is
 /// refused here, and by the server for any SQL (mysql/session.rs).
-// TODO (follow-up to #390, issue not yet filed): record each edit's row history, as
+// TODO #417: record each edit's row history, as
 // update_pg_row does, from the `before` values the tab sends with every update.
 #[tauri::command]
 pub async fn save_mysql_rows(
