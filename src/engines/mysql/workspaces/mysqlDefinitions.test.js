@@ -55,6 +55,15 @@ describe('mysql.table_browse', () => {
     expect(t.server.value).toEqual({ version: '8.4.13', encoding: 'utf8mb4' })
   })
 
+  it('writes its filters\' values in SQL mode as the backend\'s filter reads them', async () => {
+    const created = opened()
+    const tab = reactive({ ...created.fields, target: created.target, engine: 'mysql' })
+    const t = useSqlTable(tab, { readOnly: false })
+    await t.load()
+    tab.state.query.filters = [{ key: 'id', op: 'gte', value: '18446744073709551615' }, { key: 'note', op: 'eq', value: '5' }]
+    expect(t.currentSql.value).toBe('SELECT *\nFROM `shop ``2024`` ü`.`order items`\nWHERE `id` >= 18446744073709551615\n  AND `note` = \'5\'\nORDER BY `id` ASC\nLIMIT 100;')
+  })
+
   it('saves an edited cell by its row\'s primary key, in the table\'s database', async () => {
     const created = opened()
     const tab = reactive({ ...created.fields, target: created.target, engine: 'mysql' })

@@ -23,6 +23,10 @@ export const dialect = Object.freeze({
   quoteText: (text) => `'${text.replaceAll("'", "''")}'`,
   // `pattern` is a LIKE pattern, escaped with backslashes — ILIKE's default escape.
   like: (column, pattern) => `${column}::text ILIKE ${dialect.quoteText(pattern)}`,
+  // A filter's value in a comparison, and the text a contains or starts-with matches:
+  // as typed, since PostgreSQL reads a quoted value as the column's own type.
+  filterLiteral: (value) => dialect.quoteText(value),
+  filterText: (value) => value,
   // An enum column (one listing its labels) is its own kind, whatever its type's name.
   cellKind(dataType, enumValues) {
     if (enumValues?.length) return 'enum'

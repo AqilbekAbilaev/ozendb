@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildSelectSql } from './buildSelectSql.js'
 import { dialect } from '../../postgresql/sql.js'
+import { dialect as mysql } from '../../mysql/sql.js'
 
 const col = (column, table = 0) => ({ table, column })
 const base = { schema: 'public', table: 'users', filters: [], orderBy: [], descending: false, limit: 100, offset: 0 }
@@ -32,6 +33,31 @@ describe('buildSelectSql', () => {
       '  AND "mcc" IN (\'5411\', \'5812\')',
       'LIMIT 100;',
     ].join('\n'))
+  })
+
+  it('writes each value as the dialect reads its column\'s type', () => {
+    const filters = [
+      { column: 'flag ü', op: 'eq', value: 'true', dataType: 'tinyint(1)' },
+      { column: 'amount', op: 'in', value: '1.5, 2e1', dataType: 'decimal(10,2)' },
+      { column: 'at', op: 'gt', value: '2024-01-01 05:00:00+05:00', dataType: 'timestamp' },
+      { column: 'at', op: 'contains', value: '2024-01-01 05:00:00+05:00', dataType: 'timestamp' },
+      { column: 'note', op: 'ne', value: '5', dataType: 'text' },
+    ]
+    expect(buildSelectSql(mysql, { ...base, schema: 'shop', filters })).toBe([
+      'SELECT *',
+      'FROM `shop`.`users`',
+      'WHERE `flag ü` = 1',
+      '  AND `amount` IN (1.5, 20)',
+      "  AND `at` > '2024-01-01 00:00:00'",
+      "  AND CONVERT(`at` USING utf8mb4) COLLATE utf8mb4_general_ci LIKE '%2024-01-01 00:00:00%'",
+      "  AND `note` <> '5'",
+      'LIMIT 100;',
+    ].join('\n'))
+  })
+
+  it('writes PostgreSQL\'s values quoted whatever their type', () => {
+    const filters = [{ column: 'ok', op: 'eq', value: 'true', dataType: 'boolean' }, { column: 'n', op: 'in', value: '1, 2', dataType: 'numeric' }]
+    expect(buildSelectSql(dialect, { ...base, filters })).toBe('SELECT *\nFROM "public"."users"\nWHERE "ok" = \'true\'\n  AND "n" IN (\'1\', \'2\')\nLIMIT 100;')
   })
 
   it('orders every sort column in the one direction, and pages with OFFSET', () => {
