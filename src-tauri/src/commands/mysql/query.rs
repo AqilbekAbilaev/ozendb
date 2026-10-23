@@ -15,7 +15,7 @@ use super::transaction::MySqlTransactions;
 use super::AppContext;
 use crate::commands::sql::format::format_sql;
 use crate::commands::sql::{SqlQueryResult, ROW_RESULT_CAP};
-use crate::error::AppError;
+use crate::error::{mysql_number, AppError};
 use crate::mysql::session::{QUERY_TIME_LIMIT, READ_ONLY_LOCK};
 
 /// What MySQL answers a statement it can't prepare with, such as USE or LOCK TABLES.
@@ -23,13 +23,6 @@ const NOT_PREPARABLE: u16 = 1295;
 
 /// A deadlock, after which MySQL has rolled the statement's whole transaction back.
 const DEADLOCK: u16 = 1213;
-
-fn number(e: &sqlx::Error) -> Option<u16> {
-    match e {
-        sqlx::Error::Database(e) => e.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>().map(|e| e.number()),
-        _ => None,
-    }
-}
 
 /// One statement. It is prepared, so its cells arrive in the binary form cell.rs reads
 /// and a query that returns no rows still names its columns. A CALL names them only in
@@ -44,7 +37,7 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<Sq
     let elapsed_ms = || started.elapsed().as_millis() as u64;
     let prepared = match (&mut *conn).prepare(sqlx::AssertSqlSafe(sql.to_string()).into_sql_str()).await {
         Ok(prepared) => prepared,
-        Err(e) if number(&e) == Some(NOT_PREPARABLE) => {
+        Err(e) if mysql_number(&e) == Some(NOT_PREPARABLE) => {
             let done = sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string())).execute(&mut *conn).await.map_err(AppError::MySql)?;
             return Ok(SqlQueryResult { columns: Vec::new(), rows: Vec::new(), truncated: false, elapsed_ms: elapsed_ms(), rows_affected: Some(done.rows_affected()) });
         }
@@ -104,7 +97,7 @@ pub(super) async fn run_on(
                 sqlx::raw_sql(READ_ONLY_LOCK).execute(&mut *conn).await.map_err(AppError::MySql)?;
             }
             let outcome = run.limited(pool, limit, run_one(conn, statement, held)).await.map_err(|e| match e {
-                AppError::MySql(e) if held && number(&e) == Some(DEADLOCK) => AppError::RolledBack(Box::new(AppError::MySql(e))),
+                AppError::MySql(e) if held && mysql_number(&e) == Some(DEADLOCK) => AppError::RolledBack(Box::new(AppError::MySql(e))),
                 e => e,
             });
             match outcome {

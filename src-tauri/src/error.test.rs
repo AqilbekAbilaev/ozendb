@@ -148,3 +148,8 @@ fn a_rolled_back_transaction_keeps_its_cause_s_code_and_says_what_was_lost() {
         format!("{} MySQL rolled the whole transaction back, so nothing done in it is kept; the statements after this one start a new one.", sqlx::Error::PoolTimedOut),
     );
 }
+
+#[test]
+fn a_mysql_error_that_never_reached_the_server_has_no_number() {
+    assert_eq!(super::mysql_number(&sqlx::Error::PoolTimedOut), None);
+}
