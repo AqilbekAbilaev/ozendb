@@ -136,7 +136,7 @@ fn updates_a_row_found_by_its_whole_primary_key() {
 
 #[test]
 fn deletes_every_row_in_one_statement() {
-    let (sql, params) = delete(TABLE, &columns(), &[key(json!(1), "0x01"), key(json!(22), "0x")]).unwrap();
+    let [(sql, params)]: [_; 1] = delete(TABLE, &columns(), &[key(json!(1), "0x01"), key(json!(22), "0x")]).unwrap().try_into().unwrap();
     assert_eq!(
         sql,
         "DELETE FROM `shop ü`.`order ``items``` WHERE (`id ``key``` = CAST(? AS DECIMAL(1,0)) AND `region` = ?) \
@@ -176,4 +176,13 @@ fn refuses_a_value_for_a_generated_or_unknown_column() {
 fn words_a_key_that_is_not_a_number_as_a_key_not_a_filter() {
     let refused = message(matched(&info("id `key`", "bigint unsigned", true, false), &json!("abc")));
     assert_eq!(refused, "The key value for \"id `key`\" needs a number.");
+}
+
+#[test]
+fn deletes_in_statements_of_at_most_the_65535_values_mysql_binds() {
+    let rows: Vec<Vec<ColumnValue>> = (0..32_768).map(|id| key(json!(id), "0x01")).collect();
+    let statements = delete(TABLE, &columns(), &rows).unwrap();
+    let sizes: Vec<usize> = statements.iter().map(|(_, params)| params.len()).collect();
+    assert_eq!(sizes, [65_534, 2]);
+    assert!(statements[1].0.ends_with("WHERE (`id ``key``` = CAST(? AS DECIMAL(5,0)) AND `region` = ?)"));
 }
