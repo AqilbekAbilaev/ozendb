@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { dialect, api } from './sql.js'
 import { operatorsFor } from '../sql/workspaces/builderRows.js'
 
-const { quoteName, quoteText, like, filterText, readFilterText, cellKind, jsonShape, takesValue, fillsItself } = dialect
+const { quoteName, quoteText, like, filterText, readFilterText, sameColumn, cellKind, jsonShape, takesValue, fillsItself } = dialect
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -48,6 +48,13 @@ describe('readFilterText', () => {
     expect(readFilterText('2024-01-01 00:00:00', 'datetime')).toBe('2024-01-01 00:00:00')
     expect(readFilterText('59:59', 'timestamp')).toBe('59:59')
     expect(readFilterText('2024-01-01 00:00:00+05:00', 'timestamp')).toBe('2024-01-01 00:00:00+05:00')
+  })
+})
+
+describe('sameColumn', () => {
+  it('matches a column\'s name in any case, as MySQL does', () => {
+    expect(sameColumn('Straße Ü', 'STRAßE ü')).toBe(true)
+    expect(sameColumn('status', 'state')).toBe(false)
   })
 })
 

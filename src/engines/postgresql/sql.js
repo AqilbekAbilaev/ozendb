@@ -28,6 +28,8 @@ export const dialect = Object.freeze({
   filterLiteral: (value) => dialect.quoteText(value),
   filterText: (value) => value,
   readFilterText: (value) => value,
+  // The reader has already folded an unquoted name as PostgreSQL does, so names match exactly.
+  sameColumn: (name, written) => name === written,
   // An enum column (one listing its labels) is its own kind, whatever its type's name.
   cellKind(dataType, enumValues) {
     if (enumValues?.length) return 'enum'

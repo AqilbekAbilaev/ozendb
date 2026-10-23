@@ -31,6 +31,8 @@ export const dialect = Object.freeze({
   filterText,
   // A filter value read back from SQL mode's text, as its box would hold it.
   readFilterText,
+  // MySQL matches a column's name in any case, so SQL mode's `STATUS` is the column `status`.
+  sameColumn: (name, written) => name.toLowerCase() === written.toLowerCase(),
   // An enum column (one listing its labels) is its own kind, as on PostgreSQL.
   cellKind(dataType, enumValues) {
     if (enumValues?.length) return 'enum'
