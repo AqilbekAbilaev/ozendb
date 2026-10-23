@@ -85,4 +85,14 @@ describe('useMySqlTree', () => {
     expect(listTables).toHaveBeenLastCalledWith({ connectionId: 'c1', database: shop })
     expect(tree.tables.value.crm).toBeUndefined()
   })
+
+  it('forgets a table\'s column error on a refresh, as it forgets the table\'s columns', async () => {
+    listTables.mockResolvedValue([])
+    listColumns.mockRejectedValueOnce(new Error('SELECT command denied'))
+    const tree = useMySqlTree('c1')
+    await tree.toggleTable(shop, 'orders')
+    expect(tree.tableError(shop, 'orders')).toBe('SELECT command denied')
+    await tree.reloadTables()
+    expect(tree.tableError(shop, 'orders')).toBeNull()
+  })
 })

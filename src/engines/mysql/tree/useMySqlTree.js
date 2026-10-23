@@ -46,9 +46,11 @@ export function useMySqlTree(connectionId) {
   }
 
   // After a refresh: the open databases' tables are re-read, the closed ones' dropped
-  // so they're fetched fresh when next opened. Columns are re-read on next open too.
+  // so they're fetched fresh when next opened. Columns are re-read on next open too, and
+  // every error is forgotten with what it was about.
   function reloadTables() {
     tables.value = {}
+    errors.value = {}
     tableColumns.value = {}
     openTables.value = {}
     const open = Object.keys(openDatabases.value).filter(database => openDatabases.value[database])
