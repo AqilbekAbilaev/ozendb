@@ -258,8 +258,8 @@ export function useTableStage(t, connectionReadOnly) {
     return statements.join('\n\n')
   })
 
-  // Runs every pending change in one transaction: any failure rolls it back and
-  // leaves every pending change staged, untouched, to fix and retry. Success clears
+  // Saves every pending change in one transaction (the engine's saveRows): any failure
+  // rolls it back and leaves every pending change staged, untouched, to fix and retry. Success clears
   // the staged state and refreshes, so the grid shows exactly what the server has.
   async function saveChanges() {
     editError.value = null
@@ -268,28 +268,20 @@ export function useTableStage(t, connectionReadOnly) {
       editError.value = 'This tab is read-only.'
       return false
     }
-    const txId = crypto.randomUUID()
+    const pairs = (values) => Object.entries(values).map(([column, value]) => ({ column, value }))
+    const keyOf = (key) => JSON.parse(key).map((value, i) => ({ column: keyColumns.value[i], value }))
+    const changes = {
+      inserts: staged.inserts.map(draft => pairs(draft.values)),
+      updates: Object.entries(staged.edits).map(([key, edits]) => ({
+        set: Object.entries(edits).map(([column, { value }]) => ({ column, value })),
+        before: Object.entries(edits).map(([column, { original }]) => ({ column, value: original })),
+        where: keyOf(key),
+      })),
+      deletes: staged.deletedKeys.map(keyOf),
+    }
     try {
-      await api.beginTransaction(target.connectionId, txId)
-      for (const draft of staged.inserts) {
-        const affected = await api.insertRow(target, Object.entries(draft.values).map(([column, value]) => ({ column, value })), txId)
-        if (affected !== 1) throw new Error('An insert failed unexpectedly.')
-      }
-      for (const [key, edits] of Object.entries(staged.edits)) {
-        const where = JSON.parse(key).map((value, i) => ({ column: keyColumns.value[i], value }))
-        const set = Object.entries(edits).map(([column, { value }]) => ({ column, value }))
-        const before = Object.entries(edits).map(([column, { original }]) => ({ column, value: original }))
-        const affected = await api.updateRow(target, set, before, where, txId)
-        if (affected !== 1) throw new Error('A row changed or was deleted since it was loaded.')
-      }
-      if (staged.deletedKeys.length) {
-        const rows = staged.deletedKeys.map(key => JSON.parse(key).map((value, i) => ({ column: keyColumns.value[i], value })))
-        const affected = await api.deleteRows(target, rows, txId)
-        if (affected !== staged.deletedKeys.length) throw new Error('Some rows changed or were already deleted since they were loaded.')
-      }
-      await api.commitTransaction(txId)
+      await api.saveRows(target, changes)
     } catch (e) {
-      await api.rollbackTransaction(txId).catch(() => {})
       editError.value = errMessage(e)
       return false
     }
