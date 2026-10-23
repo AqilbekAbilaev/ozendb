@@ -20,6 +20,8 @@ fn reads_dates_and_date_times_at_every_length() {
 fn marks_a_timestamp_as_utc_but_not_the_zero_date() {
     assert_eq!(date_time(&[7, 0xE8, 0x07, 2, 29, 13, 14, 15], Some(0), UTC), Some(json!("2024-02-29 13:14:15+00:00")));
     assert_eq!(date_time(&[0], Some(3), UTC), Some(json!("0000-00-00 00:00:00.000")));
+    assert_eq!(date_time(&[4, 0, 0, 0, 0], Some(0), UTC), Some(json!("0000-00-00 00:00:00")));
+    assert_eq!(date_time(&[4, 0, 0, 1, 1], Some(0), UTC), Some(json!("0000-01-01 00:00:00+00:00")));
 }
 
 #[test]
