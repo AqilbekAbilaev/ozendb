@@ -1,7 +1,7 @@
 //! The bytes MySQL's binary protocol sends for a date or a BIT, read by hand, and the
 //! rules each type's text follows. Every other type is decoded by sqlx, whose values
 //! can't be built outside it, so those cases are in the live tests (live_tests/mysql_browse.rs).
-use super::{bits, boolean, date, date_time, digits, fraction, hex, is_text_type, timestamp};
+use super::{bits, boolean, date, date_time, digits, fraction, hex, timestamp};
 use chrono::FixedOffset;
 use serde_json::json;
 
@@ -77,14 +77,4 @@ fn shows_a_tinyint_1_as_a_boolean_only_when_it_holds_0_or_1() {
 fn shows_bytes_as_upper_case_hex() {
     assert_eq!(hex(&[0x00, 0xFF]), json!("0x00FF"));
     assert_eq!(hex(&[]), json!("0x"));
-}
-
-#[test]
-fn tells_a_text_column_type_from_a_binary_one() {
-    assert!(is_text_type("varchar(10)"));
-    assert!(is_text_type("text"));
-    assert!(is_text_type("enum('a','b')"));
-    assert!(!is_text_type("varbinary(10)"));
-    assert!(!is_text_type("longblob"));
-    assert!(!is_text_type("textual"));
 }

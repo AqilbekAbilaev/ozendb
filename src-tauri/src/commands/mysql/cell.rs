@@ -15,9 +15,10 @@ const SAFE_INTEGER: i128 = (1 << 53) - 1;
 const INTEGERS: [&str; 5] = ["TINYINT", "SMALLINT", "MEDIUMINT", "INT", "BIGINT"];
 
 /// One cell as every prepared `sqlx::query` reads it. `declared` is the table column's
-/// own `COLUMN_TYPE`, when the cell comes from a table: sqlx names a text column with a
-/// binary collation (`utf8mb4_bin`) VARBINARY or BLOB, and doesn't say how many fraction
-/// digits a time keeps. Binary strings,
+/// own `COLUMN_TYPE`, when the cell comes from a table: sqlx doesn't say how many fraction
+/// digits a time keeps. It does name a text column with a binary collation (`utf8mb4_bin`)
+/// VARBINARY or BLOB, so text is told from bytes by the column's character set, which is
+/// `binary` only for bytes. Binary strings,
 /// GEOMETRY and any value that can't be read show as MySQL's own hex literal: exact to
 /// the byte, where text would hide which bytes they are. A geometry's text (WKT) would
 /// need `ST_AsText` in the SELECT.
@@ -27,14 +28,16 @@ pub(crate) fn cell(value: MySqlValueRef<'_>, declared: Option<&str>) -> Value {
     let protocol = value.type_info().into_owned();
     // sqlx names TINYINT(1) BOOLEAN whatever its sign, so the sign is read off the column's flags.
     let unsigned = <u64 as sqlx::Type<MySql>>::compatible(&protocol);
-    read(protocol.name(), unsigned, declared, value).unwrap_or_else(|| hex(bytes))
+    // sqlx keeps the character set to itself, but reads a string only from one that isn't `binary`.
+    let text = <str as sqlx::Type<MySql>>::compatible(&protocol);
+    read(protocol.name(), unsigned, text, declared, value).unwrap_or_else(|| hex(bytes))
 }
 
 fn decode<'r, T: Decode<'r, MySql>>(value: MySqlValueRef<'r>) -> Option<T> {
     T::decode(value).ok()
 }
 
-fn read(protocol: &str, unsigned: bool, declared: Option<&str>, value: MySqlValueRef<'_>) -> Option<Value> {
+fn read(protocol: &str, unsigned: bool, text: bool, declared: Option<&str>, value: MySqlValueRef<'_>) -> Option<Value> {
     let name = protocol.strip_suffix(" UNSIGNED").unwrap_or(protocol);
     match name {
         "BOOLEAN" => integer(value, unsigned).map(boolean),
@@ -50,17 +53,9 @@ fn read(protocol: &str, unsigned: bool, declared: Option<&str>, value: MySqlValu
         "TIMESTAMP" => timestamp(decode(value)?, digits(declared), &chrono::Local),
         "TIME" => decode(value).map(|span| time(span, digits(declared))),
         "JSON" => decode::<Json<Value>>(value).map(|json| json.0),
-        "BINARY" | "VARBINARY" | "TINYBLOB" | "BLOB" | "MEDIUMBLOB" | "LONGBLOB" if declared.is_some_and(is_text_type) => {
-            decode(value).map(Value::String)
-        }
+        "BINARY" | "VARBINARY" | "TINYBLOB" | "BLOB" | "MEDIUMBLOB" | "LONGBLOB" if text => decode(value).map(Value::String),
         _ => None,
     }
-}
-
-fn is_text_type(declared: &str) -> bool {
-    ["char", "varchar", "tinytext", "text", "mediumtext", "longtext", "enum", "set"]
-        .iter()
-        .any(|text| declared.strip_prefix(text).is_some_and(|rest| rest.is_empty() || rest.starts_with([' ', '('])))
 }
 
 fn integer(value: MySqlValueRef<'_>, unsigned: bool) -> Option<Value> {
