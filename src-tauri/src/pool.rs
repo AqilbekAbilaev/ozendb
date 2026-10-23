@@ -2,11 +2,12 @@ use crate::error::AppError;
 use crate::known_hosts::KnownHostsStore;
 use crate::postgres::uri as pg_uri;
 use crate::ssh::{self, HostKeyPrompts, SshAuth, SshParams, SshTunnel};
+use crate::mysql::session as mysql_session;
 use crate::mysql::uri as mysql_uri;
 use crate::storage::{ConnectionConfig, Engine, MongoConfig, MySqlConfig, PostgresConfig, SshAuthMethod};
 use crate::uri;
 use mongodb::Client;
-use sqlx::mysql::MySqlConnectOptions;
+use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::postgres::PgConnectOptions;
 use sqlx::{MySqlPool, PgPool};
 use std::collections::HashMap;
@@ -145,17 +146,23 @@ impl<R: Runtime> ConnectionPool<R> {
         self.mysql_pools.lock().await.retain(|(cid, _), _| cid != id);
     }
 
-    /// MySQL sibling of `get_or_create_postgres`.
+    /// MySQL sibling of `get_or_create_postgres`. Each new connection is prepared
+    /// (`mysql::session`) before the pool hands it out.
     async fn get_or_create_mysql(
         &self,
         id: &str,
         database: &str,
         options: MySqlConnectOptions,
+        read_only: bool,
     ) -> Result<MySqlPool, AppError> {
         if let Some(pool) = self.get_mysql(id, database).await {
             return Ok(pool);
         }
-        let pool = MySqlPool::connect_with(options).await.map_err(AppError::MySql)?;
+        let pool = MySqlPoolOptions::new()
+            .after_connect(move |connection, _| Box::pin(mysql_session::prepare(connection, read_only)))
+            .connect_with(options)
+            .await
+            .map_err(AppError::MySql)?;
         let mut map = self.mysql_pools.lock().await;
         Ok(map.entry((id.to_string(), database.to_string())).or_insert(pool).clone())
     }
@@ -246,7 +253,7 @@ impl<R: Runtime> ConnectionPool<R> {
         }
         let password = crate::keychain::get(&config.id);
         let options = mysql_uri::build_options(config, password.as_deref(), database, via)?;
-        self.get_or_create_mysql(&config.id, database, options).await
+        self.get_or_create_mysql(&config.id, database, options, config.read_only).await
     }
 
     /// Returns the cached SSH tunnel for `config`, establishing one if needed.
