@@ -21,7 +21,7 @@ fn row(pairs: &[(&str, Value)]) -> Value {
 }
 
 async fn page(pool: &MySqlPool, database: &str, table: &str) -> Vec<Vec<Value>> {
-    mysql_browse(pool, database, table, &[], None, false, 10, 0).await.unwrap().rows
+    mysql_browse(pool, database, table, &[], &[], None, false, 10, 0).await.unwrap().rows
 }
 
 fn refusal(result: Result<(), AppError>) -> String {
@@ -33,7 +33,7 @@ async fn every_type_saves_back_exactly_what_the_grid_shows() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let name = "ozendb it save ведомость types";
     let pool = seeded(&config, name).await;
-    let columns = mysql_browse(&pool, name, TABLE, &[], None, false, 1, 0).await.unwrap().columns;
+    let columns = mysql_browse(&pool, name, TABLE, &[], &[], None, false, 1, 0).await.unwrap().columns;
     let before = page(&pool, name, TABLE).await;
     let shown = before.iter().find(|r| r[0] == json!("18446744073709551615")).unwrap().clone();
     let pairs = |from: usize| columns.iter().zip(&shown).skip(from).map(|(c, v)| (c.as_str(), v.clone())).collect::<Vec<_>>();

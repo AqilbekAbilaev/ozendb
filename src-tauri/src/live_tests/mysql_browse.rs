@@ -1,7 +1,7 @@
 //! Live tests of the MySQL table tab's page and count, against the server `mysql.rs` describes.
 
 use super::mysql::{connect, password, run, shown_at, test_config, SKIP};
-use crate::commands::sql::{ColumnFilter, FilterOp};
+use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp};
 use crate::commands::{mysql_browse, mysql_count};
 use crate::mysql::session::prepare;
 use crate::mysql::uri::build_options;
@@ -64,7 +64,7 @@ fn filter(column: &str, op: FilterOp, value: Option<&str>) -> ColumnFilter {
 
 /// The primary keys `filters` keep, in key order.
 async fn keys(pool: &MySqlPool, name: &str, filters: &[ColumnFilter]) -> Vec<Value> {
-    let page = mysql_browse(pool, name, TABLE, filters, None, false, 10, 0).await.unwrap();
+    let page = mysql_browse(pool, name, TABLE, &[], filters, None, false, 10, 0).await.unwrap();
     page.rows.into_iter().map(|row| row[0].clone()).collect()
 }
 
@@ -73,7 +73,7 @@ async fn every_common_type_reads_as_the_grid_shows_it() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let name = "ozendb it browse ведомость types";
     let pool = seeded(&config, name).await;
-    let page = mysql_browse(&pool, name, TABLE, &[], None, true, 1, 0).await.unwrap();
+    let page = mysql_browse(&pool, name, TABLE, &[], &[], None, true, 1, 0).await.unwrap();
     assert_eq!(page.columns[0], "id key");
     assert_eq!(page.columns[6], "name `x`");
     assert_eq!(
@@ -97,7 +97,8 @@ async fn pages_follow_the_primary_key_or_the_chosen_column() {
     let page = |order: Option<&'static str>, descending, offset| {
         let pool = pool.clone();
         async move {
-            let page = mysql_browse(&pool, name, TABLE, &[], order, descending, 2, offset).await.unwrap();
+            let order = order.map(|column: &str| ColumnRef { table: 0, column: column.into() });
+            let page = mysql_browse(&pool, name, TABLE, &[], &[], order.as_ref(), descending, 2, offset).await.unwrap();
             page.rows.into_iter().map(|row| row[0].clone()).collect::<Vec<_>>()
         }
     };
@@ -105,7 +106,7 @@ async fn pages_follow_the_primary_key_or_the_chosen_column() {
     assert_eq!(page(None, false, 2).await, [json!("18446744073709551615")]);
     // A binary collation sorts by byte: lower case after upper.
     assert_eq!(page(Some("name `x`"), true, 0).await, [json!(2), json!("18446744073709551615")]);
-    let empty = mysql_browse(&pool, name, TABLE, &[filter("small", FilterOp::Gt, Some("100"))], None, false, 2, 0).await.unwrap();
+    let empty = mysql_browse(&pool, name, TABLE, &[], &[filter("small", FilterOp::Gt, Some("100"))], None, false, 2, 0).await.unwrap();
     assert_eq!(empty.columns.len(), 19);
     assert!(empty.rows.is_empty());
     drop_seeded(&config, pool, name).await;
@@ -136,9 +137,9 @@ async fn each_filter_keeps_the_rows_it_names_and_the_count_agrees() {
         let label = format!("{f:?}");
         let filters = [f];
         assert_eq!(keys(&pool, name, &filters).await, expected, "{label}");
-        assert_eq!(mysql_count(&pool, name, TABLE, &filters).await.unwrap(), expected.len() as i64, "{label}");
+        assert_eq!(mysql_count(&pool, name, TABLE, &[], &filters).await.unwrap(), expected.len() as i64, "{label}");
     }
-    assert_eq!(mysql_count(&pool, name, TABLE, &[]).await.unwrap(), 3);
+    assert_eq!(mysql_count(&pool, name, TABLE, &[], &[]).await.unwrap(), 3);
     drop_seeded(&config, pool, name).await;
 }
 
@@ -147,7 +148,7 @@ async fn a_timestamp_filters_on_the_text_the_grid_shows() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let name = "ozendb it browse ведомость stamp";
     let pool = seeded(&config, name).await;
-    let page = mysql_browse(&pool, name, TABLE, &[], None, true, 1, 0).await.unwrap();
+    let page = mysql_browse(&pool, name, TABLE, &[], &[], None, true, 1, 0).await.unwrap();
     let shown = page.rows[0][10].as_str().unwrap().to_string();
     assert_eq!(shown, shown_at("2024-01-01 00:00:00"));
     for op in [FilterOp::Eq, FilterOp::Contains, FilterOp::StartsWith, FilterOp::In] {
@@ -192,7 +193,7 @@ async fn every_type_reads_exactly_at_its_edges() {
         run(&mut admin, &statement).await;
     }
     let pool = pool(&config).await;
-    let page = mysql_browse(&pool, name, "edge `cases` ü", &[], None, false, 10, 0).await.unwrap();
+    let page = mysql_browse(&pool, name, "edge `cases` ü", &[], &[], None, false, 10, 0).await.unwrap();
     let null = Value::Null;
     assert_eq!(
         page.rows[0],
@@ -281,10 +282,10 @@ async fn filters_compare_booleans_bits_and_decimals_exactly_at_their_edges() {
     for (f, expected) in cases {
         let label = format!("{f:?}");
         let filters = [f];
-        let page = mysql_browse(&pool, name, "exact `filters` ü", &filters, None, false, 10, 0).await.unwrap();
+        let page = mysql_browse(&pool, name, "exact `filters` ü", &[], &filters, None, false, 10, 0).await.unwrap();
         let ids: Vec<Value> = page.rows.into_iter().map(|row| row[0].clone()).collect();
         assert_eq!(ids, expected.iter().map(|&id| json!(id)).collect::<Vec<_>>(), "{label}");
-        assert_eq!(mysql_count(&pool, name, "exact `filters` ü", &filters).await.unwrap(), expected.len() as i64, "{label}");
+        assert_eq!(mysql_count(&pool, name, "exact `filters` ü", &[], &filters).await.unwrap(), expected.len() as i64, "{label}");
     }
     pool.close().await;
     run(&mut admin, &format!("DROP DATABASE {database}")).await;

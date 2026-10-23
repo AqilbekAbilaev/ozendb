@@ -1,6 +1,6 @@
-use super::{decimal, in_utc, order_clause, where_clause};
+use super::{decimal, from_clause, in_utc, order_clause, where_clause};
 use crate::commands::mysql::MySqlColumnInfo;
-use crate::commands::sql::{ColumnFilter, FilterOp};
+use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, JoinOn, TableJoin};
 use crate::error::AppError;
 
 fn columns() -> Vec<MySqlColumnInfo> {
@@ -25,7 +25,7 @@ fn filter(column: &str, op: FilterOp, value: Option<&str>) -> ColumnFilter {
 }
 
 fn clause(filters: &[ColumnFilter]) -> (String, Vec<String>) {
-    where_clause(filters, &columns()).unwrap()
+    where_clause(filters, &[columns()]).unwrap()
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn compares_exact_numbers_as_the_smallest_decimal_that_holds_the_value() {
     ]);
     assert_eq!(
         sql,
-        " WHERE `id ``key``` >= CAST(? AS DECIMAL(20,0)) AND `price €` < CAST(? AS DECIMAL(4,3)) AND `bits` = CAST(? AS DECIMAL(1,0))"
+        " WHERE `t0`.`id ``key``` >= CAST(? AS DECIMAL(20,0)) AND `t0`.`price €` < CAST(? AS DECIMAL(4,3)) AND `t0`.`bits` = CAST(? AS DECIMAL(1,0))"
     );
     assert_eq!(binds, vec!["18446744073709551615", "1.505", "5"]);
 }
@@ -70,12 +70,12 @@ fn reads_nothing_but_a_number_as_one() {
 fn compares_values_at_mysql_s_decimal_limits_exactly() {
     let (widest, finest) = ("1e64", format!("{}.{}", "9".repeat(35), "9".repeat(30)));
     let (sql, _) = clause(&[filter("id `key`", FilterOp::Gt, Some(widest)), filter("price €", FilterOp::Eq, Some(&finest))]);
-    assert_eq!(sql, " WHERE `id ``key``` > CAST(? AS DECIMAL(65,0)) AND `price €` = CAST(? AS DECIMAL(65,30))");
+    assert_eq!(sql, " WHERE `t0`.`id ``key``` > CAST(? AS DECIMAL(65,0)) AND `t0`.`price €` = CAST(? AS DECIMAL(65,30))");
 }
 
 #[test]
 fn refuses_a_number_past_mysql_s_decimal_limits_rather_than_rounding_it() {
-    let refused = |value: &str| matches!(where_clause(&[filter("price €", FilterOp::Eq, Some(value))], &columns()), Err(AppError::Validation(_)));
+    let refused = |value: &str| matches!(where_clause(&[filter("price €", FilterOp::Eq, Some(value))], &[columns()]), Err(AppError::Validation(_)));
     assert!(refused("1e-40"));
     assert!(refused(&format!("0.{}1", "0".repeat(30))));
     assert!(refused("1e65"));
@@ -86,13 +86,13 @@ fn refuses_a_number_past_mysql_s_decimal_limits_rather_than_rounding_it() {
 #[test]
 fn reads_true_and_false_on_a_tinyint_1_as_the_1_and_0_it_stores() {
     let (sql, binds) = clause(&[filter("ok", FilterOp::Eq, Some("TRUE")), filter("ok", FilterOp::In, Some("false, 5"))]);
-    assert_eq!(sql, " WHERE `ok` = CAST(? AS DECIMAL(1,0)) AND `ok` IN (CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0)))");
+    assert_eq!(sql, " WHERE `t0`.`ok` = CAST(? AS DECIMAL(1,0)) AND `t0`.`ok` IN (CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0)))");
     assert_eq!(binds, vec!["1", "0", "5"]);
 }
 
 #[test]
 fn refuses_a_value_that_is_not_a_number_on_a_number_column() {
-    let refused = |column: &str, op: FilterOp, value: &str| match where_clause(&[filter(column, op, Some(value))], &columns()) {
+    let refused = |column: &str, op: FilterOp, value: &str| match where_clause(&[filter(column, op, Some(value))], &[columns()]) {
         Err(AppError::Validation(message)) => message,
         other => panic!("{column} {value:?} gave {other:?}"),
     };
@@ -112,7 +112,7 @@ fn leaves_true_as_text_on_any_other_column() {
 #[test]
 fn compares_text_dates_and_floats_against_the_bound_value_as_it_is() {
     let (sql, binds) = clause(&[filter("name", FilterOp::Ne, Some("a'b")), filter("at", FilterOp::Gt, Some("2024-02-29")), filter("ratio", FilterOp::Eq, Some("0.5"))]);
-    assert_eq!(sql, " WHERE `name` <> ? AND `at` > ? AND `ratio` = ?");
+    assert_eq!(sql, " WHERE `t0`.`name` <> ? AND `t0`.`at` > ? AND `t0`.`ratio` = ?");
     assert_eq!(binds, vec!["a'b", "2024-02-29", "0.5"]);
 }
 
@@ -142,34 +142,34 @@ fn keeps_a_zone_on_any_other_column() {
 #[test]
 fn contains_matches_the_text_form_ignoring_case_with_wildcards_escaped() {
     let (sql, binds) = clause(&[filter("name", FilterOp::Contains, Some("50%_off\\"))]);
-    assert_eq!(sql, " WHERE CONVERT(`name` USING utf8mb4) COLLATE utf8mb4_general_ci LIKE CONCAT('%', ?, '%')");
+    assert_eq!(sql, " WHERE CONVERT(`t0`.`name` USING utf8mb4) COLLATE utf8mb4_general_ci LIKE CONCAT('%', ?, '%')");
     assert_eq!(binds, vec!["50\\%\\_off\\\\"]);
 }
 
 #[test]
 fn starts_with_matches_the_start_of_the_text_form() {
     let (sql, binds) = clause(&[filter("id `key`", FilterOp::StartsWith, Some("12"))]);
-    assert_eq!(sql, " WHERE CONVERT(`id ``key``` USING utf8mb4) COLLATE utf8mb4_general_ci LIKE CONCAT(?, '%')");
+    assert_eq!(sql, " WHERE CONVERT(`t0`.`id ``key``` USING utf8mb4) COLLATE utf8mb4_general_ci LIKE CONCAT(?, '%')");
     assert_eq!(binds, vec!["12"]);
 }
 
 #[test]
 fn any_of_binds_each_trimmed_value() {
     let (sql, binds) = clause(&[filter("id `key`", FilterOp::In, Some(" 1, 2 ,,3")), filter("name", FilterOp::In, Some("a,b"))]);
-    assert_eq!(sql, " WHERE `id ``key``` IN (CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0))) AND `name` IN (?, ?)");
+    assert_eq!(sql, " WHERE `t0`.`id ``key``` IN (CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0))) AND `t0`.`name` IN (?, ?)");
     assert_eq!(binds, vec!["1", "2", "3", "a", "b"]);
 }
 
 #[test]
 fn null_checks_bind_nothing() {
     let (sql, binds) = clause(&[filter("name", FilterOp::IsNull, None), filter("at", FilterOp::NotNull, None)]);
-    assert_eq!(sql, " WHERE `name` IS NULL AND `at` IS NOT NULL");
+    assert_eq!(sql, " WHERE `t0`.`name` IS NULL AND `t0`.`at` IS NOT NULL");
     assert!(binds.is_empty());
 }
 
 #[test]
-fn refuses_an_unknown_column_a_missing_value_an_empty_list_and_a_joined_table() {
-    let refused = |f: ColumnFilter| matches!(where_clause(&[f], &columns()), Err(AppError::Validation(_)));
+fn refuses_an_unknown_column_a_missing_value_an_empty_list_and_a_table_not_in_the_browse() {
+    let refused = |f: ColumnFilter| matches!(where_clause(&[f], &[columns()]), Err(AppError::Validation(_)));
     assert!(refused(filter("nope", FilterOp::Eq, Some("1"))));
     assert!(refused(filter("name", FilterOp::Eq, None)));
     assert!(refused(filter("name", FilterOp::In, Some(" , "))));
@@ -178,18 +178,66 @@ fn refuses_an_unknown_column_a_missing_value_an_empty_list_and_a_joined_table() 
 
 #[test]
 fn orders_by_the_chosen_column_or_else_the_primary_key() {
-    assert_eq!(order_clause(Some("name"), true, &columns()).unwrap(), " ORDER BY `name` DESC");
-    assert_eq!(order_clause(None, false, &columns()).unwrap(), " ORDER BY `id ``key``` ASC");
-    assert_eq!(order_clause(Some(""), false, &columns()).unwrap(), " ORDER BY `id ``key``` ASC");
+    assert_eq!(order_clause(Some(&ColumnRef { table: 0, column: "name".into() }), true, &[columns()]).unwrap(), " ORDER BY `t0`.`name` DESC");
+    assert_eq!(order_clause(None, false, &[columns()]).unwrap(), " ORDER BY `t0`.`id ``key``` ASC");
+    assert_eq!(order_clause(Some(&ColumnRef { table: 0, column: String::new() }), false, &[columns()]).unwrap(), " ORDER BY `t0`.`id ``key``` ASC");
 }
 
 #[test]
 fn leaves_a_table_without_a_primary_key_unordered() {
     let keyless: Vec<_> = columns().into_iter().filter(|c| !c.is_primary_key).collect();
-    assert_eq!(order_clause(None, false, &keyless).unwrap(), "");
+    assert_eq!(order_clause(None, false, &[keyless]).unwrap(), "");
 }
 
 #[test]
 fn refuses_to_order_by_a_column_the_table_lacks() {
-    assert!(matches!(order_clause(Some("nope"), false, &columns()), Err(AppError::Validation(_))));
+    assert!(matches!(order_clause(Some(&ColumnRef { table: 0, column: "nope".into() }), false, &[columns()]), Err(AppError::Validation(_))));
+}
+
+/// A table joined in, whose columns are typed differently from the browsed table's.
+fn joined() -> Vec<MySqlColumnInfo> {
+    let mut columns = columns();
+    columns[2].data_type = String::from("int");
+    columns
+}
+
+fn join(database: &str, table: &str, kind: JoinKind, on: &[(&str, usize, &str)]) -> TableJoin {
+    let on = on.iter().map(|&(column, table, equals)| JoinOn { column: column.into(), equals: ColumnRef { table, column: equals.into() } }).collect();
+    TableJoin { schema: database.into(), table: table.into(), kind, on }
+}
+
+#[test]
+fn names_the_browsed_table_and_each_join_by_its_place() {
+    let joins = [
+        join("other `db`", "склад", JoinKind::Inner, &[("slot", 0, "id `key`"), ("zone", 0, "name")]),
+        join("shop", "shop", JoinKind::Left, &[("id", 1, "slot")]),
+    ];
+    assert_eq!(
+        from_clause("shop", "shop", &joins).unwrap(),
+        "`shop`.`shop` AS `t0` JOIN `other ``db```.`склад` AS `t1` ON `t1`.`slot` = `t0`.`id ``key``` AND `t1`.`zone` = `t0`.`name` \
+         LEFT JOIN `shop`.`shop` AS `t2` ON `t2`.`id` = `t1`.`slot`"
+    );
+}
+
+#[test]
+fn refuses_a_join_on_nothing_or_on_a_table_after_it() {
+    let refused = |joins: &[TableJoin]| matches!(from_clause("shop", "t", joins), Err(AppError::Validation(_)));
+    assert!(refused(&[join("shop", "u", JoinKind::Left, &[])]));
+    assert!(refused(&[join("shop", "u", JoinKind::Left, &[("id", 1, "id")])]));
+}
+
+#[test]
+fn compares_a_joined_column_by_its_own_table_s_type() {
+    let on_join = ColumnFilter { table: 1, ..filter("name", FilterOp::Eq, Some("7")) };
+    let (sql, binds) = where_clause(&[filter("name", FilterOp::Eq, Some("7")), on_join], &[columns(), joined()]).unwrap();
+    assert_eq!(sql, " WHERE `t0`.`name` = ? AND `t1`.`name` = CAST(? AS DECIMAL(1,0))");
+    assert_eq!(binds, vec!["7", "7"]);
+}
+
+#[test]
+fn orders_by_a_joined_column_or_refuses_one_its_table_lacks() {
+    let tables = [columns(), joined()];
+    assert_eq!(order_clause(Some(&ColumnRef { table: 1, column: "at".into() }), false, &tables).unwrap(), " ORDER BY `t1`.`at` ASC");
+    assert!(order_clause(Some(&ColumnRef { table: 2, column: "at".into() }), false, &tables).is_err());
+    assert!(order_clause(Some(&ColumnRef { table: 1, column: "nope".into() }), false, &tables).is_err());
 }
