@@ -84,7 +84,13 @@ describe('api', () => {
 
   it('says what is not available yet rather than calling a command that does not exist', async () => {
     await expect(api.runQuery('c1', 'SELECT 1')).rejects.toEqual({ code: 'not_available', message: "Running SQL isn't available for MySQL yet." })
-    await expect(api.beginTransaction('c1', 'tx')).rejects.toMatchObject({ message: "Saving rows isn't available for MySQL yet." })
+    await expect(api.beginTransaction('c1', 'tx')).rejects.toMatchObject({ message: "Running SQL isn't available for MySQL yet." })
     expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('offers no row writes yet, so its table tabs open read-only', () => {
+    expect(api.insertRow).toBeUndefined()
+    expect(api.updateRow).toBeUndefined()
+    expect(api.deleteRows).toBeUndefined()
   })
 })

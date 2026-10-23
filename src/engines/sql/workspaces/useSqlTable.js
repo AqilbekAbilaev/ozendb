@@ -92,7 +92,8 @@ export function useSqlTable(tab, { readOnly = false } = {}) {
   Object.assign(t, useTableLoad(t))
   Object.assign(t, useTableQuery(t, tab.state.paused))
   Object.assign(t, useTableSqlMode(t))
-  Object.assign(t, useTableStage(t, readOnly))
+  // TODO #390: an engine whose api can't save rows yet (MySQL) opens its tables read-only.
+  Object.assign(t, useTableStage(t, readOnly || !api.updateRow))
   const explain = () => explainSql(explainRun, t.currentSql.value)
 
   return {
