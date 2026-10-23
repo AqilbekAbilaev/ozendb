@@ -10,7 +10,8 @@ use crate::error::AppError;
 
 /// The statements in `sql`, each as typed, in order. Refused whole if any of them
 /// controls a transaction (see `refuse_transaction_control`), or, on a `read_only`
-/// connection, would lift its read-only mode: a session can do that to itself.
+/// connection, would lift its read-only mode: a session can do that to itself, directly
+/// or through a prepared statement, whose SQL is text this check never reads.
 pub(super) fn statements(sql: &str, read_only: bool) -> Result<Vec<&str>, AppError> {
     let split = split(sql)?;
     if split.is_empty() {
@@ -23,6 +24,9 @@ pub(super) fn statements(sql: &str, read_only: bool) -> Result<Vec<&str>, AppErr
         }
         if read_only && (is_set(words, &["TRANSACTION_READ_ONLY", "TX_READ_ONLY"]) || is_set_read_write(words)) {
             return Err(AppError::Validation(String::from("A read-only connection can't turn its read-only mode off.")));
+        }
+        if read_only && is_prepared_statement(words) {
+            return Err(AppError::Validation(String::from("A read-only connection can't run prepared statements.")));
         }
     }
     Ok(split.into_iter().map(|(text, _)| text).collect())
@@ -91,6 +95,15 @@ fn is_set(words: &[String], variables: &[&str]) -> bool {
 /// `SET [SESSION] TRANSACTION … READ WRITE`.
 fn is_set_read_write(words: &[String]) -> bool {
     words.first().is_some_and(|w| w == "SET") && words.windows(2).any(|pair| pair == ["READ", "WRITE"])
+}
+
+/// PREPARE, EXECUTE, and DEALLOCATE or DROP PREPARE.
+fn is_prepared_statement(words: &[String]) -> bool {
+    match words {
+        [first, ..] if first == "PREPARE" || first == "EXECUTE" => true,
+        [first, second, ..] => (first == "DEALLOCATE" || first == "DROP") && second == "PREPARE",
+        _ => false,
+    }
 }
 
 #[cfg(test)]

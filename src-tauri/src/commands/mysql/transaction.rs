@@ -52,7 +52,7 @@ impl MySqlTransactions {
         let statements = statements(sql, read_only)?;
         let held = self.held(tx_id)?;
         let mut conn = held.lock().await;
-        run_on(&mut conn, pool, &statements, run_id, QUERY_TIME_LIMIT).await
+        run_on(&mut conn, pool, &statements, run_id, QUERY_TIME_LIMIT, read_only).await
     }
 
     pub async fn finish(&self, tx_id: &str, commit: bool) -> Result<(), AppError> {

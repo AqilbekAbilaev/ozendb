@@ -11,6 +11,10 @@ const MAX_EXECUTION_TIME_MS: u32 = 300_000;
 /// that runs past it (commands/mysql/cancel.rs).
 pub(crate) const QUERY_TIME_LIMIT: std::time::Duration = std::time::Duration::from_millis(MAX_EXECUTION_TIME_MS as u64);
 
+/// What makes a session read-only, which the SQL tab runs again before each statement on
+/// a read-only connection (commands/mysql/query.rs).
+pub(crate) const READ_ONLY_LOCK: &str = "SET SESSION transaction_read_only = ON";
+
 /// The one `SET` a new session runs. `max_execution_time` caps read-only `SELECT`s only:
 /// MySQL has no time limit for a write. A `read_only` connection is enforced on the
 /// server, as PostgreSQL's is, so a write is refused whatever SQL it came from.
