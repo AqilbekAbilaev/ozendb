@@ -4,10 +4,9 @@
 //! times; anything else is explained without running.
 use std::time::Duration;
 
-use sqlparser::ast::Statement;
+use sqlparser::ast::{Query, SetExpr, Statement};
 use sqlparser::dialect::MySqlDialect;
 use sqlparser::parser::Parser;
-use sqlparser::tokenizer::{Token, Tokenizer};
 use sqlx::MySqlPool;
 use tauri::State;
 
@@ -20,14 +19,26 @@ use crate::mysql::session::QUERY_TIME_LIMIT;
 /// The whole plan MySQL gives a single-table UPDATE or DELETE, which its iterators don't run.
 const NOT_ITERATED: &str = "<not executable by iterator executor>";
 
-/// Whether running `sql` can only read: one SELECT, in any of its forms (WITH, a UNION,
-/// VALUES), that writes into neither a variable nor a file. SQL sqlparser can't read
-/// doesn't count, MySQL's `TABLE t` among it.
+/// Whether running `sql` can only read: one query made only of SELECTs that write into
+/// neither a variable nor a file, and VALUES, its WITH included. SQL sqlparser can't
+/// read doesn't count, MySQL's `TABLE t` among it.
 fn only_reads(sql: &str) -> bool {
-    let into = Tokenizer::new(&MySqlDialect {}, sql)
-        .tokenize()
-        .map_or(true, |tokens| tokens.iter().any(|t| matches!(t, Token::Word(w) if w.quote_style.is_none() && w.value.eq_ignore_ascii_case("INTO"))));
-    !into && matches!(Parser::parse_sql(&MySqlDialect {}, sql).as_deref(), Ok([Statement::Query(_)]))
+    matches!(Parser::parse_sql(&MySqlDialect {}, sql).as_deref(), Ok([Statement::Query(query)]) if reads(query))
+}
+
+fn reads(query: &Query) -> bool {
+    query.with.iter().flat_map(|with| &with.cte_tables).all(|cte| reads(&cte.query)) && body_reads(&query.body)
+}
+
+/// A query's body can also be a write: sqlparser reads `WITH … DELETE` as a query.
+fn body_reads(body: &SetExpr) -> bool {
+    match body {
+        SetExpr::Select(select) => select.into.is_none(),
+        SetExpr::Query(query) => reads(query),
+        SetExpr::SetOperation { left, right, .. } => body_reads(left) && body_reads(right),
+        SetExpr::Values(_) => true,
+        _ => false,
+    }
 }
 
 /// Whether a server reporting `version` (`SELECT VERSION()`) has the second JSON format.

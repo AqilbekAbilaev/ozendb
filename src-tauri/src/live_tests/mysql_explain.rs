@@ -83,6 +83,9 @@ async fn a_write_is_explained_without_running() {
     assert!(plan["actual_rows"].is_null(), "{plan}");
     let single = explain_mysql_sql(&pool, &format!("DELETE FROM {database}.pets WHERE owner_id = 1"), false, LIMIT).await.unwrap_err();
     assert!(single.to_string().contains("single-table"), "{single}");
+    let with = format!("WITH x AS (SELECT 1 AS n) DELETE FROM {database}.pets WHERE id IN (SELECT n FROM x)");
+    let plan = explain_mysql_sql(&pool, &with, false, LIMIT).await.unwrap();
+    assert!(plan["actual_rows"].is_null(), "{plan}");
     assert_eq!(pets(&config, &database).await, 4);
     let owls: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) FROM {database}.pets WHERE kind = 'owl'"))).fetch_one(&mut connect(&config, "").await).await.unwrap();
     assert_eq!(owls, 0);
