@@ -149,7 +149,7 @@ async fn a_timestamp_filters_on_the_text_the_grid_shows() {
     let pool = seeded(&config, name).await;
     let page = mysql_browse(&pool, name, TABLE, &[], None, true, 1, 0).await.unwrap();
     let shown = page.rows[0][10].as_str().unwrap().to_string();
-    assert!(shown.ends_with(&crate::mysql::session::zone()), "{shown}");
+    assert_eq!(shown, shown_at("2024-01-01 00:00:00"));
     for op in [FilterOp::Eq, FilterOp::Contains, FilterOp::StartsWith, FilterOp::In] {
         let label = format!("{op:?}");
         assert_eq!(keys(&pool, name, &[filter("stamp", op, Some(&shown))]).await, [json!("18446744073709551615")], "{label}");

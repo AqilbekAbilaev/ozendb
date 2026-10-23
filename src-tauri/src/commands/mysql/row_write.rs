@@ -81,7 +81,7 @@ pub(super) fn stored(info: &MySqlColumnInfo, value: &Value) -> Result<Param, App
         _ if BYTES.contains(&base) => Param::Bytes(bytes(info, value)?),
         _ if base == "bit" => Param::Number(bits(info, value)?),
         Value::Bool(on) => Param::Text(String::from(if *on { "1" } else { "0" })),
-        Value::String(text) => Param::Text(flag(&info.data_type, text).unwrap_or_else(|| unzoned(&info.data_type, text)).to_string()),
+        Value::String(text) => Param::Text(flag(&info.data_type, text).map_or_else(|| unzoned(&info.data_type, text).into_owned(), str::to_string)),
         other => Param::Text(other.to_string()),
     })
 }

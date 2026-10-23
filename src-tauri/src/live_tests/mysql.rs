@@ -18,13 +18,11 @@ use std::sync::Arc;
 use tauri::Listener;
 
 /// How the grid shows a TIMESTAMP written as `utc` by a session in the server's own zone
-/// (UTC in the test container): in the user's zone, marked with it.
+/// (UTC in the test container): in the user's zone, with that date's offset.
 pub(super) fn shown_at(utc: &str) -> String {
-    let zone = crate::mysql::session::zone();
-    let offset: chrono::FixedOffset = zone.parse().unwrap();
     let (seconds, fraction) = utc.split_at(19);
-    let at = chrono::NaiveDateTime::parse_from_str(seconds, "%Y-%m-%d %H:%M:%S").unwrap().and_utc();
-    format!("{}{fraction}{zone}", at.with_timezone(&offset).format("%Y-%m-%d %H:%M:%S"))
+    let at = chrono::NaiveDateTime::parse_from_str(seconds, "%Y-%m-%d %H:%M:%S").unwrap().and_utc().with_timezone(&chrono::Local);
+    format!("{}{fraction}{}", at.format("%Y-%m-%d %H:%M:%S"), at.format("%:z"))
 }
 
 pub(super) const SKIP: &str = "skipping: set OZENDB_TEST_MYSQL=host:port to run the MySQL live tests";

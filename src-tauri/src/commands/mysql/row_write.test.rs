@@ -61,10 +61,9 @@ fn stores_numbers_dates_and_text_as_the_text_mysql_reads_them_from() {
 }
 
 #[test]
-fn stores_a_timestamp_without_the_zone_the_grid_shows() {
+fn stores_a_timestamp_the_grid_shows_as_utc() {
     let stamp = info("c", "timestamp(3)", false, false);
-    let shown = format!("2024-06-30 18:59:59.120{}", crate::mysql::session::zone());
-    assert_eq!(stored(&stamp, &json!(shown)).unwrap(), text("2024-06-30 18:59:59.120"));
+    assert_eq!(stored(&stamp, &json!("2024-07-01 03:59:59.120+05:00")).unwrap(), text("2024-06-30 22:59:59.120"));
 }
 
 #[test]
@@ -112,7 +111,7 @@ fn matches_a_big_key_exactly_and_a_binary_key_by_its_bytes() {
     assert_eq!((placeholder.as_str(), param), ("CAST(? AS DECIMAL(20,0))", text("18446744073709551615")));
     let (placeholder, param) = matched(&info("id", "binary(2)", true, false), &json!("0xABCD")).unwrap();
     assert_eq!((placeholder.as_str(), param), ("?", Param::Bytes(vec![0xAB, 0xCD])));
-    let (placeholder, param) = matched(&info("at", "timestamp", true, false), &json!(format!("2024-01-01 00:00:00{}", crate::mysql::session::zone()))).unwrap();
+    let (placeholder, param) = matched(&info("at", "timestamp", true, false), &json!("2024-01-01 05:00:00+05:00")).unwrap();
     assert_eq!((placeholder.as_str(), param), ("?", text("2024-01-01 00:00:00")));
 }
 
