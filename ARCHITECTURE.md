@@ -202,9 +202,11 @@ MySQL has no schema level, and one connection reaches every database on its serv
   afterwards so nothing it set reaches the next. `cancel.rs` stops a run with `KILL QUERY` from a
   second session, on Cancel or past the time limit, which MySQL itself applies to SELECTs only;
   `transaction.rs` holds Manual mode's transactions, each on its own session. `explain.rs` is
-  Explain: one statement's plan as `EXPLAIN FORMAT=JSON` in its second version (MySQL 8.3 and
-  later), with ANALYZE's real rows and times for a SELECT, run in a read-only transaction that is
-  rolled back; `workspaces/planRows.js` reads it into the shared plan view.
+  Explain: one statement's plan, with ANALYZE's real rows and times for a SELECT, run in a
+  read-only transaction that is rolled back. It picks the form by server version: `EXPLAIN
+  FORMAT=JSON` in its second version on MySQL 8.3 and later; ANALYZE's text tree for a SELECT on
+  8.0.18 to 8.2; the classic JSON, not run, for anything else before 8.3. `workspaces/planRows.js`
+  reads all three into the shared plan view, through `classicPlan.js` and `treePlan.js`.
 - **Tests:** the `live_tests/mysql*.rs` files run when `OZENDB_TEST_MYSQL` is set.
 
 ## Rust backend (`src-tauri/src/`)
