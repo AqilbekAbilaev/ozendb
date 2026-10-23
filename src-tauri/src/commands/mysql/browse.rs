@@ -24,6 +24,9 @@ const MAX_SCALE: usize = 30;
 // case-insensitive collation every MySQL and MariaDB server has.
 const AS_TEXT: &str = "COLLATE utf8mb4_general_ci";
 
+/// How a refused filter value is named (see `typed`).
+const FILTER: &str = "The filter on";
+
 /// The browsed column named `name`, refused when the table has none.
 pub(super) fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlColumnInfo, AppError> {
     columns.iter().find(|c| c.name == name).ok_or_else(|| AppError::Validation(format!("Unknown column \"{name}\".")))
@@ -35,8 +38,9 @@ pub(super) fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&
 /// as `>= 1`; one to the column's own scale reads `> 1.505` on a DECIMAL(10,2) as
 /// `> 1.51`; and one to a fixed DECIMAL(65,30) clips a value past 35 whole digits. On
 /// TINYINT(1), MySQL's BOOLEAN, `true` and `false` are the 1 and 0 it stores, under every
-/// operator, as MySQL reads TRUE and FALSE.
-pub(super) fn typed(info: &MySqlColumnInfo, value: &str) -> Result<(String, String), AppError> {
+/// operator, as MySQL reads TRUE and FALSE. A refusal starts with `what`, the caller's
+/// name for the value: "The filter on" for a filter.
+pub(super) fn typed(info: &MySqlColumnInfo, value: &str, what: &str) -> Result<(String, String), AppError> {
     let value = unzoned(&info.data_type, value);
     if !EXACT_NUMBERS.contains(&base_type(&info.data_type)) {
         return Ok((value.to_string(), String::from("?")));
@@ -50,11 +54,11 @@ pub(super) fn typed(info: &MySqlColumnInfo, value: &str) -> Result<(String, Stri
     // CAST would read anything else as 0.
     let (precision, scale) = decimal(value).ok_or_else(|| {
         let or_boolean = if boolean { ", or true or false" } else { "" };
-        AppError::Validation(format!("The filter on \"{}\" needs a number{or_boolean}.", info.name))
+        AppError::Validation(format!("{what} \"{}\" needs a number{or_boolean}.", info.name))
     })?;
     if precision > MAX_DIGITS || scale > MAX_SCALE {
         return Err(AppError::Validation(format!(
-            "The filter on \"{}\" needs a number of at most {MAX_DIGITS} digits, {MAX_SCALE} of them after the point.",
+            "{what} \"{}\" needs a number of at most {MAX_DIGITS} digits, {MAX_SCALE} of them after the point.",
             info.name
         )));
     }
@@ -117,7 +121,7 @@ pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]
         let like = |value: &str| unzoned(&info.data_type, value).replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
         let as_text = format!("CONVERT({name} USING utf8mb4) {AS_TEXT} LIKE");
         let compare = |symbol: &str, value: &str| {
-            let (value, placeholder) = typed(info, value)?;
+            let (value, placeholder) = typed(info, value, FILTER)?;
             Ok::<_, AppError>((vec![value], format!("{name} {symbol} {placeholder}")))
         };
         let (values, condition) = match f.op {
@@ -127,7 +131,7 @@ pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]
             FilterOp::StartsWith => (vec![like(value()?)], format!("{as_text} CONCAT(?, '%')")),
             FilterOp::In => {
                 let pairs: Vec<(String, String)> =
-                    value()?.split(',').map(str::trim).filter(|v| !v.is_empty()).map(|v| typed(info, v)).collect::<Result<_, _>>()?;
+                    value()?.split(',').map(str::trim).filter(|v| !v.is_empty()).map(|v| typed(info, v, FILTER)).collect::<Result<_, _>>()?;
                 let (items, placeholders): (Vec<String>, Vec<String>) = pairs.into_iter().unzip();
                 if items.is_empty() {
                     return Err(AppError::Validation(format!("The filter on \"{}\" needs at least one value.", f.column)));

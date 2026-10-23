@@ -167,3 +167,9 @@ fn refuses_a_value_for_a_generated_or_unknown_column() {
     let nothing = MySqlRowUpdate { set: vec![], r#where: key(json!(1), "0x01") };
     assert!(message(update(TABLE, &columns(), &nothing)).contains("Nothing"));
 }
+
+#[test]
+fn words_a_key_that_is_not_a_number_as_a_key_not_a_filter() {
+    let refused = message(matched(&info("id `key`", "bigint unsigned", true, false), &json!("abc")));
+    assert_eq!(refused, "The key value for \"id `key`\" needs a number.");
+}
