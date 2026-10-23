@@ -1,8 +1,8 @@
-//! Explain: the plan MySQL chose for one statement, as `EXPLAIN FORMAT=JSON`: in its
-//! second version on MySQL 8.3 and later, which lists the same steps as EXPLAIN
-//! ANALYZE's tree, and in the classic one before. On 8.3 and later, ANALYZE runs a
-//! statement that only reads and adds the real rows and times; anything else is
-//! explained without running.
+//! Explain: the plan MySQL chose for one statement. For a statement that only reads,
+//! ANALYZE runs it and adds the real rows and times: as `EXPLAIN FORMAT=JSON` in its
+//! second version on MySQL 8.3 and later, and as ANALYZE's tree, in text, from 8.0.18.
+//! Anything else, and any statement on an older server, is explained without running,
+//! in the second JSON version on 8.3 and later and the classic one before.
 use std::time::Duration;
 
 use sqlparser::ast::{Query, SetExpr, Statement};
@@ -50,6 +50,8 @@ enum Explain {
     /// EXPLAIN FORMAT=JSON in its second version, which lists ANALYZE's steps: MySQL 8.3
     /// and later, analyzing a statement that only reads.
     Iterators { analyze: bool },
+    /// EXPLAIN ANALYZE's tree as text: MySQL 8.0.18 to 8.2, which have no JSON for it.
+    Tree,
     /// The classic EXPLAIN FORMAT=JSON, never run.
     Classic,
 }
@@ -59,9 +61,11 @@ impl Explain {
     /// (`SELECT VERSION()`).
     fn of(version: &str, reads: bool) -> Explain {
         let mut parts = version.split(['.', '-']).map(|part| part.parse::<u32>().unwrap_or(0));
-        let (major, minor) = (parts.next().unwrap_or(0), parts.next().unwrap_or(0));
-        if (major, minor) >= (8, 3) {
+        let version = (parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0));
+        if version >= (8, 3, 0) {
             Explain::Iterators { analyze: reads }
+        } else if version >= (8, 0, 18) && reads {
+            Explain::Tree
         } else {
             Explain::Classic
         }
@@ -72,6 +76,7 @@ impl Explain {
         match self {
             Explain::Iterators { analyze: true } => Some("SET SESSION explain_json_format_version = 2; START TRANSACTION READ ONLY"),
             Explain::Iterators { analyze: false } => Some("SET SESSION explain_json_format_version = 2"),
+            Explain::Tree => Some("START TRANSACTION READ ONLY"),
             Explain::Classic => None,
         }
     }
@@ -80,13 +85,27 @@ impl Explain {
     fn statement(&self, statement: &str) -> String {
         match self {
             Explain::Iterators { analyze: true } => format!("EXPLAIN ANALYZE FORMAT=JSON {statement}"),
+            Explain::Tree => format!("EXPLAIN ANALYZE {statement}"),
             Explain::Iterators { analyze: false } | Explain::Classic => format!("EXPLAIN FORMAT=JSON {statement}"),
         }
     }
+
+    /// The plan in MySQL's `answer`: JSON, or the tree as the text it is.
+    fn read(&self, answer: String) -> Result<serde_json::Value, AppError> {
+        if *self == Explain::Tree {
+            return Ok(serde_json::Value::String(answer));
+        }
+        let plan: serde_json::Value = serde_json::from_str(&answer)?;
+        if plan["operation"] == NOT_ITERATED {
+            return Err(AppError::Validation(String::from("MySQL can't show this statement's plan as steps; explain a SELECT with the same WHERE instead.")));
+        }
+        Ok(plan)
+    }
 }
 
-/// The plan for `sql`, which must be one statement, as MySQL's JSON. It runs on a session
-/// of its own, closed afterwards, so the format it sets ends with it. ANALYZE runs the
+/// The plan for `sql`, which must be one statement, as MySQL's JSON, or ANALYZE's tree as
+/// text. It runs on a session of its own, closed afterwards, so the format it sets ends
+/// with it. ANALYZE runs the
 /// statement inside a read-only transaction that the closing session rolls back: even a
 /// stored function the SELECT calls can't write. `run_id` lets `cancel_mysql_query` stop
 /// it, and nothing it does, from waiting for a session on, runs past `limit`.
@@ -117,16 +136,7 @@ pub(crate) async fn explain_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bo
             run.limited(pool, left(), async { sqlx::query_scalar(sqlx::AssertSqlSafe(explaining)).fetch_one(&mut *conn).await.map_err(AppError::MySql) }).await
         })
         .await?;
-    plan(answer)
-}
-
-/// The plan in MySQL's `answer` to EXPLAIN FORMAT=JSON.
-fn plan(answer: String) -> Result<serde_json::Value, AppError> {
-    let plan: serde_json::Value = serde_json::from_str(&answer)?;
-    if plan["operation"] == NOT_ITERATED {
-        return Err(AppError::Validation(String::from("MySQL can't show this statement's plan as steps; explain a SELECT with the same WHERE instead.")));
-    }
-    Ok(plan)
+    explain.read(answer)
 }
 
 /// `run_id` lets `cancel_mysql_query` stop it; `database`, when given, is the one the

@@ -10,7 +10,7 @@ import { engineLabel } from '../../../data/connectionOptions.js'
 // is `estimated`: its bars are costs, and it has no times.
 const props = defineProps({
   engine:     { type: String,  required: true },
-  plan:       { type: [Array, Object], default: null },
+  plan:       { type: [Array, Object, String], default: null },
   error:      { type: String,  default: null },
   explaining: { type: Boolean, default: false },
 })

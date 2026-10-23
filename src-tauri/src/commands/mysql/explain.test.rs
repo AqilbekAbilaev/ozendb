@@ -1,4 +1,4 @@
-use super::{only_reads, plan, Explain};
+use super::{only_reads, Explain};
 use crate::error::AppError;
 
 #[test]
@@ -56,9 +56,16 @@ fn mysql_8_3_and_later_explain_in_the_second_json_version_and_analyze_a_read() {
 }
 
 #[test]
-fn older_servers_explain_in_the_classic_json_without_running() {
-    for version in ["8.2.0", "8.0.46", "5.7.44-log", "not a version"] {
-        assert_eq!(Explain::of(version, false), Explain::Classic, "{version}");
+fn mysql_8_0_18_to_8_2_analyze_a_read_as_a_tree() {
+    for version in ["8.0.18", "8.0.46-log", "8.2.0"] {
+        assert_eq!(Explain::of(version, true), Explain::Tree, "{version}");
+    }
+}
+
+#[test]
+fn older_servers_and_writes_before_8_3_are_explained_in_the_classic_json_without_running() {
+    for (version, reads) in [("8.2.0", false), ("8.0.46", false), ("8.0.17", true), ("5.7.44-log", true), ("not a version", true)] {
+        assert_eq!(Explain::of(version, reads), Explain::Classic, "{version}");
     }
 }
 
@@ -66,6 +73,7 @@ fn older_servers_explain_in_the_classic_json_without_running() {
 fn each_way_of_explaining_readies_the_session_it_needs() {
     assert_eq!(Explain::Iterators { analyze: true }.setup(), Some("SET SESSION explain_json_format_version = 2; START TRANSACTION READ ONLY"));
     assert_eq!(Explain::Iterators { analyze: false }.setup(), Some("SET SESSION explain_json_format_version = 2"));
+    assert_eq!(Explain::Tree.setup(), Some("START TRANSACTION READ ONLY"));
     assert_eq!(Explain::Classic.setup(), None);
 }
 
@@ -74,16 +82,24 @@ fn each_way_of_explaining_asks_for_its_own_format() {
     let statement = "SELECT `ü` FROM `a b`";
     assert_eq!(Explain::Iterators { analyze: true }.statement(statement), "EXPLAIN ANALYZE FORMAT=JSON SELECT `ü` FROM `a b`");
     assert_eq!(Explain::Iterators { analyze: false }.statement(statement), "EXPLAIN FORMAT=JSON SELECT `ü` FROM `a b`");
+    assert_eq!(Explain::Tree.statement(statement), "EXPLAIN ANALYZE SELECT `ü` FROM `a b`");
     assert_eq!(Explain::Classic.statement(statement), "EXPLAIN FORMAT=JSON SELECT `ü` FROM `a b`");
 }
 
 #[test]
 fn a_plan_mysql_cannot_show_as_steps_is_refused_without_guessing_the_statement() {
-    let refused = plan(String::from(r#"{"operation": "<not executable by iterator executor>"}"#)).unwrap_err();
+    let refused = Explain::Iterators { analyze: false }.read(String::from(r#"{"operation": "<not executable by iterator executor>"}"#)).unwrap_err();
     assert!(matches!(&refused, AppError::Validation(why) if why.contains("this statement") && !why.contains("single-table")), "{refused}");
 }
 
 #[test]
 fn any_other_plan_is_read_as_json() {
-    assert_eq!(plan(String::from(r#"{"operation": "Insert into `ä b`"}"#)).unwrap()["operation"], "Insert into `ä b`");
+    assert_eq!(Explain::Iterators { analyze: false }.read(String::from(r#"{"operation": "Insert into `ä b`"}"#)).unwrap()["operation"], "Insert into `ä b`");
+    assert_eq!(Explain::Classic.read(String::from(r#"{"query_block": {"select_id": 1}}"#)).unwrap()["query_block"]["select_id"], 1);
+}
+
+#[test]
+fn a_tree_is_kept_as_the_text_it_is() {
+    let tree = "-> Table scan on `ä b`  (cost=0.65 rows=4) (actual time=0.01..0.02 rows=4 loops=1)";
+    assert_eq!(Explain::Tree.read(String::from(tree)).unwrap(), serde_json::Value::from(tree));
 }
