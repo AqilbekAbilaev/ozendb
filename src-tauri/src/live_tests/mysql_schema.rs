@@ -157,6 +157,7 @@ async fn foreign_keys_are_listed_from_either_side_whole_and_across_databases() {
             quoted(&name),
             quoted(&other)
         ),
+        format!("CREATE TABLE {}.`staff ü` (id INT PRIMARY KEY, boss INT, FOREIGN KEY (boss) REFERENCES {}.`staff ü` (id))", quoted(&name), quoted(&name)),
     ] {
         run(&mut admin, &statement).await;
     }
@@ -174,6 +175,9 @@ async fn foreign_keys_are_listed_from_either_side_whole_and_across_databases() {
     assert_eq!(mysql_foreign_keys(&pool, &other, "склад").await.unwrap(), [shelf]);
     assert_eq!(mysql_foreign_keys(&pool, &name, "клиенты ü").await.unwrap(), std::slice::from_ref(&buyer));
     assert_eq!(mysql_foreign_keys(&pool, &name, "order items").await.unwrap(), [buyer]);
+    // A key on a table pointing at itself is on both sides, and listed once.
+    let boss = key((&name, "staff ü", &["boss"]), (&name, "staff ü", &["id"]));
+    assert_eq!(mysql_foreign_keys(&pool, &name, "staff ü").await.unwrap(), [boss]);
     // The shelf's database first: its key holds the other's table.
     drop_seeded(&config, pool, &name).await;
     run(&mut admin, &format!("DROP DATABASE {}", quoted(&other))).await;

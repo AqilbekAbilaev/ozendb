@@ -240,18 +240,31 @@ fn foreign_keys(rows: Vec<KeyColumn>) -> Vec<MySqlForeignKey> {
 }
 
 /// The foreign keys linking `database.table` to other tables, whichever side it is on:
-/// what a join from this table can follow.
+/// what a join from this table can follow. A branch per side, each filtered by equality,
+/// since an OR across the two sides has MySQL read every key of every table. The table's
+/// own keys are found by its name; the keys pointing at it through the list of foreign
+/// keys, as KEY_COLUMN_USAGE has no way in by the referenced table. A key from the table
+/// to itself is on both sides, and left to the first branch.
 pub(crate) async fn mysql_foreign_keys(pool: &MySqlPool, database: &str, table: &str) -> Result<Vec<MySqlForeignKey>, AppError> {
     let rows: Vec<KeyColumn> = sqlx::query_as(
         r#"
         SELECT TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, COLUMN_NAME,
-            REFERENCED_TABLE_SCHEMA, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+            REFERENCED_TABLE_SCHEMA, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME, ORDINAL_POSITION
         FROM information_schema.KEY_COLUMN_USAGE
-        WHERE REFERENCED_TABLE_NAME IS NOT NULL
-            AND ((TABLE_SCHEMA = ? AND TABLE_NAME = ?) OR (REFERENCED_TABLE_SCHEMA = ? AND REFERENCED_TABLE_NAME = ?))
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL
+        UNION ALL
+        SELECT k.TABLE_SCHEMA, k.TABLE_NAME, k.CONSTRAINT_NAME, k.COLUMN_NAME,
+            k.REFERENCED_TABLE_SCHEMA, k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME, k.ORDINAL_POSITION
+        FROM information_schema.REFERENTIAL_CONSTRAINTS r
+        JOIN information_schema.KEY_COLUMN_USAGE k
+            ON k.CONSTRAINT_SCHEMA = r.CONSTRAINT_SCHEMA AND k.TABLE_NAME = r.TABLE_NAME AND k.CONSTRAINT_NAME = r.CONSTRAINT_NAME
+        WHERE r.UNIQUE_CONSTRAINT_SCHEMA = ? AND r.REFERENCED_TABLE_NAME = ?
+            AND NOT (r.CONSTRAINT_SCHEMA = ? AND r.TABLE_NAME = ?)
         ORDER BY TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION
         "#,
     )
+    .bind(database)
+    .bind(table)
     .bind(database)
     .bind(table)
     .bind(database)
