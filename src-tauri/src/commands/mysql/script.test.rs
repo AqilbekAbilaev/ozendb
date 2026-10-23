@@ -37,6 +37,33 @@ fn keeps_a_routine_body_whole() {
 }
 
 #[test]
+fn keeps_each_kind_of_routine_body_whole_whoever_defines_it() {
+    for routine in [
+        "CREATE DEFINER = 'root'@'%' PROCEDURE p(IN `begin` INT) COMMENT 'a; b' NOT DETERMINISTIC BEGIN SELECT 1; END",
+        "CREATE DEFINER=`ü`@`h` FUNCTION f(n INT) RETURNS VARCHAR(10) CHARSET utf8mb4 DETERMINISTIC BEGIN RETURN 'x;'; END",
+        "CREATE FUNCTION f() RETURNS INT l: BEGIN RETURN 1; END l",
+        "create definer = current_user() trigger tr before insert on t for each row follows other begin set new.a = 1; end",
+        "CREATE EVENT e ON SCHEDULE EVERY 1 DAY DO BEGIN DELETE FROM t; END",
+    ] {
+        assert_eq!(split(&format!("{routine}; SELECT 2")), [routine, "SELECT 2"]);
+    }
+}
+
+#[test]
+fn reads_begin_as_a_name_where_no_routine_body_can_start() {
+    for sql in [
+        "CREATE TABLE t (begin INT); INSERT INTO t VALUES (1)",
+        "CREATE TABLE begin (id INT); INSERT INTO t VALUES (1)",
+        "CREATE PROCEDURE p(begin INT) SELECT begin; INSERT INTO t VALUES (1)",
+        "CREATE FUNCTION f() RETURNS INT RETURN begin; INSERT INTO t VALUES (1)",
+        "CREATE TRIGGER tr BEFORE INSERT ON begin FOR EACH ROW SET NEW.begin = 1; INSERT INTO t VALUES (1)",
+    ] {
+        let (create, insert) = sql.split_once("; ").unwrap();
+        assert_eq!(split(sql), [create, insert], "{sql}");
+    }
+}
+
+#[test]
 fn reads_begin_as_a_column_outside_a_routine() {
     assert_eq!(split("SELECT begin, `end` FROM t; SELECT 2"), ["SELECT begin, `end` FROM t", "SELECT 2"]);
 }
