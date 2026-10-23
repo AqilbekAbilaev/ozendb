@@ -269,13 +269,13 @@ export function useTableStage(t, connectionReadOnly) {
       editError.value = 'This tab is read-only.'
       return false
     }
-    const pairs = (values) => Object.entries(values).map(([column, value]) => ({ column, value }))
+    const pairs = (values, read = (held) => held) => Object.entries(values).map(([column, held]) => ({ column, value: read(held) }))
     const keyOf = (key) => JSON.parse(key).map((value, i) => ({ column: keyColumns.value[i], value }))
     const changes = {
       inserts: staged.inserts.map(draft => pairs(draft.values)),
       updates: Object.entries(staged.edits).map(([key, edits]) => ({
-        set: Object.entries(edits).map(([column, { value }]) => ({ column, value })),
-        before: Object.entries(edits).map(([column, { original }]) => ({ column, value: original })),
+        set: pairs(edits, edit => edit.value),
+        before: pairs(edits, edit => edit.original),
         where: keyOf(key),
       })),
       deletes: staged.deletedKeys.map(keyOf),
