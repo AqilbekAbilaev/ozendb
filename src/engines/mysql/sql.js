@@ -54,13 +54,12 @@ const notYet = (what) => () => Promise.reject({ code: 'not_available', message: 
 // The shared table tab names the namespace a table sits in its `schema`; on MySQL, which
 // has no schema level, that is the table's database.
 const inDatabase = ({ connectionId, schema, table }) => ({ connectionId, database: schema, table })
-const keyBySchemas = ({ fromDatabase, toDatabase, ...key }) => ({ ...key, fromSchema: fromDatabase, toSchema: toDatabase })
 
 export const api = Object.freeze({
   browseTable: (target, options) => queries.browseTable(inDatabase(target), options),
   countTable: (target, filters, joins) => queries.countTable(inDatabase(target), filters, joins),
   listColumns: (target) => resources.listColumns(inDatabase(target)),
-  listForeignKeys: async (target) => (await resources.listForeignKeys(inDatabase(target))).map(keyBySchemas),
+  listForeignKeys: (target) => resources.listForeignKeys(inDatabase(target)),
   runQuery: queries.runQuery,
   cancelQuery: queries.cancelQuery,
   // TODO #393: Explain.

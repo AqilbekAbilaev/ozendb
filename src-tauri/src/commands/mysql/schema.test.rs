@@ -74,3 +74,19 @@ fn reads_every_table_s_columns_in_one_query_each_table_looked_up_by_equality() {
     assert!(sql.contains("SELECT 0 AS place,") && sql.contains("SELECT 1 AS place,"));
     assert!(sql.trim_end().ends_with("ORDER BY place, position, constraint_name"));
 }
+
+#[test]
+fn sends_a_foreign_key_s_databases_as_the_schemas_the_table_tab_names_them_by() {
+    let key = MySqlForeignKey {
+        from_database: "shop ü".into(),
+        from_table: "orders".into(),
+        from_columns: vec!["buyer".into()],
+        to_database: "склад".into(),
+        to_table: "buyers".into(),
+        to_columns: vec!["id".into()],
+    };
+    assert_eq!(
+        serde_json::to_value(&key).unwrap(),
+        serde_json::json!({ "fromSchema": "shop ü", "fromTable": "orders", "fromColumns": ["buyer"], "toSchema": "склад", "toTable": "buyers", "toColumns": ["id"] })
+    );
+}
