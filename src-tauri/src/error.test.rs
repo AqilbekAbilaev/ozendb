@@ -137,3 +137,14 @@ fn a_statement_failing_later_in_a_script_is_named_and_keeps_its_own_code() {
     assert_eq!(error.code(), "network");
     assert_eq!(error.user_message(), format!("Statement 3 failed (the ones before it ran): {}", sqlx::Error::PoolTimedOut));
 }
+
+#[test]
+fn a_rolled_back_transaction_keeps_its_cause_s_code_and_says_what_was_lost() {
+    use super::AppError;
+    let error = AppError::RolledBack(Box::new(AppError::MySql(sqlx::Error::PoolTimedOut)));
+    assert_eq!(error.code(), "network");
+    assert_eq!(
+        error.user_message(),
+        format!("{} MySQL rolled the whole transaction back, so nothing done in it is kept; the statements after this one start a new one.", sqlx::Error::PoolTimedOut),
+    );
+}

@@ -113,6 +113,10 @@ pub enum AppError {
     /// A statement after the first in a script failed; the ones before it ran.
     #[error("Statement {number} failed (the ones before it ran): {source}")]
     InScript { number: usize, source: Box<AppError> },
+
+    /// A statement in a held transaction failed in a way that rolled the transaction back.
+    #[error("{0} MySQL rolled the whole transaction back, so nothing done in it is kept; the statements after this one start a new one.")]
+    RolledBack(Box<AppError>),
 }
 
 impl AppError {
@@ -155,7 +159,7 @@ impl AppError {
             AppError::SubscriptionActive => "subscription_active",
             AppError::Validation(_) => "validation",
             AppError::Cancelled | AppError::TimedOut => "cancelled",
-            AppError::InScript { source, .. } => source.code(),
+            AppError::InScript { source, .. } | AppError::RolledBack(source) => source.code(),
         }
     }
 }
@@ -183,6 +187,10 @@ impl AppError {
             ),
             AppError::MySql(e) => e.to_string(),
             AppError::InScript { number, source } => format!("Statement {number} failed (the ones before it ran): {}", source.user_message()),
+            AppError::RolledBack(source) => format!(
+                "{} MySQL rolled the whole transaction back, so nothing done in it is kept; the statements after this one start a new one.",
+                source.user_message(),
+            ),
             _ => self.to_string(),
         }
     }

@@ -1,7 +1,9 @@
 //! The SQL tab's Manual-mode transactions, each held open on a session of its own under
-//! an id the tab chose, until committed or rolled back. MySQL keeps a transaction going
-//! after a failed statement, so a commit keeps what did run, as it would in any client;
-//! a statement that commits by itself (DDL) ends the transaction early, as MySQL does.
+//! an id the tab chose, until committed or rolled back. The session runs with autocommit
+//! off, so whatever ends a transaction early (a statement that commits by itself, such as
+//! DDL, or a deadlock rolling it back) only starts the next one: every statement stays in
+//! a transaction until Commit or Rollback. MySQL keeps a transaction going after a failed
+//! statement, so a commit keeps what did run, as it would in any client.
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -33,12 +35,14 @@ async fn execute(conn: &mut PoolConnection<MySql>, sql: &'static str) -> Result<
 }
 
 impl MySqlTransactions {
-    /// A read-only connection holds a read-only transaction. The session is closed once
-    /// the transaction ends, as an auto-commit run's is (see `run_mysql_sql`).
+    /// A read-only connection holds read-only transactions: its session is locked, so each
+    /// one autocommit-off starts is read-only. The session is closed once the transaction
+    /// ends, as an auto-commit run's is (see `run_mysql_sql`); closing it with autocommit
+    /// off rolls back whatever wasn't committed.
     pub async fn begin(&self, pool: &MySqlPool, tx_id: &str, read_only: bool) -> Result<(), AppError> {
         let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
         conn.close_on_drop();
-        execute(&mut conn, if read_only { "START TRANSACTION READ ONLY" } else { "START TRANSACTION" }).await?;
+        execute(&mut conn, if read_only { "SET autocommit = 0, SESSION transaction_read_only = ON" } else { "SET autocommit = 0" }).await?;
         self.open.lock().unwrap().insert(tx_id.to_string(), Arc::new(tokio::sync::Mutex::new(conn)));
         Ok(())
     }
@@ -52,7 +56,7 @@ impl MySqlTransactions {
         let statements = statements(sql, read_only)?;
         let held = self.held(tx_id)?;
         let mut conn = held.lock().await;
-        run_on(&mut conn, pool, &statements, run_id, QUERY_TIME_LIMIT, read_only).await
+        run_on(&mut conn, pool, &statements, run_id, QUERY_TIME_LIMIT, read_only, true).await
     }
 
     pub async fn finish(&self, tx_id: &str, commit: bool) -> Result<(), AppError> {
