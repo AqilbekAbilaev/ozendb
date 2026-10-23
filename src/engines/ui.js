@@ -12,6 +12,7 @@ import { parseMySqlUri } from './mysql/connection/parseUri.js'
 import { parseConnectionUri } from '../utils/connectionUri.js'
 import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
 import PostgresTreeNodes from './postgresql/tree/PostgresTreeNodes.vue'
+import MySqlTreeNodes from './mysql/tree/MySqlTreeNodes.vue'
 
 // Tabs whose body is the same for every engine, so NewConnection.vue renders them itself.
 export const SHARED_TABS = ['ssh', 'general']
@@ -69,4 +70,5 @@ export const CONNECTION_EDITORS = Object.freeze({
 // its rows are still built into ConnectionTree.vue, which falls back to them.
 export const TREE_NODES = Object.freeze({
   postgresql: PostgresTreeNodes,
+  mysql: MySqlTreeNodes,
 })

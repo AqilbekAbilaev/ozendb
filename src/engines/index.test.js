@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { ENGINES, DEFAULT_ENGINE, engineOf } from './index.js'
 import { ENGINE_OPTIONS } from '../data/connectionOptions.js'
+import { listDatabases as listMySqlDatabases } from './mysql/api/resources.js'
 
 describe('the engine table', () => {
   it('has an entry, under its own id, for every engine the editor offers', () => {
@@ -40,8 +41,8 @@ describe('the engine table', () => {
     expect(ENGINES.mysql.databaseField).toEqual({ label: 'Default database', placeholder: 'optional' })
   })
 
-  it('refuses to list a MySQL server until one can be browsed', async () => {
-    await expect(ENGINES.mysql.loadResources('conn 1')).rejects.toThrow('isn’t available yet')
+  it('lists a MySQL server\'s databases as its top level', () => {
+    expect(ENGINES.mysql.loadResources).toBe(listMySqlDatabases)
   })
 })
 

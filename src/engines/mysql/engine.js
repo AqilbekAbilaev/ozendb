@@ -1,5 +1,6 @@
 // MySQL's entry in the engine table (engines/index.js).
 import { buildSqlFields } from '../sql/connection/fields.js'
+import { listDatabases } from './api/resources.js'
 
 export const mysql = Object.freeze({
   id: 'mysql',
@@ -10,8 +11,5 @@ export const mysql = Object.freeze({
   // How the server section of the connection editor labels that database.
   databaseField: Object.freeze({ label: 'Default database', placeholder: 'optional' }),
   buildFields: buildSqlFields,
-  // TODO #387: list the server's databases once a MySQL connection can connect (#386).
-  loadResources: async () => {
-    throw new Error('Browsing a MySQL connection isn’t available yet.')
-  },
+  loadResources: listDatabases,
 })
