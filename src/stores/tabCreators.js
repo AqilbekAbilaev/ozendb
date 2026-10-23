@@ -233,6 +233,13 @@ export function openPostgresTable({ connectionId, connectionName, database, sche
   activateTab(tab.id)
 }
 
+// A MySQL table, a new tab every time, on its `database/table` ref.
+export function openMySqlTable({ resource, connectionName }) {
+  const tab = newWorkspace('mysql.table_browse', { target: { resource, connectionName } })
+  tabs.value.push(tab)
+  activateTab(tab.id)
+}
+
 // Search in Schema, a new tab every time, as MongoDB's Search in… is (#180).
 export function openPostgresSearch({ connectionId, connectionName, database, schema }) {
   const tab = newWorkspace('postgresql.search', {

@@ -3,6 +3,8 @@ import { computed, watch } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import { useMySqlTree, visibleDatabases } from './useMySqlTree.js'
 import { contextMenu } from '../../../stores/contextMenu'
+import { activeTab } from '../../../stores/tabs'
+import { openMySqlTable } from '../../../stores/tabCreators'
 import { treeSelection, setTreeSelection } from '../../../stores/connectionNavigation'
 import { MYSQL_MENUS } from './contextMenus.js'
 import { tagOverrides } from '../../../stores/nodeTags'
@@ -48,8 +50,12 @@ function select(database, table = null) {
   })
 }
 const isSelected = (database, table = null) => sameResource(treeSelection.value?.resource, rowResource(database, table))
+// The open table tab's row is highlighted too, as PostgreSQL's is.
+const isOpen = (database, table) => sameResource(activeTab.value?.target, rowResource(database, table))
 // The row whose right-click menu is open stays highlighted, as the other engines' do.
 const ctxSel = (database, table = null) => sameResource(contextMenu.value?.nodeData?.resource, rowResource(database, table))
+
+const openTable = (database, table) => openMySqlTable({ resource: rowResource(database, table), connectionName: props.conn.name })
 
 function onContext(e, level, label, database, table = null) {
   const node = { connId: props.conn.id, connName: props.conn.name, engine: 'mysql', resource: rowResource(database, table) }
@@ -90,13 +96,14 @@ function onContext(e, level, label, database, table = null) {
       <template v-for="table in tables[database.name]" :key="table.name">
         <div
           class="tnode"
-          :class="{ 'ctx-sel': ctxSel(database.name, table.name), sel: isSelected(database.name, table.name) }"
+          :class="{ 'ctx-sel': ctxSel(database.name, table.name), sel: isSelected(database.name, table.name) || isOpen(database.name, table.name) }"
           v-bind="rowTag"
           style="padding-left: 51px"
-          @click="toggleTable(database.name, table.name); select(database.name, table.name)"
+          @click="select(database.name, table.name)"
+          @dblclick="openTable(database.name, table.name)"
           @contextmenu.prevent="onContext($event, 'table', table.name, database.name, table.name)"
         >
-          <span class="tw"><BaseIcon :name="isTableOpen(database.name, table.name) ? 'caretDown' : 'caret'" :size="12" /></span>
+          <span class="tw" @click.stop="toggleTable(database.name, table.name)"><BaseIcon :name="isTableOpen(database.name, table.name) ? 'caretDown' : 'caret'" :size="12" /></span>
           <span class="ti"><BaseIcon name="table" :size="15" /></span>
           <span class="tt">{{ table.name }}</span>
           <span
