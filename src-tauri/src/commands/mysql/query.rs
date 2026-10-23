@@ -34,8 +34,12 @@ fn number(e: &sqlx::Error) -> Option<u16> {
 /// One statement. It is prepared, so its cells arrive in the binary form cell.rs reads
 /// and a query that returns no rows still names its columns. A CALL names them only in
 /// the rows it returns, and only its first result is kept. One that can't be prepared
-/// runs as text and returns none.
-async fn run_one(conn: &mut MySqlConnection, sql: &str) -> Result<SqlQueryResult, AppError> {
+/// runs as text and returns none. Past the row cap, a query on a session that is `held`
+/// open is read to its end all the same: MySQL waits on a result nobody reads, and gives
+/// up on its session after `net_write_timeout`, taking the transaction with it. One that
+/// isn't held stops reading there, since its session closes after the run; a CALL is
+/// read on, as its procedure may still be writing after its first result.
+async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<SqlQueryResult, AppError> {
     let started = std::time::Instant::now();
     let elapsed_ms = || started.elapsed().as_millis() as u64;
     let prepared = match (&mut *conn).prepare(sqlx::AssertSqlSafe(sql.to_string()).into_sql_str()).await {
@@ -47,6 +51,7 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str) -> Result<SqlQueryResult
         Err(e) => return Err(AppError::MySql(e)),
     };
     let mut columns: Vec<String> = prepared.columns().iter().map(|c| c.name().to_string()).collect();
+    let read_to_the_end = held || columns.is_empty();
     let (mut rows, mut truncated, mut affected, mut first_done) = (Vec::new(), false, 0, false);
     let mut stream = (&mut *conn).fetch_many(sqlx::query(sqlx::AssertSqlSafe(sql.to_string())));
     while let Some(item) = stream.try_next().await.map_err(AppError::MySql)? {
@@ -56,7 +61,12 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str) -> Result<SqlQueryResult
                 first_done |= !columns.is_empty();
             }
             Either::Right(_) if first_done => {}
-            Either::Right(_) if rows.len() as i64 == ROW_RESULT_CAP => truncated = true,
+            Either::Right(_) if rows.len() as i64 == ROW_RESULT_CAP => {
+                truncated = true;
+                if !read_to_the_end {
+                    break;
+                }
+            }
             Either::Right(row) => {
                 if columns.is_empty() {
                     columns = row.columns().iter().map(|c| c.name().to_string()).collect();
@@ -93,7 +103,7 @@ pub(super) async fn run_on(
             if read_only {
                 sqlx::raw_sql(READ_ONLY_LOCK).execute(&mut *conn).await.map_err(AppError::MySql)?;
             }
-            let outcome = run.limited(pool, limit, run_one(conn, statement)).await.map_err(|e| match e {
+            let outcome = run.limited(pool, limit, run_one(conn, statement, held)).await.map_err(|e| match e {
                 AppError::MySql(e) if held && number(&e) == Some(DEADLOCK) => AppError::RolledBack(Box::new(AppError::MySql(e))),
                 e => e,
             });
