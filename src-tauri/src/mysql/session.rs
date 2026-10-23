@@ -11,8 +11,15 @@ const MAX_EXECUTION_TIME_MS: u32 = 300_000;
 /// MySQL has no time limit for a write. A `read_only` connection is enforced on the
 /// server, as PostgreSQL's is, so a write is refused whatever SQL it came from.
 // MariaDB names the time limit `max_statement_time`, in seconds, and would refuse this.
+// NO_BACKSLASH_ESCAPES is dropped because the filters' LIKE patterns (commands/mysql/
+// browse.rs) and the SQL the table tab writes (engines/mysql/sql.js) escape with
+// backslashes; a server that sets it would read them as literal text. MySQL accepts the
+// empty mode or stray comma REPLACE can leave.
 pub(crate) fn setup_statement(read_only: bool) -> String {
-    let mut statement = format!("SET SESSION max_execution_time = {MAX_EXECUTION_TIME_MS}");
+    let mut statement = format!(
+        "SET SESSION max_execution_time = {MAX_EXECUTION_TIME_MS}, \
+         SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_BACKSLASH_ESCAPES', '')"
+    );
     if read_only {
         statement.push_str(", SESSION transaction_read_only = ON");
     }
