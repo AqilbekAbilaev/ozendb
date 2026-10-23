@@ -4,7 +4,8 @@ import { reactive } from 'vue'
 const browseTable = vi.fn()
 const countTable = vi.fn()
 const listColumns = vi.fn()
-vi.mock('../api/queries', () => ({ browseTable, countTable }))
+const saveRows = vi.fn()
+vi.mock('../api/queries', () => ({ browseTable, countTable, saveRows }))
 vi.mock('../api/resources', async (original) => ({ ...(await original()), listColumns }))
 
 const { mysqlDefinitions } = await import('./mysqlDefinitions.js')
@@ -47,5 +48,33 @@ describe('mysql.table_browse', () => {
     expect(t.rows.value).toEqual([['18446744073709551615', 'a']])
     expect(t.total.value).toBe(1)
     expect(t.currentSql.value).toBe('SELECT *\nFROM `shop ``2024`` ü`.`order items`\nORDER BY `id` ASC\nLIMIT 100;')
+  })
+
+  it('saves an edited cell by its row\'s primary key, in the table\'s database', async () => {
+    const created = opened()
+    const tab = reactive({ ...created.fields, target: created.target, engine: 'mysql' })
+    const t = useSqlTable(tab, { readOnly: false })
+    await t.load()
+    expect(t.canEdit('note', 0)).toBe(true)
+    t.stageEdit(0, 'note', 'b ü')
+    expect(await t.saveChanges()).toBe(true)
+    expect(saveRows).toHaveBeenCalledWith({ connectionId: 'c1', database: 'shop `2024` ü', table: 'order items' }, {
+      inserts: [],
+      updates: [{ set: [{ column: 'note', value: 'b ü' }], before: [{ column: 'note', value: 'a' }], where: [{ column: 'id', value: '18446744073709551615' }] }],
+      deletes: [],
+    })
+  })
+
+  it('keeps a table without a primary key, or on a read-only connection, from being edited', async () => {
+    const created = opened()
+    const tab = reactive({ ...created.fields, target: created.target, engine: 'mysql' })
+    listColumns.mockResolvedValue(COLUMNS.map(column => ({ ...column, isPrimaryKey: false })))
+    const keyless = useSqlTable(tab, { readOnly: false })
+    await keyless.load()
+    expect(keyless.canEdit('note', 0)).toBe(false)
+    listColumns.mockResolvedValue(COLUMNS)
+    const readOnly = useSqlTable(reactive({ ...opened().fields, target: created.target, engine: 'mysql' }), { readOnly: true })
+    await readOnly.load()
+    expect(readOnly.canEdit('note', 0)).toBe(false)
   })
 })

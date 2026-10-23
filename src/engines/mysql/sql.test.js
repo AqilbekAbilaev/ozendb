@@ -107,9 +107,9 @@ describe('api', () => {
     expect(invoke).not.toHaveBeenCalled()
   })
 
-  it('offers no row writes yet, so its table tabs open read-only', () => {
-    expect(api.insertRow).toBeUndefined()
-    expect(api.updateRow).toBeUndefined()
-    expect(api.deleteRows).toBeUndefined()
+  it('saves a table\'s changes in one command, by the table\'s database', async () => {
+    const changes = { inserts: [[{ column: 'note', value: 'ü' }]], updates: [], deletes: [] }
+    await api.saveRows(target, changes)
+    expect(invoke).toHaveBeenCalledWith('save_mysql_rows', { id: 'c1', database: 'shop.eu', table: 'order items', changes })
   })
 })
