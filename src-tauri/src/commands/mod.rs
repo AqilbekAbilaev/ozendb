@@ -12,6 +12,7 @@ mod access;
 pub mod account;
 pub mod connection;
 pub mod mongo;
+pub mod mysql;
 pub mod postgres;
 pub mod sql;
 pub mod persistence;
@@ -25,6 +26,7 @@ pub mod updater;
 pub use account::*;
 pub use connection::*;
 pub use mongo::*;
+pub use mysql::*;
 pub use postgres::*;
 pub use persistence::*;
 pub use folders::*;
@@ -157,6 +159,13 @@ impl AppContext {
     /// `pg_pool_for_database`.
     pub async fn pg_pool_for_write_for_database(&self, id: &str, database: Option<&str>) -> Result<sqlx::PgPool, AppError> {
         self.pool.connect_postgres(&config_for(&self.storage, id, Access::Write)?, database).await
+    }
+
+    /// The MySQL sibling of `pg_pool_for_database`. `None` opens the connection's own
+    /// default database, if it has one. A `read_only` connection is also enforced on
+    /// the server (`mysql::session`).
+    pub async fn mysql_pool(&self, id: &str, database: Option<&str>) -> Result<sqlx::MySqlPool, AppError> {
+        self.pool.connect_mysql(&config_for(&self.storage, id, Access::Read)?, database).await
     }
 
     /// Whether the connection is marked `read_only` — for a command that must
