@@ -179,11 +179,22 @@ ResourceRefs.
 - **Tests:** the `live_tests/pg*.rs` files run against a live server when
   `OZENDB_TEST_POSTGRES` is set, and are skipped otherwise.
 
+## MySQL (preview)
+
+The third engine, following PostgreSQL's layout. Its resources are `database/table` ResourceRefs:
+MySQL has no schema level, and one connection reaches every database on its server.
+
+- **Frontend: `src/engines/mysql/`.** `connection/` holds the URI parsing, `tree/` the sidebar's
+  database → table → columns rows and their menus, and `api/` its half of the Tauri boundary.
+- **Backend: `src-tauri/src/commands/mysql/`**, resolving a pool through `ctx.mysql_pool`, and the
+  `src-tauri/src/mysql/` modules described below.
+- **Tests:** the `live_tests/mysql*.rs` files run when `OZENDB_TEST_MYSQL` is set.
+
 ## Rust backend (`src-tauri/src/`)
 
 | File | Responsibility |
 |---|---|
-| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds `AppContext` — the pool + storage bundle every connection-touching command takes as its single `State`, whose `client` / `client_for_write` / `collection` / `collection_for_write` methods (and `pg_pool` / `pg_pool_for_write` for PostgreSQL) are the one place a connection resolves to a live client — plus the EJSON/CSV parse helpers. PostgreSQL's commands live under `commands/postgres/`. |
+| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds `AppContext` — the pool + storage bundle every connection-touching command takes as its single `State`, whose `client` / `client_for_write` / `collection` / `collection_for_write` methods (and `pg_pool` / `pg_pool_for_write` for PostgreSQL, `mysql_pool` for MySQL) are the one place a connection resolves to a live client — plus the EJSON/CSV parse helpers. PostgreSQL's commands live under `commands/postgres/`, MySQL's under `commands/mysql/`. |
 | `pool.rs` | `ConnectionPool`: one `Client` per MongoDB connection id, or one `PgPool` per PostgreSQL `(connection, database)` — Postgres has no per-query `USE` — or one `MySqlPool` per MySQL `(connection, database)`, behind a `tokio::Mutex` (and the live `SshTunnel` for tunnelled connections). `connect()` returns the cached client on a hit and only reads the keychain / builds the URI on a miss. |
 | `storage/mod.rs` | JSON persistence for `ConnectionConfig` (`connections.json`). Read-modify-write goes through the locked `update_with`; the raw `save` is private so writes can't bypass the lock. Most other JSON stores (`folders`, `history`, `saved_queries`, `default_queries`, `settings`, `shell_history`, `known_hosts`, `node_tags`, `collection_history`, `keybindings`, `export_watermarks`, `operations`) share the same shape via the generic `JsonStore<T>` in `json_store.rs`. `tabs.rs` and `storage/mod.rs` are deliberately bespoke — each carries a comment saying why. |
 | `persist.rs` | `atomic_write()` — write-to-temp-then-rename so a crash can't leave a truncated file. Shared by every JSON store. |
@@ -193,10 +204,10 @@ ResourceRefs.
 | `uri/mod.rs` | `build_uri()` assembles the connection string from a config; `with_timeout()` appends MongoDB timeout params; `tcp_probe()` does a fast TCP check before the MongoDB handshake. |
 | `error.rs` | `AppError` enum serialized as `{ code, message }` so the frontend gets a stable category plus a human-readable message. |
 | `menu.rs` | Native OS menu (source of truth). Also opens the document editor/viewer as a **second Tauri webview window** at `src/pages/document.html` (registered as a Vite entry in `vite.config.js`). See "Native menu" below. |
-| `commands/mongo/`, `commands/postgres/` | Each engine's commands. The rest of `commands/` is engine-neutral: connections, persistence, folders, operations, the error log, the updater, and the CSV import/export helpers both engines' transfers use. `commands/access.rs` is the one lookup and read-only gate behind every `AppContext` resolver. |
+| `commands/mongo/`, `commands/postgres/`, `commands/mysql/` | Each engine's commands. The rest of `commands/` is engine-neutral: connections, persistence, folders, operations, the error log, the updater, and the CSV import/export helpers both engines' transfers use. `commands/access.rs` is the one lookup and read-only gate behind every `AppContext` resolver. |
 | `commands/sql/` | What every SQL engine's commands share without talking to a server: the filter, join and result shapes, the row cap, and reading SQL with `sqlparser` (format, read back into filters, refuse typed transaction control) in the dialect the engine passes in. |
 | `postgres/` | PostgreSQL outside the command layer: `uri.rs` (connect options) and the `query_library` / `row_history` stores. |
-| `mysql/` | MySQL outside the command layer: `uri.rs` (the connect options the pool and Test Connection dial with, and the Copy URI string). A MySQL connection can be tested, saved and pooled, but not yet browsed (#387). |
+| `mysql/` | MySQL outside the command layer: `uri.rs` (the connect options the pool and Test Connection dial with, and the Copy URI string) and `session.rs` (the time limit, and for a read-only connection the server-side read-only mode, that every new session sets, since sqlx's MySQL options carry no session variables). |
 | `live_tests/` | Tests against a live server, skipped unless `OZENDB_TEST_MONGODB` / `OZENDB_TEST_POSTGRES` / `OZENDB_TEST_MYSQL` is set. `cargo test live_tests::pg` runs just the PostgreSQL ones. |
 
 ## Native menu
