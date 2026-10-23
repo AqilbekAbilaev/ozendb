@@ -39,3 +39,16 @@ fn says_why_sql_it_cannot_read_is_left_alone() {
     assert!(format_sql("selec 1").is_err());
     assert!(format_sql("   ").is_err());
 }
+
+#[test]
+fn keeps_every_string_exactly_as_it_was_written() {
+    use sqlparser::dialect::{MySqlDialect, PostgreSqlDialect};
+    let mysql = super::format_sql(&MySqlDialect {}, r"SELECT 'a\\b', 'it\'s', 'x%\_y'").unwrap();
+    for string in [r"'a\\b'", r"'it\'s'", r"'x%\_y'"] {
+        assert!(mysql.contains(string), "{string} in {mysql}");
+    }
+    let postgres = super::format_sql(&PostgreSqlDialect {}, r"SELECT 'it''s', E'a\nb', 'c\d'").unwrap();
+    for string in [r"'it''s'", r"E'a\nb'", r"'c\d'"] {
+        assert!(postgres.contains(string), "{string} in {postgres}");
+    }
+}

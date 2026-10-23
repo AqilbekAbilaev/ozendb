@@ -1,5 +1,5 @@
 use sqlparser::dialect::Dialect;
-use sqlparser::parser::Parser;
+use sqlparser::parser::{Parser, ParserOptions};
 use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
 /// The SQL laid out one clause per line, by sqlparser's own pretty-printer (`{:#}`),
@@ -13,7 +13,13 @@ pub(crate) fn format_sql(dialect: &dyn Dialect, sql: &str) -> Result<String, Str
     if tokens.iter().any(is_comment) {
         return Err("SQL with comments isn't formatted, since formatting would drop them.".to_string());
     }
-    let statements = Parser::parse_sql(dialect, sql).map_err(|e| e.to_string())?;
+    // Escapes kept as written, so each string comes back exactly as typed rather than
+    // unescaped and written out again without them.
+    let statements = Parser::new(dialect)
+        .with_options(ParserOptions::new().with_unescape(false))
+        .try_with_sql(sql)
+        .and_then(|mut parser| parser.parse_statements())
+        .map_err(|e| e.to_string())?;
     if statements.is_empty() {
         return Err("There's no SQL to format.".to_string());
     }
