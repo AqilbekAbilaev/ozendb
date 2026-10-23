@@ -174,6 +174,74 @@ pub async fn list_mysql_columns(
     mysql_columns(&ctx.mysql_pool(&id, None).await?, &database, &table).await
 }
 
+/// One foreign key: `from_columns` hold the key, `to_columns` the columns they reference,
+/// pairwise in the key's order. The table it points at may be in another database.
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MySqlForeignKey {
+    pub from_database: String,
+    pub from_table: String,
+    pub from_columns: Vec<String>,
+    pub to_database: String,
+    pub to_table: String,
+    pub to_columns: Vec<String>,
+}
+
+/// One column of a foreign key as the catalog lists it: the key's database, table and
+/// name, then the column and the one it references.
+type KeyColumn = (String, String, String, String, String, String, String);
+
+/// Catalog rows, each key's columns side by side in the key's order, as one key apiece.
+fn foreign_keys(rows: Vec<KeyColumn>) -> Vec<MySqlForeignKey> {
+    let mut keys: Vec<(String, MySqlForeignKey)> = Vec::new();
+    for (from_database, from_table, constraint, from_column, to_database, to_table, to_column) in rows {
+        match keys.last_mut() {
+            Some((name, key)) if (&key.from_database, &key.from_table, &*name) == (&from_database, &from_table, &constraint) => {
+                key.from_columns.push(from_column);
+                key.to_columns.push(to_column);
+            }
+            _ => keys.push((
+                constraint,
+                MySqlForeignKey { from_database, from_table, from_columns: vec![from_column], to_database, to_table, to_columns: vec![to_column] },
+            )),
+        }
+    }
+    keys.into_iter().map(|(_, key)| key).collect()
+}
+
+/// The foreign keys linking `database.table` to other tables, whichever side it is on:
+/// what a join from this table can follow.
+pub(crate) async fn mysql_foreign_keys(pool: &MySqlPool, database: &str, table: &str) -> Result<Vec<MySqlForeignKey>, AppError> {
+    let rows: Vec<KeyColumn> = sqlx::query_as(
+        r#"
+        SELECT TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, COLUMN_NAME,
+            REFERENCED_TABLE_SCHEMA, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE REFERENCED_TABLE_NAME IS NOT NULL
+            AND ((TABLE_SCHEMA = ? AND TABLE_NAME = ?) OR (REFERENCED_TABLE_SCHEMA = ? AND REFERENCED_TABLE_NAME = ?))
+        ORDER BY TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION
+        "#,
+    )
+    .bind(database)
+    .bind(table)
+    .bind(database)
+    .bind(table)
+    .fetch_all(pool)
+    .await
+    .map_err(AppError::MySql)?;
+    Ok(foreign_keys(rows))
+}
+
+#[tauri::command]
+pub async fn list_mysql_foreign_keys(
+    ctx: State<'_, AppContext>,
+    id: String,
+    database: String,
+    table: String,
+) -> Result<Vec<MySqlForeignKey>, AppError> {
+    mysql_foreign_keys(&ctx.mysql_pool(&id, None).await?, &database, &table).await
+}
+
 #[cfg(test)]
 #[path = "schema.test.rs"]
 mod tests;

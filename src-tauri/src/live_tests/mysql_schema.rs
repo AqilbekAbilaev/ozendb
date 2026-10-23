@@ -1,7 +1,7 @@
 //! Live tests of the MySQL sidebar's catalog reads, against the server `mysql.rs` describes.
 
 use super::mysql::{connect, password, run, test_config, SKIP};
-use crate::commands::{mysql_columns, mysql_databases, mysql_tables, MySqlReference};
+use crate::commands::{mysql_columns, mysql_databases, mysql_foreign_keys, mysql_tables, MySqlForeignKey, MySqlReference};
 use crate::mysql::uri::build_options;
 use sqlx::{Connection, MySqlPool};
 
@@ -124,4 +124,43 @@ async fn only_a_generated_column_is_flagged_generated() {
     assert_eq!(numbered, [true, false, false, false, false]);
     admin.close().await.unwrap();
     drop_seeded(&config, pool, &name).await;
+}
+
+#[tokio::test]
+async fn foreign_keys_are_listed_from_either_side_whole_and_across_databases() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let (name, other) = (database("keys"), database("keys elsewhere"));
+    let pool = seeded(&config, &name).await;
+    let mut admin = connect(&config, "").await;
+    for statement in [
+        format!("DROP DATABASE IF EXISTS {}", quoted(&other)),
+        format!("CREATE DATABASE {}", quoted(&other)),
+        format!("CREATE TABLE {}.`склад` (`zone ``z``` INT, slot INT, PRIMARY KEY (slot, `zone ``z```))", quoted(&other)),
+        format!(
+            "CREATE TABLE {}.`shelf ü` (id INT PRIMARY KEY, `at zone` INT, `at slot` INT, \
+             CONSTRAINT `shelf, place` FOREIGN KEY (`at slot`, `at zone`) REFERENCES {}.`склад` (slot, `zone ``z```))",
+            quoted(&name),
+            quoted(&other)
+        ),
+    ] {
+        run(&mut admin, &statement).await;
+    }
+    let key = |from: (&str, &str, &[&str]), to: (&str, &str, &[&str])| MySqlForeignKey {
+        from_database: from.0.into(),
+        from_table: from.1.into(),
+        from_columns: from.2.iter().map(|c| c.to_string()).collect(),
+        to_database: to.0.into(),
+        to_table: to.1.into(),
+        to_columns: to.2.iter().map(|c| c.to_string()).collect(),
+    };
+    let shelf = key((&name, "shelf ü", &["at slot", "at zone"]), (&other, "склад", &["slot", "zone `z`"]));
+    let buyer = key((&name, "order items", &["buyer `id`"]), (&name, "клиенты ü", &["id key"]));
+    assert_eq!(mysql_foreign_keys(&pool, &name, "shelf ü").await.unwrap(), std::slice::from_ref(&shelf));
+    assert_eq!(mysql_foreign_keys(&pool, &other, "склад").await.unwrap(), [shelf]);
+    assert_eq!(mysql_foreign_keys(&pool, &name, "клиенты ü").await.unwrap(), std::slice::from_ref(&buyer));
+    assert_eq!(mysql_foreign_keys(&pool, &name, "order items").await.unwrap(), [buyer]);
+    // The shelf's database first: its key holds the other's table.
+    drop_seeded(&config, pool, &name).await;
+    run(&mut admin, &format!("DROP DATABASE {}", quoted(&other))).await;
+    admin.close().await.unwrap();
 }
