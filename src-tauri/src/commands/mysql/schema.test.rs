@@ -1,4 +1,4 @@
-use super::{enum_values, is_system_database, table_kind};
+use super::{enum_values, foreign_keys, is_system_database, table_kind, MySqlForeignKey};
 
 #[test]
 fn flags_mysql_s_own_databases_as_system() {
@@ -38,4 +38,30 @@ fn gives_no_labels_for_any_other_column_type() {
     assert_eq!(enum_values("set('a','b')"), None);
     assert_eq!(enum_values("varchar(20)"), None);
     assert_eq!(enum_values("int unsigned"), None);
+}
+
+fn key_column(database: &str, table: &str, constraint: &str, column: &str, to: &str) -> (String, String, String, String, String, String, String) {
+    (database.into(), table.into(), constraint.into(), column.into(), "склад, b".into(), "bins".into(), to.into())
+}
+
+#[test]
+fn gathers_a_key_s_columns_in_order_and_keeps_keys_apart() {
+    let keys = foreign_keys(vec![
+        key_column("shop", "shelf ü", "place, 1", "at slot", "slot"),
+        key_column("shop", "shelf ü", "place, 1", "at zone", "zone"),
+        key_column("shop", "shelf ü", "place, 2", "at slot", "slot"),
+        key_column("shop", "rack", "place, 1", "at slot", "slot"),
+    ]);
+    let key = |table: &str, from: &[&str], to: &[&str]| MySqlForeignKey {
+        from_database: "shop".into(),
+        from_table: table.into(),
+        from_columns: from.iter().map(|c| c.to_string()).collect(),
+        to_database: "склад, b".into(),
+        to_table: "bins".into(),
+        to_columns: to.iter().map(|c| c.to_string()).collect(),
+    };
+    assert_eq!(
+        keys,
+        [key("shelf ü", &["at slot", "at zone"], &["slot", "zone"]), key("shelf ü", &["at slot"], &["slot"]), key("rack", &["at slot"], &["slot"])]
+    );
 }
