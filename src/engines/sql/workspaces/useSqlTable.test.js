@@ -20,6 +20,7 @@ vi.mock('../../postgresql/api/queries', () => ({
 }))
 vi.mock('../../postgresql/api/resources', async (original) => ({ ...(await original()), listColumns, listForeignKeys }))
 vi.mock('../../postgresql/api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 const { useSqlTable } = await import('./useSqlTable.js')
 const { createTableState, createTableUi, createTableRuntime } = await import('./tableState.js')
@@ -974,6 +975,25 @@ describe('the tab\'s own read-only lock', () => {
     const t = await loaded({ readOnly: true })
     expect(t.tabReadOnly.value).toBe(false)
     expect(t.canEdit('name')).toBe(false)
+  })
+})
+
+describe('an engine that cannot save rows yet', () => {
+  it('opens its table tab read-only', async () => {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const answers = {
+      browse_mysql_table: { columns: ['id', 'name'], rows: [[1, 'Ada']], truncated: false, elapsedMs: 1 },
+      count_mysql_table: 1,
+      list_mysql_columns: COLUMNS.slice(0, 2),
+    }
+    invoke.mockImplementation((command) => Promise.resolve(answers[command]))
+    const mysqlRef = createResourceRef('c1', [{ kind: 'database', name: 'shop.eu' }, { kind: 'table', name: 'order items' }])
+    const tab = reactive({ target: mysqlRef, state: createTableState({ limit: 50 }), ui: createTableUi(), runtime: createTableRuntime('mysql', 'c1'), engine: 'mysql' })
+    const t = useSqlTable(tab, { readOnly: false })
+    await t.load()
+    expect(t.rows.value).toHaveLength(1)
+    expect(t.canEdit('name')).toBe(false)
+    expect(t.addRow()).toBe(null)
   })
 })
 

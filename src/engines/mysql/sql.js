@@ -59,13 +59,12 @@ export const api = Object.freeze({
   listSaved: notYet('Saved queries'),
   saveQuery: notYet('Saved queries'),
   deleteSaved: notYet('Saved queries'),
-  // TODO #390: saving a table's edited, added and deleted rows.
-  beginTransaction: notYet('Saving rows'),
-  commitTransaction: notYet('Saving rows'),
-  rollbackTransaction: notYet('Saving rows'),
-  insertRow: notYet('Saving rows'),
-  updateRow: notYet('Saving rows'),
-  deleteRows: notYet('Saving rows'),
+  // SQL mode's transactions (runSql.js), part of running SQL.
+  beginTransaction: notYet('Running SQL'),
+  commitTransaction: notYet('Running SQL'),
+  rollbackTransaction: notYet('Running SQL'),
+  // TODO #390: insertRow, updateRow and deleteRows, to save a table's edited, added and
+  // deleted rows; without them useSqlTable opens the table read-only.
 })
 
 export const mysqlSql = Object.freeze({
