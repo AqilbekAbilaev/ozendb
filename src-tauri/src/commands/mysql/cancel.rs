@@ -13,7 +13,7 @@ use sqlx::{Connection, MySqlPool};
 use tauri::State;
 
 use super::AppContext;
-use crate::error::AppError;
+use crate::error::{mysql_number, AppError};
 
 /// MySQL's `max_execution_time` stopping a SELECT.
 const TIME_LIMIT_EXCEEDED: u16 = 3024;
@@ -108,11 +108,7 @@ impl Run {
         };
         self.running.stopped()?;
         match outcome {
-            Err(AppError::MySql(sqlx::Error::Database(e)))
-                if e.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>().is_some_and(|e| e.number() == TIME_LIMIT_EXCEEDED) =>
-            {
-                Err(AppError::TimedOut)
-            }
+            Err(AppError::MySql(e)) if mysql_number(&e) == Some(TIME_LIMIT_EXCEEDED) => Err(AppError::TimedOut),
             outcome => outcome,
         }
     }

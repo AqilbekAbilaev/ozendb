@@ -321,12 +321,20 @@ fn mysql_code(e: &sqlx::Error) -> &'static str {
         sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("28000") => "auth",
         // MySQL files both under SQLSTATE 42000, so its own error numbers tell them apart:
         // no access to a database or table, and a database or table that doesn't exist.
-        sqlx::Error::Database(db_err) => match db_err.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>().map(|e| e.number()) {
+        sqlx::Error::Database(_) => match mysql_number(e) {
             Some(1044) | Some(1142) => "forbidden",
             Some(1049) | Some(1146) => "missing",
             _ => "command",
         },
         _ => sqlx_code(e).unwrap_or("mysql"),
+    }
+}
+
+/// The number MySQL gave an error it answered with; None for one that never reached it.
+pub(crate) fn mysql_number(e: &sqlx::Error) -> Option<u16> {
+    match e {
+        sqlx::Error::Database(db_err) => db_err.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>().map(|e| e.number()),
+        _ => None,
     }
 }
 
