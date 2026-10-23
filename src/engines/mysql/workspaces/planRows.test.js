@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { planRows } from './planRows.js'
-import { analyzedPlan, estimatedPlan, classicJoin, classicUnion, classicDerived, classicSubqueries, classicDelete } from './planRows.fixtures.js'
+import { analyzedPlan, estimatedPlan, classicJoin, classicUnion, classicDerived, classicSubqueries, classicDelete,
+  treeJoin, treeUnion, treeDerived, treeSubquery, treeNeverExecuted } from './planRows.fixtures.js'
 
 describe('planRows of an analyzed plan', () => {
   const { rows, planningMs, executionMs, estimated } = planRows(analyzedPlan)
@@ -123,5 +124,46 @@ describe('planRows of a plan in the classic format', () => {
       [1, 'Filter: (`explain probe`.`pets`.`owner_id` = 1)'],
       [2, 'Index range scan on pets using by_owner'],
     ])
+  })
+})
+
+describe('planRows of EXPLAIN ANALYZE\'s tree', () => {
+  const steps = (plan) => planRows(plan).rows.map(r => [r.depth, r.node])
+
+  it('lists the same steps the second JSON version does, a heading such as Hash folded into the step under it', () => {
+    expect(steps(treeJoin)).toEqual(steps(analyzedPlan))
+  })
+
+  it('times each step over all its loops, sizes its bar against the whole query, and marks the slowest', () => {
+    const { rows, planningMs, executionMs, estimated } = planRows(treeJoin)
+    expect([planningMs, executionMs, estimated]).toEqual([null, 0.156, false])
+    expect(rows[0].share).toBe(1)
+    expect(rows[8].ms).toBeCloseTo(0.0148, 6)
+    expect(rows[8].rows).toBe(1.5)
+    expect(rows.filter(r => r.hot).map(r => r.node)).toEqual(['Aggregate using temporary table'])
+  })
+
+  it('leaves a step that never ran without rows or a time', () => {
+    expect(planRows(treeNeverExecuted).rows[2]).toMatchObject({ node: 'Index lookup on p using by_owner (owner_id=o.id)', rows: null, ms: null })
+  })
+
+  it('puts a select-list subquery beside its query, and counts both in the execution time', () => {
+    const { executionMs } = planRows(treeSubquery)
+    expect(steps(treeSubquery)).toEqual([
+      [0, 'Covering index scan on o using by_name'],
+      [0, 'Aggregate: count(0)'],
+      [1, 'Covering index lookup on p using by_owner (owner_id=o.id)'],
+    ])
+    expect(executionMs).toBeCloseTo(0.0409 + 0.0133 * 3, 6)
+  })
+
+  it('nests a union\'s halves and a derived table\'s source under what reads them', () => {
+    expect(steps(treeUnion)).toEqual([
+      [0, 'Table scan on <union temporary>'],
+      [1, 'Union materialize with deduplication'],
+      [2, 'Covering index scan on owners using by_name'],
+      [2, 'Table scan on pets'],
+    ])
+    expect(steps(treeDerived).map(([depth]) => depth)).toEqual([0, 1, 2, 3, 4])
   })
 })

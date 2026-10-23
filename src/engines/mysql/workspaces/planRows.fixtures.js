@@ -562,3 +562,52 @@ export const classicDelete = {
     }
   }
 }
+
+// Real plans as EXPLAIN ANALYZE's tree, the text MySQL 8.0.18 – 8.2 gives, captured from
+// MySQL 8.0 on the same tables.
+
+// A join with an IN subquery, a GROUP BY and an ORDER BY.
+export const treeJoin = [
+  "-> Sort: `COUNT(*)` DESC  (actual time=0.156..0.156 rows=2 loops=1)",
+  "    -> Table scan on <temporary>  (actual time=0.145..0.145 rows=2 loops=1)",
+  "        -> Aggregate using temporary table  (actual time=0.144..0.144 rows=2 loops=1)",
+  "            -> Nested loop inner join  (cost=1.92 rows=1) (actual time=0.0622..0.0704 rows=3 loops=1)",
+  "                -> Hash semijoin (pets.owner_id = o.id)  (cost=1.07 rows=0.75) (actual time=0.0506..0.0534 rows=2 loops=1)",
+  "                    -> Covering index scan on o using by_name  (cost=0.55 rows=3) (actual time=0.00799..0.00952 rows=3 loops=1)",
+  "                    -> Hash",
+  "                        -> Filter: (pets.kind = 'cat')  (cost=0.217 rows=1) (actual time=0.0244..0.0298 rows=2 loops=1)",
+  "                            -> Table scan on pets  (cost=0.217 rows=4) (actual time=0.0223..0.0265 rows=4 loops=1)",
+  "                -> Covering index lookup on p using by_owner (owner_id=o.id)  (cost=0.295 rows=1.33) (actual time=0.00611..0.0074 rows=1.5 loops=2)",
+].join('\n')
+
+// A UNION.
+export const treeUnion = [
+  "-> Table scan on <union temporary>  (cost=2.27..4.49 rows=7) (actual time=0.0736..0.0743 rows=6 loops=1)",
+  "    -> Union materialize with deduplication  (cost=1.9..1.9 rows=7) (actual time=0.0726..0.0726 rows=6 loops=1)",
+  "        -> Covering index scan on owners using by_name  (cost=0.55 rows=3) (actual time=0.0227..0.0269 rows=3 loops=1)",
+  "        -> Table scan on pets  (cost=0.65 rows=4) (actual time=0.00549..0.00664 rows=4 loops=1)",
+].join('\n')
+
+// A derived table, grouped, then sorted.
+export const treeDerived = [
+  "-> Sort: d.n  (cost=4.18..4.18 rows=2) (actual time=0.06..0.0602 rows=3 loops=1)",
+  "    -> Table scan on d  (cost=2.51..3.78 rows=2) (actual time=0.0482..0.049 rows=3 loops=1)",
+  "        -> Materialize  (cost=1.25..1.25 rows=2) (actual time=0.0462..0.0462 rows=3 loops=1)",
+  "            -> Group aggregate: count(0)  (cost=1.05 rows=2) (actual time=0.0294..0.0338 rows=3 loops=1)",
+  "                -> Covering index scan on pets using by_owner  (cost=0.65 rows=4) (actual time=0.0248..0.0295 rows=4 loops=1)",
+].join('\n')
+
+// A subquery in the select list, which the tree puts beside its query.
+export const treeSubquery = [
+  "-> Covering index scan on o using by_name  (cost=0.55 rows=3) (actual time=0.0379..0.0409 rows=3 loops=1)",
+  "-> Select #2 (subquery in projection; dependent)",
+  "    -> Aggregate: count(0)  (cost=0.517 rows=1) (actual time=0.0132..0.0133 rows=1 loops=3)",
+  "        -> Covering index lookup on p using by_owner (owner_id=o.id)  (cost=0.383 rows=1.33) (actual time=0.00865..0.011 rows=1.33 loops=3)",
+].join('\n')
+
+// A join whose outer table finds nothing, so its inner lookup never runs.
+export const treeNeverExecuted = [
+  "-> Nested loop inner join  (cost=0.817 rows=1.33) (actual time=0.0132..0.0132 rows=0 loops=1)",
+  "    -> Covering index lookup on o using by_name (name='Nobody')  (cost=0.35 rows=1) (actual time=0.0125..0.0125 rows=0 loops=1)",
+  "    -> Index lookup on p using by_owner (owner_id=o.id)  (cost=0.467 rows=1.33) (never executed)",
+].join('\n')

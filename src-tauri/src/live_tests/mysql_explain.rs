@@ -43,8 +43,19 @@ fn ran(plan: &Value) -> bool {
     plan.to_string().contains("actual")
 }
 
-/// Every step's `operation`, depth-first.
+/// The rows the plan's first step really returned: in the JSON, or the tree's first line.
+fn rows_found(plan: &Value) -> f64 {
+    match plan.as_str() {
+        Some(tree) => tree.lines().next().and_then(|line| line.split(" rows=").last()?.split(' ').next()?.parse().ok()).unwrap(),
+        None => plan["actual_rows"].as_f64().unwrap(),
+    }
+}
+
+/// Every step's `operation`, depth-first; in a tree, each line's without its figures.
 fn operations(node: &Value) -> Vec<String> {
+    if let Some(tree) = node.as_str() {
+        return tree.lines().filter_map(|line| line.trim_start().strip_prefix("-> ")?.split("  (").next().map(str::to_string)).collect();
+    }
     let children = node["inputs"].as_array().into_iter().flatten();
     std::iter::once(node["operation"].as_str().unwrap_or_default().to_string()).chain(children.flat_map(operations)).collect()
 }
@@ -59,8 +70,8 @@ async fn a_select_is_explained_with_the_rows_and_times_it_really_took() {
          WHERE o.id IN (SELECT owner_id FROM {database}.pets WHERE kind = 'cat') GROUP BY o.name ORDER BY 2 DESC;"
     );
     let plan = explain_mysql_sql(&pool, &sql, false, None, LIMIT).await.unwrap();
-    assert!(plan["actual_last_row_ms"].is_number(), "{plan}");
-    assert_eq!(plan["actual_rows"], 2.0, "{plan}");
+    assert!(ran(&plan), "{plan}");
+    assert_eq!(rows_found(&plan), 2.0, "{plan}");
     let steps = operations(&plan);
     assert!(steps.iter().any(|s| s.contains("using by_owner")), "{steps:?}");
     assert!(steps[0].starts_with("Sort"), "{steps:?}");
