@@ -111,7 +111,7 @@ async fn only_a_generated_column_is_flagged_generated() {
         &mut admin,
         &format!(
             "CREATE TABLE {}.`мерки ü` (id INT AUTO_INCREMENT PRIMARY KEY, side INT, \
-             area INT AS (side * side) VIRTUAL, `half ``side``` DOUBLE AS (side / 2) STORED INVISIBLE, \
+             area INT AS (side * side) VIRTUAL, `half ``side``` DOUBLE AS (side / 2) STORED, \
              made DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
             quoted(&name)
         ),

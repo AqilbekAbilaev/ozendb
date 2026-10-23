@@ -2,7 +2,7 @@
 
 use super::mysql::{connect, password, run, shown_at, test_config, SKIP};
 use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp};
-use crate::commands::{mysql_browse, mysql_count};
+use crate::commands::{mysql_browse, mysql_columns, mysql_count};
 use crate::mysql::session::prepare;
 use crate::mysql::uri::build_options;
 use serde_json::{json, Value};
@@ -289,4 +289,28 @@ async fn filters_compare_booleans_bits_and_decimals_exactly_at_their_edges() {
     }
     pool.close().await;
     run(&mut admin, &format!("DROP DATABASE {database}")).await;
+}
+
+/// `SELECT *` leaves out an INVISIBLE column (#422), so the tab's column list does too:
+/// otherwise every column after it is read with the type of the one before.
+#[tokio::test]
+async fn an_invisible_column_is_left_out_so_the_columns_after_it_keep_their_types() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let (name, table) = ("ozendb it browse ведомость invisible", "hidden `h` ü");
+    let mut admin = connect(&config, "").await;
+    for statement in [
+        format!("DROP DATABASE IF EXISTS {}", quoted(name)),
+        format!("CREATE DATABASE {}", quoted(name)),
+        format!("CREATE TABLE {}.{} (id INT PRIMARY KEY, secret INT INVISIBLE, amount DECIMAL(10,2), created TIMESTAMP)", quoted(name), quoted(table)),
+        format!("INSERT INTO {}.{} (id, secret, amount, created) VALUES (1, 7, 1.5, '2024-01-01 00:00:00')", quoted(name), quoted(table)),
+    ] {
+        run(&mut admin, &statement).await;
+    }
+    let pool = pool(&config).await;
+    let columns: Vec<String> = mysql_columns(&pool, name, table).await.unwrap().into_iter().map(|c| c.name).collect();
+    assert_eq!(columns, ["id", "amount", "created"]);
+    let page = mysql_browse(&pool, name, table, &[], &[], None, false, 10, 0).await.unwrap();
+    assert_eq!(page.columns, columns);
+    assert_eq!(page.rows, [[json!(1), json!("1.50"), json!(shown_at("2024-01-01 00:00:00"))]]);
+    drop_seeded(&config, pool, name).await;
 }

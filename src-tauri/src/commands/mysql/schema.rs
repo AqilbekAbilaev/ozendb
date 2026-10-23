@@ -134,7 +134,8 @@ pub(crate) async fn mysql_columns(pool: &MySqlPool, database: &str, table: &str)
         LEFT JOIN information_schema.KEY_COLUMN_USAGE f
             ON f.TABLE_SCHEMA = c.TABLE_SCHEMA AND f.TABLE_NAME = c.TABLE_NAME
                 AND f.COLUMN_NAME = c.COLUMN_NAME AND f.REFERENCED_TABLE_NAME IS NOT NULL
-        WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ?
+        -- `SELECT *` leaves an INVISIBLE column out, and the tab lines its rows up by place.
+        WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ? AND c.EXTRA NOT LIKE '%INVISIBLE%'
         ORDER BY c.ORDINAL_POSITION, f.CONSTRAINT_NAME
         "#,
     )
