@@ -55,3 +55,9 @@ fn brackets_an_ipv6_host() {
     config.hosts = vec![HostEntry { host: String::from("::1"), port: 4322 }];
     assert!(connection_string(&config, "app", &FORMAT).starts_with("sq-l://app%20user@[::1]:4322/app"));
 }
+
+#[test]
+fn bracketed_wraps_only_an_ipv6_host() {
+    assert_eq!(bracketed("::1"), "[::1]");
+    assert_eq!(bracketed("db.example.com"), "db.example.com");
+}

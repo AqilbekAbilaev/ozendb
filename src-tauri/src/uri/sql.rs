@@ -21,7 +21,7 @@ pub(crate) fn connection_string(config: &ConnectionConfig, database: &str, forma
         Some(entry) => (entry.host.as_str(), entry.port),
         None => ("localhost", format.default_port),
     };
-    let host = if host.contains(':') { format!("[{host}]") } else { host.to_string() };
+    let host = bracketed(host);
     let user = match config.username.as_deref().filter(|s| !s.is_empty()) {
         Some(user) => format!("{}@", percent_encode(user)),
         None => String::new(),
@@ -37,6 +37,11 @@ pub(crate) fn connection_string(config: &ConnectionConfig, database: &str, forma
         uri.push_str(&format!("&{}={}", format.ca_param, percent_encode(ca)));
     }
     uri
+}
+
+/// `host` as it is written before a `:port`, with an IPv6 address in brackets.
+pub(crate) fn bracketed(host: &str) -> String {
+    if host.contains(':') { format!("[{host}]") } else { host.to_string() }
 }
 
 #[cfg(test)]

@@ -171,7 +171,7 @@ pub fn connection_string(config: &ConnectionConfig, postgres: &PostgresConfig) -
 /// `uri::tcp_probe` does for a MongoDB URI — see `uri::probe_host_port` for the
 /// shared DNS/timeout/retry core.
 pub async fn tcp_probe(options: &PgConnectOptions) -> Result<(), AppError> {
-    let host_port = format!("{}:{}", options.get_host(), options.get_port());
+    let host_port = format!("{}:{}", crate::uri::sql::bracketed(options.get_host()), options.get_port());
     crate::uri::probe_host_port(&host_port).await
 }
 
