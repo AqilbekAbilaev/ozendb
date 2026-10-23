@@ -271,6 +271,30 @@ async fn a_deadlock_in_a_held_transaction_says_it_rolled_the_transaction_back() 
 }
 
 #[tokio::test]
+async fn a_cancel_that_comes_as_a_run_ends_never_stops_the_next_run_on_its_session() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let pool = pool(&config).await;
+    let txs = std::sync::Arc::new(MySqlTransactions::default());
+    txs.begin(&pool, "tx late cancel", false).await.unwrap();
+    for delay in 0..40u64 {
+        let ending = {
+            let (txs, pool) = (txs.clone(), pool.clone());
+            tokio::spawn(async move { txs.run("tx late cancel", &pool, "DO SLEEP(0.02)", false, Some("mysql-run-late")).await })
+        };
+        tokio::time::sleep(Duration::from_micros(18_000 + delay * 100)).await;
+        let cancel = {
+            let pool = pool.clone();
+            tokio::spawn(async move { cancel_mysql_run(&pool, "mysql-run-late").await })
+        };
+        let _ = ending.await.unwrap();
+        let next = txs.run("tx late cancel", &pool, "SELECT SLEEP(0.05)", false, None).await;
+        assert_eq!(next.map(|results| results[0].rows.clone()).map_err(|e| e.user_message()), Ok(vec![vec![json!(0)]]), "after {delay}");
+        cancel.await.unwrap().unwrap();
+    }
+    txs.finish("tx late cancel", false).await.unwrap();
+}
+
+#[tokio::test]
 async fn a_read_only_connection_holds_a_read_only_transaction() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let database = database(&config, "ozendb it read only tx").await;

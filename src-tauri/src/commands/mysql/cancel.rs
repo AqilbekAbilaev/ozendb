@@ -23,9 +23,9 @@ enum Stop {
     TimedOut,
 }
 
-/// A run's session, once it has one, and what stopped it, if anything has.
+/// A run's session, while it has one, and what stopped it, if anything has.
 struct Running {
-    connection: Mutex<Option<u64>>,
+    connection: tokio::sync::Mutex<Option<u64>>,
     stop: Mutex<Option<Stop>>,
 }
 
@@ -36,8 +36,10 @@ impl Running {
         if self.stop.lock().unwrap().replace(why).is_some() {
             return Ok(false);
         }
-        let connection = *self.connection.lock().unwrap();
-        if let Some(connection) = connection {
+        // Held until the KILL has been sent, so the run can't leave its session, and the
+        // next run there start a statement, before the KILL arrives to stop it instead.
+        let connection = self.connection.lock().await;
+        if let Some(connection) = *connection {
             sqlx::raw_sql(sqlx::AssertSqlSafe(format!("KILL QUERY {connection}"))).execute(pool).await.map_err(AppError::MySql)?;
         }
         Ok(true)
@@ -65,16 +67,21 @@ pub(super) struct Run {
 
 impl Run {
     pub(super) fn new(id: Option<&str>) -> Run {
-        let run = Run { id: id.map(str::to_string), running: Arc::new(Running { connection: Mutex::new(None), stop: Mutex::new(None) }) };
+        let state = Running { connection: tokio::sync::Mutex::new(None), stop: Mutex::new(None) };
+        let run = Run { id: id.map(str::to_string), running: Arc::new(state) };
         if let Some(id) = &run.id {
             running().lock().unwrap().insert(id.clone(), run.running.clone());
         }
         run
     }
 
-    /// The run's session, `connection`, which stopping it from now on stops on the server too.
-    pub(super) fn attach(&self, connection: u64) {
-        *self.running.connection.lock().unwrap() = Some(connection);
+    /// `work`'s outcome, run on the session `connection`: stopping the run while it runs
+    /// stops it on the server too. It ends only once no KILL for it is still on its way.
+    pub(super) async fn on<T>(&self, connection: u64, work: impl Future<Output = T>) -> T {
+        *self.running.connection.lock().await = Some(connection);
+        let outcome = work.await;
+        *self.running.connection.lock().await = None;
+        outcome
     }
 
     /// An error if the run was stopped.
@@ -86,15 +93,15 @@ impl Run {
     /// `limit`, it is stopped as timed out, since MySQL's own limit covers SELECTs only.
     pub(super) async fn limited<T>(&self, pool: &MySqlPool, limit: Duration, statement: impl Future<Output = Result<T, AppError>>) -> Result<T, AppError> {
         self.running.stopped()?;
-        let timer = {
-            let (pool, running) = (pool.clone(), self.running.clone());
-            tokio::spawn(async move {
-                tokio::time::sleep(limit).await;
-                running.stop(&pool, Stop::TimedOut).await
-            })
+        let mut statement = std::pin::pin!(statement);
+        // In this task rather than a timer's own, which stopping could cut off mid-KILL.
+        let outcome = tokio::select! {
+            outcome = &mut statement => outcome,
+            () = tokio::time::sleep(limit) => {
+                self.running.stop(pool, Stop::TimedOut).await?;
+                statement.await
+            }
         };
-        let outcome = statement.await;
-        timer.abort();
         self.running.stopped()?;
         match outcome {
             Err(AppError::MySql(sqlx::Error::Database(e)))
