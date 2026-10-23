@@ -4,7 +4,7 @@ use crate::commands::sql::{ColumnFilter, FilterOp};
 use crate::error::AppError;
 
 fn columns() -> Vec<MySqlColumnInfo> {
-    [("id `key`", "bigint unsigned", true), ("price €", "decimal(10,2)", false), ("name", "varchar(80)", false), ("at", "datetime(6)", false), ("ratio", "double", false)]
+    [("id `key`", "bigint unsigned", true), ("price €", "decimal(10,2)", false), ("name", "varchar(80)", false), ("at", "datetime(6)", false), ("ratio", "double", false), ("ok", "tinyint(1) unsigned", false), ("bits", "bit(64)", false)]
         .into_iter()
         .map(|(name, data_type, is_primary_key)| MySqlColumnInfo {
             name: name.to_string(),
@@ -32,10 +32,36 @@ fn no_filters_add_no_where_clause() {
 }
 
 #[test]
-fn compares_exact_numbers_as_a_wide_decimal() {
-    let (sql, binds) = clause(&[filter("id `key`", FilterOp::Gte, Some("18446744073709551615")), filter("price €", FilterOp::Lt, Some("9.99"))]);
-    assert_eq!(sql, " WHERE `id ``key``` >= CAST(? AS DECIMAL(65,30)) AND `price €` < CAST(? AS DECIMAL(65,30))");
-    assert_eq!(binds, vec!["18446744073709551615", "9.99"]);
+fn compares_exact_numbers_as_a_decimal_holding_the_value_s_own_fraction_digits() {
+    let (sql, binds) = clause(&[
+        filter("id `key`", FilterOp::Gte, Some("18446744073709551615")),
+        filter("price €", FilterOp::Lt, Some("1.505")),
+        filter("bits", FilterOp::Eq, Some("5")),
+    ]);
+    assert_eq!(
+        sql,
+        " WHERE `id ``key``` >= CAST(? AS DECIMAL(65,0)) AND `price €` < CAST(? AS DECIMAL(65,3)) AND `bits` = CAST(? AS DECIMAL(65,0))"
+    );
+    assert_eq!(binds, vec!["18446744073709551615", "1.505", "5"]);
+}
+
+#[test]
+fn keeps_at_most_the_thirty_fraction_digits_mysql_allows() {
+    let (sql, _) = clause(&[filter("price €", FilterOp::Eq, Some(&format!("0.{}1", "0".repeat(40)))), filter("id `key`", FilterOp::Gt, Some("1e-5"))]);
+    assert_eq!(sql, " WHERE `price €` = CAST(? AS DECIMAL(65,30)) AND `id ``key``` > CAST(? AS DECIMAL(65,30))");
+}
+
+#[test]
+fn reads_true_and_false_on_a_tinyint_1_as_the_1_and_0_it_stores() {
+    let (sql, binds) = clause(&[filter("ok", FilterOp::Eq, Some("TRUE")), filter("ok", FilterOp::In, Some("false, 5"))]);
+    assert_eq!(sql, " WHERE `ok` = CAST(? AS DECIMAL(65,0)) AND `ok` IN (CAST(? AS DECIMAL(65,0)), CAST(? AS DECIMAL(65,0)))");
+    assert_eq!(binds, vec!["1", "0", "5"]);
+}
+
+#[test]
+fn leaves_true_as_text_on_any_other_column() {
+    let (_, binds) = clause(&[filter("name", FilterOp::Eq, Some("true"))]);
+    assert_eq!(binds, vec!["true"]);
 }
 
 #[test]
@@ -62,7 +88,7 @@ fn starts_with_matches_the_start_of_the_text_form() {
 #[test]
 fn any_of_binds_each_trimmed_value() {
     let (sql, binds) = clause(&[filter("id `key`", FilterOp::In, Some(" 1, 2 ,,3")), filter("name", FilterOp::In, Some("a,b"))]);
-    assert_eq!(sql, " WHERE `id ``key``` IN (CAST(? AS DECIMAL(65,30)), CAST(? AS DECIMAL(65,30)), CAST(? AS DECIMAL(65,30))) AND `name` IN (?, ?)");
+    assert_eq!(sql, " WHERE `id ``key``` IN (CAST(? AS DECIMAL(65,0)), CAST(? AS DECIMAL(65,0)), CAST(? AS DECIMAL(65,0))) AND `name` IN (?, ?)");
     assert_eq!(binds, vec!["1", "2", "3", "a", "b"]);
 }
 
