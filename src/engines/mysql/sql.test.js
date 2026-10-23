@@ -154,8 +154,7 @@ describe('api', () => {
   })
 
   it('says what is not available yet rather than calling a command that does not exist', async () => {
-    await expect(api.explainQuery('c1', 'SELECT 1')).rejects.toEqual({ code: 'not_available', message: "Explain isn't available for MySQL yet." })
-    await expect(api.pushHistory('c1', 'SELECT 1')).rejects.toMatchObject({ message: "Query history isn't available for MySQL yet." })
+    await expect(api.pushHistory('c1', 'SELECT 1')).rejects.toEqual({ code: 'not_available', message: "Query history isn't available for MySQL yet." })
     expect(invoke).not.toHaveBeenCalled()
   })
 

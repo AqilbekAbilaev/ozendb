@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { browseTable, countTable, readTableSelect, runQuery, cancelQuery, beginTransaction, commitTransaction, rollbackTransaction, formatQuery } from './queries'
+import { browseTable, countTable, readTableSelect, runQuery, cancelQuery, beginTransaction, commitTransaction, rollbackTransaction, formatQuery, explainQuery } from './queries'
 
 const target = { connectionId: 'c1', database: 'shop `2024` ü', table: 'order items' }
 
@@ -64,6 +64,11 @@ describe('running MySQL SQL', () => {
     expect(invoke).toHaveBeenCalledWith('commit_mysql_transaction', { txId: 'tx 1' })
     await rollbackTransaction('tx 2')
     expect(invoke).toHaveBeenCalledWith('rollback_mysql_transaction', { txId: 'tx 2' })
+  })
+
+  it('explains a query in the database a tab works in', async () => {
+    await explainQuery('c1', 'SELECT 1', 'shop `2024` ü')
+    expect(invoke).toHaveBeenCalledWith('explain_mysql_query', { id: 'c1', sql: 'SELECT 1', database: 'shop `2024` ü' })
   })
 
   it('formats SQL', async () => {

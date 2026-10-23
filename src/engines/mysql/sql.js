@@ -3,6 +3,7 @@
 import * as queries from './api/queries.js'
 import * as resources from './api/resources.js'
 import { exactNumber, filterText, readFilterText } from './filterValues.js'
+import { planRows } from './workspaces/planRows.js'
 
 // How a column's cells are styled and filtered, from its COLUMN_TYPE. TINYINT(1), MySQL's
 // BOOLEAN, is a number: it can hold any small integer, though its 0 and 1 show as false
@@ -62,8 +63,7 @@ export const api = Object.freeze({
   listForeignKeys: (target) => resources.listForeignKeys(inDatabase(target)),
   runQuery: queries.runQuery,
   cancelQuery: queries.cancelQuery,
-  // TODO #393: Explain.
-  explainQuery: notYet('Explain'),
+  explainQuery: queries.explainQuery,
   formatQuery: queries.formatQuery,
   readTableSelect: (target, sql) => queries.readTableSelect(inDatabase(target), sql),
   // TODO #397: the query library, history and saved queries.
@@ -82,7 +82,7 @@ export const api = Object.freeze({
 export const mysqlSql = Object.freeze({
   dialect,
   api,
-  // TODO #393: an Explain reader (readPlan). TODO #396: an export window. TODO #417:
-  // a row-history window, once saves record history.
+  readPlan: planRows,
+  // TODO #396: an export window. TODO #417: a row-history window, once saves record history.
   modals: Object.freeze({}),
 })
