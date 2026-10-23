@@ -137,6 +137,32 @@ async fn a_read_only_connection_refuses_to_lift_its_lock_and_stays_locked() {
 }
 
 #[tokio::test]
+async fn a_read_only_connection_refuses_a_prepared_statement_that_would_lift_its_lock() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it prepared ü").await;
+    run(&mut connect(&config, "").await, &format!("INSERT INTO {database}.t VALUES (1, 'a')")).await;
+    let pool = read_only_pool(&config).await;
+    let script = format!("PREPARE s FROM 'SET SESSION transaction_read_only = OFF'; EXECUTE s; DELETE FROM {database}.t;");
+    assert_eq!(run_mysql_sql(&pool, &script, true, None, LIMIT).await.unwrap_err().code(), "validation");
+    assert_eq!(count(&config, &database).await, 1);
+    drop_database(&config, &database).await;
+}
+
+#[tokio::test]
+async fn a_read_only_connection_locks_its_session_again_before_each_statement() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it relock").await;
+    let mut admin = connect(&config, "").await;
+    run(&mut admin, &format!("INSERT INTO {database}.t VALUES (1, 'a')")).await;
+    run(&mut admin, &format!("CREATE PROCEDURE {database}.`lift ü`() SET SESSION transaction_read_only = OFF")).await;
+    let pool = read_only_pool(&config).await;
+    let err = run_mysql_sql(&pool, &format!("CALL {database}.`lift ü`(); DELETE FROM {database}.t"), true, None, LIMIT).await.unwrap_err();
+    assert!(err.user_message().contains("read-only") || err.user_message().contains("READ ONLY"), "{}", err.user_message());
+    assert_eq!(count(&config, &database).await, 1);
+    drop_database(&config, &database).await;
+}
+
+#[tokio::test]
 async fn what_a_run_sets_in_its_session_ends_with_the_run() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let pool = pool(&config).await;

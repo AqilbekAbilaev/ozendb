@@ -16,7 +16,7 @@ use super::AppContext;
 use crate::commands::sql::format::format_sql;
 use crate::commands::sql::{SqlQueryResult, ROW_RESULT_CAP};
 use crate::error::AppError;
-use crate::mysql::session::QUERY_TIME_LIMIT;
+use crate::mysql::session::{QUERY_TIME_LIMIT, READ_ONLY_LOCK};
 
 /// What MySQL answers a statement it can't prepare with, such as USE or LOCK TABLES.
 const NOT_PREPARABLE: u16 = 1295;
@@ -68,18 +68,26 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str) -> Result<SqlQueryResult
 
 /// Runs `statements` in order on `conn`, stopping at the first that fails; each answers
 /// with its own result. A `run_id` lets Cancel stop it, and no statement may run past
-/// `limit`; either sends `KILL QUERY` through `pool`, from another session.
+/// `limit`; either sends `KILL QUERY` through `pool`, from another session. On a
+/// `read_only` connection the session is locked again before each statement, so nothing
+/// an earlier one did can leave the next one free to write. That still leaves a stored
+/// procedure that lifts the lock and writes within one CALL: only the server's own
+/// privileges stop that.
 pub(super) async fn run_on(
     conn: &mut MySqlConnection,
     pool: &MySqlPool,
     statements: &[&str],
     run_id: Option<&str>,
     limit: Duration,
+    read_only: bool,
 ) -> Result<Vec<SqlQueryResult>, AppError> {
     let connection: u64 = sqlx::query_scalar("SELECT CONNECTION_ID()").fetch_one(&mut *conn).await.map_err(AppError::MySql)?;
     let run = Run::new(run_id, connection);
     let mut results = Vec::with_capacity(statements.len());
     for (i, statement) in statements.iter().enumerate() {
+        if read_only {
+            sqlx::raw_sql(READ_ONLY_LOCK).execute(&mut *conn).await.map_err(AppError::MySql)?;
+        }
         match run.limited(pool, limit, run_one(conn, statement)).await {
             Ok(result) => results.push(result),
             Err(e) if i == 0 => return Err(e),
@@ -96,7 +104,7 @@ pub(crate) async fn run_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bool, 
     let statements = statements(sql, read_only)?;
     let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
     conn.close_on_drop();
-    run_on(&mut conn, pool, &statements, run_id, limit).await
+    run_on(&mut conn, pool, &statements, run_id, limit, read_only).await
 }
 
 /// Runs the SQL tab's script, one statement after another, answering with each one's

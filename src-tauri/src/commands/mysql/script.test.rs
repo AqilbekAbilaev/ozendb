@@ -77,6 +77,19 @@ fn refuses_what_would_lift_a_read_only_connections_lock() {
 }
 
 #[test]
+fn refuses_prepared_statements_on_a_read_only_connection() {
+    for sql in ["PREPARE s FROM 'SET SESSION transaction_read_only = OFF'", "execute `s ü`", "DEALLOCATE PREPARE s", "drop prepare s",
+                "SELECT 1; EXECUTE s USING @a"] {
+        assert!(refusal(sql, true).contains("prepared"), "{sql}");
+    }
+}
+
+#[test]
+fn lets_a_writable_connection_prepare_statements() {
+    assert!(statements("PREPARE s FROM 'SELECT 1'; EXECUTE s; DEALLOCATE PREPARE s", false).is_ok());
+}
+
+#[test]
 fn lets_a_read_only_connection_set_anything_else() {
     for sql in ["SET SESSION TRANSACTION READ ONLY", "SET time_zone = '+05:00'", "SET @note = 'read write'", "SELECT 'transaction_read_only'"] {
         assert!(statements(sql, true).is_ok(), "{sql}");
