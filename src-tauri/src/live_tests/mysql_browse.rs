@@ -3,14 +3,25 @@
 use super::mysql::{connect, password, run, test_config, SKIP};
 use crate::commands::sql::{ColumnFilter, FilterOp};
 use crate::commands::{mysql_browse, mysql_count};
+use crate::mysql::session::prepare;
 use crate::mysql::uri::build_options;
 use serde_json::{json, Value};
+use sqlx::mysql::MySqlPoolOptions;
 use sqlx::MySqlPool;
 
 const TABLE: &str = "every `type` ü";
 
 fn quoted(name: &str) -> String {
     format!("`{}`", name.replace('`', "``"))
+}
+
+/// A pool with no default database, each session prepared as the app's are.
+async fn pool(config: &crate::storage::ConnectionConfig) -> MySqlPool {
+    MySqlPoolOptions::new()
+        .after_connect(|connection, _| Box::pin(prepare(connection, false)))
+        .connect_with(build_options(config, password().as_deref(), "", None).unwrap())
+        .await
+        .unwrap()
 }
 
 /// A database of its own per test, holding one table with a column of each common type
@@ -38,7 +49,7 @@ async fn seeded(config: &crate::storage::ConnectionConfig, name: &str) -> MySqlP
     ] {
         run(&mut admin, &statement).await;
     }
-    MySqlPool::connect_with(build_options(config, password().as_deref(), "", None).unwrap()).await.unwrap()
+    pool(config).await
 }
 
 async fn drop_seeded(config: &crate::storage::ConnectionConfig, pool: MySqlPool, name: &str) {
@@ -68,10 +79,10 @@ async fn every_common_type_reads_as_the_grid_shows_it() {
     assert_eq!(
         page.rows,
         vec![vec![
-            json!("18446744073709551615"), json!(-128), json!(1), json!("12345678901234567890.0123456789"), json!(0.1),
+            json!("18446744073709551615"), json!(-128), json!(true), json!("12345678901234567890.0123456789"), json!(0.1),
             json!(-1.5e300), json!("Straße"), json!("long note"), json!("2024-02-29"), json!("2024-02-29 13:14:15.123456"),
-            json!("2024-01-01 00:00:00"), json!("-838:59:59"), json!(2024), json!("paid"), json!("a,b"),
-            json!({ "a": [1, "b"] }), json!("0x00FF"), json!("0x05"),
+            json!("2024-01-01 00:00:00+00:00"), json!("-838:59:59"), json!(2024), json!("paid"), json!("a,b"),
+            json!({ "a": [1, "b"] }), json!("0x00FF"), json!(5),
             json!("0x000000000101000000000000000000F03F0000000000000040"),
         ]],
     );
@@ -132,52 +143,72 @@ async fn each_filter_keeps_the_rows_it_names_and_the_count_agrees() {
 }
 
 #[tokio::test]
-async fn integers_spans_and_zero_dates_read_exactly_at_their_edges() {
+async fn every_type_reads_exactly_at_its_edges() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let name = "ozendb it browse ведомость edges";
     let (database, table) = (quoted(name), quoted("edge `cases` ü"));
+    let nines = |whole: usize, fraction: usize| format!("{}.{}", "9".repeat(whole), "9".repeat(fraction));
     let mut admin = connect(&config, "").await;
     for statement in [
         format!("DROP DATABASE IF EXISTS {database}"),
         format!("CREATE DATABASE {database}"),
         format!(
             "CREATE TABLE {database}.{table} (id INT PRIMARY KEY, s SMALLINT, m MEDIUMINT, i INT, iu INT UNSIGNED, \
-             b BIGINT, flag TINYINT(1), uflag TINYINT(1) UNSIGNED, span TIME(6), day DATE, at DATETIME(6), \
-             note TEXT COLLATE utf8mb4_bin, raw LONGBLOB)"
+             b BIGINT, bu BIGINT UNSIGNED, flag TINYINT(1), uflag TINYINT(1) UNSIGNED, yes BOOLEAN, bit1 BIT(1), \
+             bit64 BIT(64), wide DECIMAL(65,0), fine DECIMAL(65,30), span TIME(6), long_span TIME, day DATE, \
+             at DATETIME(6), at3 DATETIME(3), stamp TIMESTAMP(3) NULL, note TEXT COLLATE utf8mb4_bin, raw LONGBLOB, \
+             fixed BINARY(3), tags SET('a','b','c'), doc JSON)"
         ),
-        // The zero date needs a mode that allows it.
-        String::from("SET SESSION sql_mode = ''"),
+        // The zero date needs a mode that allows it; the zone shows a TIMESTAMP is read in UTC.
+        String::from("SET SESSION sql_mode = '', SESSION time_zone = '+05:00'"),
         format!(
             "INSERT INTO {database}.{table} VALUES \
-             (1, -300, -8388608, -2147483648, 4294967295, 9007199254740991, -5, 251, '09:05:00.000001', '0000-00-00', \
-              '2024-01-01 00:00:00', 'Ab', 'Ab'), \
-             (2, NULL, NULL, NULL, NULL, -9223372036854775808, NULL, NULL, '00:00:00', NULL, '0000-00-00 00:00:00', NULL, NULL), \
-             (3, NULL, NULL, NULL, NULL, 9007199254740992, NULL, NULL, '-12:00:00.5', NULL, NULL, NULL, NULL)"
+             (1, -300, -8388608, -2147483648, 4294967295, 9007199254740991, 18446744073709551615, -5, 251, TRUE, b'1', \
+              0xFFFFFFFFFFFFFFFF, {}, {}, '09:05:00.000001', '838:59:59', '0000-00-00', '2024-01-01 00:00:00', \
+              '2024-02-29 13:14:15.5', '2024-06-30 23:59:59.12', 'Ab', 'Ab', 'a', 'a,c', '[1, 2.5, \"x\", null, true]'), \
+             (2, NULL, NULL, NULL, NULL, -9223372036854775808, 0, 0, 1, FALSE, b'0', 0, -{0}, -{1}, '00:00:00', \
+              '-838:59:59', NULL, '0000-00-00 00:00:00', NULL, '0000-00-00 00:00:00', NULL, NULL, NULL, '', '{{}}'), \
+             (3, NULL, NULL, NULL, NULL, 9007199254740992, NULL, 5, NULL, NULL, NULL, NULL, NULL, NULL, '-12:00:00.5', \
+              '-00:00:01', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
+            "9".repeat(65),
+            nines(35, 30),
         ),
     ] {
         run(&mut admin, &statement).await;
     }
-    let pool = MySqlPool::connect_with(build_options(&config, password().as_deref(), "", None).unwrap()).await.unwrap();
+    let pool = pool(&config).await;
     let page = mysql_browse(&pool, name, "edge `cases` ü", &[], None, false, 10, 0).await.unwrap();
     let null = Value::Null;
-    // sqlx reads a zero date as NULL (sqlx-mysql's `is_null`), so the zero dates show as NULL.
     assert_eq!(
-        page.rows,
+        page.rows[0],
         vec![
-            vec![
-                json!(1), json!(-300), json!(-8_388_608), json!(-2_147_483_648i64), json!(4_294_967_295u32),
-                json!(9_007_199_254_740_991i64), json!(-5), json!(251), json!("09:05:00.000001"), null.clone(),
-                json!("2024-01-01 00:00:00"), json!("Ab"), json!("0x4162"),
-            ],
-            vec![
-                json!(2), null.clone(), null.clone(), null.clone(), null.clone(), json!("-9223372036854775808"), null.clone(),
-                null.clone(), json!("00:00:00"), null.clone(), null.clone(), null.clone(), null.clone(),
-            ],
-            vec![
-                json!(3), null.clone(), null.clone(), null.clone(), null.clone(), json!("9007199254740992"), null.clone(),
-                null.clone(), json!("-12:00:00.500000"), null.clone(), null.clone(), null.clone(), null,
-            ],
+            json!(1), json!(-300), json!(-8_388_608), json!(-2_147_483_648i64), json!(4_294_967_295u32),
+            json!(9_007_199_254_740_991i64), json!("18446744073709551615"), json!(-5), json!(251), json!(true), json!(1),
+            json!("18446744073709551615"), json!("9".repeat(65)), json!(nines(35, 30)), json!("09:05:00.000001"),
+            json!("838:59:59"), json!("0000-00-00"), json!("2024-01-01 00:00:00.000000"), json!("2024-02-29 13:14:15.500"),
+            json!("2024-06-30 18:59:59.120+00:00"), json!("Ab"), json!("0x4162"), json!("0x610000"), json!("a,c"),
+            json!([1, 2.5, "x", null, true]),
         ],
+    );
+    assert_eq!(
+        page.rows[1],
+        vec![
+            json!(2), null.clone(), null.clone(), null.clone(), null.clone(), json!("-9223372036854775808"), json!(0),
+            json!(false), json!(true), json!(false), json!(0), json!(0), json!(format!("-{}", "9".repeat(65))),
+            json!(format!("-{}", nines(35, 30))), json!("00:00:00.000000"), json!("-838:59:59"), null.clone(),
+            json!("0000-00-00 00:00:00.000000"), null.clone(), json!("0000-00-00 00:00:00.000"), null.clone(), null.clone(),
+            null.clone(), json!(""), json!({}),
+        ],
+    );
+    assert_eq!(
+        page.rows[2],
+        [
+            vec![json!(3), null.clone(), null.clone(), null.clone(), null.clone(), json!("9007199254740992"), null.clone(), json!(5)],
+            vec![null.clone(); 6],
+            vec![json!("-12:00:00.500000"), json!("-00:00:01")],
+            vec![null; 9],
+        ]
+        .concat(),
     );
     pool.close().await;
     run(&mut admin, &format!("DROP DATABASE {database}")).await;
