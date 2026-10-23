@@ -130,3 +130,55 @@ async fn each_filter_keeps_the_rows_it_names_and_the_count_agrees() {
     assert_eq!(mysql_count(&pool, name, TABLE, &[]).await.unwrap(), 3);
     drop_seeded(&config, pool, name).await;
 }
+
+#[tokio::test]
+async fn integers_spans_and_zero_dates_read_exactly_at_their_edges() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let name = "ozendb it browse ведомость edges";
+    let (database, table) = (quoted(name), quoted("edge `cases` ü"));
+    let mut admin = connect(&config, "").await;
+    for statement in [
+        format!("DROP DATABASE IF EXISTS {database}"),
+        format!("CREATE DATABASE {database}"),
+        format!(
+            "CREATE TABLE {database}.{table} (id INT PRIMARY KEY, s SMALLINT, m MEDIUMINT, i INT, iu INT UNSIGNED, \
+             b BIGINT, flag TINYINT(1), uflag TINYINT(1) UNSIGNED, span TIME(6), day DATE, at DATETIME(6), \
+             note TEXT COLLATE utf8mb4_bin, raw LONGBLOB)"
+        ),
+        // The zero date needs a mode that allows it.
+        String::from("SET SESSION sql_mode = ''"),
+        format!(
+            "INSERT INTO {database}.{table} VALUES \
+             (1, -300, -8388608, -2147483648, 4294967295, 9007199254740991, -5, 251, '09:05:00.000001', '0000-00-00', \
+              '2024-01-01 00:00:00', 'Ab', 'Ab'), \
+             (2, NULL, NULL, NULL, NULL, -9223372036854775808, NULL, NULL, '00:00:00', NULL, '0000-00-00 00:00:00', NULL, NULL), \
+             (3, NULL, NULL, NULL, NULL, 9007199254740992, NULL, NULL, '-12:00:00.5', NULL, NULL, NULL, NULL)"
+        ),
+    ] {
+        run(&mut admin, &statement).await;
+    }
+    let pool = MySqlPool::connect_with(build_options(&config, password().as_deref(), "", None).unwrap()).await.unwrap();
+    let page = mysql_browse(&pool, name, "edge `cases` ü", &[], None, false, 10, 0).await.unwrap();
+    let null = Value::Null;
+    // sqlx reads a zero date as NULL (sqlx-mysql's `is_null`), so the zero dates show as NULL.
+    assert_eq!(
+        page.rows,
+        vec![
+            vec![
+                json!(1), json!(-300), json!(-8_388_608), json!(-2_147_483_648i64), json!(4_294_967_295u32),
+                json!(9_007_199_254_740_991i64), json!(-5), json!(251), json!("09:05:00.000001"), null.clone(),
+                json!("2024-01-01 00:00:00"), json!("Ab"), json!("0x4162"),
+            ],
+            vec![
+                json!(2), null.clone(), null.clone(), null.clone(), null.clone(), json!("-9223372036854775808"), null.clone(),
+                null.clone(), json!("00:00:00"), null.clone(), null.clone(), null.clone(), null.clone(),
+            ],
+            vec![
+                json!(3), null.clone(), null.clone(), null.clone(), null.clone(), json!("9007199254740992"), null.clone(),
+                null.clone(), json!("-12:00:00.500000"), null.clone(), null.clone(), null.clone(), null,
+            ],
+        ],
+    );
+    pool.close().await;
+    run(&mut admin, &format!("DROP DATABASE {database}")).await;
+}

@@ -1,6 +1,6 @@
 //! The table tab's page and row count over one MySQL table. Names are quoted with
 //! backticks and every filter value is bound, never written into the SQL.
-use sqlx::{Column, Executor, MySqlPool, Row, SqlSafeStr, Statement, TypeInfo};
+use sqlx::{Column, Executor, MySqlPool, Row, SqlSafeStr, Statement};
 use tauri::State;
 
 use super::cell::cell;
@@ -134,9 +134,8 @@ pub(crate) async fn mysql_browse(
     let mut rows = Vec::with_capacity(fetched.len());
     for row in &fetched {
         let mut cells = Vec::with_capacity(names.len());
-        for (i, column) in row.columns().iter().enumerate() {
-            let raw: Option<&[u8]> = row.try_get_unchecked(i).map_err(AppError::MySql)?;
-            cells.push(cell(column.type_info().name(), declared.get(i).copied().flatten(), raw));
+        for i in 0..row.len() {
+            cells.push(cell(row.try_get_raw(i).map_err(AppError::MySql)?, declared.get(i).copied().flatten()));
         }
         rows.push(cells);
     }
