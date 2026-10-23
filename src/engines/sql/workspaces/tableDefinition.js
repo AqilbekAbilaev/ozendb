@@ -39,6 +39,7 @@ export function tableDefinition(engine, refOf) {
     type: `${engine}.table_browse`,
     engine,
     component: SqlTableWorkspace,
+    browsesTable: true,
     create: (ctx) => tableWorkspace(
       { target: refOf(ctx.target), connectionName: ctx.target.connectionName },
       createTableState({ rowKey: ctx.options?.rowKey }),

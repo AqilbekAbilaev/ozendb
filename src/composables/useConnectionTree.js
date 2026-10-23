@@ -18,6 +18,7 @@ import {
   treeSelection, setTreeSelection,
 } from '../stores/connectionNavigation'
 import { isCollectionTab } from '../utils/workspaceTypes'
+import { workspaceBrowsesTable } from '../workspaces/registry'
 
 const databaseResource = (connectionId, dbName) => createResourceRef(connectionId, [{ kind: 'database', name: dbName }])
 
@@ -189,10 +190,10 @@ export function useConnectionTree({ emit }) {
   })
 
   // The resource the active tab browses, whichever engine: a MongoDB collection or a
-  // PostgreSQL table. Its row is the one the tree highlights.
+  // SQL table. Its row is the one the tree highlights.
   const activeResource = computed(() => {
     const t = activeTab.value
-    return isCollectionTab(t) || t?.type === 'postgresql.table_browse' ? t : null
+    return isCollectionTab(t) || workspaceBrowsesTable(t) ? t : null
   })
   // The connection whose row highlights. Was a startsWith() over the collection key,
   // which prefix-matched an id instead of comparing one, and only ever for MongoDB.
