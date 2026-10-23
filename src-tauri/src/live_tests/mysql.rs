@@ -248,10 +248,11 @@ async fn session_setup_turns_backslash_escapes_back_on_and_keeps_the_rest_of_the
 }
 
 /// MySQL 8 logs a user in without TLS only by encrypting the password with the server's
-/// public key (sqlx's `mysql-rsa`), until the server has cached that user's login. A user
-/// made here has never logged in, so nothing is cached.
+/// public key, fetched over the open connection, until the server has cached that user's
+/// login. OzenDB refuses that (#413) and says to use TLS. A user made here has never
+/// logged in, so nothing is cached.
 #[tokio::test]
-async fn a_new_user_logs_in_without_tls() {
+async fn a_new_user_without_tls_is_told_to_use_tls() {
     let Some(mut config) = test_config() else { return eprintln!("{SKIP}") };
     let (user, secret) = ("ozendb_it_plain", "pa ss");
     config.username = Some(String::from(user));
@@ -260,9 +261,10 @@ async fn a_new_user_logs_in_without_tls() {
     let mut admin = connect(&test_config().unwrap(), "").await;
     run(&mut admin, &format!("DROP USER IF EXISTS '{user}'@'%'")).await;
     run(&mut admin, &format!("CREATE USER '{user}'@'%' IDENTIFIED WITH caching_sha2_password BY '{secret}'")).await;
-    // The user is dropped before the login is checked, so a failed login leaves no account.
+    // The user is dropped before the login is checked, so a failed check leaves no account.
     let login = MySqlConnection::connect_with(&options).await;
     run(&mut admin, &format!("DROP USER '{user}'@'%'")).await;
     admin.close().await.unwrap();
-    login.expect("a plain login succeeds").close().await.unwrap();
+    let error = crate::error::AppError::MySql(login.expect_err("the plain login is refused"));
+    assert_eq!(error.code(), "tls");
 }

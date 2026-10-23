@@ -108,3 +108,14 @@ fn a_mysql_driver_error_reads_without_the_engine_prefix() {
     let error = AppError::MySql(sqlx::Error::PoolTimedOut);
     assert_eq!(error.user_message(), sqlx::Error::PoolTimedOut.to_string());
 }
+
+#[test]
+fn a_mysql_login_that_needs_tls_says_how_to_connect() {
+    use super::AppError;
+    let error = AppError::MySql(sqlx::Error::Configuration(
+        "RSA auth backend disabled; enable feature `mysql-rsa` (or `rsa` if using sqlx-mysql directly) or use TLS.".into(),
+    ));
+    assert_eq!(error.code(), "tls");
+    assert!(error.user_message().starts_with("This MySQL login needs TLS"), "{}", error.user_message());
+    assert!(!error.user_message().contains("mysql-rsa"));
+}
