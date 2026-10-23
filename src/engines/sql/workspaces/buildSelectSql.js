@@ -1,7 +1,6 @@
 // The SQL a table tab's filters, joins, sort and page amount to, for its SQL mode,
-// written in `dialect` (engineOf(x).sql.dialect). Values are written as untyped
-// literals, which the server reads as the column's own type — the same comparison the
-// backend's filter binding makes.
+// written in `dialect` (engineOf(x).sql.dialect). Each value is written by the dialect
+// for its column's `dataType`, so the server compares it as the backend's filter does.
 const OPERATORS = { eq: '=', ne: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=' }
 
 // LIKE's escape character is a backslash.
@@ -9,13 +8,14 @@ const likeEscape = (text) => text.replace(/[\\%_]/g, '\\$&')
 // An any-of filter's values, as the backend splits them.
 const listItems = (value) => value.split(',').map(v => v.trim()).filter(Boolean)
 
-function condition(dialect, column, { op, value }) {
+function condition(dialect, column, { op, value, dataType }) {
+  const literal = (text) => dialect.filterLiteral(text, dataType)
   if (op === 'isNull') return `${column} IS NULL`
   if (op === 'notNull') return `${column} IS NOT NULL`
-  if (op === 'contains') return dialect.like(column, `%${likeEscape(value)}%`)
-  if (op === 'startsWith') return dialect.like(column, `${likeEscape(value)}%`)
-  if (op === 'in') return `${column} IN (${listItems(value).map(dialect.quoteText).join(', ')})`
-  return `${column} ${OPERATORS[op]} ${dialect.quoteText(value)}`
+  if (op === 'contains') return dialect.like(column, `%${likeEscape(dialect.filterText(value, dataType))}%`)
+  if (op === 'startsWith') return dialect.like(column, `${likeEscape(dialect.filterText(value, dataType))}%`)
+  if (op === 'in') return `${column} IN (${listItems(value).map(literal).join(', ')})`
+  return `${column} ${OPERATORS[op]} ${literal(value)}`
 }
 
 // Each table's name in the query: its own, or with a suffix when it's already taken
@@ -28,7 +28,8 @@ export function aliases(names) {
   })
 }
 
-// Columns, filters and sort name a column as `{ table, column }`, `table` being 0 for
+// Columns, filters and sort name a column as `{ table, column }` (a filter also carries
+// its column's `dataType`), `table` being 0 for
 // the browsed table and 1 and on for `joins` in order; `columns` are the ones to
 // show, or empty for all of them. Without joins, columns go unqualified.
 export function buildSelectSql(dialect, { schema, table, joins = [], columns = [], filters, orderBy, descending, limit, offset }) {

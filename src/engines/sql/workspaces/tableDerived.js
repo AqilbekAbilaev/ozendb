@@ -48,7 +48,7 @@ export function useTableDerived(t) {
     table: target.table,
     joins: wireJoins.value,
     columns: shownColumns.value.map(columnOf),
-    filters: wireFilters.value,
+    filters: filters.value.map(({ key, ...filter }) => ({ ...columnOf(key), ...filter, dataType: refByKey.value[key].info.dataType })),
     orderBy: orderBy.value ? [columnOf(orderBy.value)] : keyColumns.value.map(column => ({ table: 0, column })),
     descending: descending.value,
     limit: limit.value,

@@ -2,6 +2,7 @@
 // commands they call. Reached through the engine table as `engineOf(x).sql`.
 import * as queries from './api/queries.js'
 import * as resources from './api/resources.js'
+import { exactNumber, filterText } from './filterValues.js'
 
 // How a column's cells are styled and filtered, from its COLUMN_TYPE. TINYINT(1), MySQL's
 // BOOLEAN, is a number: it can hold any small integer, though its 0 and 1 show as false
@@ -24,6 +25,10 @@ export const dialect = Object.freeze({
   // read as text under a case-insensitive collation, so matching ignores case whatever
   // the column's own collation, as the backend's filter does (commands/mysql/browse.rs).
   like: (column, pattern) => `CONVERT(${column} USING utf8mb4) COLLATE utf8mb4_general_ci LIKE ${quoteText(pattern)}`,
+  // A filter's value in a comparison, and the text a contains or starts-with matches, as
+  // the backend's filter reads them (filterValues.js).
+  filterLiteral: (value, dataType) => exactNumber(value, dataType) ?? quoteText(filterText(value, dataType)),
+  filterText,
   // An enum column (one listing its labels) is its own kind, as on PostgreSQL.
   cellKind(dataType, enumValues) {
     if (enumValues?.length) return 'enum'
