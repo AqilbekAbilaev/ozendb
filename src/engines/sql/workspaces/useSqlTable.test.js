@@ -381,7 +381,7 @@ describe('explain', () => {
     explainQuery.mockResolvedValue([{ Plan: {} }])
     const t = await loaded()
     await t.explain()
-    expect(explainQuery).toHaveBeenCalledWith('c1', t.currentSql.value, null)
+    expect(explainQuery).toHaveBeenCalledWith('c1', t.currentSql.value, expect.any(String), null)
     expect(t.explainRun.plan).toEqual([{ Plan: {} }])
   })
 })

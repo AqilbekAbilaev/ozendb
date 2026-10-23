@@ -51,12 +51,13 @@ fn plans_in_json_v2(version: &str) -> bool {
 /// The plan for `sql`, which must be one statement, as MySQL's JSON. It runs on a session
 /// of its own, closed afterwards, so the format it sets ends with it. ANALYZE runs the
 /// statement inside a read-only transaction that the closing session rolls back: even a
-/// stored function the SELECT calls can't write. Nothing it does, from waiting for a session
-/// on, runs past `limit`.
-pub(crate) async fn explain_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bool, limit: Duration) -> Result<serde_json::Value, AppError> {
+/// stored function the SELECT calls can't write. `run_id` lets `cancel_mysql_query` stop
+/// it, and nothing it does, from waiting for a session on, runs past `limit`.
+pub(crate) async fn explain_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bool, run_id: Option<&str>, limit: Duration) -> Result<serde_json::Value, AppError> {
     let [statement] = statements(sql, read_only)?[..] else {
         return Err(AppError::Validation(String::from("Explain shows one statement's plan; leave only the one to explain in the editor.")));
     };
+    let run = Run::new(run_id);
     let started = tokio::time::Instant::now();
     let left = || limit.saturating_sub(started.elapsed());
     // No session yet to send a KILL to, so the wait for one is simply abandoned.
@@ -75,7 +76,6 @@ pub(crate) async fn explain_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bo
     let setup = if analyze { "SET SESSION explain_json_format_version = 2; START TRANSACTION READ ONLY" } else { "SET SESSION explain_json_format_version = 2" };
     // `statement` is the caller's own SQL, run as-is: the same trust as run_mysql_query.
     let explain = format!("EXPLAIN {}FORMAT=JSON {statement}", if analyze { "ANALYZE " } else { "" });
-    let run = Run::new(None);
     let answer: String = run
         .on(connection, async {
             run.limited(pool, left(), async { sqlx::raw_sql(setup).execute(&mut *conn).await.map_err(AppError::MySql) }).await?;
@@ -94,11 +94,12 @@ fn plan(answer: String) -> Result<serde_json::Value, AppError> {
     Ok(plan)
 }
 
-/// `database`, when given, is the one the session starts in rather than the connection's own.
+/// `run_id` lets `cancel_mysql_query` stop it; `database`, when given, is the one the
+/// session starts in rather than the connection's own.
 #[tauri::command]
-pub async fn explain_mysql_query(ctx: State<'_, AppContext>, id: String, sql: String, database: Option<String>) -> Result<serde_json::Value, AppError> {
+pub async fn explain_mysql_query(ctx: State<'_, AppContext>, id: String, sql: String, run_id: Option<String>, database: Option<String>) -> Result<serde_json::Value, AppError> {
     let pool = ctx.mysql_pool(&id, database.as_deref()).await?;
-    explain_mysql_sql(&pool, &sql, ctx.is_read_only(&id), QUERY_TIME_LIMIT).await
+    explain_mysql_sql(&pool, &sql, ctx.is_read_only(&id), run_id.as_deref(), QUERY_TIME_LIMIT).await
 }
 
 #[cfg(test)]

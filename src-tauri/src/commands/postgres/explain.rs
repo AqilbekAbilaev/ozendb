@@ -1,14 +1,15 @@
 use crate::error::AppError;
 use tauri::State;
 
-use super::AppContext;
+use super::{cancel, AppContext};
 
 /// The query plan PostgreSQL chose for `sql`, with real timings — `EXPLAIN (ANALYZE,
 /// FORMAT JSON)`, as the JSON array it returns. ANALYZE actually runs the query, so it
 /// runs inside a transaction that is always rolled back (read-only too on a read-only
 /// connection): explaining never leaves a change behind. Sequences are the one thing
-/// a rollback can't undo — a `nextval()` still advances.
-pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool) -> Result<serde_json::Value, AppError> {
+/// a rollback can't undo — a `nextval()` still advances. A `run_id` makes it cancellable
+/// (see cancel.rs) until it ends.
+pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool, run_id: Option<&str>) -> Result<serde_json::Value, AppError> {
     let trimmed = sql.trim().trim_end_matches(';');
     if trimmed.is_empty() {
         return Err(AppError::Validation("Enter a query to explain.".to_string()));
@@ -18,7 +19,14 @@ pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool
         Err(e) => return Err(AppError::Postgres(e)),
     };
     let mut result = Ok(serde_json::Value::Null);
-    if read_only {
+    let mut _running = None;
+    if let Some(id) = run_id {
+        match cancel::register(&mut tx, id).await {
+            Ok(guard) => _running = Some(guard),
+            Err(e) => result = Err(e),
+        }
+    }
+    if read_only && result.is_ok() {
         if let Err(e) = sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await {
             result = Err(AppError::Postgres(e));
         }
@@ -35,11 +43,11 @@ pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool
     result
 }
 
-/// `database`, when given, targets a database other than the connection's own —
-/// opening a second database on the same server (#124).
+/// `run_id` lets `cancel_pg_query` stop it. `database`, when given, targets a database
+/// other than the connection's own — opening a second database on the same server (#124).
 #[tauri::command]
-pub async fn explain_pg_query(ctx: State<'_, AppContext>, id: String, sql: String, database: Option<String>) -> Result<serde_json::Value, AppError> {
+pub async fn explain_pg_query(ctx: State<'_, AppContext>, id: String, sql: String, run_id: Option<String>, database: Option<String>) -> Result<serde_json::Value, AppError> {
     let pool = ctx.pg_pool_for_database(&id, database.as_deref()).await?;
     let read_only = ctx.is_read_only(&id);
-    explain_impl(&pool, &sql, read_only).await
+    explain_impl(&pool, &sql, read_only, run_id.as_deref()).await
 }

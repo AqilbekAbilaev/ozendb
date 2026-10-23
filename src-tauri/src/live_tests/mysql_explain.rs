@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use super::mysql::{connect, password, run, test_config, SKIP};
 use super::mysql_browse::{pool, quoted};
-use crate::commands::explain_mysql_sql;
+use crate::commands::{cancel_mysql_run, explain_mysql_sql};
 use crate::error::AppError;
 use crate::mysql::uri::build_options;
 use crate::storage::ConnectionConfig;
@@ -53,7 +53,7 @@ async fn a_select_is_explained_with_the_rows_and_times_it_really_took() {
         "SELECT o.name, COUNT(*) FROM {database}.owners o JOIN {database}.pets p ON p.owner_id = o.id \
          WHERE o.id IN (SELECT owner_id FROM {database}.pets WHERE kind = 'cat') GROUP BY o.name ORDER BY 2 DESC;"
     );
-    let plan = explain_mysql_sql(&pool, &sql, false, LIMIT).await.unwrap();
+    let plan = explain_mysql_sql(&pool, &sql, false, None, LIMIT).await.unwrap();
     assert!(plan["actual_last_row_ms"].is_number(), "{plan}");
     assert_eq!(plan["actual_rows"], 2.0, "{plan}");
     let steps = operations(&plan);
@@ -68,7 +68,7 @@ async fn a_union_is_explained_as_its_two_halves() {
     let database = database(&config, "ozendb it explain union").await;
     let pool = pool(&config).await;
     let sql = format!("SELECT name FROM {database}.owners UNION SELECT kind FROM {database}.pets");
-    let plan = explain_mysql_sql(&pool, &sql, false, LIMIT).await.unwrap();
+    let plan = explain_mysql_sql(&pool, &sql, false, None, LIMIT).await.unwrap();
     let steps = operations(&plan);
     assert!(steps.iter().any(|s| s.contains("union")), "{steps:?}");
     assert_eq!(steps.iter().filter(|s| s.starts_with("Table scan")).count(), 3, "{steps:?}");
@@ -81,13 +81,13 @@ async fn a_write_is_explained_without_running() {
     let database = database(&config, "ozendb it explain delete").await;
     let pool = pool(&config).await;
     let joined = format!("UPDATE {database}.pets p JOIN {database}.owners o ON o.id = p.owner_id SET p.kind = 'owl' WHERE o.name = 'Åsa'");
-    let plan = explain_mysql_sql(&pool, &joined, false, LIMIT).await.unwrap();
+    let plan = explain_mysql_sql(&pool, &joined, false, None, LIMIT).await.unwrap();
     assert!(plan["operation"].as_str().unwrap().starts_with("Update"), "{plan}");
     assert!(plan["actual_rows"].is_null(), "{plan}");
-    let single = explain_mysql_sql(&pool, &format!("DELETE FROM {database}.pets WHERE owner_id = 1"), false, LIMIT).await.unwrap_err();
+    let single = explain_mysql_sql(&pool, &format!("DELETE FROM {database}.pets WHERE owner_id = 1"), false, None, LIMIT).await.unwrap_err();
     assert!(single.to_string().contains("as steps"), "{single}");
     let with = format!("WITH x AS (SELECT 1 AS n) DELETE FROM {database}.pets WHERE id IN (SELECT n FROM x)");
-    let plan = explain_mysql_sql(&pool, &with, false, LIMIT).await.unwrap();
+    let plan = explain_mysql_sql(&pool, &with, false, None, LIMIT).await.unwrap();
     assert!(plan["actual_rows"].is_null(), "{plan}");
     assert_eq!(pets(&config, &database).await, 4);
     let owls: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) FROM {database}.pets WHERE kind = 'owl'"))).fetch_one(&mut connect(&config, "").await).await.unwrap();
@@ -105,7 +105,7 @@ async fn a_select_whose_function_writes_is_refused_and_writes_nothing() {
     )
     .await;
     let pool = pool(&config).await;
-    let refused = explain_mysql_sql(&pool, &format!("SELECT {database}.adopt()"), false, LIMIT).await.unwrap_err();
+    let refused = explain_mysql_sql(&pool, &format!("SELECT {database}.adopt()"), false, None, LIMIT).await.unwrap_err();
     assert!(refused.to_string().contains("READ ONLY"), "{refused}");
     assert_eq!(pets(&config, &database).await, 4);
     drop_database(&config, &database).await;
@@ -115,7 +115,7 @@ async fn a_select_whose_function_writes_is_refused_and_writes_nothing() {
 async fn more_than_one_statement_is_refused() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let pool = pool(&config).await;
-    let refused = explain_mysql_sql(&pool, "SELECT 1; SELECT 2", false, LIMIT).await.unwrap_err();
+    let refused = explain_mysql_sql(&pool, "SELECT 1; SELECT 2", false, None, LIMIT).await.unwrap_err();
     assert!(refused.to_string().contains("one statement"), "{refused}");
 }
 
@@ -123,7 +123,7 @@ async fn more_than_one_statement_is_refused() {
 async fn a_query_past_the_time_limit_is_stopped() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let pool = pool(&config).await;
-    let stopped = explain_mysql_sql(&pool, "SELECT SLEEP(5)", false, Duration::from_millis(300)).await.unwrap_err();
+    let stopped = explain_mysql_sql(&pool, "SELECT SLEEP(5)", false, None, Duration::from_millis(300)).await.unwrap_err();
     assert!(matches!(stopped, AppError::TimedOut), "{stopped}");
 }
 
@@ -132,6 +132,21 @@ async fn waiting_for_a_session_counts_against_the_time_limit() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let pool = MySqlPoolOptions::new().max_connections(1).connect_with(build_options(&config, password().as_deref(), "", None).unwrap()).await.unwrap();
     let _held = pool.acquire().await.unwrap();
-    let stopped = explain_mysql_sql(&pool, "SELECT 1", false, Duration::from_millis(300)).await.unwrap_err();
+    let stopped = explain_mysql_sql(&pool, "SELECT 1", false, None, Duration::from_millis(300)).await.unwrap_err();
     assert!(matches!(stopped, AppError::TimedOut), "{stopped}");
+}
+
+#[tokio::test]
+async fn cancel_stops_an_analyze_that_is_running() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let pool = pool(&config).await;
+    let running = {
+        let pool = pool.clone();
+        tokio::spawn(async move { explain_mysql_sql(&pool, "SELECT SLEEP(30)", false, Some("mysql-explain-sleep"), LIMIT).await })
+    };
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert!(cancel_mysql_run(&pool, "mysql-explain-sleep").await.unwrap(), "a running Explain is found and cancelled");
+    let stopped = tokio::time::timeout(Duration::from_secs(5), running).await.unwrap().unwrap().unwrap_err();
+    assert!(matches!(stopped, AppError::Cancelled), "{stopped}");
+    assert!(!cancel_mysql_run(&pool, "mysql-explain-sleep").await.unwrap(), "a finished Explain cancels nothing");
 }

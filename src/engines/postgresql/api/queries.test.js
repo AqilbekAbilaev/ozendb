@@ -42,8 +42,8 @@ describe('PostgreSQL queries', () => {
   })
 
   it('explains a query', async () => {
-    await explainQuery('c1', 'SELECT 1')
-    expect(invoke).toHaveBeenCalledWith('explain_pg_query', { id: 'c1', sql: 'SELECT 1', database: null })
+    await explainQuery('c1', 'SELECT 1', 'explain 1')
+    expect(invoke).toHaveBeenCalledWith('explain_pg_query', { id: 'c1', sql: 'SELECT 1', runId: 'explain 1', database: null })
   })
 
   it('targets a database other than the connection\'s own for query/transaction/explain', async () => {
@@ -51,8 +51,8 @@ describe('PostgreSQL queries', () => {
     expect(invoke).toHaveBeenCalledWith('run_pg_query', { id: 'c1', sql: 'SELECT 1', runId: 'run-1', txId: null, database: 'otherdb' })
     await beginTransaction('c1', 'tx-1', 'otherdb')
     expect(invoke).toHaveBeenCalledWith('begin_pg_transaction', { id: 'c1', txId: 'tx-1', database: 'otherdb' })
-    await explainQuery('c1', 'SELECT 1', 'otherdb')
-    expect(invoke).toHaveBeenCalledWith('explain_pg_query', { id: 'c1', sql: 'SELECT 1', database: 'otherdb' })
+    await explainQuery('c1', 'SELECT 1', 'explain-1', 'otherdb')
+    expect(invoke).toHaveBeenCalledWith('explain_pg_query', { id: 'c1', sql: 'SELECT 1', runId: 'explain-1', database: 'otherdb' })
   })
 
   it('browses a page of a table, unordered by default', async () => {

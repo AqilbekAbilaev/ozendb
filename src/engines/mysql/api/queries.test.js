@@ -67,8 +67,8 @@ describe('running MySQL SQL', () => {
   })
 
   it('explains a query in the database a tab works in', async () => {
-    await explainQuery('c1', 'SELECT 1', 'shop `2024` ü')
-    expect(invoke).toHaveBeenCalledWith('explain_mysql_query', { id: 'c1', sql: 'SELECT 1', database: 'shop `2024` ü' })
+    await explainQuery('c1', 'SELECT 1', 'explain 1', 'shop `2024` ü')
+    expect(invoke).toHaveBeenCalledWith('explain_mysql_query', { id: 'c1', sql: 'SELECT 1', runId: 'explain 1', database: 'shop `2024` ü' })
   })
 
   it('formats SQL', async () => {

@@ -112,7 +112,7 @@ const summary = computed(() => {
       </BaseButton>
       <BaseButton variant="ghost" icon="run" :disabled="run.running" title="Run the selected text" @click="runSelection">Run selection</BaseButton>
       <BaseButton variant="ghost" icon="exScan" :disabled="run.explaining || !sql.trim()" :title="`Show how ${engineLabel(run.engine)} runs this query`" @click="explain">Explain</BaseButton>
-      <BaseButton variant="ghost" icon="close" :disabled="!run.running" title="Stop the running query" @click="cancelSql(run)">Cancel</BaseButton>
+      <BaseButton variant="ghost" icon="close" :disabled="!run.running && !run.explaining" title="Stop the running query" @click="cancelSql(run)">Cancel</BaseButton>
       <span class="qsep"></span>
       <BaseButton variant="ghost" icon="textType" class="qbar-hide-sm" :disabled="run.running || !sql.trim()" title="Lay the SQL out one clause per line" @click="format">Format</BaseButton>
       <BaseButton v-if="engineOf(run).sql.modals.export" variant="ghost" icon="export" class="qbar-hide-sm" :disabled="!sql.trim()" title="Export every row this query returns" @click="exportQuery" />

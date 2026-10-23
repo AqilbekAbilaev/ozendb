@@ -13,7 +13,7 @@ export function createSqlRun(engine, connectionId, database = null) {
     engine, connectionId, database,
     result: null, error: null, running: false, runId: null, messages: [],
     txn: 'auto', txId: null,
-    plan: null, planError: null, explaining: false,
+    plan: null, planError: null, explaining: false, explainId: null,
     selection: createSelection(),
   }
 }
@@ -89,22 +89,26 @@ export function outcome({ rows, rowsAffected }) {
   return `${rowsAffected} row${rowsAffected === 1 ? '' : 's'} affected`
 }
 
-// The run then ends with a "cancelled" error, handled like any other.
+// Stops what is in flight, a run, an Explain or both; each then ends with a "cancelled"
+// error, handled like any other.
 export function cancelSql(run) {
-  if (run.runId) return apiOf(run).cancelQuery(run.connectionId, run.runId)
+  return Promise.all([run.runId, run.explainId].filter(Boolean).map(id => apiOf(run).cancelQuery(run.connectionId, id)))
 }
 
-// Explains `sql`, keeping the plan (or why there isn't one) on the run.
+// Explains `sql`, keeping the plan (or why there isn't one) on the run. It has an id of
+// its own, so cancelSql can stop it while it runs alongside a run.
 export async function explainSql(run, sql) {
   run.explaining = true
   run.planError = null
+  run.explainId = crypto.randomUUID()
   try {
-    run.plan = await apiOf(run).explainQuery(run.connectionId, sql, run.database)
+    run.plan = await apiOf(run).explainQuery(run.connectionId, sql, run.explainId, run.database)
   } catch (e) {
     run.plan = null
     run.planError = errMessage(e)
   } finally {
     run.explaining = false
+    run.explainId = null
   }
 }
 

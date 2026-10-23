@@ -26,9 +26,9 @@ export function rollbackTransaction(txId) {
 }
 
 // The plan PostgreSQL chose, with real timings: EXPLAIN (ANALYZE, FORMAT JSON)'s array,
-// run in a transaction that's rolled back. `database` as in `runQuery`.
-export function explainQuery(connectionId, sql, database = null) {
-  return invoke('explain_pg_query', { id: connectionId, sql, database })
+// run in a transaction that's rolled back. `runId` and `database` as in `runQuery`.
+export function explainQuery(connectionId, sql, runId = null, database = null) {
+  return invoke('explain_pg_query', { id: connectionId, sql, runId, database })
 }
 
 // The SQL laid out one clause per line; refused (with why) for SQL it can't read or
