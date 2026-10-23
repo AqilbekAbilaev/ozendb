@@ -46,41 +46,31 @@ pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]
         }
         let info = column(columns, &f.column)?;
         let name = quote_name(&f.column)?;
-        let check = match f.op {
-            FilterOp::IsNull => Some("IS NULL"),
-            FilterOp::NotNull => Some("IS NOT NULL"),
-            _ => None,
-        };
-        if let Some(check) = check {
-            conditions.push(format!("{name} {check}"));
-            continue;
-        }
-        let Some(value) = &f.value else {
-            return Err(AppError::Validation(format!("The filter on \"{}\" needs a value.", f.column)));
-        };
+        let value = || f.value.as_deref().ok_or_else(|| AppError::Validation(format!("The filter on \"{}\" needs a value.", f.column)));
         // LIKE's default escape character is a backslash.
-        let like = || value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+        let like = |value: &str| value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
         let as_text = format!("CONVERT({name} USING utf8mb4) {AS_TEXT} LIKE");
         let value_sql = placeholder(&info.data_type);
-        let compare = |symbol: &str| (vec![value.clone()], format!("{name} {symbol} {value_sql}"));
+        let compare = |symbol: &str, value: &str| (vec![value.to_string()], format!("{name} {symbol} {value_sql}"));
         let (values, condition) = match f.op {
-            FilterOp::Contains => (vec![like()], format!("{as_text} CONCAT('%', ?, '%')")),
-            FilterOp::StartsWith => (vec![like()], format!("{as_text} CONCAT(?, '%')")),
+            FilterOp::IsNull => (vec![], format!("{name} IS NULL")),
+            FilterOp::NotNull => (vec![], format!("{name} IS NOT NULL")),
+            FilterOp::Contains => (vec![like(value()?)], format!("{as_text} CONCAT('%', ?, '%')")),
+            FilterOp::StartsWith => (vec![like(value()?)], format!("{as_text} CONCAT(?, '%')")),
             FilterOp::In => {
-                let items: Vec<String> = value.split(',').map(str::trim).filter(|v| !v.is_empty()).map(String::from).collect();
+                let items: Vec<String> = value()?.split(',').map(str::trim).filter(|v| !v.is_empty()).map(String::from).collect();
                 if items.is_empty() {
                     return Err(AppError::Validation(format!("The filter on \"{}\" needs at least one value.", f.column)));
                 }
                 let condition = format!("{name} IN ({})", vec![value_sql; items.len()].join(", "));
                 (items, condition)
             }
-            FilterOp::Eq => compare("="),
-            FilterOp::Ne => compare("<>"),
-            FilterOp::Gt => compare(">"),
-            FilterOp::Gte => compare(">="),
-            FilterOp::Lt => compare("<"),
-            FilterOp::Lte => compare("<="),
-            FilterOp::IsNull | FilterOp::NotNull => continue,
+            FilterOp::Eq => compare("=", value()?),
+            FilterOp::Ne => compare("<>", value()?),
+            FilterOp::Gt => compare(">", value()?),
+            FilterOp::Gte => compare(">=", value()?),
+            FilterOp::Lt => compare("<", value()?),
+            FilterOp::Lte => compare("<=", value()?),
         };
         binds.extend(values);
         conditions.push(condition);
@@ -125,7 +115,7 @@ pub(crate) async fn mysql_browse(
     let columns = mysql_columns(pool, database, table).await?;
     let (from_where, binds) = from_where(database, table, filters, &columns)?;
     let limit = if limit <= 0 { BROWSE_LIMIT_FALLBACK } else { limit.min(ROW_RESULT_CAP) };
-    let sql = format!("SELECT * {from_where}{} LIMIT {limit} OFFSET {}", order_clause(order_by, descending, &columns)?, offset.max(0));
+    let sql = format!("SELECT * {from_where}{} LIMIT ? OFFSET ?", order_clause(order_by, descending, &columns)?);
 
     let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
     // The statement's own columns name the result, so an empty page still has a header.
@@ -137,6 +127,7 @@ pub(crate) async fn mysql_browse(
     for bind in binds {
         query = query.bind(bind);
     }
+    query = query.bind(limit).bind(offset.max(0));
     let started = std::time::Instant::now();
     let fetched = query.fetch_all(&mut *conn).await.map_err(AppError::MySql)?;
     let elapsed_ms = started.elapsed().as_millis() as u64;
