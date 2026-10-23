@@ -5,6 +5,7 @@
 mod mongodb;
 mod mysql;
 mod mysql_browse;
+mod mysql_query;
 mod mysql_row_write;
 mod mysql_schema;
 mod pg;

@@ -4,11 +4,16 @@ use crate::error::AppError;
 pub(super) use super::AppContext;
 
 pub mod browse;
+pub mod cancel;
 mod cell;
+pub mod query;
 pub mod row_write;
+mod script;
 pub mod schema;
 
 pub use browse::*;
+pub use cancel::*;
+pub use query::*;
 pub use row_write::*;
 pub use schema::*;
 

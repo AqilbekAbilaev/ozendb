@@ -119,3 +119,21 @@ fn a_mysql_login_that_needs_tls_says_how_to_connect() {
     assert!(error.user_message().starts_with("This MySQL login needs TLS"), "{}", error.user_message());
     assert!(!error.user_message().contains("mysql-rsa"));
 }
+
+#[test]
+fn a_stopped_query_says_why_under_the_code_postgres_gives_it() {
+    use super::AppError;
+    assert_eq!((AppError::Cancelled.code(), AppError::Cancelled.user_message().as_str()), ("cancelled", "The query was cancelled."));
+    assert_eq!(
+        (AppError::TimedOut.code(), AppError::TimedOut.user_message().as_str()),
+        ("cancelled", "The query ran past its time limit and was stopped.")
+    );
+}
+
+#[test]
+fn a_statement_failing_later_in_a_script_is_named_and_keeps_its_own_code() {
+    use super::AppError;
+    let error = AppError::InScript { number: 3, source: Box::new(AppError::MySql(sqlx::Error::PoolTimedOut)) };
+    assert_eq!(error.code(), "network");
+    assert_eq!(error.user_message(), format!("Statement 3 failed (the ones before it ran): {}", sqlx::Error::PoolTimedOut));
+}
