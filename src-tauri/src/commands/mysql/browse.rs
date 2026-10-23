@@ -206,15 +206,15 @@ pub(super) fn where_clause(filters: &[ColumnFilter], tables: &[Vec<MySqlColumnIn
     Ok((format!(" WHERE {}", conditions.join(" AND ")), binds))
 }
 
-/// ` ORDER BY …` on `order_by`, a column of any of `tables`, or else on the browsed
-/// table's primary key so pages don't overlap or skip rows (see PostgreSQL's browse);
-/// empty for a table with neither.
+/// ` ORDER BY …` on `order_by`, a column of any of `tables`, or else on each table's
+/// primary key in turn, so pages don't overlap or skip rows (see PostgreSQL's browse):
+/// with a join the browsed table's key repeats once per match. Empty when no table has one.
 pub(super) fn order_clause(order_by: Option<&ColumnRef>, descending: bool, tables: &[Vec<MySqlColumnInfo>]) -> Result<String, AppError> {
     let names: Vec<String> = match order_by.filter(|r| !r.column.is_empty()) {
         Some(r) => vec![column_in(tables, r)?.0],
         None => {
-            let keys = tables[0].iter().filter(|c| c.is_primary_key);
-            keys.map(|c| Ok(format!("`t0`.{}", quote_name(&c.name)?))).collect::<Result<_, AppError>>()?
+            let keys = tables.iter().enumerate().flat_map(|(i, columns)| columns.iter().filter(|c| c.is_primary_key).map(move |c| (i, c)));
+            keys.map(|(i, c)| Ok(format!("`t{i}`.{}", quote_name(&c.name)?))).collect::<Result<_, AppError>>()?
         }
     };
     if names.is_empty() {
