@@ -71,3 +71,36 @@ async fn a_page_joins_filters_and_sorts_across_tables_and_databases() {
     run(&mut admin, &format!("DROP DATABASE {db}")).await;
     run(&mut admin, &format!("DROP DATABASE {elsewhere}")).await;
 }
+
+/// One customer with many orders: ordered by the customer's key alone, MySQL 8.4 sorts
+/// the ties differently from one page to the next once there are a couple of dozen.
+#[tokio::test]
+async fn pages_of_a_one_to_many_join_neither_overlap_nor_skip() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let name = "ozendb it join ведомость paging";
+    let db = quoted(name);
+    let orders: Vec<String> = (1..=20).map(|id| format!("({id}, 1)")).collect();
+    let mut admin = connect(&config, "").await;
+    for statement in [
+        format!("DROP DATABASE IF EXISTS {db}"),
+        format!("CREATE DATABASE {db}"),
+        format!("CREATE TABLE {db}.`customers ü` (id INT PRIMARY KEY)"),
+        format!("CREATE TABLE {db}.{} (id INT PRIMARY KEY, `customer id` INT)", quoted(ORDERS)),
+        format!("INSERT INTO {db}.`customers ü` VALUES (1), (2)"),
+        format!("INSERT INTO {db}.{} VALUES {}", quoted(ORDERS), orders.join(", ")),
+    ] {
+        run(&mut admin, &statement).await;
+    }
+    let pool = pool(&config).await;
+    let joins = [TableJoin { schema: name.into(), table: ORDERS.into(), kind: JoinKind::Left, on: vec![on("customer id", "id")] }];
+    let mut seen = Vec::new();
+    for offset in (0..22).step_by(2) {
+        let page = mysql_browse(&pool, name, "customers ü", &joins, &[], None, false, 2, offset).await.unwrap();
+        seen.extend(page.rows.into_iter().map(|row| (row[0].clone(), row[1].clone())));
+    }
+    let mut expected: Vec<_> = (1..=20).map(|id| (json!(1), json!(id))).collect();
+    expected.push((json!(2), json!(null)));
+    assert_eq!(seen, expected);
+    pool.close().await;
+    run(&mut admin, &format!("DROP DATABASE {db}")).await;
+}

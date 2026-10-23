@@ -241,3 +241,10 @@ fn orders_by_a_joined_column_or_refuses_one_its_table_lacks() {
     assert!(order_clause(Some(&ColumnRef { table: 2, column: "at".into() }), false, &tables).is_err());
     assert!(order_clause(Some(&ColumnRef { table: 1, column: "nope".into() }), false, &tables).is_err());
 }
+
+#[test]
+fn orders_a_join_by_every_table_s_primary_key_in_turn_so_pages_neither_overlap_nor_skip() {
+    let keyless: Vec<_> = columns().into_iter().filter(|c| !c.is_primary_key).collect();
+    let tables = [columns(), keyless, joined()];
+    assert_eq!(order_clause(None, true, &tables).unwrap(), " ORDER BY `t0`.`id ``key``` DESC, `t2`.`id ``key``` DESC");
+}
