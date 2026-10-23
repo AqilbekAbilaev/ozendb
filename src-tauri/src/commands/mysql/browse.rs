@@ -34,7 +34,8 @@ fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlCol
 /// point, which can't tell two BIGINTs past 2^53 apart; a cast to SIGNED reads `>= 1.5`
 /// as `>= 1`; one to the column's own scale reads `> 1.505` on a DECIMAL(10,2) as
 /// `> 1.51`; and one to a fixed DECIMAL(65,30) clips a value past 35 whole digits. On
-/// TINYINT(1), MySQL's BOOLEAN, `true` and `false` are the 1 and 0 it stores.
+/// TINYINT(1), MySQL's BOOLEAN, `true` and `false` are the 1 and 0 it stores, under every
+/// operator, as MySQL reads TRUE and FALSE.
 fn typed(info: &MySqlColumnInfo, value: &str) -> Result<(String, String), AppError> {
     let value = unzoned(&info.data_type, value);
     let base = info.data_type.split(['(', ' ']).next().unwrap_or_default();
@@ -47,7 +48,11 @@ fn typed(info: &MySqlColumnInfo, value: &str) -> Result<(String, String), AppErr
         "false" if is_boolean => "0",
         _ => value.trim(),
     };
-    let (precision, scale) = decimal(value).unwrap_or((MAX_DIGITS, 0));
+    // CAST would read anything else as 0.
+    let (precision, scale) = decimal(value).ok_or_else(|| {
+        let or_boolean = if is_boolean { ", or true or false" } else { "" };
+        AppError::Validation(format!("The filter on \"{}\" needs a number{or_boolean}.", info.name))
+    })?;
     if precision > MAX_DIGITS || scale > MAX_SCALE {
         return Err(AppError::Validation(format!(
             "The filter on \"{}\" needs a number of at most {MAX_DIGITS} digits, {MAX_SCALE} of them after the point.",

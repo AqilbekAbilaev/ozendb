@@ -89,6 +89,19 @@ fn reads_true_and_false_on_a_tinyint_1_as_the_1_and_0_it_stores() {
 }
 
 #[test]
+fn refuses_a_value_that_is_not_a_number_on_a_number_column() {
+    let refused = |column: &str, op: FilterOp, value: &str| match where_clause(&[filter(column, op, Some(value))], &columns()) {
+        Err(AppError::Validation(message)) => message,
+        other => panic!("{column} {value:?} gave {other:?}"),
+    };
+    assert_eq!(refused("id `key`", FilterOp::Eq, "abc"), "The filter on \"id `key`\" needs a number.");
+    assert_eq!(refused("price €", FilterOp::Gt, "1,5"), "The filter on \"price €\" needs a number.");
+    assert_eq!(refused("bits", FilterOp::In, "1, 0x10"), "The filter on \"bits\" needs a number.");
+    assert_eq!(refused("id `key`", FilterOp::Eq, "true"), "The filter on \"id `key`\" needs a number.");
+    assert_eq!(refused("ok", FilterOp::Ne, "yes"), "The filter on \"ok\" needs a number, or true or false.");
+}
+
+#[test]
 fn leaves_true_as_text_on_any_other_column() {
     let (_, binds) = clause(&[filter("name", FilterOp::Eq, Some("true"))]);
     assert_eq!(binds, vec!["true"]);
