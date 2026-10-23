@@ -126,7 +126,8 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
   from the tab's engine as `engineOf(tab).sql`: its `dialect` (quoting, case-insensitive
   matching, column-type kinds, which columns take a value), its `api` (the commands the tabs
   call), `readPlan` for its Explain output, and the names of its own export and row-history
-  windows. A run carries its engine's name, so `runSql` finds the same commands.
+  windows. A run carries its engine's name, so `runSql` finds the same commands. Each engine
+  registers the table tab through `tableDefinition.js`.
   `connection/` holds what their connection editors share: the authentication and SSL sections and the payload builder.
 
 A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
@@ -185,9 +186,13 @@ The third engine, following PostgreSQL's layout. Its resources are `database/tab
 MySQL has no schema level, and one connection reaches every database on its server.
 
 - **Frontend: `src/engines/mysql/`.** `connection/` holds the URI parsing, `tree/` the sidebar's
-  database → table → columns rows and their menus, and `api/` its half of the Tauri boundary.
+  database → table → columns rows and their menus, `sql.js` its `sql` entry for the shared table
+  tab, `workspaces/` that tab's definition (`mysql.table_browse`), and `api/` its half of the Tauri
+  boundary. The shared tab qualifies a table by its `schema`; on MySQL that is the database.
 - **Backend: `src-tauri/src/commands/mysql/`**, resolving a pool through `ctx.mysql_pool`, and the
-  `src-tauri/src/mysql/` modules described below.
+  `src-tauri/src/mysql/` modules described below. `browse.rs` reads the table tab's page and count;
+  `cell.rs` turns each cell into the grid's JSON by its column type, since MySQL can't wrap a row
+  as JSON server-side the way PostgreSQL does.
 - **Tests:** the `live_tests/mysql*.rs` files run when `OZENDB_TEST_MYSQL` is set.
 
 ## Rust backend (`src-tauri/src/`)
