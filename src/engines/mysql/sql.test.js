@@ -51,14 +51,22 @@ describe('cellKind', () => {
     expect(cellKind("enum('new','paid')", undefined)).toBe(null)
   })
 
-  it('treats TINYINT(1) as the number it holds', () => {
-    expect(cellKind('tinyint(1)')).toBe('num')
+  it('treats TINYINT(1), MySQL\'s BOOLEAN, as a boolean whatever its sign', () => {
+    expect(cellKind('tinyint(1)')).toBe('bool')
+    expect(cellKind('tinyint(1) unsigned')).toBe('bool')
+    expect(cellKind('tinyint')).toBe('num')
+    expect(cellKind('tinyint(10)')).toBe('num')
+  })
+
+  it('treats a BIT column as the number it reads as', () => {
+    expect(cellKind('bit(1)')).toBe('num')
+    expect(cellKind('bit(64)')).toBe('num')
   })
 
   it('leaves JSON, binary, spatial and unknown columns unstyled', () => {
     expect(cellKind('json')).toBe(null)
     expect(cellKind('varbinary(16)')).toBe(null)
-    expect(cellKind('bit(1)')).toBe(null)
+    expect(cellKind('longblob')).toBe(null)
     expect(cellKind('point')).toBe(null)
     expect(cellKind(undefined)).toBe(null)
   })
