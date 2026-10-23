@@ -126,16 +126,21 @@ async fn cancel_stops_a_long_update_and_the_rest_of_its_script() {
     drop_database(&config, &database).await;
 }
 
+/// A pool with room for one session only, as a full pool would leave it.
+async fn pool_of_one(config: &ConnectionConfig) -> MySqlPool {
+    MySqlPoolOptions::new()
+        .max_connections(1)
+        .after_connect(|connection, _| Box::pin(prepare(connection, false)))
+        .connect_with(build_options(config, password().as_deref(), "", None).unwrap())
+        .await
+        .unwrap()
+}
+
 #[tokio::test]
 async fn cancel_stops_a_run_still_waiting_for_its_session() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let database = database(&config, "ozendb it early cancel").await;
-    let pool = MySqlPoolOptions::new()
-        .max_connections(1)
-        .after_connect(|connection, _| Box::pin(prepare(connection, false)))
-        .connect_with(build_options(&config, password().as_deref(), "", None).unwrap())
-        .await
-        .unwrap();
+    let pool = pool_of_one(&config).await;
     let busy = pool.acquire().await.unwrap();
     let running = {
         let (pool, sql) = (pool.clone(), format!("INSERT INTO {database}.t VALUES (1, 'a')"));
@@ -148,6 +153,23 @@ async fn cancel_stops_a_run_still_waiting_for_its_session() {
     assert_eq!(err.code(), "cancelled");
     assert_eq!(count(&config, &database).await, 0);
     drop_database(&config, &database).await;
+}
+
+#[tokio::test]
+async fn cancel_stops_a_statement_even_when_the_pool_is_full() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let pool = pool_of_one(&config).await;
+    let txs = std::sync::Arc::new(MySqlTransactions::default());
+    txs.begin(&pool, "tx full pool", false).await.unwrap();
+    let running = {
+        let (txs, pool) = (txs.clone(), pool.clone());
+        tokio::spawn(async move { txs.run("tx full pool", &pool, "SELECT SLEEP(30)", false, Some("mysql-run-full")).await })
+    };
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert!(tokio::time::timeout(Duration::from_secs(5), cancel_mysql_run(&pool, "mysql-run-full")).await.unwrap().unwrap());
+    let err = tokio::time::timeout(Duration::from_secs(5), running).await.unwrap().unwrap().unwrap_err();
+    assert_eq!(err.code(), "cancelled");
+    txs.finish("tx full pool", false).await.unwrap();
 }
 
 #[tokio::test]
