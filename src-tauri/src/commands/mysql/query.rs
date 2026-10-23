@@ -86,23 +86,26 @@ pub(super) async fn run_on(
     held: bool,
 ) -> Result<Vec<SqlQueryResult>, AppError> {
     run.stopped()?;
-    run.attach(sqlx::query_scalar("SELECT CONNECTION_ID()").fetch_one(&mut *conn).await.map_err(AppError::MySql)?);
-    let mut results = Vec::with_capacity(statements.len());
-    for (i, statement) in statements.iter().enumerate() {
-        if read_only {
-            sqlx::raw_sql(READ_ONLY_LOCK).execute(&mut *conn).await.map_err(AppError::MySql)?;
+    let connection = sqlx::query_scalar("SELECT CONNECTION_ID()").fetch_one(&mut *conn).await.map_err(AppError::MySql)?;
+    run.on(connection, async {
+        let mut results = Vec::with_capacity(statements.len());
+        for (i, statement) in statements.iter().enumerate() {
+            if read_only {
+                sqlx::raw_sql(READ_ONLY_LOCK).execute(&mut *conn).await.map_err(AppError::MySql)?;
+            }
+            let outcome = run.limited(pool, limit, run_one(conn, statement)).await.map_err(|e| match e {
+                AppError::MySql(e) if held && number(&e) == Some(DEADLOCK) => AppError::RolledBack(Box::new(AppError::MySql(e))),
+                e => e,
+            });
+            match outcome {
+                Ok(result) => results.push(result),
+                Err(e) if i == 0 => return Err(e),
+                Err(e) => return Err(AppError::InScript { number: i + 1, source: Box::new(e) }),
+            }
         }
-        let outcome = run.limited(pool, limit, run_one(conn, statement)).await.map_err(|e| match e {
-            AppError::MySql(e) if held && number(&e) == Some(DEADLOCK) => AppError::RolledBack(Box::new(AppError::MySql(e))),
-            e => e,
-        });
-        match outcome {
-            Ok(result) => results.push(result),
-            Err(e) if i == 0 => return Err(e),
-            Err(e) => return Err(AppError::InScript { number: i + 1, source: Box::new(e) }),
-        }
-    }
-    Ok(results)
+        Ok(results)
+    })
+    .await
 }
 
 /// Runs caller SQL (see `run_mysql_query`) on a session of its own, closed afterwards:
