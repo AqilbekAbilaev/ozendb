@@ -101,3 +101,10 @@ fn any_other_mysql_driver_error_keeps_its_own_code() {
     assert_eq!(AppError::MySql(sqlx::Error::RowNotFound).code(), "mysql");
     assert_eq!(AppError::Postgres(sqlx::Error::RowNotFound).code(), "postgres");
 }
+
+#[test]
+fn a_mysql_driver_error_reads_without_the_engine_prefix() {
+    use super::AppError;
+    let error = AppError::MySql(sqlx::Error::PoolTimedOut);
+    assert_eq!(error.user_message(), sqlx::Error::PoolTimedOut.to_string());
+}

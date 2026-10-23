@@ -162,7 +162,9 @@ impl AppError {
         match self {
             AppError::Mongo(e) => mongo_message(e),
             AppError::Postgres(e) => postgres_message(e),
+            // The server's own message, or the driver's sentence, without "MySQL error:".
             AppError::MySql(sqlx::Error::Database(db_err)) => db_err.message().to_string(),
+            AppError::MySql(e) => e.to_string(),
             _ => self.to_string(),
         }
     }
@@ -290,7 +292,13 @@ fn mysql_code(e: &sqlx::Error) -> &'static str {
     match e {
         // SQLSTATE 28000 is MySQL's access-denied class too (error 1045 among them).
         sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("28000") => "auth",
-        sqlx::Error::Database(_) => "command",
+        // MySQL files both under SQLSTATE 42000, so its own error numbers tell them apart:
+        // no access to a database or table, and a database or table that doesn't exist.
+        sqlx::Error::Database(db_err) => match db_err.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>().map(|e| e.number()) {
+            Some(1044) | Some(1142) => "forbidden",
+            Some(1049) | Some(1146) => "missing",
+            _ => "command",
+        },
         _ => sqlx_code(e).unwrap_or("mysql"),
     }
 }
