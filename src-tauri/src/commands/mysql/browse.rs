@@ -25,7 +25,7 @@ const MAX_SCALE: usize = 30;
 const AS_TEXT: &str = "COLLATE utf8mb4_general_ci";
 
 /// The browsed column named `name`, refused when the table has none.
-fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlColumnInfo, AppError> {
+pub(super) fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlColumnInfo, AppError> {
     columns.iter().find(|c| c.name == name).ok_or_else(|| AppError::Validation(format!("Unknown column \"{name}\".")))
 }
 
@@ -36,21 +36,20 @@ fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlCol
 /// `> 1.51`; and one to a fixed DECIMAL(65,30) clips a value past 35 whole digits. On
 /// TINYINT(1), MySQL's BOOLEAN, `true` and `false` are the 1 and 0 it stores, under every
 /// operator, as MySQL reads TRUE and FALSE.
-fn typed(info: &MySqlColumnInfo, value: &str) -> Result<(String, String), AppError> {
+pub(super) fn typed(info: &MySqlColumnInfo, value: &str) -> Result<(String, String), AppError> {
     let value = unzoned(&info.data_type, value);
-    let base = info.data_type.split(['(', ' ']).next().unwrap_or_default();
-    if !EXACT_NUMBERS.contains(&base) {
+    if !EXACT_NUMBERS.contains(&base_type(&info.data_type)) {
         return Ok((value.to_string(), String::from("?")));
     }
-    let is_boolean = info.data_type.strip_prefix("tinyint(1)").is_some_and(|rest| rest.is_empty() || rest.starts_with(' '));
+    let boolean = is_boolean(&info.data_type);
     let value = match value.trim().to_ascii_lowercase().as_str() {
-        "true" if is_boolean => "1",
-        "false" if is_boolean => "0",
+        "true" if boolean => "1",
+        "false" if boolean => "0",
         _ => value.trim(),
     };
     // CAST would read anything else as 0.
     let (precision, scale) = decimal(value).ok_or_else(|| {
-        let or_boolean = if is_boolean { ", or true or false" } else { "" };
+        let or_boolean = if boolean { ", or true or false" } else { "" };
         AppError::Validation(format!("The filter on \"{}\" needs a number{or_boolean}.", info.name))
     })?;
     if precision > MAX_DIGITS || scale > MAX_SCALE {
@@ -62,9 +61,19 @@ fn typed(info: &MySqlColumnInfo, value: &str) -> Result<(String, String), AppErr
     Ok((value.to_string(), format!("CAST(? AS DECIMAL({precision},{scale}))")))
 }
 
+/// A COLUMN_TYPE's name without its length or sign: `bigint` for `bigint(20) unsigned`.
+pub(super) fn base_type(data_type: &str) -> &str {
+    data_type.split(['(', ' ']).next().unwrap_or_default()
+}
+
+/// TINYINT(1), MySQL's BOOLEAN, signed or not.
+pub(super) fn is_boolean(data_type: &str) -> bool {
+    data_type.strip_prefix("tinyint(1)").is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
+}
+
 /// `value` as MySQL writes the column: the grid shows a TIMESTAMP in the session's UTC
 /// (cell.rs), and MySQL's own text of one, which every filter compares, has no zone.
-fn unzoned<'a>(data_type: &str, value: &'a str) -> &'a str {
+pub(super) fn unzoned<'a>(data_type: &str, value: &'a str) -> &'a str {
     if data_type.starts_with("timestamp") { value.strip_suffix(UTC).unwrap_or(value) } else { value }
 }
 

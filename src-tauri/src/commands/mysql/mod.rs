@@ -5,9 +5,11 @@ pub(super) use super::AppContext;
 
 pub mod browse;
 mod cell;
+pub mod row_write;
 pub mod schema;
 
 pub use browse::*;
+pub use row_write::*;
 pub use schema::*;
 
 /// Backtick-quotes a database, table or column name, doubling any backtick inside it. A

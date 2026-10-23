@@ -9,14 +9,14 @@ use serde_json::{json, Value};
 use sqlx::mysql::MySqlPoolOptions;
 use sqlx::MySqlPool;
 
-const TABLE: &str = "every `type` ü";
+pub(super) const TABLE: &str = "every `type` ü";
 
-fn quoted(name: &str) -> String {
+pub(super) fn quoted(name: &str) -> String {
     format!("`{}`", name.replace('`', "``"))
 }
 
 /// A pool with no default database, each session prepared as the app's are.
-async fn pool(config: &crate::storage::ConnectionConfig) -> MySqlPool {
+pub(super) async fn pool(config: &crate::storage::ConnectionConfig) -> MySqlPool {
     MySqlPoolOptions::new()
         .after_connect(|connection, _| Box::pin(prepare(connection, false)))
         .connect_with(build_options(config, password().as_deref(), "", None).unwrap())
@@ -26,7 +26,7 @@ async fn pool(config: &crate::storage::ConnectionConfig) -> MySqlPool {
 
 /// A database of its own per test, holding one table with a column of each common type
 /// and three rows, and a pool with no default database. The caller drops it.
-async fn seeded(config: &crate::storage::ConnectionConfig, name: &str) -> MySqlPool {
+pub(super) async fn seeded(config: &crate::storage::ConnectionConfig, name: &str) -> MySqlPool {
     let (database, table) = (quoted(name), quoted(TABLE));
     let mut admin = connect(config, "").await;
     for statement in [
@@ -52,7 +52,7 @@ async fn seeded(config: &crate::storage::ConnectionConfig, name: &str) -> MySqlP
     pool(config).await
 }
 
-async fn drop_seeded(config: &crate::storage::ConnectionConfig, pool: MySqlPool, name: &str) {
+pub(super) async fn drop_seeded(config: &crate::storage::ConnectionConfig, pool: MySqlPool, name: &str) {
     pool.close().await;
     let mut admin = connect(config, "").await;
     run(&mut admin, &format!("DROP DATABASE {}", quoted(name))).await;
