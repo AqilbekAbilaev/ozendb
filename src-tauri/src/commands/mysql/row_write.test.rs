@@ -5,6 +5,7 @@ use crate::error::AppError;
 use serde_json::{json, Value};
 
 const TABLE: &str = "`shop ü`.`order ``items```";
+const PLACE: &str = "table \"order `items`\" of database \"shop ü\"";
 
 fn info(name: &str, data_type: &str, is_primary_key: bool, generated: bool) -> MySqlColumnInfo {
     MySqlColumnInfo {
@@ -125,7 +126,7 @@ fn inserts_the_values_given_and_a_row_of_defaults_when_none_are() {
 #[test]
 fn updates_a_row_found_by_its_whole_primary_key() {
     let change = MySqlRowUpdate { set: vec![value("note ü", Value::Null)], r#where: key(json!(1), "0x01") };
-    let (sql, params) = update(TABLE, &columns(), &change).unwrap();
+    let (sql, params) = update(TABLE, PLACE, &columns(), &change).unwrap();
     assert_eq!(
         sql,
         "UPDATE `shop ü`.`order ``items``` SET `note ü` = ? WHERE `id ``key``` = CAST(? AS DECIMAL(1,0)) AND `region` = ?"
@@ -147,7 +148,7 @@ fn deletes_every_row_in_one_statement() {
 #[test]
 fn refuses_a_row_named_by_less_than_its_primary_key() {
     let change = MySqlRowUpdate { set: vec![value("note ü", json!("x"))], r#where: vec![value("id `key`", json!(1))] };
-    assert!(message(update(TABLE, &columns(), &change)).contains("primary key"));
+    assert!(message(update(TABLE, PLACE, &columns(), &change)).contains("primary key"));
     assert!(message(delete(TABLE, &columns(), &[vec![value("region", json!("0x01"))]])).contains("primary key"));
 }
 
@@ -155,7 +156,7 @@ fn refuses_a_row_named_by_less_than_its_primary_key() {
 fn refuses_to_find_a_row_in_a_table_without_a_primary_key() {
     let keyless = vec![info("note", "text", false, false)];
     let change = MySqlRowUpdate { set: vec![value("note", json!("x"))], r#where: vec![value("note", json!("y"))] };
-    assert!(message(update(TABLE, &keyless, &change)).contains("no primary key"));
+    assert!(message(update(TABLE, PLACE, &keyless, &change)).contains("no primary key"));
     assert!(message(delete(TABLE, &keyless, &[vec![value("note", json!("y"))]])).contains("no primary key"));
 }
 
@@ -163,9 +164,12 @@ fn refuses_to_find_a_row_in_a_table_without_a_primary_key() {
 fn refuses_a_value_for_a_generated_or_unknown_column() {
     assert!(message(insert(TABLE, &columns(), &[value("area", json!(4))])).contains("generated"));
     let change = MySqlRowUpdate { set: vec![value("missing", json!(4))], r#where: key(json!(1), "0x01") };
-    assert!(message(update(TABLE, &columns(), &change)).contains("Unknown column"));
+    assert!(message(update(TABLE, PLACE, &columns(), &change)).contains("Unknown column"));
     let nothing = MySqlRowUpdate { set: vec![], r#where: key(json!(1), "0x01") };
-    assert!(message(update(TABLE, &columns(), &nothing)).contains("Nothing"));
+    assert_eq!(
+        message(update(TABLE, PLACE, &columns(), &nothing)),
+        "Nothing to update in table \"order `items`\" of database \"shop ü\"."
+    );
 }
 
 #[test]

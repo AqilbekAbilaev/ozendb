@@ -146,9 +146,16 @@ async fn a_row_changed_by_someone_else_saves_nothing() {
         "updates": [{ "set": row(&[("note", json!("mine"))]), "before": [], "where": row(&[("id key", json!(2))]) }],
         "deletes": [],
     }));
-    assert!(refusal(mysql_save_rows(&pool, name, TABLE, &saved).await).contains("changed or was deleted"));
+    let place = format!("table \"{TABLE}\" of database \"{name}\"");
+    assert_eq!(
+        refusal(mysql_save_rows(&pool, name, TABLE, &saved).await),
+        format!("A row in {place} was deleted, or its primary key changed, since it was loaded.")
+    );
     let gone = changes(json!({ "inserts": [], "updates": [], "deletes": [row(&[("id key", json!(2))])] }));
-    assert!(refusal(mysql_save_rows(&pool, name, TABLE, &gone).await).contains("already deleted"));
+    assert_eq!(
+        refusal(mysql_save_rows(&pool, name, TABLE, &gone).await),
+        format!("Some rows in {place} were already deleted, or their primary key changed, since they were loaded.")
+    );
     let keys: Vec<Value> = page(&pool, name, TABLE).await.into_iter().map(|r| r[0].clone()).collect();
     assert_eq!(keys, [json!(20), json!("9007199254740993"), json!("18446744073709551615")]);
     drop_seeded(&config, pool, name).await;

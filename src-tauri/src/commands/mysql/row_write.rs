@@ -142,9 +142,10 @@ pub(super) fn insert(table: &str, columns: &[MySqlColumnInfo], values: &[ColumnV
     Ok((format!("INSERT INTO {table} ({}) VALUES ({})", names.join(", "), vec!["?"; names.len()].join(", ")), params))
 }
 
-pub(super) fn update(table: &str, columns: &[MySqlColumnInfo], change: &MySqlRowUpdate) -> Result<Statement, AppError> {
+/// `place` names the table in a refusal, as `mysql_save_rows` words it.
+pub(super) fn update(table: &str, place: &str, columns: &[MySqlColumnInfo], change: &MySqlRowUpdate) -> Result<Statement, AppError> {
     if change.set.is_empty() {
-        return Err(AppError::Validation(String::from("Nothing to update.")));
+        return Err(AppError::Validation(format!("Nothing to update in {place}.")));
     }
     let mut assignments = Vec::with_capacity(change.set.len());
     let mut params = Vec::with_capacity(change.set.len());
@@ -184,29 +185,32 @@ async fn execute(connection: &mut MySqlConnection, (sql, params): Statement) -> 
     Ok(query.execute(connection).await.map_err(AppError::MySql)?.rows_affected())
 }
 
-fn expect(rows: u64, expected: usize, refusal: &str) -> Result<(), AppError> {
-    if rows == expected as u64 { Ok(()) } else { Err(AppError::Validation(refusal.to_string())) }
+fn expect(rows: u64, expected: usize, refusal: String) -> Result<(), AppError> {
+    if rows == expected as u64 { Ok(()) } else { Err(AppError::Validation(refusal)) }
 }
 
 pub(crate) async fn mysql_save_rows(pool: &MySqlPool, database: &str, table: &str, changes: &MySqlRowChanges) -> Result<(), AppError> {
     let columns = mysql_columns(pool, database, table).await?;
+    let place = format!("table \"{table}\" of database \"{database}\"");
     let table = format!("{}.{}", quote_name(database)?, quote_name(table)?);
     // Every statement is built before the transaction begins, so a refused value opens none.
     let inserts: Vec<Statement> = changes.inserts.iter().map(|row| insert(&table, &columns, row)).collect::<Result<_, _>>()?;
-    let updates: Vec<Statement> = changes.updates.iter().map(|change| update(&table, &columns, change)).collect::<Result<_, _>>()?;
+    let updates: Vec<Statement> = changes.updates.iter().map(|change| update(&table, &place, &columns, change)).collect::<Result<_, _>>()?;
     let deletes = if changes.deletes.is_empty() { None } else { Some(delete(&table, &columns, &changes.deletes)?) };
 
     // Dropped uncommitted on any early return, which rolls it back.
     let mut tx = pool.begin().await.map_err(AppError::MySql)?;
     for statement in inserts {
-        expect(execute(&mut tx, statement).await?, 1, "An insert failed unexpectedly.")?;
+        expect(execute(&mut tx, statement).await?, 1, format!("An insert into {place} failed unexpectedly."))?;
     }
     for statement in updates {
-        expect(execute(&mut tx, statement).await?, 1, "A row changed or was deleted since it was loaded.")?;
+        let refusal = format!("A row in {place} was deleted, or its primary key changed, since it was loaded.");
+        expect(execute(&mut tx, statement).await?, 1, refusal)?;
     }
     if let Some(statement) = deletes {
         let rows = execute(&mut tx, statement).await?;
-        expect(rows, changes.deletes.len(), "Some rows changed or were already deleted since they were loaded.")?;
+        let refusal = format!("Some rows in {place} were already deleted, or their primary key changed, since they were loaded.");
+        expect(rows, changes.deletes.len(), refusal)?;
     }
     tx.commit().await.map_err(AppError::MySql)
 }
