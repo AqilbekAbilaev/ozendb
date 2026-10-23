@@ -52,20 +52,57 @@ fn split(sql: &str) -> Result<Vec<(&str, Vec<String>)>, AppError> {
             start = at + 1;
             continue;
         }
-        // Only a CREATE has a body whose statements end in `;` (a procedure, function,
-        // trigger or event), so only there do BEGIN and CASE open a block that END closes.
-        if words.first().is_some_and(|w| w == "CREATE") {
-            let next = significant.get(i + 1).map_or("", |n| keyword(&n.token));
-            match keyword(&t.token) {
-                "BEGIN" | "CASE" if words.last().is_none_or(|w| w != "END") => depth += 1,
-                "END" if !["IF", "LOOP", "WHILE", "REPEAT"].contains(&next) => depth = depth.saturating_sub(1),
-                _ => {}
-            }
+        // Only a routine's body holds statements that end in `;`: it opens with a BEGIN
+        // (see `opens_body`), and inside it BEGIN and CASE open blocks that END closes.
+        let next = significant.get(i + 1).map_or("", |n| keyword(&n.token));
+        match keyword(&t.token) {
+            "BEGIN" if depth == 0 && opens_body(&words) => depth += 1,
+            "BEGIN" | "CASE" if depth > 0 && words.last().is_none_or(|w| w != "END") => depth += 1,
+            "END" if !["IF", "LOOP", "WHILE", "REPEAT"].contains(&next) => depth = depth.saturating_sub(1),
+            _ => {}
         }
         words.push(t.token.to_string().to_uppercase());
     }
     finish(start, sql.len(), words);
     Ok(statements)
+}
+
+/// Whether a BEGIN after `words` opens a routine's body: a CREATE [DEFINER = …] PROCEDURE,
+/// FUNCTION, TRIGGER or EVENT, outside any parentheses, right where its header ends (or
+/// after the body's label). Anywhere else BEGIN is a name, such as a column's.
+fn opens_body(words: &[String]) -> bool {
+    let word = |i: usize| words.get(i).map_or("", String::as_str);
+    let last = |n: usize| words.len().checked_sub(n).map_or("", word);
+    let parenthesized = words.iter().filter(|w| *w == "(").count() > words.iter().filter(|w| *w == ")").count();
+    if word(0) != "CREATE" || parenthesized {
+        return false;
+    }
+    let header_ends = match word(routine_at(words)) {
+        "PROCEDURE" => last(1) == ")" || last(1).starts_with(['\'', '"']) || ["DETERMINISTIC", "SQL", "DATA", "DEFINER", "INVOKER"].contains(&last(1)),
+        // Its only other body is a RETURN, and its header has no unquoted RETURN.
+        "FUNCTION" => words.iter().any(|w| w == "RETURNS") && !words.iter().any(|w| w == "RETURN"),
+        "TRIGGER" => last(1) == "ROW" || ["FOLLOWS", "PRECEDES"].contains(&last(2)),
+        "EVENT" => last(1) == "DO",
+        _ => return false,
+    };
+    header_ends || last(1) == ":"
+}
+
+/// Where the kind of thing a CREATE makes is named in its `words`: after the DEFINER
+/// clause, if it has one (`'u'@'h'`, `u@h` or `CURRENT_USER()`).
+fn routine_at(words: &[String]) -> usize {
+    if words.get(1).is_none_or(|w| w != "DEFINER") {
+        return 1;
+    }
+    let follows = |i: usize, w: &str| words.get(i + 1).is_some_and(|next| next == w);
+    let mut at = 3;
+    if follows(at, "@") {
+        at += 2;
+    }
+    if follows(at, "(") {
+        at += 2;
+    }
+    at + 1
 }
 
 /// An unquoted word as the keyword it may be, in capitals; empty for anything else.
