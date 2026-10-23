@@ -69,8 +69,8 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str) -> Result<SqlQueryResult
     Ok(SqlQueryResult { columns, rows, truncated, elapsed_ms: elapsed_ms(), rows_affected })
 }
 
-/// Runs `statements` in order on `conn`, stopping at the first that fails; each answers
-/// with its own result. A `run_id` lets Cancel stop it, and no statement may run past
+/// Runs `statements` in order on `conn` as `run`, stopping at the first that fails; each
+/// answers with its own result. Cancel can stop `run`, and no statement may run past
 /// `limit`; either sends `KILL QUERY` through `pool`, from another session. On a
 /// `read_only` connection the session is locked again before each statement, so nothing
 /// an earlier one did can leave the next one free to write. That still leaves a stored
@@ -79,14 +79,14 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str) -> Result<SqlQueryResult
 pub(super) async fn run_on(
     conn: &mut MySqlConnection,
     pool: &MySqlPool,
+    run: &Run,
     statements: &[&str],
-    run_id: Option<&str>,
     limit: Duration,
     read_only: bool,
     held: bool,
 ) -> Result<Vec<SqlQueryResult>, AppError> {
-    let connection: u64 = sqlx::query_scalar("SELECT CONNECTION_ID()").fetch_one(&mut *conn).await.map_err(AppError::MySql)?;
-    let run = Run::new(run_id, connection);
+    run.stopped()?;
+    run.attach(sqlx::query_scalar("SELECT CONNECTION_ID()").fetch_one(&mut *conn).await.map_err(AppError::MySql)?);
     let mut results = Vec::with_capacity(statements.len());
     for (i, statement) in statements.iter().enumerate() {
         if read_only {
@@ -110,9 +110,10 @@ pub(super) async fn run_on(
 /// writable connection — ends with the run rather than reaching the next one.
 pub(crate) async fn run_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bool, run_id: Option<&str>, limit: Duration) -> Result<Vec<SqlQueryResult>, AppError> {
     let statements = statements(sql, read_only)?;
+    let run = Run::new(run_id);
     let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
     conn.close_on_drop();
-    run_on(&mut conn, pool, &statements, run_id, limit, read_only, false).await
+    run_on(&mut conn, pool, &run, &statements, limit, read_only, false).await
 }
 
 /// Runs the SQL tab's script, one statement after another, answering with each one's

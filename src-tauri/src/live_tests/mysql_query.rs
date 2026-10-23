@@ -127,6 +127,30 @@ async fn cancel_stops_a_long_update_and_the_rest_of_its_script() {
 }
 
 #[tokio::test]
+async fn cancel_stops_a_run_still_waiting_for_its_session() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it early cancel").await;
+    let pool = MySqlPoolOptions::new()
+        .max_connections(1)
+        .after_connect(|connection, _| Box::pin(prepare(connection, false)))
+        .connect_with(build_options(&config, password().as_deref(), "", None).unwrap())
+        .await
+        .unwrap();
+    let busy = pool.acquire().await.unwrap();
+    let running = {
+        let (pool, sql) = (pool.clone(), format!("INSERT INTO {database}.t VALUES (1, 'a')"));
+        tokio::spawn(async move { run_mysql_sql(&pool, &sql, false, Some("mysql-run-early"), LIMIT).await })
+    };
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(cancel_mysql_run(&pool, "mysql-run-early").await.unwrap(), "a run waiting for a session is found and cancelled");
+    drop(busy);
+    let err = tokio::time::timeout(Duration::from_secs(10), running).await.unwrap().unwrap().unwrap_err();
+    assert_eq!(err.code(), "cancelled");
+    assert_eq!(count(&config, &database).await, 0);
+    drop_database(&config, &database).await;
+}
+
+#[tokio::test]
 async fn a_statement_that_is_not_a_select_stops_at_the_time_limit() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let pool = pool(&config).await;
