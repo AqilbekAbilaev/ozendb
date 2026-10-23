@@ -2,6 +2,7 @@
 
 pub(super) use super::AppContext;
 
+mod cell;
 pub mod schema;
 
 pub use schema::*;
