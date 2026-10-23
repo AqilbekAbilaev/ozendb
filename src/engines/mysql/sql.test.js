@@ -4,6 +4,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
 import { dialect, api } from './sql.js'
+import { operatorsFor } from '../sql/workspaces/builderRows.js'
 
 const { quoteName, quoteText, like, cellKind, jsonShape } = dialect
 
@@ -51,11 +52,10 @@ describe('cellKind', () => {
     expect(cellKind("enum('new','paid')", undefined)).toBe(null)
   })
 
-  it('treats TINYINT(1), MySQL\'s BOOLEAN, as a boolean whatever its sign', () => {
-    expect(cellKind('tinyint(1)')).toBe('bool')
-    expect(cellKind('tinyint(1) unsigned')).toBe('bool')
-    expect(cellKind('tinyint')).toBe('num')
-    expect(cellKind('tinyint(10)')).toBe('num')
+  it('treats TINYINT(1), MySQL\'s BOOLEAN, as the small integer it can hold, so it keeps number operators', () => {
+    expect(cellKind('tinyint(1)')).toBe('num')
+    expect(cellKind('tinyint(1) unsigned')).toBe('num')
+    expect(operatorsFor(cellKind('tinyint(1)')).map(({ op }) => op)).toEqual(expect.arrayContaining(['gt', 'ne', 'in']))
   })
 
   it('treats a BIT column as the number it reads as', () => {
