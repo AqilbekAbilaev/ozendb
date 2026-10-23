@@ -5,7 +5,7 @@ import { runSql } from './runSql.js'
 // A table tab's SQL mode: opening it on the SQL the filters amount to, and going back —
 // reading edited SQL into the joins, boxes, sort and page, or saying why they can't show it.
 export function useTableSqlMode(t) {
-  const { api, kindOf, target, runtime, total, limit, orderBy, descending, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun, mainColumns, joins, joinColumns, nextJoinKey, pauses, refs, keyColumns, currentSql, loadForeignKeys, goTo } = t
+  const { dialect, api, kindOf, target, runtime, total, limit, orderBy, descending, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun, mainColumns, joins, joinColumns, nextJoinKey, pauses, refs, keyColumns, currentSql, loadForeignKeys, goTo } = t
   function toSql() {
     openSql(currentSql.value)
     return runSql(sqlRun, sql.value)
@@ -35,7 +35,7 @@ export function useTableSqlMode(t) {
   // Takes SQL read back by the backend as the tab's joins, filters, sort and page, or
   // returns why the grid can't show it. Columns arrive as `{ table, column }`; the joins
   // are rebuilt, each with its columns fetched afresh.
-  async function adopt({ joins: readJoins, columns: shown, filters: read, orderBy: order, descending: desc, limit: rowsPerPage, offset: at }) {
+  async function adopt({ joins: readJoins, columns: shown, filters: readFilters, orderBy: order, descending: desc, limit: rowsPerPage, offset: at }) {
     if (rowsPerPage == null) return 'the filter view shows a page at a time, so it needs a LIMIT.'
     const nextJoins = await Promise.all(readJoins.map(async ({ schema, table, kind, on }) => ({
       key: nextJoinKey(), schema, table, kind, on,
@@ -43,6 +43,7 @@ export function useTableSqlMode(t) {
     })))
     const keyOf = ({ table, column }) => (table ? `${nextJoins[table - 1].key}.${column}` : column)
     const infoOf = ({ table, column }) => (table ? nextJoins[table - 1].columns : mainColumns.value).find(c => c.name === column)
+    const read = readFilters.map(f => (f.value == null ? f : { ...f, value: dialect.readFilterText(f.value, infoOf(f)?.dataType) }))
     const keys = keyColumns.value
     const byKey = order.length === keys.length && order.every((c, i) => !c.table && c.column === keys[i])
     if (order.length > 1 && !byKey) return 'the filter view sorts by one column at a time.'

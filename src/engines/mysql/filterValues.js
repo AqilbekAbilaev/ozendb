@@ -53,3 +53,11 @@ export function inUtc(value, digits) {
   const micros = fraction.padEnd(6, '0').slice(0, 6)
   return new Date(at).toISOString().slice(0, 19).replace('T', ' ') + (digits ? `.${micros.slice(0, digits)}` : '')
 }
+
+// A value read back from SQL mode's text as its box would hold it: on a TIMESTAMP, each
+// whole date and time (one per item of an any-of list) marked as the UTC that filterText
+// wrote it in, which is also how MySQL reads hand-written SQL in a session in UTC.
+export function readFilterText(value, dataType = '') {
+  if (!/^timestamp\b/.test(dataType ?? '')) return value
+  return value.split(',').map(item => (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(item.trim()) ? `${item}+00:00` : item)).join(',')
+}

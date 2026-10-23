@@ -15,3 +15,9 @@ export function listTables({ connectionId, database }) {
 export function listColumns({ connectionId, database, table }) {
   return invoke('list_mysql_columns', { id: connectionId, database, table })
 }
+
+// The foreign keys with the table on either side, as `{ fromDatabase, fromTable,
+// fromColumns, toDatabase, toTable, toColumns }`, the columns pairwise in the key's order.
+export function listForeignKeys({ connectionId, database, table }) {
+  return invoke('list_mysql_foreign_keys', { id: connectionId, database, table })
+}

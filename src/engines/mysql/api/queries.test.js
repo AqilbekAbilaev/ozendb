@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { browseTable, countTable, runQuery, cancelQuery, beginTransaction, commitTransaction, rollbackTransaction, formatQuery } from './queries'
+import { browseTable, countTable, readTableSelect, runQuery, cancelQuery, beginTransaction, commitTransaction, rollbackTransaction, formatQuery } from './queries'
 
 const target = { connectionId: 'c1', database: 'shop `2024` ü', table: 'order items' }
 
@@ -13,24 +13,31 @@ beforeEach(() => {
 })
 
 describe('MySQL queries', () => {
-  it('browses a page of a table, sorted by a column', async () => {
-    const filters = [{ table: 0, column: 'qty', op: 'gt', value: '5' }]
-    await browseTable(target, { filters, orderBy: { table: 0, column: 'qty' }, descending: true, limit: 50, offset: 100 })
+  const joins = [{ schema: 'other db', table: 'склад', kind: 'left', on: [{ column: 'slot', equals: { table: 0, column: 'at slot' } }] }]
+
+  it('browses a page of a table and its joins, sorted by a joined column', async () => {
+    const filters = [{ table: 1, column: 'qty', op: 'gt', value: '5' }]
+    await browseTable(target, { joins, filters, orderBy: { table: 1, column: 'qty' }, descending: true, limit: 50, offset: 100 })
     expect(invoke).toHaveBeenCalledWith('browse_mysql_table', {
-      id: 'c1', database: 'shop `2024` ü', table: 'order items', filters, orderBy: 'qty', descending: true, limit: 50, offset: 100,
+      id: 'c1', database: 'shop `2024` ü', table: 'order items', joins, filters, orderBy: 'qty', orderTable: 1, descending: true, limit: 50, offset: 100,
     })
   })
 
   it('browses by the primary key when no column is chosen', async () => {
     await browseTable(target, { orderBy: null, limit: 100, offset: 0 })
-    expect(invoke).toHaveBeenCalledWith('browse_mysql_table', expect.objectContaining({ filters: [], orderBy: null, descending: false }))
+    expect(invoke).toHaveBeenCalledWith('browse_mysql_table', expect.objectContaining({ joins: [], filters: [], orderBy: null, orderTable: 0, descending: false }))
   })
 
-  it('counts the rows the filters keep', async () => {
-    await countTable(target, [{ table: 0, column: 'qty', op: 'isNull' }])
+  it('counts the rows the filters keep, joins included', async () => {
+    await countTable(target, [{ table: 0, column: 'qty', op: 'isNull' }], joins)
     expect(invoke).toHaveBeenCalledWith('count_mysql_table', {
-      id: 'c1', database: 'shop `2024` ü', table: 'order items', filters: [{ table: 0, column: 'qty', op: 'isNull' }],
+      id: 'c1', database: 'shop `2024` ü', table: 'order items', joins, filters: [{ table: 0, column: 'qty', op: 'isNull' }],
     })
+  })
+
+  it('reads a table tab\'s SQL back by the table\'s database', async () => {
+    await readTableSelect(target, 'SELECT * FROM `order items`')
+    expect(invoke).toHaveBeenCalledWith('read_mysql_table_select', { sql: 'SELECT * FROM `order items`', database: 'shop `2024` ü', table: 'order items' })
   })
 })
 

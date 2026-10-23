@@ -2,7 +2,7 @@
 // commands they call. Reached through the engine table as `engineOf(x).sql`.
 import * as queries from './api/queries.js'
 import * as resources from './api/resources.js'
-import { exactNumber, filterText } from './filterValues.js'
+import { exactNumber, filterText, readFilterText } from './filterValues.js'
 
 // How a column's cells are styled and filtered, from its COLUMN_TYPE. TINYINT(1), MySQL's
 // BOOLEAN, is a number: it can hold any small integer, though its 0 and 1 show as false
@@ -29,6 +29,8 @@ export const dialect = Object.freeze({
   // the backend's filter reads them (filterValues.js).
   filterLiteral: (value, dataType) => exactNumber(value, dataType) ?? quoteText(filterText(value, dataType)),
   filterText,
+  // A filter value read back from SQL mode's text, as its box would hold it.
+  readFilterText,
   // An enum column (one listing its labels) is its own kind, as on PostgreSQL.
   cellKind(dataType, enumValues) {
     if (enumValues?.length) return 'enum'
@@ -50,19 +52,19 @@ const notYet = (what) => () => Promise.reject({ code: 'not_available', message: 
 // The shared table tab names the namespace a table sits in its `schema`; on MySQL, which
 // has no schema level, that is the table's database.
 const inDatabase = ({ connectionId, schema, table }) => ({ connectionId, database: schema, table })
+const keyBySchemas = ({ fromDatabase, toDatabase, ...key }) => ({ ...key, fromSchema: fromDatabase, toSchema: toDatabase })
 
 export const api = Object.freeze({
   browseTable: (target, options) => queries.browseTable(inDatabase(target), options),
-  countTable: (target, filters) => queries.countTable(inDatabase(target), filters),
+  countTable: (target, filters, joins) => queries.countTable(inDatabase(target), filters, joins),
   listColumns: (target) => resources.listColumns(inDatabase(target)),
-  // TODO #392: the foreign keys a join is offered on.
-  listForeignKeys: notYet('Joining tables'),
+  listForeignKeys: async (target) => (await resources.listForeignKeys(inDatabase(target))).map(keyBySchemas),
   runQuery: queries.runQuery,
   cancelQuery: queries.cancelQuery,
   // TODO #393: Explain.
   explainQuery: notYet('Explain'),
   formatQuery: queries.formatQuery,
-  readTableSelect: notYet('Reading SQL back into filters'),
+  readTableSelect: (target, sql) => queries.readTableSelect(inDatabase(target), sql),
   // TODO #397: the query library, history and saved queries.
   pushHistory: notYet('Query history'),
   listHistory: notYet('Query history'),
