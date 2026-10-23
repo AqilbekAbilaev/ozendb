@@ -1,6 +1,6 @@
 use serde::Serialize;
 use sqlparser::ast::{
-    BinaryOperator, DataType, Expr, GroupByExpr, Ident, JoinConstraint, JoinOperator, LimitClause, ObjectName,
+    BinaryOperator, Expr, GroupByExpr, Ident, JoinConstraint, JoinOperator, LimitClause, ObjectName,
     OrderByKind, OrderBySort, SelectItem, SelectItemQualifiedWildcardKind, SetExpr, Statement,
     TableAlias, TableFactor, TableWithJoins, UnaryOperator, Value,
 };
@@ -24,33 +24,38 @@ pub struct TableSelect {
     pub offset: i64,
 }
 
-/// Postgres folds an unquoted name to lower case; a quoted one is taken as written.
-// TODO #392: this reader knows PostgreSQL's ways — folding names, and writing "contains"
-// as `::text ILIKE` — which belong with the engine's dialect before MySQL reads back.
-fn name(ident: &Ident) -> String {
-    match ident.quote_style {
-        Some(_) => ident.value.clone(),
-        None => ident.value.to_lowercase(),
-    }
+/// What an engine's table tab SQL means beyond its grammar: how the engine reads a name,
+/// and how its SQL mode writes the case-insensitive match a contains or starts-with is.
+pub(crate) trait TableDialect {
+    fn grammar(&self) -> &dyn Dialect;
+    /// A table or column name as the engine reads it.
+    fn name(&self, ident: &Ident) -> String;
+    /// The column and the pattern of `expr`, when it is that match.
+    fn matched<'e>(&self, expr: &'e Expr) -> Option<(&'e Expr, &'e Expr)>;
 }
 
 /// The tables a query reads — the browsed one, then each join — by the names SQL may
 /// call them: its alias if it has one, else its own name, bare or schema-qualified.
-struct Scope {
+struct Scope<'d> {
+    dialect: &'d dyn TableDialect,
     names: Vec<Vec<String>>,
 }
 
-impl Scope {
+impl Scope<'_> {
+    fn name(&self, ident: &Ident) -> String {
+        self.dialect.name(ident)
+    }
+
     /// A column of one of the first `upto` tables. With joins it must be qualified,
     /// since which table a bare name belongs to takes the catalog to know.
     fn column_in(&self, expr: &Expr, upto: usize) -> Result<ColumnRef, String> {
         match expr {
-            Expr::Identifier(ident) if self.names.len() == 1 => Ok(ColumnRef { table: 0, column: name(ident) }),
-            Expr::Identifier(ident) => Err(format!("with joins, name \"{}\" by its table", name(ident))),
+            Expr::Identifier(ident) if self.names.len() == 1 => Ok(ColumnRef { table: 0, column: self.name(ident) }),
+            Expr::Identifier(ident) => Err(format!("with joins, name \"{}\" by its table", self.name(ident))),
             Expr::CompoundIdentifier(parts) if parts.len() > 1 => {
                 let (column, qualifier) = parts.split_last().expect("two or more parts");
-                let qualifier = qualifier.iter().map(name).collect::<Vec<_>>().join(".");
-                Ok(ColumnRef { table: self.table(&qualifier, upto)?, column: name(column) })
+                let qualifier = qualifier.iter().map(|p| self.name(p)).collect::<Vec<_>>().join(".");
+                Ok(ColumnRef { table: self.table(&qualifier, upto)?, column: self.name(column) })
             }
             other => Err(format!("`{other}` isn't a plain column")),
         }
@@ -70,19 +75,19 @@ impl Scope {
 
 /// A plain table in FROM or a JOIN: its schema (the tab's when unqualified), name, and
 /// the names it goes by.
-fn table_named(relation: &TableFactor, default_schema: &str) -> Result<(String, String, Vec<String>), String> {
+fn table_named(relation: &TableFactor, default_schema: &str, dialect: &dyn TableDialect) -> Result<(String, String, Vec<String>), String> {
     let TableFactor::Table { name: object, alias, args: None, .. } = relation else {
         return Err(format!("`{relation}` isn't a plain table"));
     };
     let ObjectName(parts) = object;
-    let parts: Vec<String> = parts.iter().filter_map(|p| p.as_ident()).map(name).collect();
+    let parts: Vec<String> = parts.iter().filter_map(|p| p.as_ident()).map(|p| dialect.name(p)).collect();
     let (schema, table) = match parts.as_slice() {
         [table] => (default_schema.to_string(), table.clone()),
         [schema, table] => (schema.clone(), table.clone()),
         _ => return Err(format!("`{object}` isn't a table name")),
     };
     let names = match alias {
-        Some(TableAlias { name: alias, columns, .. }) if columns.is_empty() => vec![name(alias)],
+        Some(TableAlias { name: alias, columns, .. }) if columns.is_empty() => vec![dialect.name(alias)],
         Some(_) => return Err("a table alias can't rename columns here".to_string()),
         None => vec![table.clone(), format!("{schema}.{table}")],
     };
@@ -111,16 +116,16 @@ fn join_pairs(expr: &Expr, scope: &Scope, n: usize, out: &mut Vec<JoinOn>) -> Re
 }
 
 /// FROM this table and its JOIN … ON joins, with the scope naming them.
-fn from_joins(from: &TableWithJoins, schema: &str, table: &str) -> Result<(Vec<TableJoin>, Scope), String> {
+fn from_joins<'d>(from: &TableWithJoins, schema: &str, table: &str, dialect: &'d dyn TableDialect) -> Result<(Vec<TableJoin>, Scope<'d>), String> {
     let refused = || format!("only a query on {schema}.{table} and tables joined to it can be shown as its filters");
-    let (main_schema, main_table, names) = table_named(&from.relation, schema).map_err(|_| refused())?;
+    let (main_schema, main_table, names) = table_named(&from.relation, schema, dialect).map_err(|_| refused())?;
     if (main_schema.as_str(), main_table.as_str()) != (schema, table) {
         return Err(refused());
     }
-    let mut scope = Scope { names: vec![names] };
+    let mut scope = Scope { dialect, names: vec![names] };
     let mut joined = Vec::new();
     for join in &from.joins {
-        let (schema, table, names) = table_named(&join.relation, schema)?;
+        let (schema, table, names) = table_named(&join.relation, schema, dialect)?;
         let (kind, on) = match &join.join_operator {
             JoinOperator::Join(JoinConstraint::On(on)) | JoinOperator::Inner(JoinConstraint::On(on)) => (JoinKind::Inner, on),
             JoinOperator::Left(JoinConstraint::On(on)) | JoinOperator::LeftOuter(JoinConstraint::On(on)) => (JoinKind::Left, on),
@@ -147,7 +152,7 @@ fn shown_columns(projection: &[SelectItem], scope: &Scope) -> Result<Vec<ColumnR
     let every_table = projection.len() == scope.names.len()
         && projection.iter().enumerate().all(|(i, item)| match item {
             SelectItem::QualifiedWildcard(SelectItemQualifiedWildcardKind::ObjectName(object), _) => {
-                let qualifier = object.0.iter().filter_map(|p| p.as_ident()).map(name).collect::<Vec<_>>().join(".");
+                let qualifier = object.0.iter().filter_map(|p| p.as_ident()).map(|p| scope.name(p)).collect::<Vec<_>>().join(".");
                 scope.table(&qualifier, scope.names.len()) == Ok(i)
             }
             _ => false,
@@ -168,7 +173,8 @@ fn shown_columns(projection: &[SelectItem], scope: &Scope) -> Result<Vec<ColumnR
 fn literal(expr: &Expr) -> Result<String, String> {
     match expr {
         Expr::Value(v) => match &v.value {
-            Value::SingleQuotedString(text) | Value::Number(text, _) => Ok(text.clone()),
+            // A double-quoted string is a value only where it can't be a name (MySQL).
+            Value::SingleQuotedString(text) | Value::DoubleQuotedString(text) | Value::Number(text, _) => Ok(text.clone()),
             Value::Boolean(flag) => Ok(flag.to_string()),
             other => Err(format!("`{other}` isn't a value a filter can hold")),
         },
@@ -177,7 +183,7 @@ fn literal(expr: &Expr) -> Result<String, String> {
     }
 }
 
-/// An ILIKE pattern back to its filter: `'%text%'` is contains, `'text%'` starts with,
+/// A case-insensitive match's pattern back to its filter: `'%text%'` is contains, `'text%'` starts with,
 /// with `\` escapes undone — refused if it holds any other wildcard.
 fn like_filter(pattern: &Expr) -> Result<(FilterOp, String), String> {
     // Each character, and whether it's a wildcard (an unescaped `%` or `_`).
@@ -190,7 +196,7 @@ fn like_filter(pattern: &Expr) -> Result<(FilterOp, String), String> {
             c => tokens.push((c, c == '%' || c == '_')),
         }
     }
-    let refused = || "only an ILIKE '%…%' or '…%' match can be a filter".to_string();
+    let refused = || "only a '%…%' or '…%' match can be a filter".to_string();
     let Some((&('%', true), body)) = tokens.split_last() else { return Err(refused()) };
     let (op, body) = match body.split_first() {
         Some((&('%', true), inner)) => (FilterOp::Contains, inner),
@@ -200,7 +206,7 @@ fn like_filter(pattern: &Expr) -> Result<(FilterOp, String), String> {
         return Err(refused());
     }
     if body.iter().any(|&(_, wild)| wild) {
-        return Err("a wildcard inside ILIKE can't be a filter".to_string());
+        return Err("a wildcard inside a match can't be a filter".to_string());
     }
     Ok((op, body.iter().map(|&(c, _)| c).collect()))
 }
@@ -220,18 +226,14 @@ fn condition(expr: &Expr, scope: &Scope) -> Result<ColumnFilter, String> {
         Ok(ColumnFilter { table, column, op, value })
     };
     let with_value = |col: &Expr, op, value: String| filter(col, op, Some(value));
+    if let Some((col, pattern)) = scope.dialect.matched(expr) {
+        let (op, text) = like_filter(pattern)?;
+        return with_value(col, op, text);
+    }
     match expr {
         Expr::Nested(inner) => condition(inner, scope),
         Expr::IsNull(col) => filter(col, FilterOp::IsNull, None),
         Expr::IsNotNull(col) => filter(col, FilterOp::NotNull, None),
-        Expr::ILike { negated: false, any: false, expr, pattern, escape_char: None } => {
-            let col = match expr.as_ref() {
-                Expr::Cast { expr, data_type: DataType::Text, .. } => expr.as_ref(),
-                other => other,
-            };
-            let (op, text) = like_filter(pattern)?;
-            with_value(col, op, text)
-        }
         Expr::InList { expr, list, negated: false } => with_value(expr, FilterOp::In, listed(list)?),
         Expr::BinaryOp { left, op, right } => {
             let op = match op {
@@ -267,8 +269,8 @@ fn integer(expr: &Expr) -> Result<i64, String> {
 /// `*` or plain columns, conditions joined by AND, one sort direction, and LIMIT/OFFSET. Anything else is
 /// refused with the reason, since the filter boxes couldn't show it. Read in the
 /// engine's `dialect`.
-pub(crate) fn read_table_select(dialect: &dyn Dialect, sql: &str, schema: &str, table: &str) -> Result<TableSelect, String> {
-    let statements = Parser::parse_sql(dialect, sql).map_err(|e| e.to_string())?;
+pub(crate) fn read_table_select(dialect: &dyn TableDialect, sql: &str, schema: &str, table: &str) -> Result<TableSelect, String> {
+    let statements = Parser::parse_sql(dialect.grammar(), sql).map_err(|e| e.to_string())?;
     let [Statement::Query(query)] = statements.as_slice() else {
         return Err("only a single SELECT can be shown as filters".to_string());
     };
@@ -285,7 +287,7 @@ pub(crate) fn read_table_select(dialect: &dyn Dialect, sql: &str, schema: &str, 
     let [from] = select.from.as_slice() else {
         return Err(format!("only a query on {schema}.{table} and tables joined to it can be shown as its filters"));
     };
-    let (joins, scope) = from_joins(from, schema, table)?;
+    let (joins, scope) = from_joins(from, schema, table, dialect)?;
     let columns = shown_columns(&select.projection, &scope)?;
 
     let mut filters = Vec::new();
