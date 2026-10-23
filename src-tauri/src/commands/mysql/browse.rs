@@ -3,7 +3,7 @@
 use sqlx::{Column, Executor, MySqlPool, Row, SqlSafeStr, Statement};
 use tauri::State;
 
-use super::cell::cell;
+use super::cell::{cell, UTC};
 use super::schema::{mysql_columns, MySqlColumnInfo};
 use super::{quote_name, AppContext};
 use crate::commands::sql::{ColumnFilter, FilterOp, SqlQueryResult, ROW_RESULT_CAP};
@@ -35,6 +35,7 @@ fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlCol
 /// DECIMAL(10,2) as `> 1.51`; and one to a fixed DECIMAL(65,30) clips a value past 35
 /// whole digits. On TINYINT(1), MySQL's BOOLEAN, `true` and `false` are the 1 and 0 it stores.
 fn typed(data_type: &str, value: &str) -> (String, String) {
+    let value = unzoned(data_type, value);
     let base = data_type.split(['(', ' ']).next().unwrap_or_default();
     if !EXACT_NUMBERS.contains(&base) {
         return (value.to_string(), String::from("?"));
@@ -46,6 +47,12 @@ fn typed(data_type: &str, value: &str) -> (String, String) {
         _ => value,
     };
     (value.to_string(), format!("CAST(? AS DECIMAL(65,{}))", scale(value)))
+}
+
+/// `value` as MySQL writes the column: the grid shows a TIMESTAMP in the session's UTC
+/// (cell.rs), and MySQL's own text of one, which every filter compares, has no zone.
+fn unzoned<'a>(data_type: &str, value: &'a str) -> &'a str {
+    if data_type.starts_with("timestamp") { value.strip_suffix(UTC).unwrap_or(value) } else { value }
 }
 
 /// The fraction digits `value` is written with, up to MySQL's limit; the limit itself
@@ -70,7 +77,7 @@ pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]
         let name = quote_name(&f.column)?;
         let value = || f.value.as_deref().ok_or_else(|| AppError::Validation(format!("The filter on \"{}\" needs a value.", f.column)));
         // LIKE's default escape character is a backslash.
-        let like = |value: &str| value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+        let like = |value: &str| unzoned(&info.data_type, value).replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
         let as_text = format!("CONVERT({name} USING utf8mb4) {AS_TEXT} LIKE");
         let compare = |symbol: &str, value: &str| {
             let (value, placeholder) = typed(&info.data_type, value);
