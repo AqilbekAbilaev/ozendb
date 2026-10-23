@@ -3,7 +3,9 @@
 use sqlx::{Column, Executor, MySqlPool, Row, SqlSafeStr, Statement};
 use tauri::State;
 
-use super::cell::{cell, UTC};
+use super::cell::{cell, digits, fraction};
+use chrono::{DateTime, NaiveDateTime, TimeZone};
+use std::borrow::Cow;
 use super::schema::{mysql_columns, MySqlColumnInfo};
 use super::{quote_name, AppContext};
 use crate::commands::sql::{ColumnFilter, FilterOp, SqlQueryResult, ROW_RESULT_CAP};
@@ -41,7 +43,7 @@ pub(super) fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&
 /// operator, as MySQL reads TRUE and FALSE. A refusal starts with `what`, the caller's
 /// name for the value: "The filter on" for a filter.
 pub(super) fn typed(info: &MySqlColumnInfo, value: &str, what: &str) -> Result<(String, String), AppError> {
-    let value = unzoned(&info.data_type, value);
+    let value = &*unzoned(&info.data_type, value);
     if !EXACT_NUMBERS.contains(&base_type(&info.data_type)) {
         return Ok((value.to_string(), String::from("?")));
     }
@@ -80,10 +82,25 @@ pub(super) fn flag(data_type: &str, value: &str) -> Option<&'static str> {
     }
 }
 
-/// `value` as MySQL writes the column: the grid shows a TIMESTAMP in the session's UTC
-/// (cell.rs), and MySQL's own text of one, which every filter compares, has no zone.
-pub(super) fn unzoned<'a>(data_type: &str, value: &'a str) -> &'a str {
-    if data_type.starts_with("timestamp") { value.strip_suffix(UTC).unwrap_or(value) } else { value }
+/// `value` as MySQL writes the column. The grid shows a TIMESTAMP in the user's zone with
+/// its offset (cell.rs), while the session and MySQL's own text of it, which every filter
+/// compares, are in UTC; so a whole date and time, with an offset or read as the user's,
+/// goes back as UTC. Anything else, such as part of one for a contains, goes as it is.
+pub(super) fn unzoned<'a>(data_type: &str, value: &'a str) -> Cow<'a, str> {
+    match data_type.starts_with("timestamp").then(|| in_utc(value, &chrono::Local, digits(Some(data_type)))).flatten() {
+        Some(utc) => Cow::Owned(utc),
+        None => Cow::Borrowed(value),
+    }
+}
+
+/// `value`, a date and time with an offset or else in `zone`, as UTC text to `digits`.
+pub(super) fn in_utc<Z: TimeZone>(value: &str, zone: &Z, digits: Option<usize>) -> Option<String> {
+    let value = value.trim();
+    let at = match DateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S%.f%:z") {
+        Ok(at) => at.naive_utc(),
+        Err(_) => zone.from_local_datetime(&NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S%.f").ok()?).earliest()?.naive_utc(),
+    };
+    Some(format!("{}{}", at.format("%Y-%m-%d %H:%M:%S"), fraction(at.and_utc().timestamp_subsec_micros(), digits)))
 }
 
 /// The precision and scale of the smallest DECIMAL that holds `value` exactly, or None

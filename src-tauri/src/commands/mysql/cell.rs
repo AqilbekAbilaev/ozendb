@@ -1,7 +1,9 @@
 //! A MySQL result cell as the JSON the grid shows, read by the column's type. MySQL can't
 //! wrap a row as JSON server-side the way PostgreSQL does: it writes binary and BIT
 //! columns as "base64:type15:…" and corrupts a TIME past a day, so each cell is read here.
+use chrono::{NaiveDate, TimeZone};
 use serde_json::Value;
+use std::fmt::Display;
 use sqlx::mysql::types::MySqlTime;
 use sqlx::mysql::{MySql, MySqlValueRef};
 use sqlx::types::Json;
@@ -11,9 +13,6 @@ use sqlx::{Decode, TypeInfo, ValueRef};
 const SAFE_INTEGER: i128 = (1 << 53) - 1;
 
 const INTEGERS: [&str; 5] = ["TINYINT", "SMALLINT", "MEDIUMINT", "INT", "BIGINT"];
-
-/// What a TIMESTAMP's text ends with. Every session reads them in UTC (mysql/session.rs).
-pub(super) const UTC: &str = "+00:00";
 
 /// One cell as every prepared `sqlx::query` reads it. `declared` is the table column's
 /// own `COLUMN_TYPE`, when the cell comes from a table: sqlx names a text column with a
@@ -48,8 +47,8 @@ fn read(protocol: &str, declared: Option<&str>, value: MySqlValueRef<'_>) -> Opt
         // DECIMAL arrives as the server's own text, exact to the last digit.
         "DECIMAL" | "CHAR" | "VARCHAR" | "TINYTEXT" | "TEXT" | "MEDIUMTEXT" | "LONGTEXT" | "ENUM" | "SET" => decode(value).map(Value::String),
         "DATE" => date(decode(value)?),
-        "DATETIME" => date_time(decode(value)?, digits(declared), ""),
-        "TIMESTAMP" => date_time(decode(value)?, digits(declared), UTC),
+        "DATETIME" => date_time(decode(value)?, digits(declared)),
+        "TIMESTAMP" => timestamp(decode(value)?, digits(declared), &chrono::Local),
         "TIME" => decode(value).map(|span| time(span, digits(declared))),
         "JSON" => decode::<Json<Value>>(value).map(|json| json.0),
         "BINARY" | "VARBINARY" | "TINYBLOB" | "BLOB" | "MEDIUMBLOB" | "LONGBLOB" if declared.is_some_and(is_text_type) => {
@@ -125,26 +124,39 @@ fn date(bytes: &[u8]) -> Option<Value> {
     Some(Value::String(format!("{year:04}-{month:02}-{day:02}")))
 }
 
-/// A DATETIME, or a TIMESTAMP with `zone` set. The zero date, every field 0, is no
-/// instant, so it has none.
-fn date_time(bytes: &[u8], digits: Option<usize>, zone: &str) -> Option<Value> {
-    let fields = fields(bytes)?;
-    let zone = if fields == [0; 7] { "" } else { zone };
-    let [year, month, day, hour, minute, second, micros] = fields;
+/// A DATETIME, which names no zone.
+fn date_time(bytes: &[u8], digits: Option<usize>) -> Option<Value> {
+    let [year, month, day, hour, minute, second, micros] = fields(bytes)?;
     Some(Value::String(format!(
-        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}{}{zone}",
+        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}{}",
         fraction(micros, digits)
     )))
 }
 
+/// A TIMESTAMP, read in the session's UTC (mysql/session.rs), shown in `zone` (the user's)
+/// and marked with the offset it had on that date: `+05:00`. The zero date, every field 0,
+/// is no instant, so it shows as a DATETIME does.
+fn timestamp<Z: TimeZone>(bytes: &[u8], digits: Option<usize>, zone: &Z) -> Option<Value>
+where
+    Z::Offset: Display,
+{
+    let [year, month, day, hour, minute, second, micros] = fields(bytes)?;
+    if [year, month, day, hour, minute, second, micros] == [0; 7] {
+        return date_time(bytes, digits);
+    }
+    let at = NaiveDate::from_ymd_opt(i32::try_from(year).ok()?, month, day)?.and_hms_opt(hour, minute, second)?.and_utc();
+    let local = at.with_timezone(zone);
+    Some(Value::String(format!("{}{}{}", local.format("%Y-%m-%d %H:%M:%S"), fraction(micros, digits), local.format("%:z"))))
+}
+
 /// The fraction digits a time column declares: 3 for `datetime(3)`, 0 for `datetime`.
-fn digits(declared: Option<&str>) -> Option<usize> {
+pub(super) fn digits(declared: Option<&str>) -> Option<usize> {
     Some(declared?.split_once('(').and_then(|(_, rest)| rest.strip_suffix(')')?.parse().ok()).unwrap_or(0))
 }
 
 /// The seconds' fraction to the declared `digits`, as MySQL writes it; with none
 /// declared, six digits when there is a fraction.
-fn fraction(micros: u32, digits: Option<usize>) -> String {
+pub(super) fn fraction(micros: u32, digits: Option<usize>) -> String {
     match digits.unwrap_or(if micros > 0 { 6 } else { 0 }).min(6) {
         0 => String::new(),
         digits => format!(".{micros:06}")[..=digits].to_string(),

@@ -1,6 +1,6 @@
 //! Live tests of the MySQL table tab's page and count, against the server `mysql.rs` describes.
 
-use super::mysql::{connect, password, run, test_config, SKIP};
+use super::mysql::{connect, password, run, shown_at, test_config, SKIP};
 use crate::commands::sql::{ColumnFilter, FilterOp};
 use crate::commands::{mysql_browse, mysql_count};
 use crate::mysql::session::prepare;
@@ -81,7 +81,7 @@ async fn every_common_type_reads_as_the_grid_shows_it() {
         vec![vec![
             json!("18446744073709551615"), json!(-128), json!(true), json!("12345678901234567890.0123456789"), json!(0.1),
             json!(-1.5e300), json!("Straße"), json!("long note"), json!("2024-02-29"), json!("2024-02-29 13:14:15.123456"),
-            json!("2024-01-01 00:00:00+00:00"), json!("-838:59:59"), json!(2024), json!("paid"), json!("a,b"),
+            json!(shown_at("2024-01-01 00:00:00")), json!("-838:59:59"), json!(2024), json!("paid"), json!("a,b"),
             json!({ "a": [1, "b"] }), json!("0x00FF"), json!(5),
             json!("0x000000000101000000000000000000F03F0000000000000040"),
         ]],
@@ -149,7 +149,7 @@ async fn a_timestamp_filters_on_the_text_the_grid_shows() {
     let pool = seeded(&config, name).await;
     let page = mysql_browse(&pool, name, TABLE, &[], None, true, 1, 0).await.unwrap();
     let shown = page.rows[0][10].as_str().unwrap().to_string();
-    assert!(shown.ends_with("+00:00"), "{shown}");
+    assert_eq!(shown, shown_at("2024-01-01 00:00:00"));
     for op in [FilterOp::Eq, FilterOp::Contains, FilterOp::StartsWith, FilterOp::In] {
         let label = format!("{op:?}");
         assert_eq!(keys(&pool, name, &[filter("stamp", op, Some(&shown))]).await, [json!("18446744073709551615")], "{label}");
@@ -174,7 +174,7 @@ async fn every_type_reads_exactly_at_its_edges() {
              at DATETIME(6), at3 DATETIME(3), stamp TIMESTAMP(3) NULL, note TEXT COLLATE utf8mb4_bin, raw LONGBLOB, \
              fixed BINARY(3), tags SET('a','b','c'), doc JSON)"
         ),
-        // The zero date needs a mode that allows it; the zone shows a TIMESTAMP is read in UTC.
+        // The zero date needs a mode that allows it; the zone shows a TIMESTAMP is read in the user's zone.
         String::from("SET SESSION sql_mode = '', SESSION time_zone = '+05:00'"),
         format!(
             "INSERT INTO {database}.{table} VALUES \
@@ -201,7 +201,7 @@ async fn every_type_reads_exactly_at_its_edges() {
             json!(9_007_199_254_740_991i64), json!("18446744073709551615"), json!(-5), json!(251), json!(true), json!(1),
             json!("18446744073709551615"), json!("9".repeat(65)), json!(nines(35, 30)), json!("09:05:00.000001"),
             json!("838:59:59"), json!("0000-00-00"), json!("2024-01-01 00:00:00.000000"), json!("2024-02-29 13:14:15.500"),
-            json!("2024-06-30 18:59:59.120+00:00"), json!("Ab"), json!("0x4162"), json!("0x610000"), json!("a,c"),
+            json!(shown_at("2024-06-30 18:59:59.120")), json!("Ab"), json!("0x4162"), json!("0x610000"), json!("a,c"),
             json!([1, 2.5, "x", null, true]),
         ],
     );

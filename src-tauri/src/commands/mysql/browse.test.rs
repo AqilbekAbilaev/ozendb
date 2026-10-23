@@ -1,4 +1,4 @@
-use super::{decimal, order_clause, where_clause};
+use super::{decimal, in_utc, order_clause, where_clause};
 use crate::commands::mysql::MySqlColumnInfo;
 use crate::commands::sql::{ColumnFilter, FilterOp};
 use crate::error::AppError;
@@ -117,15 +117,20 @@ fn compares_text_dates_and_floats_against_the_bound_value_as_it_is() {
 }
 
 #[test]
-fn reads_a_timestamp_value_without_the_utc_zone_the_grid_shows_it_with() {
-    let (sql, binds) = clause(&[
-        filter("stamp", FilterOp::Eq, Some("2024-06-30 18:59:59.120+00:00")),
-        filter("stamp", FilterOp::Contains, Some("59.120+00:00")),
-        filter("stamp", FilterOp::StartsWith, Some("2024-06-30 18:59:59.120+00:00")),
-        filter("stamp", FilterOp::In, Some("2024-01-01 00:00:00+00:00, 2024-01-02")),
-    ]);
-    assert_eq!(sql.matches('?').count(), 5);
-    assert_eq!(binds, vec!["2024-06-30 18:59:59.120", "59.120", "2024-06-30 18:59:59.120", "2024-01-01 00:00:00", "2024-01-02"]);
+fn reads_a_shown_timestamp_back_as_utc() {
+    let tashkent = chrono::FixedOffset::east_opt(5 * 3600).unwrap();
+    assert_eq!(in_utc("2024-07-01 03:59:59.120+05:00", &tashkent, Some(3)).as_deref(), Some("2024-06-30 22:59:59.120"));
+    assert_eq!(in_utc("2024-06-30 18:59:59.120-04:00", &tashkent, Some(3)).as_deref(), Some("2024-06-30 22:59:59.120"));
+    // Without an offset, a date and time is the user's own.
+    assert_eq!(in_utc(" 2024-07-01 03:59:59 ", &tashkent, Some(0)).as_deref(), Some("2024-06-30 22:59:59"));
+    assert_eq!(in_utc("2024-07-01", &tashkent, Some(0)), None);
+    assert_eq!(in_utc("59.120+05:00", &tashkent, Some(3)), None);
+}
+
+#[test]
+fn sends_part_of_a_timestamp_as_it_is() {
+    let (_, binds) = clause(&[filter("stamp", FilterOp::Contains, Some("59.120")), filter("stamp", FilterOp::StartsWith, Some("2024-06"))]);
+    assert_eq!(binds, vec!["59.120", "2024-06"]);
 }
 
 #[test]

@@ -106,7 +106,7 @@ async fn a_composite_key_finds_each_row_by_every_part() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let name = "ozendb it save ведомость composite";
     let pool = seeded_keys(&config, name).await;
-    let key = |code: &str| row(&[("at", json!("2024-06-30 18:59:59.120+00:00")), ("code `x`", json!(code))]);
+    let key = |code: &str| row(&[("at", json!(super::mysql::shown_at("2024-06-30 18:59:59.120"))), ("code `x`", json!(code))]);
     let saved = changes(json!({
         "inserts": [],
         "updates": [{ "set": row(&[("note", json!("edited"))]), "before": [], "where": key("0x0A0B") }],
