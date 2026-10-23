@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use tauri::State;
 
 use super::query::run_wrapped;
-use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, SqlQueryResult, TableJoin, ROW_RESULT_CAP};
+use crate::commands::sql::{self, ColumnFilter, ColumnRef, FilterOp, SqlQueryResult, TableJoin, ROW_RESULT_CAP};
 use super::row_write::column_types;
 use super::array_literal::array_literal;
 use super::{primary_key_columns, quote_ident, AppContext};
@@ -20,34 +20,9 @@ fn column_sql(table: usize, column: &str, tables: usize) -> Result<String, AppEr
     Ok(format!("\"t{table}\".{}", quote_ident(column)?))
 }
 
-/// The browsed table as `t0` and each join as `t1`, `t2`…, so a table joined to
-/// itself still has a name of its own.
+/// The FROM's tables, quoted as identifiers (see `sql::from_clause`).
 fn from_clause(schema: &str, table: &str, joins: &[TableJoin]) -> Result<String, AppError> {
-    let mut sql = format!("{}.{} AS \"t0\"", quote_ident(schema)?, quote_ident(table)?);
-    for (i, join) in joins.iter().enumerate() {
-        let n = i + 1;
-        if join.on.is_empty() {
-            return Err(AppError::Validation(format!("The join to \"{}\" matches on no columns.", join.table)));
-        }
-        let mut pairs = Vec::with_capacity(join.on.len());
-        for pair in &join.on {
-            if pair.equals.table >= n {
-                return Err(AppError::Validation(String::from("A join can only match a table that comes before it.")));
-            }
-            pairs.push(format!("\"t{n}\".{} = {}", quote_ident(&pair.column)?, column_sql(pair.equals.table, &pair.equals.column, n)?));
-        }
-        let kind = match join.kind {
-            JoinKind::Left => "LEFT JOIN",
-            JoinKind::Inner => "JOIN",
-        };
-        sql.push_str(&format!(
-            " {kind} {}.{} AS \"t{n}\" ON {}",
-            quote_ident(&join.schema)?,
-            quote_ident(&join.table)?,
-            pairs.join(" AND "),
-        ));
-    }
-    Ok(sql)
+    sql::from_clause(quote_ident, schema, table, joins)
 }
 
 /// The ` WHERE …` clause (empty for no filters) and the values its `$n`

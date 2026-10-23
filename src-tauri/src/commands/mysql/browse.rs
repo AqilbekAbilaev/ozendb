@@ -9,7 +9,7 @@ use chrono::{DateTime, NaiveDateTime, TimeZone};
 use std::borrow::Cow;
 use super::schema::{mysql_tables_columns, MySqlColumnInfo};
 use super::{quote_name, AppContext};
-use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, SqlQueryResult, TableJoin, ROW_RESULT_CAP};
+use crate::commands::sql::{self, ColumnFilter, ColumnRef, FilterOp, SqlQueryResult, TableJoin, ROW_RESULT_CAP};
 use crate::error::AppError;
 
 /// The page size when the caller sends a non-positive `limit`, as PostgreSQL's browse does.
@@ -136,29 +136,9 @@ fn column_in<'a>(tables: &'a [Vec<MySqlColumnInfo>], r: &ColumnRef) -> Result<(S
     Ok((format!("`t{}`.{}", r.table, quote_name(&r.column)?), column(columns, &r.column)?))
 }
 
-/// The browsed table as `t0` and each join as `t1`, `t2`…, so a table joined to itself
-/// still has a name of its own.
+/// The FROM's tables, quoted with backticks (see `sql::from_clause`).
 pub(super) fn from_clause(database: &str, table: &str, joins: &[TableJoin]) -> Result<String, AppError> {
-    let mut sql = format!("{}.{} AS `t0`", quote_name(database)?, quote_name(table)?);
-    for (i, join) in joins.iter().enumerate() {
-        let n = i + 1;
-        if join.on.is_empty() {
-            return Err(AppError::Validation(format!("The join to \"{}\" matches on no columns.", join.table)));
-        }
-        let mut pairs = Vec::with_capacity(join.on.len());
-        for pair in &join.on {
-            if pair.equals.table >= n {
-                return Err(AppError::Validation(String::from("A join can only match a table that comes before it.")));
-            }
-            pairs.push(format!("`t{n}`.{} = `t{}`.{}", quote_name(&pair.column)?, pair.equals.table, quote_name(&pair.equals.column)?));
-        }
-        let kind = match join.kind {
-            JoinKind::Left => "LEFT JOIN",
-            JoinKind::Inner => "JOIN",
-        };
-        sql.push_str(&format!(" {kind} {}.{} AS `t{n}` ON {}", quote_name(&join.schema)?, quote_name(&join.table)?, pairs.join(" AND ")));
-    }
-    Ok(sql)
+    sql::from_clause(quote_name, database, table, joins)
 }
 
 /// The ` WHERE …` clause (empty for no filters) and the values its placeholders take.

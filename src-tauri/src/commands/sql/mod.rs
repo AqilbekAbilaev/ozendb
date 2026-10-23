@@ -3,6 +3,8 @@
 //! dialect. Each engine's commands (`commands/postgres/`) do the talking.
 use serde::{Deserialize, Serialize};
 
+use crate::error::AppError;
+
 pub mod format;
 pub mod read_select;
 pub mod statement;
@@ -92,4 +94,30 @@ pub struct TableJoin {
     pub table: String,
     pub kind: JoinKind,
     pub on: Vec<JoinOn>,
+}
+
+/// A browse's FROM: the browsed table as `t0` and each join as `t1`, `t2`…, so a table
+/// joined to itself still has a name of its own. `quote` quotes a name as the engine does.
+pub(crate) fn from_clause(quote: fn(&str) -> Result<String, AppError>, schema: &str, table: &str, joins: &[TableJoin]) -> Result<String, AppError> {
+    let alias = |n: usize| quote(&format!("t{n}"));
+    let mut sql = format!("{}.{} AS {}", quote(schema)?, quote(table)?, alias(0)?);
+    for (i, join) in joins.iter().enumerate() {
+        let n = i + 1;
+        if join.on.is_empty() {
+            return Err(AppError::Validation(format!("The join to \"{}\" matches on no columns.", join.table)));
+        }
+        let mut pairs = Vec::with_capacity(join.on.len());
+        for pair in &join.on {
+            if pair.equals.table >= n {
+                return Err(AppError::Validation(String::from("A join can only match a table that comes before it.")));
+            }
+            pairs.push(format!("{}.{} = {}.{}", alias(n)?, quote(&pair.column)?, alias(pair.equals.table)?, quote(&pair.equals.column)?));
+        }
+        let kind = match join.kind {
+            JoinKind::Left => "LEFT JOIN",
+            JoinKind::Inner => "JOIN",
+        };
+        sql.push_str(&format!(" {kind} {}.{} AS {} ON {}", quote(&join.schema)?, quote(&join.table)?, alias(n)?, pairs.join(" AND ")));
+    }
+    Ok(sql)
 }
