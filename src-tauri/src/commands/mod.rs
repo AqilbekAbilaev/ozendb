@@ -168,6 +168,12 @@ impl AppContext {
         self.pool.connect_mysql(&config_for(&self.storage, id, Access::Read)?, database).await
     }
 
+    /// The write-gated sibling of `mysql_pool`, mirroring `pg_pool_for_write`: a
+    /// `read_only` connection is refused before any write reaches the server.
+    pub async fn mysql_pool_for_write(&self, id: &str, database: Option<&str>) -> Result<sqlx::MySqlPool, AppError> {
+        self.pool.connect_mysql(&config_for(&self.storage, id, Access::Write)?, database).await
+    }
+
     /// Whether the connection is marked `read_only` — for a command that must
     /// still be *usable* on one, unlike `client_for_write`/`pg_pool_for_write`'s
     /// outright refusal, but needs to know so it can constrain itself (see

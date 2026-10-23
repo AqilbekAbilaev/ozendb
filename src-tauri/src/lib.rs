@@ -220,6 +220,7 @@ pub fn run() {
             list_mysql_columns,
             browse_mysql_table,
             count_mysql_table,
+            save_mysql_rows,
             list_pg_databases,
             list_pg_schemas,
             list_pg_tables,
