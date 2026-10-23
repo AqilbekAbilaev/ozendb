@@ -1,5 +1,8 @@
 use crate::error::AppError;
 use serde::Serialize;
+use sqlparser::ast::{DataType, EnumMember};
+use sqlparser::dialect::MySqlDialect;
+use sqlparser::parser::Parser;
 use sqlx::MySqlPool;
 use tauri::State;
 
@@ -85,6 +88,14 @@ pub struct MySqlReference {
     pub column: String,
 }
 
+/// An ENUM's labels, read from its `COLUMN_TYPE`. MySQL writes them as string literals
+/// with quotes doubled and backslashes escaped, whatever the session's `sql_mode`.
+fn enum_values(column_type: &str) -> Option<Vec<String>> {
+    let parsed = Parser::new(&MySqlDialect {}).try_with_sql(column_type).ok()?.parse_data_type().ok()?;
+    let DataType::Enum(members, _) = parsed else { return None };
+    Some(members.into_iter().map(|(EnumMember::Name(label) | EnumMember::NamedValue(label, _))| label).collect())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MySqlColumnInfo {
@@ -95,6 +106,8 @@ pub struct MySqlColumnInfo {
     pub nullable: bool,
     pub is_primary_key: bool,
     pub default: Option<String>,
+    /// An ENUM column's labels, in their declared order; None for any other type.
+    pub enum_values: Option<Vec<String>>,
     /// The first foreign key on this column, by constraint name; None for most columns.
     pub references: Option<MySqlReference>,
 }
@@ -128,6 +141,7 @@ pub(crate) async fn mysql_columns(pool: &MySqlPool, database: &str, table: &str)
         .into_iter()
         .map(|(name, data_type, nullable, is_primary_key, default, to_database, to_table, to_column)| MySqlColumnInfo {
             name,
+            enum_values: enum_values(&data_type),
             data_type,
             nullable,
             is_primary_key,

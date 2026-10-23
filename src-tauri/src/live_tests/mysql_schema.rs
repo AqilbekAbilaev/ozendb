@@ -25,7 +25,7 @@ async fn seeded(config: &crate::storage::ConnectionConfig, name: &str) -> MySqlP
         format!("CREATE TABLE {database}.`клиенты ü` (`id key` INT PRIMARY KEY, email VARCHAR(80) NOT NULL UNIQUE)"),
         format!(
             "CREATE TABLE {database}.`order items` (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, \
-             `buyer ``id``` INT NULL, status ENUM('new','paid') NOT NULL DEFAULT 'new', \
+             `buyer ``id``` INT NULL, status ENUM('new','it''s \\\\ paid') NOT NULL DEFAULT 'new', \
              FOREIGN KEY (`buyer ``id```) REFERENCES {database}.`клиенты ü` (`id key`))"
         ),
         format!("INSERT INTO {database}.`клиенты ü` VALUES (1, 'a@example.com'), (2, 'b@example.com')"),
@@ -86,12 +86,14 @@ async fn columns_carry_their_type_key_default_and_reference() {
         [
             ("id", "bigint unsigned", false, true, None),
             ("buyer `id`", "int", true, false, None),
-            ("status", "enum('new','paid')", false, false, Some("new")),
+            ("status", r"enum('new','it''s \\ paid')", false, false, Some("new")),
         ],
     );
     let reference = MySqlReference { database: name.clone(), table: "клиенты ü".into(), column: "id key".into() };
     assert_eq!(columns[1].references, Some(reference));
     assert_eq!(columns[0].references, None);
+    assert_eq!(columns[2].enum_values, Some(vec![String::from("new"), String::from(r"it's \ paid")]));
+    assert_eq!(columns[0].enum_values, None);
 
     // A unique, not-null column is not mistaken for the primary key.
     let keyed = mysql_columns(&pool, &name, "клиенты ü").await.unwrap();

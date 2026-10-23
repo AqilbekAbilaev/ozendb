@@ -9,7 +9,6 @@ const KINDS = [
   [/^(tinyint|smallint|mediumint|int|bigint|decimal|float|double|year)\b/, 'num'],
   [/^(char|varchar|tinytext|text|mediumtext|longtext|set)\b/, 'str'],
   [/^(date|datetime|timestamp|time)\b/, 'date'],
-  [/^enum\(/, 'enum'],
 ]
 
 const quoteText = (text) => `'${text.replaceAll('\\', '\\\\').replaceAll("'", "''")}'`
@@ -23,8 +22,11 @@ export const dialect = Object.freeze({
   // read as text under a case-insensitive collation, so matching ignores case whatever
   // the column's own collation, as the backend's filter does (commands/mysql/browse.rs).
   like: (column, pattern) => `CONVERT(${column} USING utf8mb4) COLLATE utf8mb4_general_ci LIKE ${quoteText(pattern)}`,
-  // An ENUM's labels are part of its type name, so it needs no list of its own.
-  cellKind: (dataType) => KINDS.find(([pattern]) => pattern.test(dataType ?? ''))?.[1] ?? null,
+  // An enum column (one listing its labels) is its own kind, as on PostgreSQL.
+  cellKind(dataType, enumValues) {
+    if (enumValues?.length) return 'enum'
+    return KINDS.find(([pattern]) => pattern.test(dataType ?? ''))?.[1] ?? null
+  },
   jsonShape: (dataType) => (dataType === 'json' ? 'json' : null),
   // TODO #390: refuse a generated column, once list_mysql_columns reports one.
   takesValue: () => true,
