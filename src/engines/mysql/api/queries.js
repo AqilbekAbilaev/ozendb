@@ -3,16 +3,27 @@
 
 import { invoke } from '@tauri-apps/api/core'
 
-// `filters` are `{ column, op, value }`, all of which must hold; `orderBy` is
-// `{ column }` or null, which orders by the primary key.
-export function browseTable({ connectionId, database, table }, { filters = [], orderBy = null, descending = false, limit, offset }) {
+// A column is named by `table` — 0 for the browsed table, 1 and on for `joins` in
+// order — and its name. `filters` are `{ table, column, op, value }`, all of which must
+// hold; `joins` are `{ schema, table, kind: 'left'|'inner', on: [{ column, equals:
+// { table, column } }] }`, `schema` naming the joined table's database; `orderBy` is
+// `{ table, column }` or null, which orders by the primary key.
+export function browseTable({ connectionId, database, table }, { joins = [], filters = [], orderBy = null, descending = false, limit, offset }) {
   return invoke('browse_mysql_table', {
-    id: connectionId, database, table, filters, orderBy: orderBy?.column ?? null, descending, limit, offset,
+    id: connectionId, database, table, joins, filters,
+    orderBy: orderBy?.column ?? null, orderTable: orderBy?.table ?? 0,
+    descending, limit, offset,
   })
 }
 
-export function countTable({ connectionId, database, table }, filters = []) {
-  return invoke('count_mysql_table', { id: connectionId, database, table, filters })
+export function countTable({ connectionId, database, table }, filters = [], joins = []) {
+  return invoke('count_mysql_table', { id: connectionId, database, table, joins, filters })
+}
+
+// A table tab's SQL as `{ joins, columns, filters, orderBy, descending, limit, offset }`;
+// rejects, with the reason, SQL the filter boxes can't show.
+export function readTableSelect({ database, table }, sql) {
+  return invoke('read_mysql_table_select', { sql, database, table })
 }
 
 // Saves a table tab's staged rows, `{ inserts, updates, deletes }`, in one transaction

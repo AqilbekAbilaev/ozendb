@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { dialect, api } from './sql.js'
 import { operatorsFor } from '../sql/workspaces/builderRows.js'
 
-const { quoteName, quoteText, like, cellKind, jsonShape, takesValue, fillsItself } = dialect
+const { quoteName, quoteText, like, filterText, readFilterText, cellKind, jsonShape, takesValue, fillsItself } = dialect
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -29,6 +29,25 @@ describe('quoting', () => {
 describe('like', () => {
   it('matches a column read as text under a case-insensitive collation', () => {
     expect(like('`Straße`', '%ö\\%%')).toBe("CONVERT(`Straße` USING utf8mb4) COLLATE utf8mb4_general_ci LIKE '%ö\\\\%%'")
+  })
+})
+
+describe('readFilterText', () => {
+  it('marks a TIMESTAMP\'s whole date and time as the UTC SQL mode wrote it in', () => {
+    expect(readFilterText('2024-01-01 00:00:00', 'timestamp')).toBe('2024-01-01 00:00:00+00:00')
+    expect(readFilterText('2024-01-01 00:00:00.120, 2024-06', 'timestamp(3)')).toBe('2024-01-01 00:00:00.120+00:00, 2024-06')
+  })
+
+  it('reads back to the filter SQL mode wrote', () => {
+    const typed = '2024-07-01 03:59:59.5+05:00'
+    const written = filterText(typed, 'timestamp(1)')
+    expect(filterText(readFilterText(written, 'timestamp(1)'), 'timestamp(1)')).toBe(written)
+  })
+
+  it('leaves any other value as it is', () => {
+    expect(readFilterText('2024-01-01 00:00:00', 'datetime')).toBe('2024-01-01 00:00:00')
+    expect(readFilterText('59:59', 'timestamp')).toBe('59:59')
+    expect(readFilterText('2024-01-01 00:00:00+05:00', 'timestamp')).toBe('2024-01-01 00:00:00+05:00')
   })
 })
 
@@ -109,8 +128,16 @@ describe('api', () => {
   it('reads the table tab\'s schema as the table\'s database', async () => {
     await api.listColumns({ connectionId: 'c1', schema: 'shop.eu', table: 'order items' })
     expect(invoke).toHaveBeenCalledWith('list_mysql_columns', { id: 'c1', database: 'shop.eu', table: 'order items' })
-    await api.countTable(target, [])
-    expect(invoke).toHaveBeenCalledWith('count_mysql_table', { id: 'c1', database: 'shop.eu', table: 'order items', filters: [] })
+    await api.countTable(target, [], [])
+    expect(invoke).toHaveBeenCalledWith('count_mysql_table', { id: 'c1', database: 'shop.eu', table: 'order items', joins: [], filters: [] })
+  })
+
+  it('offers foreign keys by the databases they link, as the table tab\'s schemas', async () => {
+    invoke.mockResolvedValue([{ fromDatabase: 'shop.eu', fromTable: 'order items', fromColumns: ['at slot', 'at zone'], toDatabase: 'склад', toTable: 'bins', toColumns: ['slot', 'zone'] }])
+    expect(await api.listForeignKeys({ connectionId: 'c1', schema: 'shop.eu', table: 'order items' })).toEqual([
+      { fromSchema: 'shop.eu', fromTable: 'order items', fromColumns: ['at slot', 'at zone'], toSchema: 'склад', toTable: 'bins', toColumns: ['slot', 'zone'] },
+    ])
+    expect(invoke).toHaveBeenCalledWith('list_mysql_foreign_keys', { id: 'c1', database: 'shop.eu', table: 'order items' })
   })
 
   it('says what is not available yet rather than calling a command that does not exist', async () => {

@@ -27,6 +27,7 @@ export const dialect = Object.freeze({
   // as typed, since PostgreSQL reads a quoted value as the column's own type.
   filterLiteral: (value) => dialect.quoteText(value),
   filterText: (value) => value,
+  readFilterText: (value) => value,
   // An enum column (one listing its labels) is its own kind, whatever its type's name.
   cellKind(dataType, enumValues) {
     if (enumValues?.length) return 'enum'
