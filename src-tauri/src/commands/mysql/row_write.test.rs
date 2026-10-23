@@ -14,6 +14,7 @@ fn info(name: &str, data_type: &str, is_primary_key: bool, generated: bool) -> M
         is_primary_key,
         default: None,
         generated,
+        auto_increment: false,
         enum_values: None,
         references: None,
     }

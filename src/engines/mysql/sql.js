@@ -33,6 +33,9 @@ export const dialect = Object.freeze({
   // MySQL refuses a value for a generated column. An auto-increment one takes a value, or
   // numbers the row itself when left blank, as PostgreSQL's by-default identity does.
   takesValue: (info) => !info?.generated,
+  // A column that numbers a row left without a value: a duplicated row leaves it out, or
+  // the copy would repeat its original's number.
+  fillsItself: (info) => Boolean(info?.autoIncrement),
   serverSql: 'SELECT VERSION(), @@character_set_server',
 })
 

@@ -36,6 +36,9 @@ export const dialect = Object.freeze({
   },
   // PostgreSQL never accepts a value for an identity-always or stored generated column.
   takesValue: (info) => !(info?.identity === 'always' || info?.generated === 'stored'),
+  // An identity or serial column numbers a row left without a value: a duplicated row
+  // leaves it out, or the copy would repeat its original's number.
+  fillsItself: (info) => Boolean(info?.identity) || /^nextval\(/.test(info?.default ?? ''),
   serverSql: "SELECT current_setting('server_version'), current_setting('server_encoding')",
 })
 

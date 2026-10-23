@@ -700,6 +700,17 @@ describe('staged inserting', () => {
     expect(t.pendingCount.value).toBe(1)
   })
 
+  it('duplicateRow leaves out the columns the server numbers itself, so the copy gets its own', async () => {
+    listColumns.mockResolvedValue([
+      { name: 'id', dataType: 'integer', isPrimaryKey: true, identity: 'by_default' },
+      { name: 'name', dataType: 'text', isPrimaryKey: false, default: "nextval('names ü_seq'::regclass)" },
+      ...COLUMNS.slice(2),
+    ])
+    const t = await loaded()
+    t.duplicateRow(0)
+    expect(t.insertDrafts.value[0].values).toEqual({ tags: ['a'], meta: { x: 1 } })
+  })
+
   it('removeInsert drops a staged draft', async () => {
     const t = await loaded()
     const key = t.addRow()

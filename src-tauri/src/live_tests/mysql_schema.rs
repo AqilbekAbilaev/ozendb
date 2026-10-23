@@ -120,6 +120,8 @@ async fn only_a_generated_column_is_flagged_generated() {
     let columns = mysql_columns(&pool, &name, "мерки ü").await.unwrap();
     let flagged: Vec<(&str, bool)> = columns.iter().map(|c| (c.name.as_str(), c.generated)).collect();
     assert_eq!(flagged, [("id", false), ("side", false), ("area", true), ("half `side`", true), ("made", false)]);
+    let numbered: Vec<bool> = columns.iter().map(|c| c.auto_increment).collect();
+    assert_eq!(numbered, [true, false, false, false, false]);
     admin.close().await.unwrap();
     drop_seeded(&config, pool, &name).await;
 }

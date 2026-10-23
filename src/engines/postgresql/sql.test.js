@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { dialect } from './sql.js'
 
-const { quoteName, quoteText, like, cellKind, jsonShape, takesValue } = dialect
+const { quoteName, quoteText, like, cellKind, jsonShape, takesValue, fillsItself } = dialect
 
 describe('quoting', () => {
   it('double-quotes a name, doubling any quote inside it', () => {
@@ -72,5 +72,20 @@ describe('takesValue', () => {
     expect(takesValue({ identity: 'by default' })).toBe(true)
     expect(takesValue({ dataType: 'text' })).toBe(true)
     expect(takesValue(undefined)).toBe(true)
+  })
+})
+
+describe('fillsItself', () => {
+  it('reports identity columns and serial ones, which number a row left without a value', () => {
+    expect(fillsItself({ identity: 'by_default' })).toBe(true)
+    expect(fillsItself({ identity: 'always' })).toBe(true)
+    expect(fillsItself({ default: `nextval('"order lines ü_id_seq"'::regclass)` })).toBe(true)
+  })
+
+  it('leaves out a plain default, a stored generated column and an unknown one', () => {
+    expect(fillsItself({ default: "'nextval('::text" })).toBe(false)
+    expect(fillsItself({ default: 'now()' })).toBe(false)
+    expect(fillsItself({ generated: 'stored' })).toBe(false)
+    expect(fillsItself(undefined)).toBe(false)
   })
 })
