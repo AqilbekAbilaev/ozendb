@@ -1,7 +1,9 @@
 //! Saving the table tab's staged rows: its inserts, then its edits, then its deletes, in
-//! one transaction inside one command. A failure, or a row that changed or went since it
-//! was loaded, saves none of them, and no transaction is left open between calls. Every
-//! value is bound; only quoted names are written into the SQL.
+//! one transaction inside one command. A failure, or a row deleted or given another
+//! primary key since it was loaded, saves none of them, and no transaction is left open
+//! between calls. Rows are found by their primary key alone, as on PostgreSQL, so a change
+//! someone else made to a row's other columns is overwritten, not detected. Every value is
+//! bound; only quoted names are written into the SQL.
 use serde::Deserialize;
 use serde_json::Value;
 use sqlx::mysql::MySqlConnection;
