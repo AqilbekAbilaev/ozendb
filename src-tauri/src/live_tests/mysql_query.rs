@@ -205,6 +205,48 @@ async fn a_held_transaction_spans_runs_until_it_is_committed_or_rolled_back() {
 }
 
 #[tokio::test]
+async fn a_held_transaction_outlasts_a_statement_that_commits_by_itself() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it implicit commit").await;
+    let pool = pool(&config).await;
+    let txs = MySqlTransactions::default();
+    txs.begin(&pool, "tx ddl", false).await.unwrap();
+    let script = format!("CREATE TABLE {database}.`other ü` (id INT); INSERT INTO {database}.t VALUES (1, 'a')");
+    txs.run("tx ddl", &pool, &script, false, None).await.unwrap();
+    txs.finish("tx ddl", false).await.unwrap();
+    assert_eq!(count(&config, &database).await, 0);
+    drop_database(&config, &database).await;
+}
+
+#[tokio::test]
+async fn a_deadlock_in_a_held_transaction_says_it_rolled_the_transaction_back() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it deadlock").await;
+    let mut other = connect(&config, "").await;
+    run(&mut other, &format!("INSERT INTO {database}.t VALUES (1, 'a'), (2, 'b')")).await;
+    let pool = pool(&config).await;
+    let txs = std::sync::Arc::new(MySqlTransactions::default());
+    txs.begin(&pool, "tx deadlock", false).await.unwrap();
+    txs.run("tx deadlock", &pool, &format!("UPDATE {database}.t SET note = 'x' WHERE id = 1"), false, None).await.unwrap();
+    // The other session changes more rows, so InnoDB picks the held transaction as the one to roll back.
+    run(&mut other, "START TRANSACTION").await;
+    run(&mut other, &format!("INSERT INTO {database}.t SELECT seq, 'c' FROM (SELECT 10 seq UNION SELECT 11 UNION SELECT 12) s")).await;
+    run(&mut other, &format!("UPDATE {database}.t SET note = 'y' WHERE id = 2")).await;
+    let blocked = {
+        let (txs, pool, sql) = (txs.clone(), pool.clone(), format!("UPDATE {database}.t SET note = 'x' WHERE id = 2"));
+        tokio::spawn(async move { txs.run("tx deadlock", &pool, &sql, false, None).await })
+    };
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    run(&mut other, &format!("UPDATE {database}.t SET note = 'y' WHERE id = 1")).await;
+    run(&mut other, "ROLLBACK").await;
+    let err = tokio::time::timeout(Duration::from_secs(10), blocked).await.unwrap().unwrap().unwrap_err();
+    assert_eq!(err.code(), "command");
+    assert!(err.user_message().contains("rolled the whole transaction back"), "{}", err.user_message());
+    txs.finish("tx deadlock", false).await.unwrap();
+    drop_database(&config, &database).await;
+}
+
+#[tokio::test]
 async fn a_read_only_connection_holds_a_read_only_transaction() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let database = database(&config, "ozendb it read only tx").await;

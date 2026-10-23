@@ -21,6 +21,9 @@ use crate::mysql::session::{QUERY_TIME_LIMIT, READ_ONLY_LOCK};
 /// What MySQL answers a statement it can't prepare with, such as USE or LOCK TABLES.
 const NOT_PREPARABLE: u16 = 1295;
 
+/// A deadlock, after which MySQL has rolled the statement's whole transaction back.
+const DEADLOCK: u16 = 1213;
+
 fn number(e: &sqlx::Error) -> Option<u16> {
     match e {
         sqlx::Error::Database(e) => e.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>().map(|e| e.number()),
@@ -72,7 +75,7 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str) -> Result<SqlQueryResult
 /// `read_only` connection the session is locked again before each statement, so nothing
 /// an earlier one did can leave the next one free to write. That still leaves a stored
 /// procedure that lifts the lock and writes within one CALL: only the server's own
-/// privileges stop that.
+/// privileges stop that. `held` is a session holding a Manual-mode transaction.
 pub(super) async fn run_on(
     conn: &mut MySqlConnection,
     pool: &MySqlPool,
@@ -80,6 +83,7 @@ pub(super) async fn run_on(
     run_id: Option<&str>,
     limit: Duration,
     read_only: bool,
+    held: bool,
 ) -> Result<Vec<SqlQueryResult>, AppError> {
     let connection: u64 = sqlx::query_scalar("SELECT CONNECTION_ID()").fetch_one(&mut *conn).await.map_err(AppError::MySql)?;
     let run = Run::new(run_id, connection);
@@ -88,7 +92,11 @@ pub(super) async fn run_on(
         if read_only {
             sqlx::raw_sql(READ_ONLY_LOCK).execute(&mut *conn).await.map_err(AppError::MySql)?;
         }
-        match run.limited(pool, limit, run_one(conn, statement)).await {
+        let outcome = run.limited(pool, limit, run_one(conn, statement)).await.map_err(|e| match e {
+            AppError::MySql(e) if held && number(&e) == Some(DEADLOCK) => AppError::RolledBack(Box::new(AppError::MySql(e))),
+            e => e,
+        });
+        match outcome {
             Ok(result) => results.push(result),
             Err(e) if i == 0 => return Err(e),
             Err(e) => return Err(AppError::InScript { number: i + 1, source: Box::new(e) }),
@@ -104,7 +112,7 @@ pub(crate) async fn run_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bool, 
     let statements = statements(sql, read_only)?;
     let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
     conn.close_on_drop();
-    run_on(&mut conn, pool, &statements, run_id, limit, read_only).await
+    run_on(&mut conn, pool, &statements, run_id, limit, read_only, false).await
 }
 
 /// Runs the SQL tab's script, one statement after another, answering with each one's
