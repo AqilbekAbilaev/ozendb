@@ -71,7 +71,7 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str) -> Result<SqlQueryResult
 
 /// Runs `statements` in order on `conn` as `run`, stopping at the first that fails; each
 /// answers with its own result. Cancel can stop `run`, and no statement may run past
-/// `limit`; either sends `KILL QUERY` through `pool`, from another session. On a
+/// `limit`; either sends `KILL QUERY` from a session opened with `pool`'s options. On a
 /// `read_only` connection the session is locked again before each statement, so nothing
 /// an earlier one did can leave the next one free to write. That still leaves a stored
 /// procedure that lifts the lock and writes within one CALL: only the server's own

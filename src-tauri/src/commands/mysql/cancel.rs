@@ -1,14 +1,15 @@
 //! Stopping a running SQL run: Cancel, or the time limit. A run is kept under the run id
 //! the frontend chose for it from before it has a session, so a Cancel that comes while
 //! it waits for one still stops it; once it has one, stopping it also sends `KILL QUERY`
-//! for that session from a second connection. A statement is checked against the stop
-//! itself, since `SELECT SLEEP(30)` stopped that way returns 1 rather than an error.
+//! for that session from a connection opened for it. A statement is checked against the
+//! stop itself, since `SELECT SLEEP(30)` stopped that way returns 1 rather than an error.
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use sqlx::MySqlPool;
+use sqlx::mysql::MySqlConnection;
+use sqlx::{Connection, MySqlPool};
 use tauri::State;
 
 use super::AppContext;
@@ -40,7 +41,10 @@ impl Running {
         // next run there start a statement, before the KILL arrives to stop it instead.
         let connection = self.connection.lock().await;
         if let Some(connection) = *connection {
-            sqlx::raw_sql(sqlx::AssertSqlSafe(format!("KILL QUERY {connection}"))).execute(pool).await.map_err(AppError::MySql)?;
+            // A connection of its own rather than the pool's: held transactions can fill the pool.
+            let mut killing = MySqlConnection::connect_with(&pool.connect_options()).await.map_err(AppError::MySql)?;
+            sqlx::raw_sql(sqlx::AssertSqlSafe(format!("KILL QUERY {connection}"))).execute(&mut killing).await.map_err(AppError::MySql)?;
+            killing.close().await.map_err(AppError::MySql)?;
         }
         Ok(true)
     }
