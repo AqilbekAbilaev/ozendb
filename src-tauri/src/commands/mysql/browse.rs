@@ -15,7 +15,8 @@ const BROWSE_LIMIT_FALLBACK: i64 = 100;
 /// The exact numeric types, BIT among them, whose filter values are read as a DECIMAL.
 const EXACT_NUMBERS: [&str; 7] = ["tinyint", "smallint", "mediumint", "int", "bigint", "decimal", "bit"];
 
-/// The most fraction digits a MySQL DECIMAL holds.
+/// The most digits a MySQL DECIMAL holds, and the most of them after the point.
+const MAX_DIGITS: usize = 65;
 const MAX_SCALE: usize = 30;
 
 // Contains and starts-with ignore case whatever the column's collation, as PostgreSQL's
@@ -29,24 +30,31 @@ fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlCol
 }
 
 /// A filter value as it is bound, and the placeholder that reads it. An exact number's
-/// value is read as a DECIMAL with the value's own fraction digits: a bare `?` compares
-/// as floating point, which can't tell two BIGINTs past 2^53 apart; a cast to SIGNED
-/// reads `>= 1.5` as `>= 1`; one to the column's own scale reads `> 1.505` on a
-/// DECIMAL(10,2) as `> 1.51`; and one to a fixed DECIMAL(65,30) clips a value past 35
-/// whole digits. On TINYINT(1), MySQL's BOOLEAN, `true` and `false` are the 1 and 0 it stores.
-fn typed(data_type: &str, value: &str) -> (String, String) {
-    let value = unzoned(data_type, value);
-    let base = data_type.split(['(', ' ']).next().unwrap_or_default();
+/// value is read as the smallest DECIMAL that holds it: a bare `?` compares as floating
+/// point, which can't tell two BIGINTs past 2^53 apart; a cast to SIGNED reads `>= 1.5`
+/// as `>= 1`; one to the column's own scale reads `> 1.505` on a DECIMAL(10,2) as
+/// `> 1.51`; and one to a fixed DECIMAL(65,30) clips a value past 35 whole digits. On
+/// TINYINT(1), MySQL's BOOLEAN, `true` and `false` are the 1 and 0 it stores.
+fn typed(info: &MySqlColumnInfo, value: &str) -> Result<(String, String), AppError> {
+    let value = unzoned(&info.data_type, value);
+    let base = info.data_type.split(['(', ' ']).next().unwrap_or_default();
     if !EXACT_NUMBERS.contains(&base) {
-        return (value.to_string(), String::from("?"));
+        return Ok((value.to_string(), String::from("?")));
     }
-    let is_boolean = data_type.strip_prefix("tinyint(1)").is_some_and(|rest| rest.is_empty() || rest.starts_with(' '));
-    let value = match value.to_ascii_lowercase().as_str() {
+    let is_boolean = info.data_type.strip_prefix("tinyint(1)").is_some_and(|rest| rest.is_empty() || rest.starts_with(' '));
+    let value = match value.trim().to_ascii_lowercase().as_str() {
         "true" if is_boolean => "1",
         "false" if is_boolean => "0",
-        _ => value,
+        _ => value.trim(),
     };
-    (value.to_string(), format!("CAST(? AS DECIMAL(65,{}))", scale(value)))
+    let (precision, scale) = decimal(value).unwrap_or((MAX_DIGITS, 0));
+    if precision > MAX_DIGITS || scale > MAX_SCALE {
+        return Err(AppError::Validation(format!(
+            "The filter on \"{}\" needs a number of at most {MAX_DIGITS} digits, {MAX_SCALE} of them after the point.",
+            info.name
+        )));
+    }
+    Ok((value.to_string(), format!("CAST(? AS DECIMAL({precision},{scale}))")))
 }
 
 /// `value` as MySQL writes the column: the grid shows a TIMESTAMP in the session's UTC
@@ -55,14 +63,29 @@ fn unzoned<'a>(data_type: &str, value: &'a str) -> &'a str {
     if data_type.starts_with("timestamp") { value.strip_suffix(UTC).unwrap_or(value) } else { value }
 }
 
-/// The fraction digits `value` is written with, up to MySQL's limit; the limit itself
-/// for a number written with an exponent, whose digits aren't counted.
-fn scale(value: &str) -> usize {
-    if value.contains(['e', 'E']) {
-        return MAX_SCALE;
+/// The precision and scale of the smallest DECIMAL that holds `value` exactly, or None
+/// when it isn't a number. Counted from its digits, not read as a float, so nothing
+/// rounds: `-1.50e-3` is 0.0015, a DECIMAL(4,4), and `12e3` a DECIMAL(5,0).
+fn decimal(value: &str) -> Option<(usize, usize)> {
+    let unsigned = value.strip_prefix(['+', '-']).unwrap_or(value);
+    let (mantissa, exponent) = match unsigned.split_once(['e', 'E']) {
+        Some((mantissa, exponent)) => (mantissa, exponent.parse::<i64>().ok()?),
+        None => (unsigned, 0),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    if whole.len() + fraction.len() == 0 || !whole.chars().chain(fraction.chars()).all(|c| c.is_ascii_digit()) {
+        return None;
     }
-    let digits = value.split_once('.').map_or(0, |(_, fraction)| fraction.chars().take_while(char::is_ascii_digit).count());
-    digits.min(MAX_SCALE)
+    let digits = format!("{whole}{fraction}");
+    let leading = digits.trim_start_matches('0');
+    let significant = leading.trim_end_matches('0');
+    if significant.is_empty() {
+        return Some((1, 0));
+    }
+    // How many of the significant digits come before the point; negative when zeros do.
+    let point = leading.len() as i128 - fraction.len() as i128 + i128::from(exponent);
+    let scale = (significant.len() as i128 - point).max(0);
+    Some((usize::try_from(point.max(0) + scale).ok()?, usize::try_from(scale).ok()?))
 }
 
 /// The ` WHERE …` clause (empty for no filters) and the values its placeholders take.
@@ -80,8 +103,8 @@ pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]
         let like = |value: &str| unzoned(&info.data_type, value).replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
         let as_text = format!("CONVERT({name} USING utf8mb4) {AS_TEXT} LIKE");
         let compare = |symbol: &str, value: &str| {
-            let (value, placeholder) = typed(&info.data_type, value);
-            (vec![value], format!("{name} {symbol} {placeholder}"))
+            let (value, placeholder) = typed(info, value)?;
+            Ok::<_, AppError>((vec![value], format!("{name} {symbol} {placeholder}")))
         };
         let (values, condition) = match f.op {
             FilterOp::IsNull => (vec![], format!("{name} IS NULL")),
@@ -89,23 +112,20 @@ pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]
             FilterOp::Contains => (vec![like(value()?)], format!("{as_text} CONCAT('%', ?, '%')")),
             FilterOp::StartsWith => (vec![like(value()?)], format!("{as_text} CONCAT(?, '%')")),
             FilterOp::In => {
-                let (items, placeholders): (Vec<String>, Vec<String>) = value()?
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|v| !v.is_empty())
-                    .map(|v| typed(&info.data_type, v))
-                    .unzip();
+                let pairs: Vec<(String, String)> =
+                    value()?.split(',').map(str::trim).filter(|v| !v.is_empty()).map(|v| typed(info, v)).collect::<Result<_, _>>()?;
+                let (items, placeholders): (Vec<String>, Vec<String>) = pairs.into_iter().unzip();
                 if items.is_empty() {
                     return Err(AppError::Validation(format!("The filter on \"{}\" needs at least one value.", f.column)));
                 }
                 (items, format!("{name} IN ({})", placeholders.join(", ")))
             }
-            FilterOp::Eq => compare("=", value()?),
-            FilterOp::Ne => compare("<>", value()?),
-            FilterOp::Gt => compare(">", value()?),
-            FilterOp::Gte => compare(">=", value()?),
-            FilterOp::Lt => compare("<", value()?),
-            FilterOp::Lte => compare("<=", value()?),
+            FilterOp::Eq => compare("=", value()?)?,
+            FilterOp::Ne => compare("<>", value()?)?,
+            FilterOp::Gt => compare(">", value()?)?,
+            FilterOp::Gte => compare(">=", value()?)?,
+            FilterOp::Lt => compare("<", value()?)?,
+            FilterOp::Lte => compare("<=", value()?)?,
         };
         binds.extend(values);
         conditions.push(condition);

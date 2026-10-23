@@ -1,4 +1,4 @@
-use super::{order_clause, where_clause};
+use super::{decimal, order_clause, where_clause};
 use crate::commands::mysql::MySqlColumnInfo;
 use crate::commands::sql::{ColumnFilter, FilterOp};
 use crate::error::AppError;
@@ -32,7 +32,7 @@ fn no_filters_add_no_where_clause() {
 }
 
 #[test]
-fn compares_exact_numbers_as_a_decimal_holding_the_value_s_own_fraction_digits() {
+fn compares_exact_numbers_as_the_smallest_decimal_that_holds_the_value() {
     let (sql, binds) = clause(&[
         filter("id `key`", FilterOp::Gte, Some("18446744073709551615")),
         filter("price €", FilterOp::Lt, Some("1.505")),
@@ -40,21 +40,51 @@ fn compares_exact_numbers_as_a_decimal_holding_the_value_s_own_fraction_digits()
     ]);
     assert_eq!(
         sql,
-        " WHERE `id ``key``` >= CAST(? AS DECIMAL(65,0)) AND `price €` < CAST(? AS DECIMAL(65,3)) AND `bits` = CAST(? AS DECIMAL(65,0))"
+        " WHERE `id ``key``` >= CAST(? AS DECIMAL(20,0)) AND `price €` < CAST(? AS DECIMAL(4,3)) AND `bits` = CAST(? AS DECIMAL(1,0))"
     );
     assert_eq!(binds, vec!["18446744073709551615", "1.505", "5"]);
 }
 
 #[test]
-fn keeps_at_most_the_thirty_fraction_digits_mysql_allows() {
-    let (sql, _) = clause(&[filter("price €", FilterOp::Eq, Some(&format!("0.{}1", "0".repeat(40)))), filter("id `key`", FilterOp::Gt, Some("1e-5"))]);
-    assert_eq!(sql, " WHERE `price €` = CAST(? AS DECIMAL(65,30)) AND `id ``key``` > CAST(? AS DECIMAL(65,30))");
+fn counts_a_number_s_digits_however_it_is_written() {
+    assert_eq!(decimal("1e3"), Some((4, 0)));
+    assert_eq!(decimal("-1.50e-3"), Some((4, 4)));
+    assert_eq!(decimal("1.5E+1"), Some((2, 0)));
+    assert_eq!(decimal("+007.250"), Some((3, 2)));
+    assert_eq!(decimal(".5"), Some((1, 1)));
+    assert_eq!(decimal("5."), Some((1, 0)));
+    assert_eq!(decimal("-0.000e9"), Some((1, 0)));
+    assert_eq!(decimal("1e-40"), Some((40, 40)));
+}
+
+#[test]
+fn reads_nothing_but_a_number_as_one() {
+    for text in ["", ".", "-", "1e", "e5", "1.2.3", "--1", "0x10", "1 000", "abc"] {
+        assert_eq!(decimal(text), None, "{text:?}");
+    }
+}
+
+#[test]
+fn compares_values_at_mysql_s_decimal_limits_exactly() {
+    let (widest, finest) = ("1e64", format!("{}.{}", "9".repeat(35), "9".repeat(30)));
+    let (sql, _) = clause(&[filter("id `key`", FilterOp::Gt, Some(widest)), filter("price €", FilterOp::Eq, Some(&finest))]);
+    assert_eq!(sql, " WHERE `id ``key``` > CAST(? AS DECIMAL(65,0)) AND `price €` = CAST(? AS DECIMAL(65,30))");
+}
+
+#[test]
+fn refuses_a_number_past_mysql_s_decimal_limits_rather_than_rounding_it() {
+    let refused = |value: &str| matches!(where_clause(&[filter("price €", FilterOp::Eq, Some(value))], &columns()), Err(AppError::Validation(_)));
+    assert!(refused("1e-40"));
+    assert!(refused(&format!("0.{}1", "0".repeat(30))));
+    assert!(refused("1e65"));
+    assert!(refused(&format!("1{}.5", "0".repeat(64))));
+    assert!(!refused(&format!("0.{}1", "0".repeat(29))));
 }
 
 #[test]
 fn reads_true_and_false_on_a_tinyint_1_as_the_1_and_0_it_stores() {
     let (sql, binds) = clause(&[filter("ok", FilterOp::Eq, Some("TRUE")), filter("ok", FilterOp::In, Some("false, 5"))]);
-    assert_eq!(sql, " WHERE `ok` = CAST(? AS DECIMAL(65,0)) AND `ok` IN (CAST(? AS DECIMAL(65,0)), CAST(? AS DECIMAL(65,0)))");
+    assert_eq!(sql, " WHERE `ok` = CAST(? AS DECIMAL(1,0)) AND `ok` IN (CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0)))");
     assert_eq!(binds, vec!["1", "0", "5"]);
 }
 
@@ -106,7 +136,7 @@ fn starts_with_matches_the_start_of_the_text_form() {
 #[test]
 fn any_of_binds_each_trimmed_value() {
     let (sql, binds) = clause(&[filter("id `key`", FilterOp::In, Some(" 1, 2 ,,3")), filter("name", FilterOp::In, Some("a,b"))]);
-    assert_eq!(sql, " WHERE `id ``key``` IN (CAST(? AS DECIMAL(65,0)), CAST(? AS DECIMAL(65,0)), CAST(? AS DECIMAL(65,0))) AND `name` IN (?, ?)");
+    assert_eq!(sql, " WHERE `id ``key``` IN (CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0)), CAST(? AS DECIMAL(1,0))) AND `name` IN (?, ?)");
     assert_eq!(binds, vec!["1", "2", "3", "a", "b"]);
 }
 
