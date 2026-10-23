@@ -9,8 +9,8 @@ pub(super) enum Access {
     Write,
 }
 
-/// The saved config `AppContext` connects from, for either engine. Lookup and the
-/// read-only gate live here once, so the eight resolvers on `AppContext` can't drift
+/// The saved config `AppContext` connects from, for any engine. Lookup and the
+/// read-only gate live here once, so the resolvers on `AppContext` can't drift
 /// apart on either rule.
 pub(super) fn config_for(storage: &Storage, id: &str, access: Access) -> Result<ConnectionConfig, AppError> {
     let config = match storage.find(id) {
