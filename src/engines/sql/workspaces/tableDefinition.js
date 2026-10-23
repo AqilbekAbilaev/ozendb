@@ -13,7 +13,7 @@ import { showToast } from '../../../stores/toast'
 const SqlTableWorkspace = defineAsyncComponent(() => import('./SqlTableWorkspace.vue'))
 
 // Tabs are reactive, which structuredClone can't copy; state and ui are JSON-only.
-const copy = (value) => JSON.parse(JSON.stringify(value))
+export const copy = (value) => JSON.parse(JSON.stringify(value))
 
 // A closing tab can't ask first (closes are synchronous), so the safe side wins:
 // its open transaction is rolled back, and a message says so.
