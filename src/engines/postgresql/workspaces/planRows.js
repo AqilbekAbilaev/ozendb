@@ -23,7 +23,7 @@ export function planRows([{ Plan: root, 'Planning Time': planningMs, 'Execution 
   walk(root, 0)
   const hottest = rows.reduce((a, b) => (b.own > a.own ? b : a))
   hottest.hot = true
-  return { rows, planningMs, executionMs }
+  return { rows, planningMs, executionMs, estimated: false }
 }
 
 function detailOf(node) {

@@ -29,6 +29,10 @@ describe('planRows', () => {
     expect([planningMs, executionMs]).toEqual([0.582, 0.204])
   })
 
+  it('is never estimated, as PostgreSQL\'s Explain always runs the query: the view keeps its ms column', () => {
+    expect(planRows(joinPlan).estimated).toBe(false)
+  })
+
   it('counts a node\'s time over all its loops', () => {
     const plan = [{ Plan: { 'Node Type': 'Nested Loop', 'Actual Total Time': 2, 'Actual Loops': 1, 'Actual Rows': 5, Plans: [
       { 'Node Type': 'Index Scan', 'Index Name': 'b_pkey', 'Relation Name': 'b', 'Actual Total Time': 0.1, 'Actual Loops': 10, 'Actual Rows': 1 },
