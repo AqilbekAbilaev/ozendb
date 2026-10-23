@@ -2,11 +2,14 @@
 
 use std::time::Duration;
 
-use super::mysql::{connect, run, test_config, SKIP};
+use super::mysql::{connect, password, run, test_config, SKIP};
 use super::mysql_browse::{pool, quoted};
 use crate::commands::explain_mysql_sql;
+use crate::error::AppError;
+use crate::mysql::uri::build_options;
 use crate::storage::ConnectionConfig;
 use serde_json::Value;
+use sqlx::mysql::MySqlPoolOptions;
 
 const LIMIT: Duration = Duration::from_secs(60);
 
@@ -121,5 +124,14 @@ async fn a_query_past_the_time_limit_is_stopped() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let pool = pool(&config).await;
     let stopped = explain_mysql_sql(&pool, "SELECT SLEEP(5)", false, Duration::from_millis(300)).await.unwrap_err();
-    assert!(matches!(stopped, crate::error::AppError::TimedOut), "{stopped}");
+    assert!(matches!(stopped, AppError::TimedOut), "{stopped}");
+}
+
+#[tokio::test]
+async fn waiting_for_a_session_counts_against_the_time_limit() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let pool = MySqlPoolOptions::new().max_connections(1).connect_with(build_options(&config, password().as_deref(), "", None).unwrap()).await.unwrap();
+    let _held = pool.acquire().await.unwrap();
+    let stopped = explain_mysql_sql(&pool, "SELECT 1", false, Duration::from_millis(300)).await.unwrap_err();
+    assert!(matches!(stopped, AppError::TimedOut), "{stopped}");
 }
