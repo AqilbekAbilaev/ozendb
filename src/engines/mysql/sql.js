@@ -72,7 +72,7 @@ export const api = Object.freeze({
 export const mysqlSql = Object.freeze({
   dialect,
   api,
-  // TODO #391: an Explain reader (readPlan) and an export window. TODO (follow-up to
-  // #390, issue not yet filed): a row-history window, once saves record history.
+  // TODO #391: an Explain reader (readPlan) and an export window. TODO #417:
+  // a row-history window, once saves record history.
   modals: Object.freeze({}),
 })
