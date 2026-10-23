@@ -125,10 +125,12 @@ fn date(bytes: &[u8]) -> Option<Value> {
     Some(Value::String(format!("{year:04}-{month:02}-{day:02}")))
 }
 
-/// A DATETIME, or a TIMESTAMP with `zone` set. The zero date is no instant, so it has none.
+/// A DATETIME, or a TIMESTAMP with `zone` set. The zero date, every field 0, is no
+/// instant, so it has none.
 fn date_time(bytes: &[u8], digits: Option<usize>, zone: &str) -> Option<Value> {
-    let [year, month, day, hour, minute, second, micros] = fields(bytes)?;
-    let zone = if year == 0 { "" } else { zone };
+    let fields = fields(bytes)?;
+    let zone = if fields == [0; 7] { "" } else { zone };
+    let [year, month, day, hour, minute, second, micros] = fields;
     Some(Value::String(format!(
         "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}{}{zone}",
         fraction(micros, digits)
