@@ -14,3 +14,9 @@ export function browseTable({ connectionId, database, table }, { filters = [], o
 export function countTable({ connectionId, database, table }, filters = []) {
   return invoke('count_mysql_table', { id: connectionId, database, table, filters })
 }
+
+// Saves a table tab's staged rows, `{ inserts, updates, deletes }`, in one transaction
+// inside one command: any failure, or a row changed since it was loaded, saves none.
+export function saveRows({ connectionId, database, table }, changes) {
+  return invoke('save_mysql_rows', { id: connectionId, database, table, changes })
+}

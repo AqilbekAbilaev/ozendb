@@ -66,13 +66,13 @@ export const api = Object.freeze({
   beginTransaction: notYet('Running SQL'),
   commitTransaction: notYet('Running SQL'),
   rollbackTransaction: notYet('Running SQL'),
-  // TODO #390: insertRow, updateRow and deleteRows, to save a table's edited, added and
-  // deleted rows; without them useSqlTable opens the table read-only.
+  saveRows: (target, changes) => queries.saveRows(inDatabase(target), changes),
 })
 
 export const mysqlSql = Object.freeze({
   dialect,
   api,
-  // TODO #391: an Explain reader (readPlan) and an export window; TODO #390: row history.
+  // TODO #391: an Explain reader (readPlan) and an export window. TODO (follow-up to
+  // #390, issue not yet filed): a row-history window, once saves record history.
   modals: Object.freeze({}),
 })
