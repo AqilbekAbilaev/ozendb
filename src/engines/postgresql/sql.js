@@ -5,6 +5,7 @@ import * as queries from './api/queries.js'
 import { listColumns, listForeignKeys } from './api/resources.js'
 import * as library from './api/library.js'
 import { planRows } from './workspaces/planRows.js'
+import { saveRows } from './saveRows.js'
 
 // How a column's cells are styled, from its format_type() name. Arrays and JSON show
 // as JSON text, so they stay plain whatever their element type.
@@ -38,7 +39,7 @@ export const dialect = Object.freeze({
   serverSql: "SELECT current_setting('server_version'), current_setting('server_encoding')",
 })
 
-export const api = Object.freeze({ ...queries, listColumns, listForeignKeys, ...library })
+export const api = Object.freeze({ ...queries, listColumns, listForeignKeys, ...library, saveRows })
 
 export const postgresSql = Object.freeze({
   dialect,
