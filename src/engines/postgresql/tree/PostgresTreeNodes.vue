@@ -14,7 +14,7 @@ import { formatCompact, fmtBytes } from '../../../utils/format'
 
 const props = defineProps({
   conn: { type: Object, required: true },
-  schemas: { type: Array, required: true },
+  resources: { type: Array, required: true },
   // ConnectionTree owns the hover card (it renders the single StatsTip), so the
   // handlers come down rather than a second instance being created here.
   statsTip: { type: Object, required: true },
@@ -23,7 +23,7 @@ const props = defineProps({
 const { toggleTable, isTableOpen, columnsOf, databaseSizes, databaseOpen, toggleDatabase, showSystem, toggleSystem, openSchemas, tables, loading, errors, toggleSchema, reloadTables } =
   usePostgresTree(props.conn.id)
 // A refresh brings a new schema list; the open schemas' tables are re-read with it.
-watch(() => props.schemas, reloadTables)
+watch(() => props.resources, reloadTables)
 // The active table's row can only carry the highlight once it is rendered, so the tree
 // opens down to it, as the sidebar does for MongoDB's active collection. `immediate`
 // because this component is rebuilt whenever its connection is re-expanded — and because
@@ -34,7 +34,7 @@ watch(activeTab, (tab) => {
   if (!databaseOpen.value) toggleDatabase()
   if (!openSchemas.value[schema]) toggleSchema(schema)
 }, { immediate: true })
-const shown = computed(() => visibleSchemas(props.schemas, showSystem.value))
+const shown = computed(() => visibleSchemas(props.resources, showSystem.value))
 const database = computed(() => props.conn.database || 'postgres')
 // Read when the database row opens (see usePostgresTree); null until then, and null
 // for a database this role may not connect to.
