@@ -12,10 +12,11 @@ use crate::error::AppError;
 /// The page size when the caller sends a non-positive `limit`, as PostgreSQL's browse does.
 const BROWSE_LIMIT_FALLBACK: i64 = 100;
 
-/// The exact numeric types, whose filter values are read as a DECIMAL wide enough for any
-/// of them. A bare `?` would compare as floating point, which can't tell two BIGINTs past
-/// 2^53 apart, and a cast to SIGNED would read `>= 1.5` as `>= 1`.
-const EXACT_NUMBERS: [&str; 6] = ["tinyint", "smallint", "mediumint", "int", "bigint", "decimal"];
+/// The exact numeric types, BIT among them, whose filter values are read as a DECIMAL.
+const EXACT_NUMBERS: [&str; 7] = ["tinyint", "smallint", "mediumint", "int", "bigint", "decimal", "bit"];
+
+/// The most fraction digits a MySQL DECIMAL holds.
+const MAX_SCALE: usize = 30;
 
 // Contains and starts-with ignore case whatever the column's collation, as PostgreSQL's
 // ILIKE does: the column is read as utf8mb4 text so any type can be matched, under a
@@ -27,13 +28,34 @@ fn column<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlCol
     columns.iter().find(|c| c.name == name).ok_or_else(|| AppError::Validation(format!("Unknown column \"{name}\".")))
 }
 
-fn placeholder(data_type: &str) -> &'static str {
+/// A filter value as it is bound, and the placeholder that reads it. An exact number's
+/// value is read as a DECIMAL with the value's own fraction digits: a bare `?` compares
+/// as floating point, which can't tell two BIGINTs past 2^53 apart; a cast to SIGNED
+/// reads `>= 1.5` as `>= 1`; one to the column's own scale reads `> 1.505` on a
+/// DECIMAL(10,2) as `> 1.51`; and one to a fixed DECIMAL(65,30) clips a value past 35
+/// whole digits. On TINYINT(1), MySQL's BOOLEAN, `true` and `false` are the 1 and 0 it stores.
+fn typed(data_type: &str, value: &str) -> (String, String) {
     let base = data_type.split(['(', ' ']).next().unwrap_or_default();
-    if EXACT_NUMBERS.contains(&base) {
-        "CAST(? AS DECIMAL(65,30))"
-    } else {
-        "?"
+    if !EXACT_NUMBERS.contains(&base) {
+        return (value.to_string(), String::from("?"));
     }
+    let is_boolean = data_type.strip_prefix("tinyint(1)").is_some_and(|rest| rest.is_empty() || rest.starts_with(' '));
+    let value = match value.to_ascii_lowercase().as_str() {
+        "true" if is_boolean => "1",
+        "false" if is_boolean => "0",
+        _ => value,
+    };
+    (value.to_string(), format!("CAST(? AS DECIMAL(65,{}))", scale(value)))
+}
+
+/// The fraction digits `value` is written with, up to MySQL's limit; the limit itself
+/// for a number written with an exponent, whose digits aren't counted.
+fn scale(value: &str) -> usize {
+    if value.contains(['e', 'E']) {
+        return MAX_SCALE;
+    }
+    let digits = value.split_once('.').map_or(0, |(_, fraction)| fraction.chars().take_while(char::is_ascii_digit).count());
+    digits.min(MAX_SCALE)
 }
 
 /// The ` WHERE …` clause (empty for no filters) and the values its placeholders take.
@@ -50,20 +72,26 @@ pub(super) fn where_clause(filters: &[ColumnFilter], columns: &[MySqlColumnInfo]
         // LIKE's default escape character is a backslash.
         let like = |value: &str| value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
         let as_text = format!("CONVERT({name} USING utf8mb4) {AS_TEXT} LIKE");
-        let value_sql = placeholder(&info.data_type);
-        let compare = |symbol: &str, value: &str| (vec![value.to_string()], format!("{name} {symbol} {value_sql}"));
+        let compare = |symbol: &str, value: &str| {
+            let (value, placeholder) = typed(&info.data_type, value);
+            (vec![value], format!("{name} {symbol} {placeholder}"))
+        };
         let (values, condition) = match f.op {
             FilterOp::IsNull => (vec![], format!("{name} IS NULL")),
             FilterOp::NotNull => (vec![], format!("{name} IS NOT NULL")),
             FilterOp::Contains => (vec![like(value()?)], format!("{as_text} CONCAT('%', ?, '%')")),
             FilterOp::StartsWith => (vec![like(value()?)], format!("{as_text} CONCAT(?, '%')")),
             FilterOp::In => {
-                let items: Vec<String> = value()?.split(',').map(str::trim).filter(|v| !v.is_empty()).map(String::from).collect();
+                let (items, placeholders): (Vec<String>, Vec<String>) = value()?
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty())
+                    .map(|v| typed(&info.data_type, v))
+                    .unzip();
                 if items.is_empty() {
                     return Err(AppError::Validation(format!("The filter on \"{}\" needs at least one value.", f.column)));
                 }
-                let condition = format!("{name} IN ({})", vec![value_sql; items.len()].join(", "));
-                (items, condition)
+                (items, format!("{name} IN ({})", placeholders.join(", ")))
             }
             FilterOp::Eq => compare("=", value()?),
             FilterOp::Ne => compare("<>", value()?),

@@ -213,3 +213,61 @@ async fn every_type_reads_exactly_at_its_edges() {
     pool.close().await;
     run(&mut admin, &format!("DROP DATABASE {database}")).await;
 }
+
+#[tokio::test]
+async fn filters_compare_booleans_bits_and_decimals_exactly_at_their_edges() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let name = "ozendb it browse ведомость exact filters";
+    let (database, table) = (quoted(name), quoted("exact `filters` ü"));
+    let (huge, max) = (format!("1{}", "0".repeat(64)), format!("{}.{}", "9".repeat(35), "9".repeat(30)));
+    let tiny = format!("0.{}1", "0".repeat(29));
+    let mut admin = connect(&config, "").await;
+    for statement in [
+        format!("DROP DATABASE IF EXISTS {database}"),
+        format!("CREATE DATABASE {database}"),
+        format!(
+            "CREATE TABLE {database}.{table} (id INT PRIMARY KEY, flag TINYINT(1), bits BIT(64), wide DECIMAL(65,0), \
+             fine DECIMAL(65,30), cents DECIMAL(10,2), day DATE)"
+        ),
+        String::from("SET SESSION sql_mode = ''"),
+        format!(
+            "INSERT INTO {database}.{table} VALUES \
+             (1, 1, 0xFFFFFFFFFFFFFFFF, {huge}, {tiny}, 1.51, '0000-00-00'), \
+             (2, 0, 5, {huge} + 1, {max}, 1.50, '2024-01-01'), \
+             (3, 5, 0, -1, -{max}, NULL, NULL)"
+        ),
+    ] {
+        run(&mut admin, &statement).await;
+    }
+    let pool = pool(&config).await;
+    let one_more = format!("1{}1", "0".repeat(63));
+    let cases = [
+        (filter("flag", FilterOp::Eq, Some("true")), vec![1]),
+        (filter("flag", FilterOp::Eq, Some("FALSE")), vec![2]),
+        (filter("flag", FilterOp::Eq, Some("5")), vec![3]),
+        (filter("flag", FilterOp::In, Some("true, false")), vec![1, 2]),
+        (filter("flag", FilterOp::Ne, Some("true")), vec![2, 3]),
+        (filter("bits", FilterOp::Eq, Some("18446744073709551615")), vec![1]),
+        (filter("bits", FilterOp::Gt, Some("4")), vec![1, 2]),
+        (filter("wide", FilterOp::Eq, Some(&one_more)), vec![2]),
+        (filter("wide", FilterOp::Gt, Some(&huge)), vec![2]),
+        (filter("wide", FilterOp::Lt, Some("0")), vec![3]),
+        (filter("fine", FilterOp::Eq, Some(&tiny)), vec![1]),
+        (filter("fine", FilterOp::Gte, Some(&max)), vec![2]),
+        (filter("fine", FilterOp::Lt, Some("0")), vec![3]),
+        (filter("cents", FilterOp::Gt, Some("1.505")), vec![1]),
+        (filter("cents", FilterOp::Lt, Some("1.505")), vec![2]),
+        (filter("cents", FilterOp::Eq, Some("1.5")), vec![2]),
+        (filter("day", FilterOp::Eq, Some("0000-00-00")), vec![1]),
+    ];
+    for (f, expected) in cases {
+        let label = format!("{f:?}");
+        let filters = [f];
+        let page = mysql_browse(&pool, name, "exact `filters` ü", &filters, None, false, 10, 0).await.unwrap();
+        let ids: Vec<Value> = page.rows.into_iter().map(|row| row[0].clone()).collect();
+        assert_eq!(ids, expected.iter().map(|&id| json!(id)).collect::<Vec<_>>(), "{label}");
+        assert_eq!(mysql_count(&pool, name, "exact `filters` ü", &filters).await.unwrap(), expected.len() as i64, "{label}");
+    }
+    pool.close().await;
+    run(&mut admin, &format!("DROP DATABASE {database}")).await;
+}
