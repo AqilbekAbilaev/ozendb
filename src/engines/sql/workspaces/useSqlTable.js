@@ -18,7 +18,9 @@ export function useSqlTable(tab, { readOnly = false } = {}) {
   const target = {
     connectionId: tab.target.connectionId,
     database: segmentName(tab.target, 'database'),
-    schema: segmentName(tab.target, 'schema'),
+    // The namespace the table's name is qualified by: on an engine with no schema level
+    // (MySQL), the database.
+    schema: segmentName(tab.target, 'schema') ?? segmentName(tab.target, 'database'),
     table: segmentName(tab.target, 'table'),
   }
   const query = tab.state.query
