@@ -13,6 +13,7 @@ fn columns() -> Vec<MySqlColumnInfo> {
             is_primary_key,
             default: None,
             generated: false,
+            auto_increment: false,
             enum_values: None,
             references: None,
         })

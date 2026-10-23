@@ -198,15 +198,16 @@ export function useTableStage(t, connectionReadOnly) {
   }
 
   // Same as addRow, seeded from a loaded row's current (possibly already-edited)
-  // values and shown right after it — identity/generated columns are left out, exactly
-  // as addRow leaves them for the server to fill in.
+  // values and shown right after it — generated and self-numbering columns
+  // (dialect.fillsItself) are left out, exactly as addRow leaves them for the server to
+  // fill in.
   function duplicateRow(index) {
     if (locked()) return null
     const row = rows.value[loadedAt(index)]
     if (!row) return null
     const values = {}
     for (const column of columns.value) {
-      if (!canEditInsertColumn(column)) continue
+      if (!canEditInsertColumn(column) || dialect.fillsItself(columnInfo.value[column])) continue
       values[column] = row[at(column)]
     }
     return stageInsert(values, index)

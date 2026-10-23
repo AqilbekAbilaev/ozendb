@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { dialect, api } from './sql.js'
 import { operatorsFor } from '../sql/workspaces/builderRows.js'
 
-const { quoteName, quoteText, like, cellKind, jsonShape, takesValue } = dialect
+const { quoteName, quoteText, like, cellKind, jsonShape, takesValue, fillsItself } = dialect
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -88,6 +88,18 @@ describe('takesValue', () => {
   it('takes a value for an auto-increment column, which the server fills when left blank', () => {
     expect(takesValue({ name: 'id', dataType: 'bigint unsigned', generated: false })).toBe(true)
     expect(takesValue(undefined)).toBe(true)
+  })
+})
+
+describe('fillsItself', () => {
+  it('reports an auto-increment column, which numbers a row left without a value', () => {
+    expect(fillsItself({ name: 'id ü', dataType: 'bigint unsigned', autoIncrement: true })).toBe(true)
+  })
+
+  it('leaves out every other column, generated ones included', () => {
+    expect(fillsItself({ name: 'note', dataType: 'text', autoIncrement: false })).toBe(false)
+    expect(fillsItself({ name: 'area', dataType: 'int', generated: true, autoIncrement: false })).toBe(false)
+    expect(fillsItself(undefined)).toBe(false)
   })
 })
 
