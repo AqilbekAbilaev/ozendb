@@ -158,3 +158,22 @@ async fn a_mysql_connection_runs_through_an_ssh_tunnel() {
     assert_eq!(answer, 42);
     connection.close().await.unwrap();
 }
+
+#[tokio::test]
+async fn a_missing_or_forbidden_database_gets_its_own_code() {
+    let Some(mut config) = test_config() else { return eprintln!("{SKIP}") };
+    let code = |config: ConnectionConfig, database: &'static str, password: Option<String>| async move {
+        let options = build_options(&config, password.as_deref(), database, None).unwrap();
+        crate::error::AppError::MySql(MySqlConnection::connect_with(&options).await.err().unwrap()).code()
+    };
+    assert_eq!(code(config.clone(), "ozendb_it_no_such_database", password()).await, "missing");
+
+    let user = "ozendb_it_forbidden";
+    let mut admin = connect(&config, "").await;
+    run(&mut admin, &format!("DROP USER IF EXISTS '{user}'@'%'")).await;
+    run(&mut admin, &format!("CREATE USER '{user}'@'%'")).await;
+    config.username = Some(String::from(user));
+    assert_eq!(code(config, "mysql", None).await, "forbidden");
+    run(&mut admin, &format!("DROP USER '{user}'@'%'")).await;
+    admin.close().await.unwrap();
+}
