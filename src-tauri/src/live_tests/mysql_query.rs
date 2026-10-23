@@ -77,6 +77,35 @@ async fn text_with_a_binary_collation_reads_as_text_and_binary_strings_as_hex() 
     drop_database(&config, &database).await;
 }
 
+/// Ten to the `power` rows, made on the server as they are read.
+fn many_rows(power: usize) -> String {
+    let ten = "(SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 \
+               UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9)";
+    format!("SELECT 'Straße ü' FROM {}", (0..power).map(|i| format!("{ten} d{i}")).collect::<Vec<_>>().join(", "))
+}
+
+#[tokio::test]
+async fn a_run_of_its_own_stops_reading_a_result_at_the_row_cap() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let pool = pool(&config).await;
+    let started = Instant::now();
+    let results = run_mysql_sql(&pool, &format!("{}; {}", many_rows(5), many_rows(7)), false, None, LIMIT).await.unwrap();
+    assert!((results[0].truncated, results[1].truncated) == (true, true));
+    assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
+}
+
+#[tokio::test]
+async fn a_held_transaction_reads_past_the_row_cap_and_stays_usable() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let pool = pool(&config).await;
+    let txs = MySqlTransactions::default();
+    txs.begin(&pool, "tx cap", false).await.unwrap();
+    let results = txs.run("tx cap", &pool, &format!("{}; SELECT 2", many_rows(5)), false, None).await.unwrap();
+    assert!(results[0].truncated);
+    assert_eq!(results[1].rows, [vec![json!(2)]]);
+    txs.finish("tx cap", false).await.unwrap();
+}
+
 #[tokio::test]
 async fn a_failing_statement_stops_the_script_and_is_named() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
