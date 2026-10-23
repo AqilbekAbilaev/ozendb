@@ -125,7 +125,7 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
 - **`src/engines/sql/`** — the table and SQL tabs every SQL engine shares. What differs comes
   from the tab's engine as `engineOf(tab).sql`: its `dialect` (quoting, case-insensitive
   matching, column-type kinds, which columns take a value), its `api` (the commands the tabs
-  call), `readPlan` for its Explain output, and the names of its own export and row-history
+  call, and `saveRows`, which saves a table tab's staged rows in one transaction), `readPlan` for its Explain output, and the names of its own export and row-history
   windows. A run carries its engine's name, so `runSql` finds the same commands. Each engine
   registers the table tab through `tableDefinition.js`.
   `connection/` holds what their connection editors share: the authentication and SSL sections and the payload builder.
@@ -189,17 +189,19 @@ MySQL has no schema level, and one connection reaches every database on its serv
   database → table → columns rows and their menus, `sql.js` its `sql` entry for the shared table
   tab, `workspaces/` that tab's definition (`mysql.table_browse`), and `api/` its half of the Tauri
   boundary. The shared tab qualifies a table by its `schema`; on MySQL that is the database.
-- **Backend: `src-tauri/src/commands/mysql/`**, resolving a pool through `ctx.mysql_pool`, and the
-  `src-tauri/src/mysql/` modules described below. `browse.rs` reads the table tab's page and count;
-  `cell.rs` turns each cell into the grid's JSON by its column type, since MySQL can't wrap a row
-  as JSON server-side the way PostgreSQL does.
+- **Backend: `src-tauri/src/commands/mysql/`**, resolving a pool through `ctx.mysql_pool` (or
+  `ctx.mysql_pool_for_write` to change data), and the `src-tauri/src/mysql/` modules described
+  below. `browse.rs` reads the table tab's page and count; `cell.rs` turns each cell into the
+  grid's JSON by its column type, since MySQL can't wrap a row as JSON server-side the way
+  PostgreSQL does; `row_write.rs` saves the tab's staged rows, writing each value back from what
+  the grid shows, in one transaction inside one command rather than one held open between calls.
 - **Tests:** the `live_tests/mysql*.rs` files run when `OZENDB_TEST_MYSQL` is set.
 
 ## Rust backend (`src-tauri/src/`)
 
 | File | Responsibility |
 |---|---|
-| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds `AppContext` — the pool + storage bundle every connection-touching command takes as its single `State`, whose `client` / `client_for_write` / `collection` / `collection_for_write` methods (and `pg_pool` / `pg_pool_for_write` for PostgreSQL, `mysql_pool` for MySQL) are the one place a connection resolves to a live client — plus the EJSON/CSV parse helpers. PostgreSQL's commands live under `commands/postgres/`, MySQL's under `commands/mysql/`. |
+| `commands/` | All `#[tauri::command]` functions, split by area (`query`, `admin`, `connection`, `schema`, `sql`, `gridfs`, `stats`, `search`, `profiler`, `duplicate`, `copyops`, `users`, `mapreduce`, …) and re-exported from `commands/mod.rs`. `mod.rs` also holds `AppContext` — the pool + storage bundle every connection-touching command takes as its single `State`, whose `client` / `client_for_write` / `collection` / `collection_for_write` methods (and `pg_pool` / `pg_pool_for_write` for PostgreSQL, `mysql_pool` / `mysql_pool_for_write` for MySQL) are the one place a connection resolves to a live client — plus the EJSON/CSV parse helpers. PostgreSQL's commands live under `commands/postgres/`, MySQL's under `commands/mysql/`. |
 | `pool.rs` | `ConnectionPool`: one `Client` per MongoDB connection id, or one `PgPool` per PostgreSQL `(connection, database)` — Postgres has no per-query `USE` — or one `MySqlPool` per MySQL `(connection, database)`, behind a `tokio::Mutex` (and the live `SshTunnel` for tunnelled connections). `connect()` returns the cached client on a hit and only reads the keychain / builds the URI on a miss. |
 | `storage/mod.rs` | JSON persistence for `ConnectionConfig` (`connections.json`). Read-modify-write goes through the locked `update_with`; the raw `save` is private so writes can't bypass the lock. Most other JSON stores (`folders`, `history`, `saved_queries`, `default_queries`, `settings`, `shell_history`, `known_hosts`, `node_tags`, `collection_history`, `keybindings`, `export_watermarks`, `operations`) share the same shape via the generic `JsonStore<T>` in `json_store.rs`. `tabs.rs` and `storage/mod.rs` are deliberately bespoke — each carries a comment saying why. |
 | `persist.rs` | `atomic_write()` — write-to-temp-then-rename so a crash can't leave a truncated file. Shared by every JSON store. |
