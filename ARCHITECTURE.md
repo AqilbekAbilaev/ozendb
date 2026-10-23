@@ -192,7 +192,7 @@ MySQL has no schema level, and one connection reaches every database on its serv
   The shared tab qualifies a table by its `schema`; on MySQL that is the database.
 - **Backend: `src-tauri/src/commands/mysql/`**, resolving a pool through `ctx.mysql_pool` (or
   `ctx.mysql_pool_for_write` to change data), and the `src-tauri/src/mysql/` modules described
-  below. `browse.rs` reads the table tab's page and count; `cell.rs` turns each cell into the
+  below. `browse.rs` reads the table tab's page and count, joins included (each table aliased `t0`, `t1`…, and a filter on a joined column read by that table's own column types); `schema.rs` lists the catalog and the foreign keys join offers come from; `cell.rs` turns each cell into the
   grid's JSON by its column type, since MySQL can't wrap a row as JSON server-side the way
   PostgreSQL does; `row_write.rs` saves the tab's staged rows, writing each value back from what
   the grid shows, in one transaction inside one command rather than one held open between calls.
