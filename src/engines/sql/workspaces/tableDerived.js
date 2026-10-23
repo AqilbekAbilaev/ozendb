@@ -22,7 +22,8 @@ export function useTableDerived(t) {
   const columnInfo = computed(() => Object.fromEntries(refs.value.map(r =>
     [r.key, joins.value.length ? { ...r.info, tableLabel: tableNames.value[r.table] } : r.info])))
   const columnOf = (key) => ({ table: refByKey.value[key].table, column: refByKey.value[key].name })
-  const wireFilters = computed(() => filters.value.map(({ key, ...filter }) => ({ ...columnOf(key), ...filter })))
+  const wireFilter = ({ key, ...filter }) => ({ ...columnOf(key), ...filter })
+  const wireFilters = computed(() => filters.value.map(wireFilter))
   const wireJoins = computed(() => joins.value.map(({ schema, table, kind, on }) =>
     ({ schema, table, kind, on: on.map(({ column, equals }) => ({ column, equals: columnOf(equals) })) })))
   const joinOffers = computed(() => offersFor(
@@ -48,7 +49,7 @@ export function useTableDerived(t) {
     table: target.table,
     joins: wireJoins.value,
     columns: shownColumns.value.map(columnOf),
-    filters: filters.value.map(({ key, ...filter }) => ({ ...columnOf(key), ...filter, dataType: refByKey.value[key].info.dataType })),
+    filters: filters.value.map(filter => ({ ...wireFilter(filter), dataType: refByKey.value[filter.key].info.dataType })),
     orderBy: orderBy.value ? [columnOf(orderBy.value)] : keyColumns.value.map(column => ({ table: 0, column })),
     descending: descending.value,
     limit: limit.value,
