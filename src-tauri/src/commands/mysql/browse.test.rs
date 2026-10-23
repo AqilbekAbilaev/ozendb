@@ -1,4 +1,4 @@
-use super::{decimal, from_clause, in_utc, order_clause, where_clause};
+use super::{decimal, from_clause, in_utc, order_clause, requested, where_clause};
 use crate::commands::mysql::MySqlColumnInfo;
 use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, JoinOn, TableJoin};
 use crate::error::AppError;
@@ -247,4 +247,11 @@ fn orders_a_join_by_every_table_s_primary_key_in_turn_so_pages_neither_overlap_n
     let keyless: Vec<_> = columns().into_iter().filter(|c| !c.is_primary_key).collect();
     let tables = [columns(), keyless, joined()];
     assert_eq!(order_clause(None, true, &tables).unwrap(), " ORDER BY `t0`.`id ``key``` DESC, `t2`.`id ``key``` DESC");
+}
+
+#[test]
+fn asks_once_for_each_table_wanted_and_for_no_table_the_browse_lacks() {
+    let joins = [join("other `db`", "склад", JoinKind::Inner, &[("slot", 0, "id")]), join("shop", "shop ü", JoinKind::Left, &[("id", 1, "slot")])];
+    assert_eq!(requested("shop", "shop ü", &joins, &[2, 0, 2, 9]), [(0, ("shop", "shop ü")), (2, ("shop", "shop ü"))]);
+    assert_eq!(requested("shop", "shop ü", &joins, &[]), []);
 }
