@@ -4,7 +4,7 @@ use crate::commands::sql::{ColumnFilter, FilterOp};
 use crate::error::AppError;
 
 fn columns() -> Vec<MySqlColumnInfo> {
-    [("id `key`", "bigint unsigned", true), ("price €", "decimal(10,2)", false), ("name", "varchar(80)", false), ("at", "datetime(6)", false), ("ratio", "double", false), ("ok", "tinyint(1) unsigned", false), ("bits", "bit(64)", false)]
+    [("id `key`", "bigint unsigned", true), ("price €", "decimal(10,2)", false), ("name", "varchar(80)", false), ("at", "datetime(6)", false), ("ratio", "double", false), ("ok", "tinyint(1) unsigned", false), ("bits", "bit(64)", false), ("stamp", "timestamp(3)", false)]
         .into_iter()
         .map(|(name, data_type, is_primary_key)| MySqlColumnInfo {
             name: name.to_string(),
@@ -69,6 +69,24 @@ fn compares_text_dates_and_floats_against_the_bound_value_as_it_is() {
     let (sql, binds) = clause(&[filter("name", FilterOp::Ne, Some("a'b")), filter("at", FilterOp::Gt, Some("2024-02-29")), filter("ratio", FilterOp::Eq, Some("0.5"))]);
     assert_eq!(sql, " WHERE `name` <> ? AND `at` > ? AND `ratio` = ?");
     assert_eq!(binds, vec!["a'b", "2024-02-29", "0.5"]);
+}
+
+#[test]
+fn reads_a_timestamp_value_without_the_utc_zone_the_grid_shows_it_with() {
+    let (sql, binds) = clause(&[
+        filter("stamp", FilterOp::Eq, Some("2024-06-30 18:59:59.120+00:00")),
+        filter("stamp", FilterOp::Contains, Some("59.120+00:00")),
+        filter("stamp", FilterOp::StartsWith, Some("2024-06-30 18:59:59.120+00:00")),
+        filter("stamp", FilterOp::In, Some("2024-01-01 00:00:00+00:00, 2024-01-02")),
+    ]);
+    assert_eq!(sql.matches('?').count(), 5);
+    assert_eq!(binds, vec!["2024-06-30 18:59:59.120", "59.120", "2024-06-30 18:59:59.120", "2024-01-01 00:00:00", "2024-01-02"]);
+}
+
+#[test]
+fn keeps_a_zone_on_any_other_column() {
+    let (_, binds) = clause(&[filter("at", FilterOp::Eq, Some("2024-01-01 00:00:00+00:00")), filter("name", FilterOp::Contains, Some("+00:00"))]);
+    assert_eq!(binds, vec!["2024-01-01 00:00:00+00:00", "+00:00"]);
 }
 
 #[test]

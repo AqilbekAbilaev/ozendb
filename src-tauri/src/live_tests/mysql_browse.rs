@@ -143,6 +143,21 @@ async fn each_filter_keeps_the_rows_it_names_and_the_count_agrees() {
 }
 
 #[tokio::test]
+async fn a_timestamp_filters_on_the_text_the_grid_shows() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let name = "ozendb it browse ведомость stamp";
+    let pool = seeded(&config, name).await;
+    let page = mysql_browse(&pool, name, TABLE, &[], None, true, 1, 0).await.unwrap();
+    let shown = page.rows[0][10].as_str().unwrap().to_string();
+    assert!(shown.ends_with("+00:00"), "{shown}");
+    for op in [FilterOp::Eq, FilterOp::Contains, FilterOp::StartsWith, FilterOp::In] {
+        let label = format!("{op:?}");
+        assert_eq!(keys(&pool, name, &[filter("stamp", op, Some(&shown))]).await, [json!("18446744073709551615")], "{label}");
+    }
+    drop_seeded(&config, pool, name).await;
+}
+
+#[tokio::test]
 async fn every_type_reads_exactly_at_its_edges() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let name = "ozendb it browse ведомость edges";
