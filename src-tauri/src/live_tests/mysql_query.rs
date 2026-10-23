@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use super::mysql::{connect, password, run, shown_at, test_config, SKIP};
 use super::mysql_browse::{pool, quoted};
-use crate::commands::{cancel_mysql_run, run_mysql_sql};
+use crate::commands::{cancel_mysql_run, run_mysql_sql, MySqlTransactions};
 use crate::error::AppError;
 use crate::mysql::session::prepare;
 use crate::mysql::uri::build_options;
@@ -143,4 +143,36 @@ async fn what_a_run_sets_in_its_session_ends_with_the_run() {
     run_mysql_sql(&pool, "SET time_zone = '+05:00'", false, None, LIMIT).await.unwrap();
     let results = run_mysql_sql(&pool, "SELECT @@time_zone", false, None, LIMIT).await.unwrap();
     assert_eq!(results[0].rows, [vec![json!("+00:00")]]);
+}
+
+#[tokio::test]
+async fn a_held_transaction_spans_runs_until_it_is_committed_or_rolled_back() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it transaction").await;
+    let pool = pool(&config).await;
+    let txs = MySqlTransactions::default();
+    for (tx_id, commit, kept) in [("tx rolled back", false, 0), ("tx committed", true, 2)] {
+        txs.begin(&pool, tx_id, false).await.unwrap();
+        txs.run(tx_id, &pool, &format!("INSERT INTO {database}.t VALUES (1, 'a')"), false, None).await.unwrap();
+        txs.run(tx_id, &pool, &format!("INSERT INTO {database}.t VALUES (2, 'b')"), false, None).await.unwrap();
+        assert_eq!(count(&config, &database).await, 0, "nothing shows outside the transaction before it ends");
+        txs.finish(tx_id, commit).await.unwrap();
+        assert_eq!(count(&config, &database).await, kept);
+        assert_eq!(txs.finish(tx_id, commit).await.unwrap_err().to_string(), "That transaction has already ended.");
+    }
+    drop_database(&config, &database).await;
+}
+
+#[tokio::test]
+async fn a_read_only_connection_holds_a_read_only_transaction() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it read only tx").await;
+    let pool = read_only_pool(&config).await;
+    let txs = MySqlTransactions::default();
+    txs.begin(&pool, "tx", true).await.unwrap();
+    let err = txs.run("tx", &pool, &format!("INSERT INTO {database}.t VALUES (1, 'a')"), true, None).await.unwrap_err();
+    assert_eq!(err.code(), "command");
+    txs.finish("tx", true).await.unwrap();
+    assert_eq!(count(&config, &database).await, 0);
+    drop_database(&config, &database).await;
 }
