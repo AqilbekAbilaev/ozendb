@@ -4,6 +4,7 @@
 //! `cargo test` stays green without one.
 mod mongodb;
 mod mysql;
+mod mysql_browse;
 mod mysql_schema;
 mod pg;
 mod pg_activity;
