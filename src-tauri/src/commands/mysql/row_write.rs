@@ -51,6 +51,9 @@ pub(super) enum Param {
 
 type Statement = (String, Vec<Param>);
 
+/// The most values one prepared statement binds: MySQL counts them in 16 bits.
+const MAX_PARAMS: usize = 65_535;
+
 /// The bytes a `0x…` hex literal, as the grid shows a binary value, spells.
 fn bytes(info: &MySqlColumnInfo, value: &Value) -> Result<Vec<u8>, AppError> {
     let refused = || AppError::Validation(format!("\"{}\" holds bytes: write them in hex, like 0x4F7A.", info.name));
@@ -159,15 +162,22 @@ pub(super) fn update(table: &str, place: &str, columns: &[MySqlColumnInfo], chan
     Ok((format!("UPDATE {table} SET {} WHERE {condition}", assignments.join(", ")), params))
 }
 
-pub(super) fn delete(table: &str, columns: &[MySqlColumnInfo], rows: &[Vec<ColumnValue>]) -> Result<Statement, AppError> {
-    let mut conditions = Vec::with_capacity(rows.len());
-    let mut params = Vec::new();
-    for row in rows {
-        let (condition, key) = found_by_key(columns, row)?;
-        conditions.push(format!("({condition})"));
-        params.extend(key);
-    }
-    Ok((format!("DELETE FROM {table} WHERE {}", conditions.join(" OR ")), params))
+/// As few statements as MySQL can bind: each binds the whole key of every row it deletes,
+/// and a statement binds at most `MAX_PARAMS` values.
+pub(super) fn delete(table: &str, columns: &[MySqlColumnInfo], rows: &[Vec<ColumnValue>]) -> Result<Vec<Statement>, AppError> {
+    let key_length = columns.iter().filter(|c| c.is_primary_key).count().max(1);
+    rows.chunks(MAX_PARAMS / key_length)
+        .map(|chunk| {
+            let mut conditions = Vec::with_capacity(chunk.len());
+            let mut params = Vec::new();
+            for row in chunk {
+                let (condition, key) = found_by_key(columns, row)?;
+                conditions.push(format!("({condition})"));
+                params.extend(key);
+            }
+            Ok((format!("DELETE FROM {table} WHERE {}", conditions.join(" OR ")), params))
+        })
+        .collect()
 }
 
 /// The rows a statement matched, edited or not: sqlx asks MySQL for found rows, not
@@ -196,7 +206,7 @@ pub(crate) async fn mysql_save_rows(pool: &MySqlPool, database: &str, table: &st
     // Every statement is built before the transaction begins, so a refused value opens none.
     let inserts: Vec<Statement> = changes.inserts.iter().map(|row| insert(&table, &columns, row)).collect::<Result<_, _>>()?;
     let updates: Vec<Statement> = changes.updates.iter().map(|change| update(&table, &place, &columns, change)).collect::<Result<_, _>>()?;
-    let deletes = if changes.deletes.is_empty() { None } else { Some(delete(&table, &columns, &changes.deletes)?) };
+    let deletes = delete(&table, &columns, &changes.deletes)?;
 
     // Dropped uncommitted on any early return, which rolls it back.
     let mut tx = pool.begin().await.map_err(AppError::MySql)?;
@@ -207,11 +217,12 @@ pub(crate) async fn mysql_save_rows(pool: &MySqlPool, database: &str, table: &st
         let refusal = format!("A row in {place} was deleted, or its primary key changed, since it was loaded.");
         expect(execute(&mut tx, statement).await?, 1, refusal)?;
     }
-    if let Some(statement) = deletes {
-        let rows = execute(&mut tx, statement).await?;
-        let refusal = format!("Some rows in {place} were already deleted, or their primary key changed, since they were loaded.");
-        expect(rows, changes.deletes.len(), refusal)?;
+    let mut deleted = 0;
+    for statement in deletes {
+        deleted += execute(&mut tx, statement).await?;
     }
+    let refusal = format!("Some rows in {place} were already deleted, or their primary key changed, since they were loaded.");
+    expect(deleted, changes.deletes.len(), refusal)?;
     tx.commit().await.map_err(AppError::MySql)
 }
 

@@ -162,6 +162,19 @@ async fn a_row_changed_by_someone_else_saves_nothing() {
 }
 
 #[tokio::test]
+async fn more_deletes_than_one_statement_binds_are_all_counted() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let name = "ozendb it save ведомость many deletes";
+    let pool = seeded(&config, name).await;
+    // Row 2 and 65,536 rows that were never there: refused for those, not by the server's limit.
+    let deletes: Vec<Value> = (2..65_538).map(|id| row(&[("id key", json!(id))])).collect();
+    let saved = changes(json!({ "inserts": [], "updates": [], "deletes": deletes }));
+    assert!(refusal(mysql_save_rows(&pool, name, TABLE, &saved).await).contains("already deleted"));
+    assert_eq!(page(&pool, name, TABLE).await.len(), 3);
+    drop_seeded(&config, pool, name).await;
+}
+
+#[tokio::test]
 async fn a_read_only_session_refuses_the_save() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let name = "ozendb it save ведомость read only";
