@@ -3,7 +3,7 @@
 use super::mysql::{connect, password, run, test_config, SKIP};
 use crate::commands::{mysql_columns, mysql_databases, mysql_tables, MySqlReference};
 use crate::mysql::uri::build_options;
-use sqlx::MySqlPool;
+use sqlx::{Connection, MySqlPool};
 
 /// `name` as a database each test seeds for itself, so tests running at once never share one.
 fn database(name: &str) -> String {
@@ -98,5 +98,28 @@ async fn columns_carry_their_type_key_default_and_reference() {
     // A unique, not-null column is not mistaken for the primary key.
     let keyed = mysql_columns(&pool, &name, "клиенты ü").await.unwrap();
     assert_eq!(keyed.iter().map(|c| c.is_primary_key).collect::<Vec<_>>(), [true, false]);
+    drop_seeded(&config, pool, &name).await;
+}
+
+#[tokio::test]
+async fn only_a_generated_column_is_flagged_generated() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let name = database("generated");
+    let pool = seeded(&config, &name).await;
+    let mut admin = connect(&config, "").await;
+    run(
+        &mut admin,
+        &format!(
+            "CREATE TABLE {}.`мерки ü` (id INT AUTO_INCREMENT PRIMARY KEY, side INT, \
+             area INT AS (side * side) VIRTUAL, `half ``side``` DOUBLE AS (side / 2) STORED INVISIBLE, \
+             made DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
+            quoted(&name)
+        ),
+    )
+    .await;
+    let columns = mysql_columns(&pool, &name, "мерки ü").await.unwrap();
+    let flagged: Vec<(&str, bool)> = columns.iter().map(|c| (c.name.as_str(), c.generated)).collect();
+    assert_eq!(flagged, [("id", false), ("side", false), ("area", true), ("half `side`", true), ("made", false)]);
+    admin.close().await.unwrap();
     drop_seeded(&config, pool, &name).await;
 }

@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { dialect, api } from './sql.js'
 import { operatorsFor } from '../sql/workspaces/builderRows.js'
 
-const { quoteName, quoteText, like, cellKind, jsonShape } = dialect
+const { quoteName, quoteText, like, cellKind, jsonShape, takesValue } = dialect
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -77,6 +77,17 @@ describe('jsonShape', () => {
     expect(jsonShape('json')).toBe('json')
     expect(jsonShape('varchar(20)')).toBe(null)
     expect(jsonShape(undefined)).toBe(null)
+  })
+})
+
+describe('takesValue', () => {
+  it('refuses a generated column, virtual or stored', () => {
+    expect(takesValue({ name: 'area ü', dataType: 'int', generated: true })).toBe(false)
+  })
+
+  it('takes a value for an auto-increment column, which the server fills when left blank', () => {
+    expect(takesValue({ name: 'id', dataType: 'bigint unsigned', generated: false })).toBe(true)
+    expect(takesValue(undefined)).toBe(true)
   })
 })
 

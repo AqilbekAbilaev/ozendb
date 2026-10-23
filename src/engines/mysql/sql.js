@@ -30,8 +30,9 @@ export const dialect = Object.freeze({
     return KINDS.find(([pattern]) => pattern.test(dataType ?? ''))?.[1] ?? null
   },
   jsonShape: (dataType) => (dataType === 'json' ? 'json' : null),
-  // TODO #390: refuse a generated column, once list_mysql_columns reports one.
-  takesValue: () => true,
+  // MySQL refuses a value for a generated column. An auto-increment one takes a value, or
+  // numbers the row itself when left blank, as PostgreSQL's by-default identity does.
+  takesValue: (info) => !info?.generated,
   serverSql: 'SELECT VERSION(), @@character_set_server',
 })
 
