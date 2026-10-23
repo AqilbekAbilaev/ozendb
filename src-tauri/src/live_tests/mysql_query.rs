@@ -50,14 +50,14 @@ async fn a_script_runs_each_statement_and_answers_with_each_result() {
     let pool = pool(&config).await;
     let script = format!(
         "USE {database};\nCREATE TABLE flags (f TINYINT(1) UNSIGNED, at TIMESTAMP NULL);\n\
-         INSERT INTO flags VALUES (0, '2024-01-01 00:00:00'), (1, NULL); -- a; comment\n\
+         INSERT INTO flags VALUES (251, '2024-01-01 00:00:00'), (1, NULL); -- a; comment\n\
          SELECT f, at, 'x;y' AS `semi;colon` FROM flags ORDER BY f DESC; SELECT f FROM flags WHERE f > 999"
     );
     let results = run_mysql_sql(&pool, &script, false, None, LIMIT).await.unwrap();
     assert_eq!(results.len(), 5);
     assert_eq!(results[2].rows_affected, Some(2));
     assert_eq!(results[3].columns, ["f", "at", "semi;colon"]);
-    assert_eq!(results[3].rows, [vec![json!(true), json!(null), json!("x;y")], vec![json!(false), json!(shown_at("2024-01-01 00:00:00")), json!("x;y")]]);
+    assert_eq!(results[3].rows, [vec![json!(251), json!(shown_at("2024-01-01 00:00:00")), json!("x;y")], vec![json!(true), json!(null), json!("x;y")]]);
     assert_eq!((results[4].columns.as_slice(), results[4].rows.len(), results[4].rows_affected), (["f".to_string()].as_slice(), 0, None));
     drop_database(&config, &database).await;
 }
