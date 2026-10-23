@@ -99,6 +99,7 @@ pub fn run() {
             app.manage(SavedQueryStorage::new(data_dir.join("saved_queries.json")));
             app.manage(PgQueryLibraryStore::new(data_dir.join("pg_queries.json")));
             app.manage(commands::PgTransactions::default());
+            app.manage(commands::MySqlTransactions::default());
             app.manage(DefaultQueryStorage::new(data_dir.join("default_queries.json")));
             app.manage(SettingsStorage::new(data_dir.join("settings.json")));
             app.manage(TabStorage::new(data_dir.join("tabs.json")));
@@ -223,6 +224,9 @@ pub fn run() {
             save_mysql_rows,
             run_mysql_query,
             cancel_mysql_query,
+            begin_mysql_transaction,
+            commit_mysql_transaction,
+            rollback_mysql_transaction,
             list_pg_databases,
             list_pg_schemas,
             list_pg_tables,

@@ -10,6 +10,7 @@ use tauri::State;
 use super::cancel::Run;
 use super::cell::cell;
 use super::script::statements;
+use super::transaction::MySqlTransactions;
 use super::AppContext;
 use crate::commands::sql::{SqlQueryResult, ROW_RESULT_CAP};
 use crate::error::AppError;
@@ -97,19 +98,25 @@ pub(crate) async fn run_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bool, 
 }
 
 /// Runs the SQL tab's script, one statement after another, answering with each one's
-/// result. `run_id` lets `cancel_mysql_query` stop it. `database`, when given, is the
-/// one the session starts in rather than the connection's own. Read through `mysql_pool`, not
+/// result. `run_id` lets `cancel_mysql_query` stop it; `tx_id` runs it in that held
+/// transaction instead (see transaction.rs). `database`, when given, is the one the
+/// session starts in rather than the connection's own. Read through `mysql_pool`, not
 /// the write-gated one, so a read-only connection can still query: its sessions are
 /// read-only on the server (`mysql::session`).
 #[tauri::command]
 pub async fn run_mysql_query(
     ctx: State<'_, AppContext>,
+    txs: State<'_, MySqlTransactions>,
     id: String,
     sql: String,
     run_id: Option<String>,
+    tx_id: Option<String>,
     database: Option<String>,
 ) -> Result<Vec<SqlQueryResult>, AppError> {
     let pool = ctx.mysql_pool(&id, database.as_deref()).await?;
     let read_only = ctx.is_read_only(&id);
-    run_mysql_sql(&pool, &sql, read_only, run_id.as_deref(), QUERY_TIME_LIMIT).await
+    match tx_id {
+        Some(tx_id) => txs.run(&tx_id, &pool, &sql, read_only, run_id.as_deref()).await,
+        None => run_mysql_sql(&pool, &sql, read_only, run_id.as_deref(), QUERY_TIME_LIMIT).await,
+    }
 }

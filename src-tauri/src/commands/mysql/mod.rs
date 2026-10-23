@@ -10,12 +10,14 @@ pub mod query;
 pub mod row_write;
 mod script;
 pub mod schema;
+pub mod transaction;
 
 pub use browse::*;
 pub use cancel::*;
 pub use query::*;
 pub use row_write::*;
 pub use schema::*;
+pub use transaction::*;
 
 /// Backtick-quotes a database, table or column name, doubling any backtick inside it. A
 /// bound value can never stand for a name, so every name spliced into SQL comes through here.
