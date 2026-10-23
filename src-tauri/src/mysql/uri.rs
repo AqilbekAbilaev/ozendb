@@ -72,7 +72,8 @@ pub fn connection_string(config: &ConnectionConfig, mysql: &MySqlConfig) -> Stri
 /// A quick TCP probe of the options' host and port, so an unreachable server fails fast
 /// with a clear message rather than after the driver's own timeout.
 pub async fn tcp_probe(options: &MySqlConnectOptions) -> Result<(), AppError> {
-    crate::uri::probe_host_port(&format!("{}:{}", options.get_host(), options.get_port())).await
+    let host_port = format!("{}:{}", crate::uri::sql::bracketed(options.get_host()), options.get_port());
+    crate::uri::probe_host_port(&host_port).await
 }
 
 #[cfg(test)]
