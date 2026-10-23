@@ -14,11 +14,14 @@ const MAX_EXECUTION_TIME_MS: u32 = 300_000;
 // NO_BACKSLASH_ESCAPES is dropped because the filters' LIKE patterns (commands/mysql/
 // browse.rs) and the SQL the table tab writes (engines/mysql/sql.js) escape with
 // backslashes; a server that sets it would read them as literal text. MySQL accepts the
-// empty mode or stray comma REPLACE can leave.
+// empty mode or stray comma REPLACE can leave. The time zone is UTC so that a TIMESTAMP,
+// stored in UTC and read in the session's zone, reads as itself: every instant once,
+// even across a daylight-saving change, and marked as UTC (commands/mysql/cell.rs).
 pub(crate) fn setup_statement(read_only: bool) -> String {
     let mut statement = format!(
         "SET SESSION max_execution_time = {MAX_EXECUTION_TIME_MS}, \
-         SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_BACKSLASH_ESCAPES', '')"
+         SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_BACKSLASH_ESCAPES', ''), \
+         SESSION time_zone = '+00:00'"
     );
     if read_only {
         statement.push_str(", SESSION transaction_read_only = ON");
