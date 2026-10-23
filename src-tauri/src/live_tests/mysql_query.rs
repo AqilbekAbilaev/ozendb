@@ -63,6 +63,21 @@ async fn a_script_runs_each_statement_and_answers_with_each_result() {
 }
 
 #[tokio::test]
+async fn text_with_a_binary_collation_reads_as_text_and_binary_strings_as_hex() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it collation").await;
+    run(&mut connect(&config, "").await, &format!("CREATE TABLE {database}.bin (word VARCHAR(10) COLLATE utf8mb4_bin, raw VARBINARY(4))")).await;
+    let pool = pool(&config).await;
+    let script = format!(
+        "INSERT INTO {database}.bin VALUES ('Straße', 'ab'); \
+         SELECT word, raw, 'ü;' COLLATE utf8mb4_bin, CAST('x' AS BINARY) FROM {database}.bin"
+    );
+    let results = run_mysql_sql(&pool, &script, false, None, LIMIT).await.unwrap();
+    assert_eq!(results[1].rows, [vec![json!("Straße"), json!("0x6162"), json!("ü;"), json!("0x78")]]);
+    drop_database(&config, &database).await;
+}
+
+#[tokio::test]
 async fn a_failing_statement_stops_the_script_and_is_named() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let database = database(&config, "ozendb it failing").await;
