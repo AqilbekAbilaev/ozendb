@@ -46,11 +46,7 @@ pub(super) fn typed(info: &MySqlColumnInfo, value: &str, what: &str) -> Result<(
         return Ok((value.to_string(), String::from("?")));
     }
     let boolean = is_boolean(&info.data_type);
-    let value = match value.trim().to_ascii_lowercase().as_str() {
-        "true" if boolean => "1",
-        "false" if boolean => "0",
-        _ => value.trim(),
-    };
+    let value = flag(&info.data_type, value).unwrap_or(value.trim());
     // CAST would read anything else as 0.
     let (precision, scale) = decimal(value).ok_or_else(|| {
         let or_boolean = if boolean { ", or true or false" } else { "" };
@@ -73,6 +69,15 @@ pub(super) fn base_type(data_type: &str) -> &str {
 /// TINYINT(1), MySQL's BOOLEAN, signed or not.
 pub(super) fn is_boolean(data_type: &str) -> bool {
     data_type.strip_prefix("tinyint(1)").is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
+}
+
+/// On TINYINT(1), `true` or `false`, in any case, as the 1 or 0 MySQL stores for it.
+pub(super) fn flag(data_type: &str, value: &str) -> Option<&'static str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" if is_boolean(data_type) => Some("1"),
+        "false" if is_boolean(data_type) => Some("0"),
+        _ => None,
+    }
 }
 
 /// `value` as MySQL writes the column: the grid shows a TIMESTAMP in the session's UTC

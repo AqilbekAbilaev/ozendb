@@ -10,7 +10,7 @@ use sqlx::mysql::MySqlConnection;
 use sqlx::MySqlPool;
 use tauri::State;
 
-use super::browse::{base_type, column, is_boolean, typed, unzoned};
+use super::browse::{base_type, column, flag, typed, unzoned};
 use super::schema::{mysql_columns, MySqlColumnInfo};
 use super::{quote_name, AppContext};
 use crate::commands::postgres::ColumnValue;
@@ -75,16 +75,13 @@ fn bits(info: &MySqlColumnInfo, value: &Value) -> Result<u64, AppError> {
 /// `value` as it is written into the column `info`.
 pub(super) fn stored(info: &MySqlColumnInfo, value: &Value) -> Result<Param, AppError> {
     let base = base_type(&info.data_type);
-    let flag = |on: bool| Param::Text(String::from(if on { "1" } else { "0" }));
     Ok(match value {
         Value::Null => Param::Null,
         _ if base == "json" => Param::Text(value.to_string()),
         _ if BYTES.contains(&base) => Param::Bytes(bytes(info, value)?),
         _ if base == "bit" => Param::Number(bits(info, value)?),
-        Value::Bool(on) => flag(*on),
-        Value::String(text) if is_boolean(&info.data_type) && text.trim().eq_ignore_ascii_case("true") => flag(true),
-        Value::String(text) if is_boolean(&info.data_type) && text.trim().eq_ignore_ascii_case("false") => flag(false),
-        Value::String(text) => Param::Text(unzoned(&info.data_type, text).to_string()),
+        Value::Bool(on) => Param::Text(String::from(if *on { "1" } else { "0" })),
+        Value::String(text) => Param::Text(flag(&info.data_type, text).unwrap_or_else(|| unzoned(&info.data_type, text)).to_string()),
         other => Param::Text(other.to_string()),
     })
 }
