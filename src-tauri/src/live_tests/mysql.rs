@@ -28,9 +28,7 @@ pub(super) fn shown_at(utc: &str) -> String {
 pub(super) const SKIP: &str = "skipping: set OZENDB_TEST_MYSQL=host:port to run the MySQL live tests";
 
 /// The test server as a saved connection with no default database, or `None` to skip.
-/// TLS is on, unverified, because MySQL 8's default `caching_sha2_password` login over a
-/// plain connection needs sqlx's `mysql-rsa` feature, which is not enabled; the server's
-/// own self-signed certificate is enough to carry the password instead.
+/// TLS is on, unverified: the server's own certificate is self-signed.
 pub(super) fn test_config() -> Option<ConnectionConfig> {
     let (host, port) = host_port(&std::env::var("OZENDB_TEST_MYSQL").ok()?);
     Some(ConnectionConfig {
@@ -247,4 +245,23 @@ async fn session_setup_turns_backslash_escapes_back_on_and_keeps_the_rest_of_the
     let unescaped: String = sqlx::query_scalar(r"SELECT 'a\\b'").fetch_one(&mut connection).await.unwrap();
     assert_eq!(unescaped, r"a\b");
     connection.close().await.unwrap();
+}
+
+/// MySQL 8 logs a user in without TLS only by encrypting the password with the server's
+/// public key (sqlx's `mysql-rsa`), until the server has cached that user's login. A user
+/// made here has never logged in, so nothing is cached.
+#[tokio::test]
+async fn a_new_user_logs_in_without_tls() {
+    let Some(mut config) = test_config() else { return eprintln!("{SKIP}") };
+    let user = "ozendb_it_plain";
+    let mut admin = connect(&config, "").await;
+    run(&mut admin, &format!("DROP USER IF EXISTS '{user}'@'%'")).await;
+    run(&mut admin, &format!("CREATE USER '{user}'@'%' IDENTIFIED WITH caching_sha2_password BY 'pa ss'")).await;
+    config.username = Some(String::from(user));
+    config.tls = false;
+    let options = build_options(&config, Some("pa ss"), "", None).unwrap();
+    let login = MySqlConnection::connect_with(&options).await;
+    run(&mut admin, &format!("DROP USER '{user}'@'%'")).await;
+    admin.close().await.unwrap();
+    login.expect("a plain login succeeds").close().await.unwrap();
 }

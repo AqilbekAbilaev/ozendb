@@ -97,7 +97,10 @@ regex = "1"
 # names come from `Executor::prepare` (public, ungated — unlike `describe`,
 # which is internal plumbing for the `query!`/`query_as!` macros and would need
 # the unused `macros` feature and its `sqlx-macros` dependency just to reach).
-sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "mysql", "runtime-tokio", "tls-rustls-ring", "json"] }
+# `mysql-rsa` lets a MySQL 8 login (caching_sha2_password) send its password over a
+# connection without TLS, encrypted with the server's public key; without it, such a login
+# fails. Its `rsa` crate is already built for russh.
+sqlx = { version = "0.9.0", default-features = false, features = ["postgres", "mysql", "mysql-rsa", "runtime-tokio", "tls-rustls-ring", "json"] }
 
 # End-to-end encryption for sync (sync/crypto.rs). XChaCha20-Poly1305 encrypts the sync
 # blob and wraps its data key; its random 192-bit nonces are safe to pick at random, and
