@@ -165,7 +165,7 @@ impl AppError {
             // The server's own message, or the driver's sentence, without "MySQL error:".
             AppError::MySql(sqlx::Error::Database(db_err)) => db_err.message().to_string(),
             AppError::MySql(e) if needs_tls(e) => String::from(
-                "This MySQL login needs TLS: turn on TLS for the connection, or reach the server through an SSH tunnel.",
+                "This MySQL login needs TLS: turn on TLS for the connection, even when it goes through an SSH tunnel.",
             ),
             AppError::MySql(e) => e.to_string(),
             _ => self.to_string(),
