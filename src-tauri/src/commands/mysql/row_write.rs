@@ -96,7 +96,7 @@ pub(super) fn matched(info: &MySqlColumnInfo, value: &Value) -> Result<(String, 
         Value::String(text) => text.clone(),
         other => other.to_string(),
     };
-    let (text, placeholder) = typed(info, &text)?;
+    let (text, placeholder) = typed(info, &text, "The key value for")?;
     Ok((placeholder, Param::Text(text)))
 }
 
