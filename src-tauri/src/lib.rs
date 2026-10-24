@@ -221,6 +221,7 @@ pub fn run() {
             list_mysql_columns,
             list_mysql_foreign_keys,
             list_mysql_stored_programs,
+            show_mysql_definition,
             browse_mysql_table,
             count_mysql_table,
             save_mysql_rows,
