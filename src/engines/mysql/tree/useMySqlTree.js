@@ -29,7 +29,7 @@ export function programFolders(tables, programs) {
   const folders = [
     { kind: 'view', label: 'Views', icon: 'table', menu: 'view', hasColumns: true, rows: tables.filter(table => table.kind === 'view').map(view => ({ name: view.name, meta: null })) },
     { kind: 'procedure', menu: 'program', label: 'Procedures', icon: 'run', rows: routines('procedure').map(routine => ({ name: routine.name, meta: null })) },
-    { kind: 'function', menu: 'program', label: 'Functions', icon: 'aggregate', rows: routines('function').map(routine => ({ name: routine.name, meta: `→ ${routine.returns}` })) },
+    { kind: 'function', menu: 'program', label: 'Functions', icon: 'aggregate', rows: routines('function').map(routine => ({ name: routine.name, meta: routine.returns && `→ ${routine.returns}` })) },
     { kind: 'trigger', menu: 'program', label: 'Triggers', icon: 'bolt', rows: programs.triggers.map(trigger => ({ name: trigger.name, meta: `${trigger.timing} ${trigger.event} on ${trigger.table}` })) },
     { kind: 'event', menu: 'program', label: 'Events', icon: 'clock', rows: programs.events.map(event => ({ name: event.name, meta: `${event.schedule} · ${event.status.toLowerCase()}` })) },
   ]

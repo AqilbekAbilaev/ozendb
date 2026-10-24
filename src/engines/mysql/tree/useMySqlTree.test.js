@@ -73,6 +73,11 @@ describe('programFolders', () => {
     expect(meta).toEqual({ view: null, procedure: null, function: '→ varchar(10)', trigger: 'BEFORE INSERT on order items', event: 'EVERY 1 DAY · disabled' })
   })
 
+  it('leaves out what a function returns when MySQL hides it from the login', () => {
+    const hidden = { ...noPrograms, routines: [{ name: 'secret ü', kind: 'function', returns: null }] }
+    expect(programFolders([], hidden)[0].rows).toEqual([{ name: 'secret ü', meta: null }])
+  })
+
   it('gives a view\'s row the view menu and every stored program\'s the program menu', () => {
     expect(programFolders(tables, programs).map(folder => folder.menu)).toEqual(['view', 'program', 'program', 'program', 'program'])
   })
