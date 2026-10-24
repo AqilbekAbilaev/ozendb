@@ -77,6 +77,10 @@ describe('programFolders', () => {
     expect(programFolders(tables, programs).map(folder => folder.menu)).toEqual(['view', 'program', 'program', 'program', 'program'])
   })
 
+  it('lets only a view\'s row open onto its columns', () => {
+    expect(programFolders(tables, programs).map(folder => !!folder.hasColumns)).toEqual([true, false, false, false, false])
+  })
+
   it('leaves out a folder with nothing in it', () => {
     expect(programFolders([{ name: 'order items', kind: 'table' }], noPrograms)).toEqual([])
   })
@@ -154,6 +158,14 @@ describe('useMySqlTree', () => {
     expect(tree.isTableOpen(shop, 'order items')).toBe(true)
     expect(tree.columnsOf(shop, 'order items')[0].dataType).toBe('bigint unsigned')
     expect(tree.columnsOf(shop, 'order')).toBeNull()
+  })
+
+  it('reads a view\'s columns when its row opens, as a table\'s', async () => {
+    listColumns.mockResolvedValue([{ name: 'total ü', dataType: 'decimal(10,2)', nullable: true, isPrimaryKey: false, default: null, references: null }])
+    const tree = useMySqlTree('c1')
+    await tree.toggleTable(shop, 'big `view` ü')
+    expect(listColumns).toHaveBeenCalledWith({ connectionId: 'c1', database: shop, table: 'big `view` ü' })
+    expect(tree.columnsOf(shop, 'big `view` ü').map(column => column.name)).toEqual(['total ü'])
   })
 
   it('re-reads the open databases\' tables on a refresh, and forgets the closed ones', async () => {

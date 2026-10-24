@@ -8,6 +8,7 @@ import { openMySqlTable } from '../../../stores/tabCreators'
 import { openModal } from '../../../stores/modals'
 import { treeSelection, setTreeSelection } from '../../../stores/connectionNavigation'
 import { MYSQL_MENUS } from './contextMenus.js'
+import MySqlColumnRows from './MySqlColumnRows.vue'
 import { tagOverrides } from '../../../stores/nodeTags'
 import { colorHex, nodeTagName } from '../../../utils/tabColor.js'
 import { createResourceRef, sameResource } from '../../../utils/resourceRef'
@@ -129,26 +130,7 @@ function onContext(e, level, label, database, name = null, kind = 'table') {
         <div v-if="tableError(database.name, table.name)" class="tnode err-node" style="padding-left: 66px">
           <span class="err-msg">{{ tableError(database.name, table.name) }}</span>
         </div>
-        <template v-if="isTableOpen(database.name, table.name)">
-          <div class="tnode" style="padding-left: 66px">
-            <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
-            <span class="ti"><BaseIcon name="folder" :size="15" /></span>
-            <span class="tt">Columns</span>
-            <span class="cnt">({{ columnsOf(database.name, table.name)?.length ?? '…' }})</span>
-          </div>
-          <div
-            v-for="col in columnsOf(database.name, table.name) ?? []"
-            :key="col.name"
-            class="tnode col-node"
-            style="padding-left: 96px"
-          >
-            <span class="ti" :class="{ pk: col.primaryKey, fk: col.references }">
-              <BaseIcon :name="col.primaryKey ? 'key' : col.references ? 'uri' : 'textType'" :size="13" />
-            </span>
-            <span class="tt">{{ col.name }}</span>
-            <span class="tmeta">{{ col.dataType }}<template v-if="col.primaryKey"> · PK</template><template v-if="col.references"> → {{ col.references }}</template><template v-if="!col.nullable && !col.primaryKey"> · not null</template></span>
-          </div>
-        </template>
+        <MySqlColumnRows v-if="isTableOpen(database.name, table.name)" :columns="columnsOf(database.name, table.name)" :indent="51" />
       </template>
 
       <template v-for="folder in foldersOf(database.name)" :key="folder.kind">
@@ -159,25 +141,32 @@ function onContext(e, level, label, database, name = null, kind = 'table') {
           <span class="cnt">({{ folder.rows.length }})</span>
         </div>
         <template v-if="isFolderOpen(database.name, folder.kind)">
-          <div
-            v-for="row in folder.rows"
-            :key="row.name"
-            class="tnode"
-            :class="{
-              'ctx-sel': ctxSel(database.name, row.name, folder.kind),
-              sel: isSelected(database.name, row.name, folder.kind) || isOpen(database.name, row.name, folder.kind),
-            }"
-            v-bind="rowTag"
-            style="padding-left: 66px"
-            @click="select(database.name, row.name, folder.kind)"
-            @dblclick="openRow(database.name, folder, row.name)"
-            @contextmenu.prevent="onContext($event, folder.menu, row.name, database.name, row.name, folder.kind)"
-          >
-            <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
-            <span class="ti"><BaseIcon :name="folder.icon" :size="15" /></span>
-            <span class="tt">{{ row.name }}</span>
-            <span v-if="row.meta" class="tmeta">{{ row.meta }}</span>
-          </div>
+          <template v-for="row in folder.rows" :key="row.name">
+            <div
+              class="tnode"
+              :class="{
+                'ctx-sel': ctxSel(database.name, row.name, folder.kind),
+                sel: isSelected(database.name, row.name, folder.kind) || isOpen(database.name, row.name, folder.kind),
+              }"
+              v-bind="rowTag"
+              style="padding-left: 66px"
+              @click="select(database.name, row.name, folder.kind)"
+              @dblclick="openRow(database.name, folder, row.name)"
+              @contextmenu.prevent="onContext($event, folder.menu, row.name, database.name, row.name, folder.kind)"
+            >
+              <span v-if="folder.hasColumns" class="tw" @click.stop="toggleTable(database.name, row.name)"><BaseIcon :name="isTableOpen(database.name, row.name) ? 'caretDown' : 'caret'" :size="12" /></span>
+              <span v-else class="tw empty"><BaseIcon name="caret" :size="12" /></span>
+              <span class="ti"><BaseIcon :name="folder.icon" :size="15" /></span>
+              <span class="tt">{{ row.name }}</span>
+              <span v-if="row.meta" class="tmeta">{{ row.meta }}</span>
+            </div>
+            <template v-if="folder.hasColumns">
+              <div v-if="tableError(database.name, row.name)" class="tnode err-node" style="padding-left: 81px">
+                <span class="err-msg">{{ tableError(database.name, row.name) }}</span>
+              </div>
+              <MySqlColumnRows v-if="isTableOpen(database.name, row.name)" :columns="columnsOf(database.name, row.name)" :indent="66" />
+            </template>
+          </template>
         </template>
       </template>
       <div v-if="programsError(database.name)" class="tnode err-node" style="padding-left: 51px">
@@ -199,8 +188,5 @@ function onContext(e, level, label, database, name = null, kind = 'table') {
 <style src="../../../components/connection/ConnectionTree.css" scoped></style>
 
 <style scoped>
-.col-node { cursor: default; }
-.ti.pk { color: var(--warn); }
-.ti.fk { color: var(--link); }
 .tmeta { margin-left: 6px; font: 11px var(--mono); color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; }
 </style>
