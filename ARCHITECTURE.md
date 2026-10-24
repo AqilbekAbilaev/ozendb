@@ -182,7 +182,7 @@ ResourceRefs.
 
 ## MySQL (preview)
 
-The third engine, following PostgreSQL's layout. Its resources are `database/table` ResourceRefs:
+The third engine, following PostgreSQL's layout. Its resources are `database/table` ResourceRefs (and `database/view`, `database/procedure` and the like for stored programs):
 MySQL has no schema level, and one connection reaches every database on its server.
 
 - **Frontend: `src/engines/mysql/`.** `connection/` holds the URI parsing, `tree/` the sidebar's
