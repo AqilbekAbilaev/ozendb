@@ -611,3 +611,7 @@ export const treeNeverExecuted = [
   "    -> Covering index lookup on o using by_name (name='Nobody')  (cost=0.35 rows=1) (actual time=0.0125..0.0125 rows=0 loops=1)",
   "    -> Index lookup on p using by_owner (owner_id=o.id)  (cost=0.467 rows=1.33) (never executed)",
 ].join('\n')
+
+// A WHERE MySQL found could never hold, as MySQL 8.0.46 gives it: one step, timed in
+// microseconds written with an exponent.
+export const treeImpossibleWhere = "-> Zero rows (Impossible WHERE)  (cost=0..0 rows=0) (actual time=76e-6..76e-6 rows=0 loops=1)\n"
