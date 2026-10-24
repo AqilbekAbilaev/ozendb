@@ -28,6 +28,9 @@ fn refuses_a_kind_it_has_no_definition_for() {
 
 #[test]
 fn says_whose_body_mysql_hides_and_where() {
-    let message = kind("function").hidden("shop ü", "f ü").to_string();
-    assert_eq!(message, "MySQL doesn't show this login the body of function `f ü` in `shop ü`: only its definer or a login with SHOW_ROUTINE may read it.");
+    let hidden = kind("function").hidden("shop ü", "f ü");
+    assert_eq!(
+        (hidden.code(), hidden.to_string().as_str()),
+        ("forbidden", "MySQL doesn't show this login the body of function `f ü` in `shop ü`: only its definer, or a login with SHOW_ROUTINE or SELECT on every database, may read it.")
+    );
 }

@@ -104,7 +104,7 @@ async fn a_login_that_may_only_run_a_routine_is_told_its_body_is_hidden() {
     let programs = mysql_stored_programs(&pool, &unquoted(&database)).await.unwrap();
     assert_eq!(programs.routines.len(), 3, "a routine the login may run is still listed");
     let hidden = mysql_definition(&pool, &unquoted(&database), kind("procedure"), "same `name` ü").await.unwrap_err();
-    assert_eq!(hidden.code(), "validation");
+    assert_eq!(hidden.code(), "forbidden");
     assert!(hidden.to_string().contains("doesn't show this login the body of procedure `same `name` ü`"), "{hidden}");
     let view = mysql_definition(&pool, &unquoted(&database), kind("view"), "big `view`").await.unwrap_err();
     assert_eq!(view.code(), "forbidden", "{}", view.user_message());
