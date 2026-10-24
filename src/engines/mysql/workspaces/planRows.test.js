@@ -182,6 +182,31 @@ describe('planRows of EXPLAIN ANALYZE\'s tree', () => {
     expect(steps(tree)).toEqual([[0, 'Sort: d.n'], [1, 'Filter: (d.n > 1)'], [2, 'Table scan on d'], [2, 'Materialize'], [1, 'Table scan on e']])
   })
 
+  it('reads rows written with an exponent', () => {
+    const tree = '-> Table scan on `big table`  (cost=101000 rows=1e+06) (actual time=0.05..250 rows=1e+06 loops=1)'
+    expect(planRows(tree).rows[0]).toMatchObject({ node: 'Table scan on `big table`', rows: 1000000, ms: 250 })
+  })
+
+  it('reads a time given as one figure rather than a range', () => {
+    expect(planRows('-> Table scan on t  (actual time=0.2 rows=3 loops=2)').rows[0]).toMatchObject({ node: 'Table scan on t', rows: 3, ms: 0.4 })
+  })
+
+  it('keeps a step with only a cost as a step, without a time', () => {
+    const tree = '-> Limit: 1 row(s)  (cost=0.35..0.35 rows=1)\n    -> Table scan on t  (actual time=0.1..0.2 rows=1 loops=1)'
+    expect(steps(tree)).toEqual([[0, 'Limit: 1 row(s)'], [1, 'Table scan on t']])
+    expect(planRows(tree).rows[0].ms).toBe(null)
+  })
+
+  it('keeps text it does not know after the figures in what the step names, and the step itself', () => {
+    const tree = '-> Sort: ü  (cost=1 rows=2) (actual time=0.1..0.2 rows=2 loops=1) (using filesort)\n    -> Table scan on t  (actual time=0.1..0.2 rows=2 loops=1)'
+    expect(steps(tree)).toEqual([[0, 'Sort: ü (using filesort)'], [1, 'Table scan on t']])
+    expect(planRows(tree).rows[0].ms).toBe(0.2)
+  })
+
+  it('keeps a step whose figures it cannot read, without them', () => {
+    expect(planRows('-> Table scan on t  (actual time=? rows=? loops=?)').rows[0]).toMatchObject({ node: 'Table scan on t', rows: null, ms: null })
+  })
+
   it('nests a union\'s halves and a derived table\'s source under what reads them', () => {
     expect(steps(treeUnion)).toEqual([
       [0, 'Table scan on <union temporary>'],
