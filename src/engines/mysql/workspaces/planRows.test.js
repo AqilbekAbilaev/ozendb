@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { planRows } from './planRows.js'
 import { analyzedPlan, estimatedPlan, classicJoin, classicUnion, classicDerived, classicSubqueries, classicDelete,
-  treeJoin, treeUnion, treeDerived, treeSubquery, treeNeverExecuted, treeImpossibleWhere } from './planRows.fixtures.js'
+  treeJoin, treeUnion, treeDerived, treeSubquery, treeNeverExecuted, treeImpossibleWhere,
+  treeBrokenLines } from './planRows.fixtures.js'
 
 describe('planRows of an analyzed plan', () => {
   const { rows, planningMs, executionMs, estimated } = planRows(analyzedPlan)
@@ -155,6 +156,30 @@ describe('planRows of EXPLAIN ANALYZE\'s tree', () => {
       [1, 'Covering index lookup on p using by_owner (owner_id=o.id)'],
     ])
     expect(executionMs).toBeCloseTo(0.0409 + 0.0133 * 3, 6)
+  })
+
+  it('keeps a step that runs over more than one line whole, with its line breaks', () => {
+    expect(steps(treeBrokenLines)).toEqual([
+      [0, "Filter: ((cap.`o\nx`.`name` > <cache>(convert(concat('a','\\n') using utf8mb4))) and (cap.`o\nx`.id > 1))"],
+      [1, 'Covering index scan on o\nx using by_name'],
+    ])
+    expect(planRows(treeBrokenLines).rows[1].ms).toBe(0.0147)
+  })
+
+  it('puts a step indented more than one level deeper under the nearest step above it', () => {
+    const tree = '-> Limit: 1 row(s)  (actual time=0.2..0.3 rows=1 loops=1)\n            -> Table scan on Straße  (actual time=0.1..0.2 rows=1 loops=1)'
+    expect(steps(tree)).toEqual([[0, 'Limit: 1 row(s)'], [1, 'Table scan on Straße']])
+  })
+
+  it('nests by indentation that is not in steps of four, and never fails on it', () => {
+    const tree = [
+      '-> Sort: d.n  (actual time=0.5..0.6 rows=3 loops=1)',
+      '  -> Filter: (d.n > 1)  (actual time=0.4..0.5 rows=3 loops=1)',
+      '         -> Table scan on d  (actual time=0.1..0.2 rows=3 loops=1)',
+      '     -> Materialize  (actual time=0.1..0.2 rows=3 loops=1)',
+      ' -> Table scan on e  (actual time=0.1..0.2 rows=3 loops=1)',
+    ].join('\n')
+    expect(steps(tree)).toEqual([[0, 'Sort: d.n'], [1, 'Filter: (d.n > 1)'], [2, 'Table scan on d'], [2, 'Materialize'], [1, 'Table scan on e']])
   })
 
   it('nests a union\'s halves and a derived table\'s source under what reads them', () => {
