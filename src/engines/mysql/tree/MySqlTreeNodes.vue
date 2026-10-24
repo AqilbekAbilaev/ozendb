@@ -91,7 +91,7 @@ function onContext(e, level, label, database, name = null, kind = 'table') {
       <span class="tw"><BaseIcon :name="openDatabases[database.name] ? 'caretDown' : 'caret'" :size="12" /></span>
       <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
       <span class="tt">{{ database.name }}</span>
-      <span v-if="tables[database.name]" class="cnt">({{ tables[database.name].length }})</span>
+      <span v-if="tables[database.name]" class="cnt">({{ tablesOf(database.name).length }})</span>
     </div>
 
     <div v-if="loading[database.name]" class="tnode" style="padding-left: 51px">
