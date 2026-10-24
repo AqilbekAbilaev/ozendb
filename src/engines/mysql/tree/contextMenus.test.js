@@ -1,19 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const openMySqlTable = vi.fn()
-const openMySqlQuery = vi.fn()
-const openModal = vi.fn()
-vi.mock('../../../stores/tabCreators', () => ({ openMySqlTable, openMySqlQuery }))
-vi.mock('../../../stores/modals', () => ({ openModal }))
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
+
+// The tab store builds its first tab from the registered definitions, so it is loaded
+// after they are (see stores/tabCreators.test.js).
+import { registerWorkspaceDefinitions } from '../../../workspaces/registerDefinitions'
+registerWorkspaceDefinitions()
 
 const { MYSQL_MENUS, MYSQL_ACTIONS } = await import('./contextMenus.js')
 const { contextAction } = await import('../../contextActions.js')
 const { createResourceRef } = await import('../../../utils/resourceRef')
+const { tabs, activeTabId } = await import('../../../stores/tabs')
+const { openModals, closeModal } = await import('../../../stores/modals')
+const { MODALS } = await import('../../../constants/modalRegistry')
 
 const resource = createResourceRef('m1', [{ kind: 'database', name: 'shop `2024` ü' }, { kind: 'table', name: 'order items' }])
 const table = { connId: 'm1', connName: 'Shop MySQL', engine: 'mysql', resource }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  tabs.value = []
+  activeTabId.value = null
+  for (const id of Object.keys(openModals)) closeModal(id)
+})
+
+const openedTab = () => tabs.value.at(-1)
 
 describe('MySQL right-click menus', () => {
   it('offers to open a table from its row', () => {
@@ -22,7 +32,7 @@ describe('MySQL right-click menus', () => {
 
   it('opens the table it was opened on, by its ref', () => {
     MYSQL_ACTIONS['mysql:open_table'](table)
-    expect(openMySqlTable).toHaveBeenCalledWith({ resource, connectionName: 'Shop MySQL' })
+    expect([openedTab().type, openedTab().target]).toEqual(['mysql.table_browse', resource])
   })
 
   it('offers a SQL query on the connection, a database and a table', () => {
@@ -31,7 +41,7 @@ describe('MySQL right-click menus', () => {
 
   it('opens a SQL query on the row it was opened on, by its ref', () => {
     MYSQL_ACTIONS['mysql:new_sql'](table)
-    expect(openMySqlQuery).toHaveBeenCalledWith({ resource, connectionName: 'Shop MySQL' })
+    expect([openedTab().type, openedTab().title, openedTab().target.segments]).toEqual(['mysql.query', 'SQL: shop `2024` ü', [{ kind: 'database', name: 'shop `2024` ü' }]])
   })
 
   it('offers to open a view as a table, and a SQL query on it', () => {
@@ -50,10 +60,12 @@ describe('MySQL right-click menus', () => {
     expect(MYSQL_MENUS.table.map(item => item.value)).not.toContain('mysql:definition')
   })
 
-  it('shows a definition for the row it was opened on', () => {
+  it('shows a definition for the row it was opened on, in a modal the registry knows', () => {
     const event = { ...table, kind: 'event', resource: createResourceRef('m1', [{ kind: 'database', name: 'shop' }, { kind: 'event', name: 'nightly ü' }]) }
     MYSQL_ACTIONS['mysql:definition'](event)
-    expect(openModal).toHaveBeenCalledWith('mysqlDefinition', event)
+    expect(Object.keys(openModals)).toEqual(['mysqlDefinition'])
+    expect(MODALS.mysqlDefinition).toBeDefined()
+    expect(openModals.mysqlDefinition).toEqual(event)
   })
 
   it('is the action the engine table finds for a MySQL node', () => {
