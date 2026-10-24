@@ -55,3 +55,22 @@ async fn cancel_stops_an_explain_that_is_running() {
     assert_eq!(stopped.code(), "cancelled");
     assert!(!cancel_query_impl(&pool, "pg-explain-sleep").await.unwrap(), "a finished Explain cancels nothing");
 }
+
+#[tokio::test]
+async fn cancel_stops_an_explain_however_soon_it_comes() {
+    let Some(config) = test_config() else { return eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests") };
+    let pool = pool(&config).await;
+    // Cancelled as soon as it can be found, often before its EXPLAIN has started.
+    for attempt in 0..20 {
+        let id = format!("pg-explain-soon {attempt}");
+        let running = {
+            let (pool, id) = (pool.clone(), id.clone());
+            tokio::spawn(async move { explain_impl(&pool, "SELECT pg_sleep(3)", true, Some(&id)).await })
+        };
+        while !cancel_query_impl(&pool, &id).await.unwrap() {
+            tokio::task::yield_now().await;
+        }
+        let stopped = tokio::time::timeout(std::time::Duration::from_secs(2), running).await.expect("Cancel stops it however soon it comes").unwrap().unwrap_err();
+        assert_eq!(stopped.code(), "cancelled", "attempt {attempt}");
+    }
+}
