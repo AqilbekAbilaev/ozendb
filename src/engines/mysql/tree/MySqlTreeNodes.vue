@@ -20,8 +20,10 @@ const props = defineProps({
   resources: { type: Array, required: true },
 })
 
-const { showSystem, toggleSystem, openDatabases, tables, loading, errors, toggleDatabase, reloadTables, toggleTable, isTableOpen, columnsOf, tableError } =
-  useMySqlTree(props.conn.id)
+const {
+  showSystem, toggleSystem, openDatabases, tables, loading, errors, toggleDatabase, reloadTables, toggleTable, isTableOpen, columnsOf, tableError,
+  tablesOf, foldersOf, toggleFolder, isFolderOpen,
+} = useMySqlTree(props.conn.id)
 // A refresh brings a new database list; the open databases' tables are re-read with it.
 watch(() => props.resources, reloadTables)
 const shown = computed(() => visibleDatabases(props.resources, showSystem.value))
@@ -34,31 +36,37 @@ const rowTag = computed(() => {
   return color ? { class: 'tagged', style: { '--tag-color': colorHex(color) } } : {}
 })
 
-function rowResource(database, table = null) {
+// A row's ref: its database, and the table, view or stored program it names, if any. A
+// view is a table to the table tab that browses it.
+function rowResource(database, name = null, kind = 'table') {
   const segments = [{ kind: 'database', name: database }]
-  if (table) segments.push({ kind: 'table', name: table })
+  if (name) segments.push({ kind: kind === 'view' ? 'table' : kind, name })
   return createResourceRef(props.conn.id, segments)
 }
 
-function select(database, table = null) {
+function select(database, name = null, kind = 'table') {
   setTreeSelection({
-    resource: rowResource(database, table),
+    resource: rowResource(database, name, kind),
     connectionId: props.conn.id,
     connectionName: props.conn.name,
     engine: 'mysql',
-    kind: table ? 'table' : 'database',
+    kind: name ? kind : 'database',
   })
 }
-const isSelected = (database, table = null) => sameResource(treeSelection.value?.resource, rowResource(database, table))
+const isSelected = (database, name = null, kind = 'table') => sameResource(treeSelection.value?.resource, rowResource(database, name, kind))
 // The open table tab's row is highlighted too, as PostgreSQL's is.
-const isOpen = (database, table) => sameResource(activeTab.value?.target, rowResource(database, table))
+const isOpen = (database, name, kind = 'table') => sameResource(activeTab.value?.target, rowResource(database, name, kind))
 // The row whose right-click menu is open stays highlighted, as the other engines' do.
-const ctxSel = (database, table = null) => sameResource(contextMenu.value?.nodeData?.resource, rowResource(database, table))
+const ctxSel = (database, name = null, kind = 'table') => sameResource(contextMenu.value?.nodeData?.resource, rowResource(database, name, kind))
 
 const openTable = (database, table) => openMySqlTable({ resource: rowResource(database, table), connectionName: props.conn.name })
+// Double-clicking a view browses it, as a table's row does.
+function openRow(database, folder, name) {
+  if (folder.menu === 'view') openTable(database, name)
+}
 
-function onContext(e, level, label, database, table = null) {
-  const node = { connId: props.conn.id, connName: props.conn.name, engine: 'mysql', resource: rowResource(database, table) }
+function onContext(e, level, label, database, name = null, kind = 'table') {
+  const node = { connId: props.conn.id, connName: props.conn.name, engine: 'mysql', resource: rowResource(database, name, kind) }
   contextMenu.value = { type: 'mysql:' + level, x: e.clientX, y: e.clientY, label, nodeData: node, items: MYSQL_MENUS[level] }
 }
 </script>
@@ -93,7 +101,7 @@ function onContext(e, level, label, database, table = null) {
       <span class="tt" style="color:var(--text-faint);font-size:11.5px;font-style:italic">No tables or views you can read</span>
     </div>
     <template v-if="openDatabases[database.name]">
-      <template v-for="table in tables[database.name]" :key="table.name">
+      <template v-for="table in tablesOf(database.name)" :key="table.name">
         <div
           class="tnode"
           :class="{ 'ctx-sel': ctxSel(database.name, table.name), sel: isSelected(database.name, table.name) || isOpen(database.name, table.name) }"
@@ -133,6 +141,36 @@ function onContext(e, level, label, database, table = null) {
             </span>
             <span class="tt">{{ col.name }}</span>
             <span class="tmeta">{{ col.dataType }}<template v-if="col.primaryKey"> · PK</template><template v-if="col.references"> → {{ col.references }}</template><template v-if="!col.nullable && !col.primaryKey"> · not null</template></span>
+          </div>
+        </template>
+      </template>
+
+      <template v-for="folder in foldersOf(database.name)" :key="folder.kind">
+        <div class="tnode" style="padding-left: 51px" @click="toggleFolder(database.name, folder.kind)">
+          <span class="tw"><BaseIcon :name="isFolderOpen(database.name, folder.kind) ? 'caretDown' : 'caret'" :size="12" /></span>
+          <span class="ti"><BaseIcon name="folder" :size="15" /></span>
+          <span class="tt">{{ folder.label }}</span>
+          <span class="cnt">({{ folder.rows.length }})</span>
+        </div>
+        <template v-if="isFolderOpen(database.name, folder.kind)">
+          <div
+            v-for="row in folder.rows"
+            :key="row.name"
+            class="tnode"
+            :class="{
+              'ctx-sel': ctxSel(database.name, row.name, folder.kind),
+              sel: isSelected(database.name, row.name, folder.kind) || isOpen(database.name, row.name, folder.kind),
+            }"
+            v-bind="rowTag"
+            style="padding-left: 66px"
+            @click="select(database.name, row.name, folder.kind)"
+            @dblclick="openRow(database.name, folder, row.name)"
+            @contextmenu.prevent="onContext($event, folder.menu, row.name, database.name, row.name, folder.kind)"
+          >
+            <span class="tw empty"><BaseIcon name="caret" :size="12" /></span>
+            <span class="ti"><BaseIcon :name="folder.icon" :size="15" /></span>
+            <span class="tt">{{ row.name }}</span>
+            <span v-if="row.meta" class="tmeta">{{ row.meta }}</span>
           </div>
         </template>
       </template>

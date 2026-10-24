@@ -12,6 +12,9 @@ export const MYSQL_MENUS = {
   connection: [NEW_SQL, { sep: true }, COPY_NAME, { sep: true }, REFRESH_NODE, CHOOSE_COLOR, { sep: true }, ...DISCONNECT],
   database: [NEW_SQL, { sep: true }, COPY_NAME, { sep: true }, REFRESH_NODE],
   table: [{ value: 'mysql:open_table', label: 'Open Table', icon: 'table' }, NEW_SQL, { sep: true }, COPY_NAME],
+  view: [{ value: 'mysql:open_table', label: 'Open View', icon: 'table' }, NEW_SQL, { sep: true }, COPY_NAME],
+  // A procedure, function, trigger or event.
+  program: [NEW_SQL, { sep: true }, COPY_NAME],
 }
 
 export const MYSQL_ACTIONS = {

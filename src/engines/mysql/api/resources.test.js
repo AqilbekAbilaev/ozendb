@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { listDatabases, listTables, listColumns, listForeignKeys } from './resources'
+import { listDatabases, listTables, listColumns, listForeignKeys, listStoredPrograms } from './resources'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -29,5 +29,10 @@ describe('MySQL resources', () => {
   it('lists the foreign keys on either side of a table', async () => {
     await listForeignKeys({ connectionId: 'c1', database: 'shop.eu', table: 'order items' })
     expect(invoke).toHaveBeenCalledWith('list_mysql_foreign_keys', { id: 'c1', database: 'shop.eu', table: 'order items' })
+  })
+
+  it('lists the stored programs of a database', async () => {
+    await listStoredPrograms({ connectionId: 'c1', database: 'shop `2024` ü' })
+    expect(invoke).toHaveBeenCalledWith('list_mysql_stored_programs', { id: 'c1', database: 'shop `2024` ü' })
   })
 })

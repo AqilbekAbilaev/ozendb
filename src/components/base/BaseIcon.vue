@@ -48,6 +48,7 @@ const PATHS = {
   textType:   '<path d="M5 7V5h14v2M12 5v14M9 19h6"/>',
   count:      '<path d="M5 6h3M5 12h3M5 18h3M13 6h6M13 12h6M13 18h6"/>',
   clock:      '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  bolt:       '<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>',
   cog:        '<circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"/>',
   expr:       '<path d="M8 5H6a2 2 0 0 0-2 2v3l-2 2 2 2v3a2 2 0 0 0 2 2h2M16 5h2a2 2 0 0 1 2 2v3l2 2-2 2v3a2 2 0 0 1-2 2h-2"/>',
   typeId:     '<rect x="2.5" y="7" width="19" height="10" rx="2.5"/><path d="M7 10.5v3M11 9.5v4M11 13.5h1.8a2 2 0 0 0 0-4H11z"/>',

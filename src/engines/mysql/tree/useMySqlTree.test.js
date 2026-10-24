@@ -2,11 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const listTables = vi.fn()
 const listColumns = vi.fn()
-vi.mock('../api/resources', () => ({ listTables, listColumns }))
+const listStoredPrograms = vi.fn()
+vi.mock('../api/resources', () => ({ listTables, listColumns, listStoredPrograms }))
 
-const { useMySqlTree, visibleDatabases, columnRow } = await import('./useMySqlTree.js')
+const { useMySqlTree, visibleDatabases, columnRow, programFolders } = await import('./useMySqlTree.js')
 
-beforeEach(() => vi.resetAllMocks())
+const noPrograms = { routines: [], triggers: [], events: [] }
+
+beforeEach(() => {
+  vi.resetAllMocks()
+  listStoredPrograms.mockResolvedValue(noPrograms)
+})
 
 const shop = 'shop `eu` ü'
 
@@ -41,6 +47,41 @@ describe('columnRow', () => {
   })
 })
 
+describe('programFolders', () => {
+  const tables = [{ name: 'order items', kind: 'table' }, { name: 'big `view` ü', kind: 'view' }]
+  const programs = {
+    routines: [
+      { name: 'same name ü', kind: 'function', returns: 'varchar(10)' },
+      { name: 'same name ü', kind: 'procedure', returns: null },
+    ],
+    triggers: [{ name: 'stamp; ü', table: 'order items', timing: 'BEFORE', event: 'INSERT' }],
+    events: [{ name: 'nightly', schedule: 'EVERY 1 DAY', status: 'DISABLED' }],
+  }
+
+  it('gives views and each kind of stored program a folder of its own, in a fixed order', () => {
+    expect(programFolders(tables, programs).map(folder => [folder.kind, folder.rows.map(row => row.name)])).toEqual([
+      ['view', ['big `view` ü']],
+      ['procedure', ['same name ü']],
+      ['function', ['same name ü']],
+      ['trigger', ['stamp; ü']],
+      ['event', ['nightly']],
+    ])
+  })
+
+  it('says what a function returns, when a trigger fires, and when an event runs', () => {
+    const meta = Object.fromEntries(programFolders(tables, programs).map(folder => [folder.kind, folder.rows[0].meta]))
+    expect(meta).toEqual({ view: null, procedure: null, function: '→ varchar(10)', trigger: 'BEFORE INSERT on order items', event: 'EVERY 1 DAY · disabled' })
+  })
+
+  it('gives a view\'s row the view menu and every stored program\'s the program menu', () => {
+    expect(programFolders(tables, programs).map(folder => folder.menu)).toEqual(['view', 'program', 'program', 'program', 'program'])
+  })
+
+  it('leaves out a folder with nothing in it', () => {
+    expect(programFolders([{ name: 'order items', kind: 'table' }], noPrograms)).toEqual([])
+  })
+})
+
 describe('useMySqlTree', () => {
   it('reads a database\'s tables the first time it opens, not again', async () => {
     listTables.mockResolvedValue([{ name: 'order items', kind: 'table', estimatedRows: 12 }])
@@ -52,6 +93,26 @@ describe('useMySqlTree', () => {
     expect(listTables).toHaveBeenCalledWith({ connectionId: 'c1', database: shop })
     expect(tree.tables.value[shop]).toEqual([{ name: 'order items', kind: 'table', estimatedRows: 12 }])
     expect(tree.openDatabases.value[shop]).toBe(true)
+  })
+
+  it('reads a database\'s stored programs with its tables, and keeps its tables apart from its views', async () => {
+    listTables.mockResolvedValue([{ name: 'order items', kind: 'table', estimatedRows: 12 }, { name: 'big view', kind: 'view', estimatedRows: null }])
+    listStoredPrograms.mockResolvedValue({ ...noPrograms, events: [{ name: 'nightly', schedule: 'EVERY 1 DAY', status: 'ENABLED' }] })
+    const tree = useMySqlTree('c1')
+    await tree.toggleDatabase(shop)
+    expect(listStoredPrograms).toHaveBeenCalledWith({ connectionId: 'c1', database: shop })
+    expect(tree.tablesOf(shop).map(table => table.name)).toEqual(['order items'])
+    expect(tree.foldersOf(shop).map(folder => folder.kind)).toEqual(['view', 'event'])
+  })
+
+  it('opens and closes a database\'s folders one by one', async () => {
+    const tree = useMySqlTree('c1')
+    tree.toggleFolder(shop, 'event')
+    expect(tree.isFolderOpen(shop, 'event')).toBe(true)
+    expect(tree.isFolderOpen(shop, 'view')).toBe(false)
+    expect(tree.isFolderOpen('crm', 'event')).toBe(false)
+    tree.toggleFolder(shop, 'event')
+    expect(tree.isFolderOpen(shop, 'event')).toBe(false)
   })
 
   it('closes a database whose tables fail to load, with the reason', async () => {

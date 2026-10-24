@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { listTables, listColumns } from '../api/resources'
+import { listTables, listColumns, listStoredPrograms } from '../api/resources'
 import { errMessage } from '../../../utils/errors'
 
 // MySQL's own databases (mysql, sys, …) are on every server and aren't what anyone is
@@ -21,14 +21,31 @@ export function columnRow(column, database) {
   }
 }
 
+// The folders that follow a database's tables, each with its rows as `{ name, meta }` and
+// the right-click menu they share: its views, then each kind of stored program. A folder
+// with nothing in it is left out.
+export function programFolders(tables, programs) {
+  const routines = (kind) => programs.routines.filter(routine => routine.kind === kind)
+  const folders = [
+    { kind: 'view', label: 'Views', icon: 'table', menu: 'view', rows: tables.filter(table => table.kind === 'view').map(view => ({ name: view.name, meta: null })) },
+    { kind: 'procedure', menu: 'program', label: 'Procedures', icon: 'run', rows: routines('procedure').map(routine => ({ name: routine.name, meta: null })) },
+    { kind: 'function', menu: 'program', label: 'Functions', icon: 'aggregate', rows: routines('function').map(routine => ({ name: routine.name, meta: `→ ${routine.returns}` })) },
+    { kind: 'trigger', menu: 'program', label: 'Triggers', icon: 'bolt', rows: programs.triggers.map(trigger => ({ name: trigger.name, meta: `${trigger.timing} ${trigger.event} on ${trigger.table}` })) },
+    { kind: 'event', menu: 'program', label: 'Events', icon: 'clock', rows: programs.events.map(event => ({ name: event.name, meta: `${event.schedule} · ${event.status.toLowerCase()}` })) },
+  ]
+  return folders.filter(folder => folder.rows.length)
+}
+
 /**
  * One MySQL connection's sidebar state below its database list: each database's tables
- * and each table's columns, fetched the first time they open.
+ * and stored programs, and each table's columns, fetched the first time they open.
  */
 export function useMySqlTree(connectionId) {
   const showSystem = ref(false)
   const openDatabases = ref({})  // database → boolean
-  const tables = ref({})         // database → MySqlTableInfo[]
+  const tables = ref({})         // database → MySqlTableInfo[], views included
+  const programs = ref({})       // database → { routines, triggers, events }
+  const openFolders = ref({})    // folder key → boolean
   const loading = ref({})        // database → boolean
   const errors = ref({})         // database (or table key) → message
   const openTables = ref({})     // table key → boolean
@@ -61,7 +78,9 @@ export function useMySqlTree(connectionId) {
     loading.value[database] = true
     delete errors.value[database]
     try {
-      tables.value[database] = await listTables({ connectionId, database })
+      const [listed, stored] = await Promise.all([listTables({ connectionId, database }), listStoredPrograms({ connectionId, database })])
+      tables.value[database] = listed
+      programs.value[database] = stored
     } catch (e) {
       errors.value[database] = errMessage(e)
       openDatabases.value[database] = false
@@ -87,5 +106,16 @@ export function useMySqlTree(connectionId) {
   const columnsOf = (database, table) => tableColumns.value[tableKey(database, table)] ?? null
   const tableError = (database, table) => errors.value[tableKey(database, table)] ?? null
 
-  return { showSystem, toggleSystem, openDatabases, tables, loading, errors, toggleDatabase, reloadTables, toggleTable, isTableOpen, columnsOf, tableError }
+  const tablesOf = (database) => tables.value[database]?.filter(table => table.kind === 'table') ?? []
+  const foldersOf = (database) => tables.value[database] ? programFolders(tables.value[database], programs.value[database]) : []
+  const folderKey = (database, kind) => JSON.stringify([database, kind])
+  function toggleFolder(database, kind) {
+    openFolders.value[folderKey(database, kind)] = !openFolders.value[folderKey(database, kind)]
+  }
+  const isFolderOpen = (database, kind) => !!openFolders.value[folderKey(database, kind)]
+
+  return {
+    showSystem, toggleSystem, openDatabases, tables, loading, errors, toggleDatabase, reloadTables, toggleTable, isTableOpen, columnsOf, tableError,
+    tablesOf, foldersOf, toggleFolder, isFolderOpen,
+  }
 }

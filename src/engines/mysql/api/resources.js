@@ -22,3 +22,9 @@ export function listColumns({ connectionId, database, table }) {
 export function listForeignKeys({ connectionId, database, table }) {
   return invoke('list_mysql_foreign_keys', { id: connectionId, database, table })
 }
+
+// A database's procedures and functions, triggers and events, as `{ routines, triggers,
+// events }`: only those the login may see.
+export function listStoredPrograms({ connectionId, database }) {
+  return invoke('list_mysql_stored_programs', { id: connectionId, database })
+}
