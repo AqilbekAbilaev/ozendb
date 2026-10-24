@@ -96,20 +96,22 @@ export function cancelSql(run) {
 }
 
 // Explains `sql`, keeping the plan (or why there isn't one) on the run. It has an id of
-// its own, so cancelSql can stop it while it runs alongside a run.
+// its own, so cancelSql can stop it while it runs alongside a run. A newer Explain
+// replaces it: once replaced, its answer changes nothing.
 export async function explainSql(run, sql) {
+  const id = crypto.randomUUID()
   run.explaining = true
   run.planError = null
-  run.explainId = crypto.randomUUID()
+  run.explainId = id
+  let plan = null
+  let planError = null
   try {
-    run.plan = await apiOf(run).explainQuery(run.connectionId, sql, run.explainId, run.database)
+    plan = await apiOf(run).explainQuery(run.connectionId, sql, id, run.database)
   } catch (e) {
-    run.plan = null
-    run.planError = errMessage(e)
-  } finally {
-    run.explaining = false
-    run.explainId = null
+    planError = errMessage(e)
   }
+  if (run.explainId !== id) return
+  Object.assign(run, { plan, planError, explaining: false, explainId: null })
 }
 
 // `sql` laid out, or — for SQL that can't be formatted — as typed, with the reason.

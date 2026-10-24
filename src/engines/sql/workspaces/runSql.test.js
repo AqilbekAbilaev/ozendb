@@ -168,6 +168,36 @@ describe('runSql', () => {
     expect(cancelQuery.mock.calls).toEqual([['c1', runQuery.mock.calls[0][2]], ['c1', explainQuery.mock.calls[0][2]]])
   })
 
+  it('lets a newer Explain replace an older one still in flight, which then changes nothing', async () => {
+    const finish = []
+    explainQuery.mockImplementation(() => new Promise((resolve, reject) => { finish.push({ resolve, reject }) }))
+    const t = newRun()
+    const older = explainSql(t, 'SELECT 1')
+    const newer = explainSql(t, 'SELECT 2')
+    const newerId = explainQuery.mock.calls[1][2]
+    finish[0].resolve(['older plan'])
+    await older
+    expect(t).toMatchObject({ explaining: true, explainId: newerId, plan: null })
+    await cancelSql(t)
+    expect(cancelQuery.mock.calls).toEqual([['c1', newerId]])
+    finish[1].resolve(['newer plan'])
+    await newer
+    expect(t).toMatchObject({ explaining: false, explainId: null, plan: ['newer plan'] })
+  })
+
+  it('keeps the newer Explain\'s plan when an older one fails after it', async () => {
+    const finish = []
+    explainQuery.mockImplementation(() => new Promise((resolve, reject) => { finish.push({ resolve, reject }) }))
+    const t = newRun()
+    const older = explainSql(t, 'SELECT 1')
+    const newer = explainSql(t, 'SELECT 2')
+    finish[1].resolve(['newer plan'])
+    await newer
+    finish[0].reject({ code: 'cancelled', message: 'The query was cancelled.' })
+    await older
+    expect(t).toMatchObject({ explaining: false, plan: ['newer plan'], planError: null })
+  })
+
   it('keeps a plan on the tab, or the reason there isn\'t one', async () => {
     const t = newRun({ plan: 'old' })
     explainQuery.mockResolvedValueOnce([{ Plan: {} }])
