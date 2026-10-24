@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { planRows } from './planRows.js'
 import { analyzedPlan, estimatedPlan, classicJoin, classicUnion, classicDerived, classicSubqueries, classicDelete,
-  treeJoin, treeUnion, treeDerived, treeSubquery, treeNeverExecuted } from './planRows.fixtures.js'
+  treeJoin, treeUnion, treeDerived, treeSubquery, treeNeverExecuted, treeImpossibleWhere } from './planRows.fixtures.js'
 
 describe('planRows of an analyzed plan', () => {
   const { rows, planningMs, executionMs, estimated } = planRows(analyzedPlan)
@@ -165,5 +165,23 @@ describe('planRows of EXPLAIN ANALYZE\'s tree', () => {
       [2, 'Table scan on pets'],
     ])
     expect(steps(treeDerived).map(([depth]) => depth)).toEqual([0, 1, 2, 3, 4])
+  })
+})
+
+describe('planRows of a plan with no steps, or only one', () => {
+  it('draws no rows for a tree with no steps in it, rather than failing', () => {
+    expect(planRows('')).toEqual({ rows: [], planningMs: null, executionMs: 0, estimated: false })
+  })
+
+  it('draws no rows for a classic plan whose query block names nothing it knows', () => {
+    expect(planRows({ query_block: { select_id: 1 } }).rows).toEqual([])
+  })
+
+  it('shows a WHERE that can never hold as the one step it is', () => {
+    expect(planRows(treeImpossibleWhere).rows).toMatchObject([{ depth: 0, node: 'Zero rows (Impossible WHERE)', rows: 0, ms: 0.000076, share: 1, hot: true }])
+  })
+
+  it('keeps a line with no figures and nothing under it as a step of its own', () => {
+    expect(planRows('-> Zero rows (Impossible WHERE)').rows).toMatchObject([{ depth: 0, node: 'Zero rows (Impossible WHERE)', rows: null, ms: null }])
   })
 })

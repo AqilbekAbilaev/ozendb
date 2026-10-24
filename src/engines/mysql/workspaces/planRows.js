@@ -31,8 +31,8 @@ export function planRows(plan) {
     inputs.forEach(input => walk(input, depth + 1))
   }
   roots.forEach(root => walk(root, 0))
-  const largest = Math.max(...rows.map(r => r.weight))
+  const largest = Math.max(0, ...rows.map(r => r.weight))
   for (const row of rows) row.share = largest ? row.weight / largest : 0
-  rows.reduce((a, b) => (b.own > a.own ? b : a)).hot = true
+  if (rows.length) rows.reduce((a, b) => (b.own > a.own ? b : a)).hot = true
   return { rows, planningMs: null, executionMs: estimated ? null : roots.reduce((sum, root) => sum + weight(root), 0), estimated }
 }
