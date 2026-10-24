@@ -18,14 +18,15 @@ export function planRows(plan) {
   const rows = []
   const walk = (node, depth) => {
     const inputs = node.inputs ?? []
+    const total = weight(node)
     rows.push({
       depth,
       node: node.operation,
       detail: node.alias && node.table_name !== node.alias ? node.table_name : '',
       rows: twoPlaces(estimated ? node.estimated_rows : node.actual_rows),
-      ms: estimated || node.actual_last_row_ms == null ? null : weight(node),
-      weight: weight(node),
-      own: weight(node) - inputs.reduce((sum, input) => sum + weight(input), 0),
+      ms: node.actual_last_row_ms == null ? null : total,
+      weight: total,
+      own: total - inputs.reduce((sum, input) => sum + weight(input), 0),
       hot: false,
     })
     inputs.forEach(input => walk(input, depth + 1))
