@@ -116,13 +116,16 @@ pub(crate) async fn explain_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bo
     let run = Run::new(run_id);
     let started = tokio::time::Instant::now();
     let left = || limit.saturating_sub(started.elapsed());
-    // No session yet to send a KILL to, so the wait for one is simply abandoned.
-    let (mut conn, version, connection) = tokio::time::timeout(limit, async {
-        let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
-        conn.close_on_drop();
-        let (version, connection): (String, u64) = sqlx::query_as("SELECT VERSION(), CONNECTION_ID()").fetch_one(&mut *conn).await.map_err(AppError::MySql)?;
-        Ok::<_, AppError>((conn, version, connection))
-    })
+    // No session yet to send a KILL to, so Cancel or the limit simply abandons the wait for one.
+    let (mut conn, version, connection) = tokio::time::timeout(
+        limit,
+        run.unless_stopped(async {
+            let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
+            conn.close_on_drop();
+            let (version, connection): (String, u64) = sqlx::query_as("SELECT VERSION(), CONNECTION_ID()").fetch_one(&mut *conn).await.map_err(AppError::MySql)?;
+            Ok((conn, version, connection))
+        }),
+    )
     .await
     .map_err(|_| AppError::TimedOut)??;
     let explain = Explain::of(&version, only_reads(statement));

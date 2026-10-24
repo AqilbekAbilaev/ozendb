@@ -11,6 +11,7 @@ use std::time::Duration;
 use sqlx::mysql::MySqlConnection;
 use sqlx::{Connection, MySqlPool};
 use tauri::State;
+use tokio::sync::watch;
 
 use super::AppContext;
 use crate::error::{mysql_number, AppError};
@@ -27,14 +28,14 @@ enum Stop {
 /// A run's session, while it has one, and what stopped it, if anything has.
 struct Running {
     connection: tokio::sync::Mutex<Option<u64>>,
-    stop: Mutex<Option<Stop>>,
+    stop: watch::Sender<Option<Stop>>,
 }
 
 impl Running {
     /// Stops the statement running now and every one after it; false when the run was
     /// already stopped.
     async fn stop(&self, pool: &MySqlPool, why: Stop) -> Result<bool, AppError> {
-        if self.stop.lock().unwrap().replace(why).is_some() {
+        if self.stop.send_replace(Some(why)).is_some() {
             return Ok(false);
         }
         // Held until the KILL has been sent, so the run can't leave its session, and the
@@ -52,7 +53,7 @@ impl Running {
     }
 
     fn stopped(&self) -> Result<(), AppError> {
-        match *self.stop.lock().unwrap() {
+        match *self.stop.borrow() {
             Some(Stop::Cancelled) => Err(AppError::Cancelled),
             Some(Stop::TimedOut) => Err(AppError::TimedOut),
             None => Ok(()),
@@ -73,7 +74,7 @@ pub(super) struct Run {
 
 impl Run {
     pub(super) fn new(id: Option<&str>) -> Run {
-        let state = Running { connection: tokio::sync::Mutex::new(None), stop: Mutex::new(None) };
+        let state = Running { connection: tokio::sync::Mutex::new(None), stop: watch::Sender::new(None) };
         let run = Run { id: id.map(str::to_string), running: Arc::new(state) };
         if let Some(id) = &run.id {
             running().lock().unwrap().insert(id.clone(), run.running.clone());
@@ -93,6 +94,16 @@ impl Run {
     /// An error if the run was stopped.
     pub(super) fn stopped(&self) -> Result<(), AppError> {
         self.running.stopped()
+    }
+
+    /// `work`'s outcome, unless the run is stopped first: a stop then ends a wait no
+    /// KILL can reach, such as the one for a session.
+    pub(super) async fn unless_stopped<T>(&self, work: impl Future<Output = Result<T, AppError>>) -> Result<T, AppError> {
+        let mut stop = self.running.stop.subscribe();
+        tokio::select! {
+            outcome = work => outcome,
+            _ = stop.wait_for(Option::is_some) => Err(self.running.stopped().err().unwrap_or(AppError::Cancelled)),
+        }
     }
 
     /// `statement`'s outcome, unless the run was stopped before or while it ran: past

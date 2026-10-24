@@ -166,3 +166,19 @@ async fn cancel_stops_an_analyze_that_is_running() {
     assert!(matches!(stopped, AppError::Cancelled), "{stopped}");
     assert!(!cancel_mysql_run(&pool, "mysql-explain-sleep").await.unwrap(), "a finished Explain cancels nothing");
 }
+
+#[tokio::test]
+async fn cancel_ends_the_wait_for_a_session() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let pool = MySqlPoolOptions::new().max_connections(1).connect_with(build_options(&config, password().as_deref(), "", None).unwrap()).await.unwrap();
+    let _held = pool.acquire().await.unwrap();
+    let waiting = {
+        let pool = pool.clone();
+        tokio::spawn(async move { explain_mysql_sql(&pool, "SELECT 1", false, Some("mysql-explain-waiting"), LIMIT).await })
+    };
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    // Cancel opens a connection of its own, so the held one doesn't stop it.
+    assert!(cancel_mysql_run(&pool, "mysql-explain-waiting").await.unwrap(), "a waiting Explain is found and cancelled");
+    let stopped = tokio::time::timeout(Duration::from_secs(2), waiting).await.expect("Cancel ends the wait promptly").unwrap().unwrap_err();
+    assert!(matches!(stopped, AppError::Cancelled), "{stopped}");
+}
