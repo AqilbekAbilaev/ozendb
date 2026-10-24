@@ -48,32 +48,27 @@ pub struct MySqlStoredPrograms {
 }
 
 pub(crate) async fn mysql_stored_programs(pool: &MySqlPool, database: &str) -> Result<MySqlStoredPrograms, AppError> {
-    let routines: Vec<(String, String, Option<String>)> = sqlx::query_as(
+    let routines = sqlx::query_as::<_, (String, String, Option<String>)>(
         "SELECT ROUTINE_NAME, LOWER(ROUTINE_TYPE), DTD_IDENTIFIER FROM information_schema.ROUTINES \
          WHERE ROUTINE_SCHEMA = ? ORDER BY ROUTINE_NAME, ROUTINE_TYPE",
     )
     .bind(database)
-    .fetch_all(pool)
-    .await
-    .map_err(AppError::MySql)?;
-    let triggers: Vec<(String, String, String, String)> = sqlx::query_as(
+    .fetch_all(pool);
+    let triggers = sqlx::query_as::<_, (String, String, String, String)>(
         "SELECT TRIGGER_NAME, EVENT_OBJECT_TABLE, ACTION_TIMING, EVENT_MANIPULATION FROM information_schema.TRIGGERS \
          WHERE TRIGGER_SCHEMA = ? ORDER BY TRIGGER_NAME",
     )
     .bind(database)
-    .fetch_all(pool)
-    .await
-    .map_err(AppError::MySql)?;
+    .fetch_all(pool);
     // The scheduler being off stops events running, not their being listed.
-    let events: Vec<(String, String, String)> = sqlx::query_as(
+    let events = sqlx::query_as::<_, (String, String, String)>(
         "SELECT EVENT_NAME, CASE EVENT_TYPE WHEN 'ONE TIME' THEN CONCAT('AT ', EXECUTE_AT) \
          ELSE CONCAT('EVERY ', INTERVAL_VALUE, ' ', INTERVAL_FIELD) END, STATUS FROM information_schema.EVENTS \
          WHERE EVENT_SCHEMA = ? ORDER BY EVENT_NAME",
     )
     .bind(database)
-    .fetch_all(pool)
-    .await
-    .map_err(AppError::MySql)?;
+    .fetch_all(pool);
+    let (routines, triggers, events) = tokio::try_join!(routines, triggers, events).map_err(AppError::MySql)?;
     Ok(MySqlStoredPrograms {
         routines: routines.into_iter().map(|(name, kind, returns)| MySqlRoutine { name, kind, returns }).collect(),
         triggers: triggers.into_iter().map(|(name, table, timing, event)| MySqlTrigger { name, table, timing, event }).collect(),
