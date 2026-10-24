@@ -123,6 +123,27 @@ describe('useMySqlTree', () => {
     expect(tree.errors.value[shop]).toBe('Access denied for user to database')
   })
 
+  it('keeps a database\'s tables and views open when its stored programs fail to load, with the reason', async () => {
+    listTables.mockResolvedValue([{ name: 'order items', kind: 'table', estimatedRows: 12 }, { name: 'big view', kind: 'view', estimatedRows: null }])
+    listStoredPrograms.mockRejectedValue({ code: 'forbidden', message: 'SELECT command denied on ROUTINES ü' })
+    const tree = useMySqlTree('c1')
+    await tree.toggleDatabase(shop)
+    expect(tree.openDatabases.value[shop]).toBe(true)
+    expect(tree.errors.value[shop]).toBeUndefined()
+    expect(tree.tablesOf(shop).map(table => table.name)).toEqual(['order items'])
+    expect(tree.foldersOf(shop).map(folder => folder.kind)).toEqual(['view'])
+    expect(tree.programsError(shop)).toBe('SELECT command denied on ROUTINES ü')
+  })
+
+  it('forgets a stored-programs error on a refresh that reads them', async () => {
+    listTables.mockResolvedValue([])
+    listStoredPrograms.mockRejectedValueOnce(new Error('SELECT command denied'))
+    const tree = useMySqlTree('c1')
+    await tree.toggleDatabase(shop)
+    await tree.reloadTables()
+    expect(tree.programsError(shop)).toBeNull()
+  })
+
   it('reads a table\'s columns when its folder opens', async () => {
     listColumns.mockResolvedValue([
       { name: 'id', dataType: 'bigint unsigned', nullable: false, isPrimaryKey: true, default: null, references: null },

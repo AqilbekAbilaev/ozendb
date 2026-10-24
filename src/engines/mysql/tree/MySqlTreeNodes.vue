@@ -23,7 +23,7 @@ const props = defineProps({
 
 const {
   showSystem, toggleSystem, openDatabases, tables, loading, errors, toggleDatabase, reloadTables, toggleTable, isTableOpen, columnsOf, tableError,
-  tablesOf, foldersOf, toggleFolder, isFolderOpen,
+  tablesOf, foldersOf, programsError, toggleFolder, isFolderOpen,
 } = useMySqlTree(props.conn.id)
 // A refresh brings a new database list; the open databases' tables are re-read with it.
 watch(() => props.resources, reloadTables)
@@ -180,6 +180,9 @@ function onContext(e, level, label, database, name = null, kind = 'table') {
           </div>
         </template>
       </template>
+      <div v-if="programsError(database.name)" class="tnode err-node" style="padding-left: 51px">
+        <span class="err-msg">{{ programsError(database.name) }}</span>
+      </div>
     </template>
   </template>
 
