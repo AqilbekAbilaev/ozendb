@@ -24,56 +24,65 @@ const NOT_PREPARABLE: u16 = 1295;
 /// A deadlock, after which MySQL has rolled the statement's whole transaction back.
 const DEADLOCK: u16 = 1213;
 
-/// One statement. It is prepared, so its cells arrive in the binary form cell.rs reads
-/// and a query that returns no rows still names its columns. A CALL names them only in
-/// the rows it returns, and only its first result is kept. One that can't be prepared
-/// runs as text and returns none. Past the row cap, a query on a session that is `held`
-/// open is read to its end all the same: MySQL waits on a result nobody reads, and gives
-/// up on its session after `net_write_timeout`, taking the transaction with it. One that
-/// isn't held stops reading there, since its session closes after the run; a CALL is
-/// read on, as its procedure may still be writing after its first result.
-async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<SqlQueryResult, AppError> {
+/// One statement, answering with its result, or a CALL with each result set its procedure
+/// returns. It is prepared, so its cells arrive in the binary form cell.rs reads and a
+/// query that returns no rows still names its columns. A CALL names them only in the rows
+/// it returns, so a set with none can't be told from the CALL's own status and is left
+/// out; a CALL that returns no rows answers with how many it changed. One that can't be
+/// prepared runs as text and returns none. Past the row cap, a query on a session that is
+/// `held` open is read to its end all the same: MySQL waits on a result nobody reads, and
+/// gives up on its session after `net_write_timeout`, taking the transaction with it. One
+/// that isn't held stops reading there, since its session closes after the run; a CALL is
+/// read on, as its procedure may still be writing after a capped set.
+async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<Vec<SqlQueryResult>, AppError> {
     let started = std::time::Instant::now();
     let elapsed_ms = || started.elapsed().as_millis() as u64;
     let prepared = match (&mut *conn).prepare(sqlx::AssertSqlSafe(sql.to_string()).into_sql_str()).await {
         Ok(prepared) => prepared,
         Err(e) if mysql_number(&e) == Some(NOT_PREPARABLE) => {
             let done = sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string())).execute(&mut *conn).await.map_err(AppError::MySql)?;
-            return Ok(SqlQueryResult { columns: Vec::new(), rows: Vec::new(), truncated: false, elapsed_ms: elapsed_ms(), rows_affected: Some(done.rows_affected()) });
+            return Ok(vec![SqlQueryResult { columns: Vec::new(), rows: Vec::new(), truncated: false, elapsed_ms: elapsed_ms(), rows_affected: Some(done.rows_affected()) }]);
         }
         Err(e) => return Err(AppError::MySql(e)),
     };
-    let mut columns: Vec<String> = prepared.columns().iter().map(|c| c.name().to_string()).collect();
+    let columns: Vec<String> = prepared.columns().iter().map(|c| c.name().to_string()).collect();
     let read_to_the_end = held || columns.is_empty();
-    let (mut rows, mut truncated, mut affected, mut first_done) = (Vec::new(), false, 0, false);
+    let set = |columns| SqlQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0, rows_affected: None };
+    let (mut results, mut current, mut affected) = (Vec::new(), set(columns), 0);
     let mut stream = (&mut *conn).fetch_many(sqlx::query(sqlx::AssertSqlSafe(sql.to_string())));
     while let Some(item) = stream.try_next().await.map_err(AppError::MySql)? {
         match item {
             Either::Left(done) => {
                 affected += done.rows_affected();
-                first_done |= !columns.is_empty();
+                if !current.columns.is_empty() {
+                    results.push(SqlQueryResult { elapsed_ms: elapsed_ms(), ..std::mem::replace(&mut current, set(Vec::new())) });
+                }
             }
-            Either::Right(_) if first_done => {}
-            Either::Right(_) if rows.len() as i64 == ROW_RESULT_CAP => {
-                truncated = true;
+            Either::Right(_) if current.rows.len() as i64 == ROW_RESULT_CAP => {
+                current.truncated = true;
                 if !read_to_the_end {
                     break;
                 }
             }
             Either::Right(row) => {
-                if columns.is_empty() {
-                    columns = row.columns().iter().map(|c| c.name().to_string()).collect();
+                if current.columns.is_empty() {
+                    current.columns = row.columns().iter().map(|c| c.name().to_string()).collect();
                 }
-                rows.push((0..row.len()).map(|i| row.try_get_raw(i).map(|value| cell(value, None))).collect::<Result<_, _>>().map_err(AppError::MySql)?);
+                current.rows.push((0..row.len()).map(|i| row.try_get_raw(i).map(|value| cell(value, None))).collect::<Result<_, _>>().map_err(AppError::MySql)?);
             }
         }
     }
-    let rows_affected = columns.is_empty().then_some(affected);
-    Ok(SqlQueryResult { columns, rows, truncated, elapsed_ms: elapsed_ms(), rows_affected })
+    if !current.columns.is_empty() {
+        results.push(SqlQueryResult { elapsed_ms: elapsed_ms(), ..current });
+    }
+    if results.is_empty() {
+        results.push(SqlQueryResult { elapsed_ms: elapsed_ms(), rows_affected: Some(affected), ..set(Vec::new()) });
+    }
+    Ok(results)
 }
 
 /// Runs `statements` in order on `conn` as `run`, stopping at the first that fails; each
-/// answers with its own result. Cancel can stop `run`, and no statement may run past
+/// answers with its own result, or a CALL with each of its result sets. Cancel can stop `run`, and no statement may run past
 /// `limit`; either sends `KILL QUERY` from a session opened with `pool`'s options. On a
 /// `read_only` connection the session is locked again before each statement, so nothing
 /// an earlier one did can leave the next one free to write. That still leaves a stored
@@ -101,7 +110,7 @@ pub(super) async fn run_on(
                 e => e,
             });
             match outcome {
-                Ok(result) => results.push(result),
+                Ok(result) => results.extend(result),
                 Err(e) if i == 0 => return Err(e),
                 Err(e) => return Err(AppError::InScript { number: i + 1, source: Box::new(e) }),
             }
