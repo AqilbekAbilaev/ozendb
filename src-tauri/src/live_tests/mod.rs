@@ -8,6 +8,7 @@ mod mysql_browse;
 mod mysql_explain;
 mod mysql_join;
 mod mysql_query;
+mod mysql_routines;
 mod mysql_row_write;
 mod mysql_schema;
 mod pg;
