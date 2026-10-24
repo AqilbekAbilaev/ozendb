@@ -105,10 +105,10 @@ impl Explain {
 
 /// The plan for `sql`, which must be one statement, as MySQL's JSON, or ANALYZE's tree as
 /// text. It runs on a session of its own, closed afterwards, so the format it sets ends
-/// with it. ANALYZE runs the
-/// statement inside a read-only transaction that the closing session rolls back: even a
-/// stored function the SELECT calls can't write. `run_id` lets `cancel_mysql_query` stop
-/// it, and nothing it does, from waiting for a session on, runs past `limit`.
+/// with it. ANALYZE runs the statement inside a read-only transaction that the closing
+/// session rolls back, so even a stored function the SELECT calls can't write. `run_id`
+/// lets `cancel_mysql_query` stop it, and nothing it does, from waiting for a session
+/// on, runs past `limit`.
 pub(crate) async fn explain_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bool, run_id: Option<&str>, limit: Duration) -> Result<serde_json::Value, AppError> {
     let [statement] = statements(sql, read_only)?[..] else {
         return Err(AppError::Validation(String::from("Explain shows one statement's plan; leave only the one to explain in the editor.")));
