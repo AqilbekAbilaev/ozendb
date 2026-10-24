@@ -85,9 +85,8 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<Ve
 /// answers with its own result, or a CALL with each of its result sets. Cancel can stop `run`, and no statement may run past
 /// `limit`; either sends `KILL QUERY` from a session opened with `pool`'s options. On a
 /// `read_only` connection the session is locked again before each statement, so nothing
-/// an earlier one did can leave the next one free to write. That still leaves a stored
-/// procedure that lifts the lock and writes within one CALL: only the server's own
-/// privileges stop that. `held` is a session holding a Manual-mode transaction.
+/// an earlier one did, such as a stored function that lifts the lock, can leave the next
+/// one free to write. `held` is a session holding a Manual-mode transaction.
 pub(super) async fn run_on(
     conn: &mut MySqlConnection,
     pool: &MySqlPool,

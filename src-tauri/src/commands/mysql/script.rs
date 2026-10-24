@@ -10,8 +10,10 @@ use crate::error::AppError;
 
 /// The statements in `sql`, each as typed, in order. Refused whole if any of them
 /// controls a transaction (see `refuse_transaction_control`), or, on a `read_only`
-/// connection, would lift its read-only mode: a session can do that to itself, directly
-/// or through a prepared statement, whose SQL is text this check never reads.
+/// connection, would lift its read-only mode: a session can do that to itself, directly,
+/// through a prepared statement, whose SQL is text this check never reads, or in a
+/// procedure, which can lift it and write within one CALL whatever SQL DATA ACCESS it
+/// declares, as MySQL never holds a routine to that.
 pub(super) fn statements(sql: &str, read_only: bool) -> Result<Vec<&str>, AppError> {
     let split = split(sql)?;
     if split.is_empty() {
@@ -27,6 +29,11 @@ pub(super) fn statements(sql: &str, read_only: bool) -> Result<Vec<&str>, AppErr
         }
         if read_only && is_prepared_statement(words) {
             return Err(AppError::Validation(String::from("A read-only connection can't run prepared statements.")));
+        }
+        if read_only && words.first().is_some_and(|w| w == "CALL") {
+            return Err(AppError::Validation(String::from(
+                "A read-only connection can't call a stored procedure, since a procedure can turn the read-only mode off and write.",
+            )));
         }
     }
     Ok(split.into_iter().map(|(text, _)| text).collect())
