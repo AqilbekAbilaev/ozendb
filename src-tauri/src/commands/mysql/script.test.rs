@@ -127,3 +127,16 @@ fn lets_a_read_only_connection_set_anything_else() {
 fn lets_a_writable_connection_change_its_read_only_mode() {
     assert!(statements("SET SESSION transaction_read_only = ON", false).is_ok());
 }
+
+#[test]
+fn refuses_a_call_on_a_read_only_connection() {
+    for sql in ["CALL `report ü`()", "call shop.p", "SELECT 1; Call p(1, 'a;b')"] {
+        assert!(refusal(sql, true).contains("can't call a stored procedure"), "{sql}");
+    }
+}
+
+#[test]
+fn lets_a_writable_connection_call_a_procedure_and_a_read_only_one_select_a_column_named_call() {
+    assert!(statements("CALL `report ü`()", false).is_ok());
+    assert!(statements("SELECT `call` FROM t", true).is_ok());
+}
