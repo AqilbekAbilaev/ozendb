@@ -117,7 +117,8 @@ pub(super) async fn run_on(
 pub(crate) async fn run_mysql_sql(pool: &MySqlPool, sql: &str, read_only: bool, run_id: Option<&str>, limit: Duration) -> Result<Vec<SqlQueryResult>, AppError> {
     let statements = statements(sql, read_only)?;
     let run = Run::new(run_id);
-    let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
+    // Cancel ends the wait for a session too: there's no session yet to send a KILL to.
+    let mut conn = run.unless_stopped(async { pool.acquire().await.map_err(AppError::MySql) }).await?;
     conn.close_on_drop();
     run_on(&mut conn, pool, &run, &statements, limit, read_only, false).await
 }
