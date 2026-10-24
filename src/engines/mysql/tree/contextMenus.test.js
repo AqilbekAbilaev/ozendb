@@ -32,6 +32,16 @@ describe('MySQL right-click menus', () => {
     expect(openMySqlQuery).toHaveBeenCalledWith({ resource, connectionName: 'Shop MySQL' })
   })
 
+  it('offers to open a view as a table, and a SQL query on it', () => {
+    expect(MYSQL_MENUS.view.map(item => item.value)).toEqual(expect.arrayContaining(['mysql:open_table', 'mysql:new_sql', 'node:copy_name']))
+  })
+
+  it('offers a SQL query and its name on a stored program\'s row, but nothing that would open it as a table', () => {
+    const offered = MYSQL_MENUS.program.map(item => item.value)
+    expect(offered).toEqual(expect.arrayContaining(['mysql:new_sql', 'node:copy_name']))
+    expect(offered).not.toContain('mysql:open_table')
+  })
+
   it('is the action the engine table finds for a MySQL node', () => {
     expect(contextAction(table, 'mysql:open_table')).toBe(MYSQL_ACTIONS['mysql:open_table'])
   })
