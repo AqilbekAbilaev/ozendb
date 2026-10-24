@@ -8,7 +8,7 @@ use super::{cancel, AppContext};
 /// runs inside a transaction that is always rolled back (read-only too on a read-only
 /// connection): explaining never leaves a change behind. Sequences are the one thing
 /// a rollback can't undo — a `nextval()` still advances. A `run_id` makes it cancellable
-/// (see cancel.rs) until it ends.
+/// (see cancel.rs) until it ends, a Cancel before its EXPLAIN starts included.
 pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool, run_id: Option<&str>) -> Result<serde_json::Value, AppError> {
     let trimmed = sql.trim().trim_end_matches(';');
     if trimmed.is_empty() {
@@ -19,10 +19,10 @@ pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool
         Err(e) => return Err(AppError::Postgres(e)),
     };
     let mut result = Ok(serde_json::Value::Null);
-    let mut _running = None;
+    let mut running = None;
     if let Some(id) = run_id {
         match cancel::register(&mut tx, id).await {
-            Ok(guard) => _running = Some(guard),
+            Ok(guard) => running = Some(guard),
             Err(e) => result = Err(e),
         }
     }
@@ -30,6 +30,9 @@ pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool
         if let Err(e) = sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await {
             result = Err(AppError::Postgres(e));
         }
+    }
+    if let (Ok(_), Some(running)) = (&result, &running) {
+        result = running.stopped().map(|()| serde_json::Value::Null);
     }
     if result.is_ok() {
         // `sql` is the caller's own query, run as-is — the same trust as run_pg_query.
