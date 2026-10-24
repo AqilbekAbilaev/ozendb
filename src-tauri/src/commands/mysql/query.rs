@@ -41,13 +41,13 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<Ve
         Ok(prepared) => prepared,
         Err(e) if mysql_number(&e) == Some(NOT_PREPARABLE) => {
             let done = sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string())).execute(&mut *conn).await.map_err(AppError::MySql)?;
-            return Ok(vec![SqlQueryResult { columns: Vec::new(), rows: Vec::new(), truncated: false, elapsed_ms: elapsed_ms(), rows_affected: Some(done.rows_affected()) }]);
+            return Ok(vec![SqlQueryResult { columns: Vec::new(), rows: Vec::new(), truncated: false, elapsed_ms: elapsed_ms(), rows_affected: Some(done.rows_affected()), statement: 0 }]);
         }
         Err(e) => return Err(AppError::MySql(e)),
     };
     let columns: Vec<String> = prepared.columns().iter().map(|c| c.name().to_string()).collect();
     let read_to_the_end = held || columns.is_empty();
-    let set = |columns| SqlQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0, rows_affected: None };
+    let set = |columns| SqlQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms: 0, rows_affected: None, statement: 0 };
     let (mut results, mut current, mut affected) = (Vec::new(), set(columns), 0);
     let mut stream = (&mut *conn).fetch_many(sqlx::query(sqlx::AssertSqlSafe(sql.to_string())));
     while let Some(item) = stream.try_next().await.map_err(AppError::MySql)? {
@@ -82,7 +82,8 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<Ve
 }
 
 /// Runs `statements` in order on `conn` as `run`, stopping at the first that fails; each
-/// answers with its own result, or a CALL with each of its result sets. Cancel can stop `run`, and no statement may run past
+/// answers with its own result, or a CALL with each of its result sets, all numbered by
+/// the statement they answer. Cancel can stop `run`, and no statement may run past
 /// `limit`; either sends `KILL QUERY` from a session opened with `pool`'s options. On a
 /// `read_only` connection the session is locked again before each statement, so nothing
 /// an earlier one did, such as a stored function that lifts the lock, can leave the next
@@ -109,7 +110,7 @@ pub(super) async fn run_on(
                 e => e,
             });
             match outcome {
-                Ok(result) => results.extend(result),
+                Ok(result) => results.extend(result.into_iter().map(|result| SqlQueryResult { statement: i, ..result })),
                 Err(e) if i == 0 => return Err(e),
                 Err(e) => return Err(AppError::InScript { number: i + 1, source: Box::new(e) }),
             }

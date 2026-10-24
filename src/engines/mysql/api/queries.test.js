@@ -44,12 +44,22 @@ describe('MySQL queries', () => {
 describe('running MySQL SQL', () => {
   it('runs a script in the run\'s transaction and database, answering with its last result', async () => {
     const statements = [
-      { columns: [], rows: [], truncated: false, elapsedMs: 1, rowsAffected: 2 },
-      { columns: ['ü'], rows: [['a']], truncated: false, elapsedMs: 3, rowsAffected: null },
+      { columns: [], rows: [], truncated: false, elapsedMs: 1, rowsAffected: 2, statement: 0 },
+      { columns: ['ü'], rows: [['a']], truncated: false, elapsedMs: 3, rowsAffected: null, statement: 1 },
     ]
     invoke.mockResolvedValue(statements)
     expect(await runQuery('c1', 'UPDATE t SET a = 1; SELECT 1', 'run 1', 'tx 1', 'shop `2024` ü')).toEqual({ ...statements[1], statements })
     expect(invoke).toHaveBeenCalledWith('run_mysql_query', { id: 'c1', sql: 'UPDATE t SET a = 1; SELECT 1', runId: 'run 1', txId: 'tx 1', database: 'shop `2024` ü' })
+  })
+
+  it('answers a script that ends in a CALL with the CALL\'s first result set, and every set in its statements', async () => {
+    const statements = [
+      { columns: ['a'], rows: [['before']], truncated: false, elapsedMs: 1, rowsAffected: null, statement: 0 },
+      { columns: ['main ü'], rows: [['x;y']], truncated: false, elapsedMs: 2, rowsAffected: null, statement: 1 },
+      { columns: ['n'], rows: [[3]], truncated: false, elapsedMs: 3, rowsAffected: null, statement: 1 },
+    ]
+    invoke.mockResolvedValue(statements)
+    expect(await runQuery('c1', 'SELECT 1; CALL `two sets ü`()', null, null, null)).toEqual({ ...statements[1], statements })
   })
 
   it('cancels a run by its id', async () => {

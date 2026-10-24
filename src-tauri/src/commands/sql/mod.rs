@@ -28,6 +28,9 @@ pub struct SqlQueryResult {
     pub elapsed_ms: u64,
     /// Set for a statement that returns no rows (INSERT, UPDATE, DDL…): how many rows it changed.
     pub rows_affected: Option<u64>,
+    /// Which of the run's statements this answers, counting from 0. A statement answers
+    /// with one result, except a MySQL CALL, whose result sets all carry its number.
+    pub statement: usize,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]

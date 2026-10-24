@@ -35,10 +35,12 @@ export function saveRows({ connectionId, database, table }, changes) {
 // Runs a script, its statements one after another. `runId` names the run so cancelQuery
 // can stop it; `txId` runs it in a transaction held open by beginTransaction;
 // `database`, when given, is the one the session starts in. Resolves to the last
-// result, with every statement's in `statements`, a CALL's one per result set.
+// statement's result, or a CALL's first result set when a CALL ends the script, as its
+// main one; with every result in `statements`, a CALL's one per result set.
 export async function runQuery(connectionId, sql, runId = null, txId = null, database = null) {
   const statements = await invoke('run_mysql_query', { id: connectionId, sql, runId, txId, database })
-  return { ...statements.at(-1), statements }
+  const last = statements.at(-1).statement
+  return { ...statements.find(result => result.statement === last), statements }
 }
 
 export function cancelQuery(connectionId, runId) {

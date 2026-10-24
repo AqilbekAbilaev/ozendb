@@ -126,7 +126,7 @@ pub(super) async fn run_wrapped_on(
         }
         let done = query.execute(&mut *conn).await.map_err(AppError::Postgres)?;
         let elapsed_ms = started.elapsed().as_millis() as u64;
-        return Ok(SqlQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms, rows_affected: Some(done.rows_affected()) });
+        return Ok(SqlQueryResult { columns, rows: Vec::new(), truncated: false, elapsed_ms, rows_affected: Some(done.rows_affected()), statement: 0 });
     }
     let mut query = sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(wrapped));
     for bind in binds {
@@ -139,7 +139,7 @@ pub(super) async fn run_wrapped_on(
     let elapsed_ms = started.elapsed().as_millis() as u64;
     let (rows, truncated) = rows_from_json(raw_rows);
 
-    Ok(SqlQueryResult { columns, rows, truncated, elapsed_ms, rows_affected: None })
+    Ok(SqlQueryResult { columns, rows, truncated, elapsed_ms, rows_affected: None, statement: 0 })
 }
 
 /// `run_wrapped_on` a connection borrowed from the pool.
