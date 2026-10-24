@@ -22,12 +22,12 @@ export function columnRow(column, database) {
 }
 
 // The folders that follow a database's tables, each with its rows as `{ name, meta }` and
-// the right-click menu they share: its views, then each kind of stored program. A folder
-// with nothing in it is left out.
+// the right-click menu they share: its views, then each kind of stored program. A view's
+// row opens onto its columns, as a table's does. A folder with nothing in it is left out.
 export function programFolders(tables, programs) {
   const routines = (kind) => programs.routines.filter(routine => routine.kind === kind)
   const folders = [
-    { kind: 'view', label: 'Views', icon: 'table', menu: 'view', rows: tables.filter(table => table.kind === 'view').map(view => ({ name: view.name, meta: null })) },
+    { kind: 'view', label: 'Views', icon: 'table', menu: 'view', hasColumns: true, rows: tables.filter(table => table.kind === 'view').map(view => ({ name: view.name, meta: null })) },
     { kind: 'procedure', menu: 'program', label: 'Procedures', icon: 'run', rows: routines('procedure').map(routine => ({ name: routine.name, meta: null })) },
     { kind: 'function', menu: 'program', label: 'Functions', icon: 'aggregate', rows: routines('function').map(routine => ({ name: routine.name, meta: `→ ${routine.returns}` })) },
     { kind: 'trigger', menu: 'program', label: 'Triggers', icon: 'bolt', rows: programs.triggers.map(trigger => ({ name: trigger.name, meta: `${trigger.timing} ${trigger.event} on ${trigger.table}` })) },
