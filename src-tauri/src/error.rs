@@ -102,6 +102,11 @@ pub enum AppError {
     #[error("{0}")]
     Validation(String),
 
+    /// Something the server keeps from this login, said in our own words where the
+    /// server's answer alone wouldn't say so.
+    #[error("{0}")]
+    Forbidden(String),
+
     /// A running query stopped by Cancel.
     #[error("The query was cancelled.")]
     Cancelled,
@@ -158,6 +163,7 @@ impl AppError {
             AppError::SignInAgain => "sign_in_again",
             AppError::SubscriptionActive => "subscription_active",
             AppError::Validation(_) => "validation",
+            AppError::Forbidden(_) => "forbidden",
             AppError::Cancelled | AppError::TimedOut => "cancelled",
             AppError::InScript { source, .. } | AppError::RolledBack(source) => source.code(),
         }

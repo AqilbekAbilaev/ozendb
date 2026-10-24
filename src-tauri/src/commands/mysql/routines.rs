@@ -123,11 +123,13 @@ impl MySqlDefinitionKind {
         }
     }
 
-    /// Why a routine came back with no body: MySQL lists one to a login that may only
-    /// run it, and leaves its body out.
+    /// Why a routine came back with no body: MySQL shows one to a login that may only run,
+    /// change or create it, and leaves its body out. SHOW_ROUTINE came with 8.0.20; before
+    /// it, SELECT on every database was the definer's only peer, and 8.0 and 8.4 still
+    /// accept either.
     fn hidden(self, database: &str, name: &str) -> AppError {
-        AppError::Validation(format!(
-            "MySQL doesn't show this login the body of {} `{name}` in `{database}`: only its definer or a login with SHOW_ROUTINE may read it.",
+        AppError::Forbidden(format!(
+            "MySQL doesn't show this login the body of {} `{name}` in `{database}`: only its definer, or a login with SHOW_ROUTINE or SELECT on every database, may read it.",
             self.word()
         ))
     }
