@@ -271,7 +271,7 @@ pub(crate) async fn mysql_browse(
         }
         rows.push(cells);
     }
-    Ok(SqlQueryResult { columns: names, rows, truncated: false, elapsed_ms, rows_affected: None })
+    Ok(SqlQueryResult { columns: names, rows, truncated: false, elapsed_ms, rows_affected: None, statement: 0 })
 }
 
 /// A page of one table or view and the tables joined to it: `filters` must all hold,

@@ -74,14 +74,14 @@ async fn a_call_answers_with_every_result_set_its_procedure_returns() {
     run(&mut admin, &format!("CREATE PROCEDURE {database}.`no sets`() DELETE FROM {database}.t WHERE id = 2")).await;
     let pool = pool(&config).await;
     let results = run_mysql_sql(&pool, &format!("CALL {database}.`two sets ü`(); CALL {database}.`no sets`(); SELECT 4"), false, None, LIMIT).await.unwrap();
-    let shown: Vec<_> = results.iter().map(|r| (r.columns.clone(), r.rows.clone(), r.rows_affected)).collect();
+    let shown: Vec<_> = results.iter().map(|r| (r.statement, r.columns.clone(), r.rows.clone(), r.rows_affected)).collect();
     assert_eq!(
         shown,
         [
-            (vec![String::from("id")], vec![vec![json!(1)], vec![json!(2)]], None),
-            (vec![String::from("note ü"), String::from("n")], vec![vec![json!("x;y"), json!(3)]], None),
-            (vec![], vec![], Some(1)),
-            (vec![String::from("4")], vec![vec![json!(4)]], None),
+            (0, vec![String::from("id")], vec![vec![json!(1)], vec![json!(2)]], None),
+            (0, vec![String::from("note ü"), String::from("n")], vec![vec![json!("x;y"), json!(3)]], None),
+            (1, vec![], vec![], Some(1)),
+            (2, vec![String::from("4")], vec![vec![json!(4)]], None),
         ]
     );
     drop_database(&config, &database).await;
