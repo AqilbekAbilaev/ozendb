@@ -42,6 +42,9 @@ pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool
             Err(e) => Err(AppError::Postgres(e)),
         };
     }
+    // Unregistered while the connection is still this run's: once rolled back, the pool
+    // can hand it to another tab, whose query a late Cancel would stop instead.
+    drop(running);
     let _ = tx.rollback().await;
     result
 }
