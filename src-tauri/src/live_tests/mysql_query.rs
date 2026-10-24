@@ -177,8 +177,9 @@ async fn cancel_stops_a_run_still_waiting_for_its_session() {
     };
     tokio::time::sleep(Duration::from_millis(300)).await;
     assert!(cancel_mysql_run(&pool, "mysql-run-early").await.unwrap(), "a run waiting for a session is found and cancelled");
+    // The run ends while the session is still held: Cancel ends the wait, not a freed session.
+    let err = tokio::time::timeout(Duration::from_secs(5), running).await.expect("Cancel ends the wait").unwrap().unwrap_err();
     drop(busy);
-    let err = tokio::time::timeout(Duration::from_secs(10), running).await.unwrap().unwrap().unwrap_err();
     assert_eq!(err.code(), "cancelled");
     assert_eq!(count(&config, &database).await, 0);
     drop_database(&config, &database).await;
