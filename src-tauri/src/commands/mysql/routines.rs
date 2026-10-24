@@ -14,7 +14,8 @@ pub struct MySqlRoutine {
     pub name: String,
     /// "procedure" or "function": a procedure and a function may share a name.
     pub kind: String,
-    /// What a function returns, as declared (`varchar(10)`); None for a procedure.
+    /// What a function returns, as declared (`varchar(10)`); None for a procedure, or for a
+    /// function whose return type MySQL hides from this login.
     pub returns: Option<String>,
 }
 
