@@ -5,6 +5,7 @@ import { useMySqlTree, visibleDatabases } from './useMySqlTree.js'
 import { contextMenu } from '../../../stores/contextMenu'
 import { activeTab } from '../../../stores/tabs'
 import { openMySqlTable } from '../../../stores/tabCreators'
+import { openModal } from '../../../stores/modals'
 import { treeSelection, setTreeSelection } from '../../../stores/connectionNavigation'
 import { MYSQL_MENUS } from './contextMenus.js'
 import { tagOverrides } from '../../../stores/nodeTags'
@@ -60,14 +61,19 @@ const isOpen = (database, name, kind = 'table') => sameResource(activeTab.value?
 const ctxSel = (database, name = null, kind = 'table') => sameResource(contextMenu.value?.nodeData?.resource, rowResource(database, name, kind))
 
 const openTable = (database, table) => openMySqlTable({ resource: rowResource(database, table), connectionName: props.conn.name })
-// Double-clicking a view browses it, as a table's row does.
+// The node a row's menu and actions get; a row below a table's names its kind too.
+function rowNode(database, name, kind) {
+  return { connId: props.conn.id, connName: props.conn.name, engine: 'mysql', resource: rowResource(database, name, kind), ...(name && { kind }) }
+}
+
+// Double-clicking a view browses it, as a table's row does; a stored program's shows its definition.
 function openRow(database, folder, name) {
   if (folder.menu === 'view') openTable(database, name)
+  else openModal('mysqlDefinition', rowNode(database, name, folder.kind))
 }
 
 function onContext(e, level, label, database, name = null, kind = 'table') {
-  const node = { connId: props.conn.id, connName: props.conn.name, engine: 'mysql', resource: rowResource(database, name, kind) }
-  contextMenu.value = { type: 'mysql:' + level, x: e.clientX, y: e.clientY, label, nodeData: node, items: MYSQL_MENUS[level] }
+  contextMenu.value = { type: 'mysql:' + level, x: e.clientX, y: e.clientY, label, nodeData: rowNode(database, name, kind), items: MYSQL_MENUS[level] }
 }
 </script>
 

@@ -240,10 +240,11 @@ export function openMySqlTable({ resource, connectionName }) {
   activateTab(tab.id)
 }
 
-// A SQL editor in the database of a MySQL row (any database or table row, or the
-// connection's for its own row); a new tab every time.
-export function openMySqlQuery({ resource, connectionName }) {
+// A SQL editor in the database of a MySQL row (any database, table or stored program's
+// row, or the connection's for its own row), holding `sql`; a new tab every time.
+export function openMySqlQuery({ resource, connectionName, sql = '' }) {
   const tab = newWorkspace('mysql.query', { target: { resource, connectionName } })
+  if (sql) tab.state.sql = sql
   tabs.value.push(tab)
   activateTab(tab.id)
 }

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const openMySqlTable = vi.fn()
 const openMySqlQuery = vi.fn()
+const openModal = vi.fn()
 vi.mock('../../../stores/tabCreators', () => ({ openMySqlTable, openMySqlQuery }))
+vi.mock('../../../stores/modals', () => ({ openModal }))
 
 const { MYSQL_MENUS, MYSQL_ACTIONS } = await import('./contextMenus.js')
 const { contextAction } = await import('../../contextActions.js')
@@ -40,6 +42,18 @@ describe('MySQL right-click menus', () => {
     const offered = MYSQL_MENUS.program.map(item => item.value)
     expect(offered).toEqual(expect.arrayContaining(['mysql:new_sql', 'node:copy_name']))
     expect(offered).not.toContain('mysql:open_table')
+  })
+
+  it('offers the definition of a view and of a stored program, but not of a table', () => {
+    expect(MYSQL_MENUS.view.map(item => item.value)).toContain('mysql:definition')
+    expect(MYSQL_MENUS.program.map(item => item.value)).toContain('mysql:definition')
+    expect(MYSQL_MENUS.table.map(item => item.value)).not.toContain('mysql:definition')
+  })
+
+  it('shows a definition for the row it was opened on', () => {
+    const event = { ...table, kind: 'event', resource: createResourceRef('m1', [{ kind: 'database', name: 'shop' }, { kind: 'event', name: 'nightly ü' }]) }
+    MYSQL_ACTIONS['mysql:definition'](event)
+    expect(openModal).toHaveBeenCalledWith('mysqlDefinition', event)
   })
 
   it('is the action the engine table finds for a MySQL node', () => {

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { listDatabases, listTables, listColumns, listForeignKeys, listStoredPrograms } from './resources'
+import { listDatabases, listTables, listColumns, listForeignKeys, listStoredPrograms, showDefinition } from './resources'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -34,5 +34,10 @@ describe('MySQL resources', () => {
   it('lists the stored programs of a database', async () => {
     await listStoredPrograms({ connectionId: 'c1', database: 'shop `2024` ü' })
     expect(invoke).toHaveBeenCalledWith('list_mysql_stored_programs', { id: 'c1', database: 'shop `2024` ü' })
+  })
+
+  it('asks for the statement that creates a view or stored program, by its kind and name', async () => {
+    await showDefinition({ connectionId: 'c1', database: 'shop.eu' }, 'procedure', 'p `x`; ü')
+    expect(invoke).toHaveBeenCalledWith('show_mysql_definition', { id: 'c1', database: 'shop.eu', kind: 'procedure', name: 'p `x`; ü' })
   })
 })
