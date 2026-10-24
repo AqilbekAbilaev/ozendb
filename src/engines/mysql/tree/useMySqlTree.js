@@ -36,6 +36,8 @@ export function programFolders(tables, programs) {
   return folders.filter(folder => folder.rows.length)
 }
 
+const NO_PROGRAMS = { routines: [], triggers: [], events: [] }
+
 /**
  * One MySQL connection's sidebar state below its database list: each database's tables
  * and stored programs, and each table's columns, fetched the first time they open.
@@ -45,6 +47,7 @@ export function useMySqlTree(connectionId) {
   const openDatabases = ref({})  // database → boolean
   const tables = ref({})         // database → MySqlTableInfo[], views included
   const programs = ref({})       // database → { routines, triggers, events }
+  const programErrors = ref({})  // database → why its stored programs couldn't be read
   const openFolders = ref({})    // folder key → boolean
   const loading = ref({})        // database → boolean
   const errors = ref({})         // database (or table key) → message
@@ -67,26 +70,30 @@ export function useMySqlTree(connectionId) {
   // every error is forgotten with what it was about.
   function reloadTables() {
     tables.value = {}
+    programs.value = {}
     errors.value = {}
+    programErrors.value = {}
     tableColumns.value = {}
     openTables.value = {}
     const open = Object.keys(openDatabases.value).filter(database => openDatabases.value[database])
     return Promise.all(open.map(loadTables))
   }
 
+  // Its tables and its stored programs are read side by side, and either may fail alone:
+  // a login that can't read the stored programs still sees the tables.
   async function loadTables(database) {
     loading.value[database] = true
     delete errors.value[database]
-    try {
-      const [listed, stored] = await Promise.all([listTables({ connectionId, database }), listStoredPrograms({ connectionId, database })])
-      tables.value[database] = listed
-      programs.value[database] = stored
-    } catch (e) {
-      errors.value[database] = errMessage(e)
+    delete programErrors.value[database]
+    const [listed, stored] = await Promise.allSettled([listTables({ connectionId, database }), listStoredPrograms({ connectionId, database })])
+    if (listed.status === 'fulfilled') tables.value[database] = listed.value
+    else {
+      errors.value[database] = errMessage(listed.reason)
       openDatabases.value[database] = false
-    } finally {
-      loading.value[database] = false
     }
+    if (stored.status === 'fulfilled') programs.value[database] = stored.value
+    else programErrors.value[database] = errMessage(stored.reason)
+    loading.value[database] = false
   }
 
   async function toggleTable(database, table) {
@@ -107,7 +114,8 @@ export function useMySqlTree(connectionId) {
   const tableError = (database, table) => errors.value[tableKey(database, table)] ?? null
 
   const tablesOf = (database) => tables.value[database]?.filter(table => table.kind === 'table') ?? []
-  const foldersOf = (database) => tables.value[database] ? programFolders(tables.value[database], programs.value[database]) : []
+  const foldersOf = (database) => tables.value[database] ? programFolders(tables.value[database], programs.value[database] ?? NO_PROGRAMS) : []
+  const programsError = (database) => programErrors.value[database] ?? null
   const folderKey = (database, kind) => JSON.stringify([database, kind])
   function toggleFolder(database, kind) {
     openFolders.value[folderKey(database, kind)] = !openFolders.value[folderKey(database, kind)]
@@ -116,6 +124,6 @@ export function useMySqlTree(connectionId) {
 
   return {
     showSystem, toggleSystem, openDatabases, tables, loading, errors, toggleDatabase, reloadTables, toggleTable, isTableOpen, columnsOf, tableError,
-    tablesOf, foldersOf, toggleFolder, isFolderOpen,
+    tablesOf, foldersOf, programsError, toggleFolder, isFolderOpen,
   }
 }
