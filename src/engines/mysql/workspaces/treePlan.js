@@ -7,22 +7,32 @@
 // it, as the JSON version keeps it on them; one with nothing under it is a step. A step
 // that `(never executed)` has no figures.
 
-const LINE = /^(?<indent> *)-> (?<operation>.*?)(?<cost> {2}\(cost=[^)]*\))?(?: {1,2}\((?:actual time=[^ ]+?\.\.(?<ms>[^ ]+) rows=(?<rows>[^ ]+) loops=(?<loops>\d+)|(?<never>never executed))\))?$/s
+const STEP = /^(?<indent> *)-> (?<text>.*)$/s
 
-const number = (text) => (text == null ? null : Number(text))
+// A step's figures, each group known by its first words; text in any other parentheses
+// stays in what the step names.
+const FIGURES = / {1,2}\((cost=[^)]*|actual time=[^)]*|never executed)\)/g
+
+// The figure `key` gives in `group`, the last of a range such as `time=0.1..0.2`.
+function figure(group, key) {
+  const value = Number(new RegExp(`${key}=(?:\\S+?\\.\\.)?(\\S+)`).exec(group)?.[1] ?? NaN)
+  return Number.isNaN(value) ? null : value
+}
 
 export function treeSteps(text) {
   const roots = []
   const above = []
   const headings = new Set()
   for (const line of lines(text)) {
-    const found = LINE.exec(line)?.groups
+    const found = STEP.exec(line)?.groups
     if (!found) continue
+    const groups = [...found.text.matchAll(FIGURES)].map(([, group]) => group)
+    const actual = groups.find(group => group.startsWith('actual')) ?? ''
     const step = {
-      operation: found.operation, inputs: [],
-      actual_rows: number(found.rows), actual_loops: number(found.loops), actual_last_row_ms: number(found.ms),
+      operation: found.text.replace(FIGURES, '').trim(), inputs: [],
+      actual_rows: figure(actual, 'rows'), actual_loops: figure(actual, 'loops'), actual_last_row_ms: figure(actual, 'time'),
     }
-    if (!found.cost && !found.ms && !found.never) headings.add(step)
+    if (!groups.length) headings.add(step)
     while (above.length && above.at(-1).indent >= found.indent.length) above.pop()
     const feeds = above.at(-1)?.step.inputs ?? roots
     feeds.push(step)
