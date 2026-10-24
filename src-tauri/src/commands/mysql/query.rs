@@ -27,9 +27,10 @@ const DEADLOCK: u16 = 1213;
 /// One statement, answering with its result, or a CALL with each result set its procedure
 /// returns. It is prepared, so its cells arrive in the binary form cell.rs reads and a
 /// query that returns no rows still names its columns. A CALL names them only in the rows
-/// it returns, so a set with none can't be told from the CALL's own status and is left
-/// out; a CALL that returns no rows answers with how many it changed. One that can't be
-/// prepared runs as text and returns none. Past the row cap, a query on a session that is
+/// it returns: sqlx ends each set, and then the CALL itself, with a status that carries
+/// no column names, so a set with no rows answers with none. A CALL that returns no sets
+/// answers with how many rows it changed. One that can't be prepared runs as text and
+/// returns none. Past the row cap, a query on a session that is
 /// `held` open is read to its end all the same: MySQL waits on a result nobody reads, and
 /// gives up on its session after `net_write_timeout`, taking the transaction with it. One
 /// that isn't held stops reading there, since its session closes after the run; a CALL is
@@ -54,9 +55,7 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<Ve
         match item {
             Either::Left(done) => {
                 affected += done.rows_affected();
-                if !current.columns.is_empty() {
-                    results.push(SqlQueryResult { elapsed_ms: elapsed_ms(), ..std::mem::replace(&mut current, set(Vec::new())) });
-                }
+                results.push(SqlQueryResult { elapsed_ms: elapsed_ms(), ..std::mem::replace(&mut current, set(Vec::new())) });
             }
             Either::Right(_) if current.rows.len() as i64 == ROW_RESULT_CAP => {
                 current.truncated = true;
@@ -72,8 +71,13 @@ async fn run_one(conn: &mut MySqlConnection, sql: &str, held: bool) -> Result<Ve
             }
         }
     }
+    // A read stopped at the cap never reaches its set's end.
     if !current.columns.is_empty() {
         results.push(SqlQueryResult { elapsed_ms: elapsed_ms(), ..current });
+    }
+    // The last status with no columns is a CALL's own, or a statement's that returns no rows.
+    if results.last().is_some_and(|last| last.columns.is_empty()) {
+        results.pop();
     }
     if results.is_empty() {
         results.push(SqlQueryResult { elapsed_ms: elapsed_ms(), rows_affected: Some(affected), ..set(Vec::new()) });

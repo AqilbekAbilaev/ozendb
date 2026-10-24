@@ -87,6 +87,27 @@ async fn a_call_answers_with_every_result_set_its_procedure_returns() {
     drop_database(&config, &database).await;
 }
 
+/// sqlx hands back a result set's end but not its column names, so a set with no rows
+/// answers as an empty result: it found nothing, rather than changed nothing.
+#[tokio::test]
+async fn a_call_answers_with_a_result_set_that_found_nothing_rather_than_with_rows_changed() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it empty call ü").await;
+    let mut admin = connect(&config, "").await;
+    run(&mut admin, &format!("CREATE PROCEDURE {database}.`finds nothing ü`() SELECT id AS `id ü` FROM {database}.t WHERE id < 0")).await;
+    run(&mut admin, &format!(
+        "CREATE PROCEDURE {database}.`nothing then one`() BEGIN SELECT id FROM {database}.t WHERE id < 0; SELECT 5 AS n; END"
+    )).await;
+    let pool = pool(&config).await;
+    let results = run_mysql_sql(&pool, &format!("CALL {database}.`finds nothing ü`(); CALL {database}.`nothing then one`()"), false, None, LIMIT).await.unwrap();
+    let shown: Vec<_> = results.iter().map(|r| (r.statement, r.columns.clone(), r.rows.clone(), r.rows_affected)).collect();
+    assert_eq!(
+        shown,
+        [(0, vec![], vec![], None), (1, vec![], vec![], None), (1, vec![String::from("n")], vec![vec![json!(5)]], None)]
+    );
+    drop_database(&config, &database).await;
+}
+
 #[tokio::test]
 async fn text_with_a_binary_collation_reads_as_text_and_binary_strings_as_hex() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
