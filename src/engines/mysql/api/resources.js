@@ -28,3 +28,9 @@ export function listForeignKeys({ connectionId, database, table }) {
 export function listStoredPrograms({ connectionId, database }) {
   return invoke('list_mysql_stored_programs', { id: connectionId, database })
 }
+
+// The statement that creates a view, procedure, function, trigger or event, as `kind`
+// names it. Rejected, saying so, when MySQL hides a routine's body from the login.
+export function showDefinition({ connectionId, database }, kind, name) {
+  return invoke('show_mysql_definition', { id: connectionId, database, kind, name })
+}

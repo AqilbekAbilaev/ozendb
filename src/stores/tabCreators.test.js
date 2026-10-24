@@ -436,4 +436,11 @@ describe('MySQL queries', () => {
     expect(lastTab().target.segments).toEqual([{ kind: 'database', name: 'shop `2024` ü' }])
     expect(activeTabId.value).toBe(lastTab().id)
   })
+  it('opens a query tab holding the SQL it is given, in the database of a stored program\'s row', () => {
+    const c = harness()
+    const procedure = createResourceRef('m1', [{ kind: 'database', name: 'shop `2024` ü' }, { kind: 'procedure', name: 'p; ü' }])
+    c.openMySqlQuery({ resource: procedure, connectionName: 'Shop MySQL', sql: 'CREATE PROCEDURE `p; ü`() SELECT 1' })
+    expect(lastTab().state.sql).toBe('CREATE PROCEDURE `p; ü`() SELECT 1')
+    expect(lastTab().target.segments).toEqual([{ kind: 'database', name: 'shop `2024` ü' }])
+  })
 })

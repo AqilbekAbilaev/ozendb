@@ -48,6 +48,8 @@ export const MODALS = {
   pgImport:       { component: lazy(() => import('../engines/postgresql/admin/PostgresImportModal.vue')),       level: 'database' },
   // Opened from a table workspace's own toolbar, not a sidebar node.
   pgRowHistory:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRowHistoryModal.vue')),    level: 'table' },
+  // A MySQL view's or stored program's CREATE statement, opened from its sidebar row.
+  mysqlDefinition: { component: lazy(() => import('../engines/mysql/admin/MySqlDefinitionModal.vue')), level: 'database' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },
