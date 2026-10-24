@@ -63,6 +63,31 @@ async fn a_script_runs_each_statement_and_answers_with_each_result() {
 }
 
 #[tokio::test]
+async fn a_call_answers_with_every_result_set_its_procedure_returns() {
+    let Some(config) = test_config() else { return eprintln!("{SKIP}") };
+    let database = database(&config, "ozendb it call ü").await;
+    let mut admin = connect(&config, "").await;
+    run(&mut admin, &format!(
+        "CREATE PROCEDURE {database}.`two sets ü`() BEGIN INSERT INTO {database}.t VALUES (1, 'a'), (2, 'b'); \
+         SELECT id FROM {database}.t ORDER BY id; SELECT 'x;y' AS `note ü`, 3 AS n; END"
+    )).await;
+    run(&mut admin, &format!("CREATE PROCEDURE {database}.`no sets`() DELETE FROM {database}.t WHERE id = 2")).await;
+    let pool = pool(&config).await;
+    let results = run_mysql_sql(&pool, &format!("CALL {database}.`two sets ü`(); CALL {database}.`no sets`(); SELECT 4"), false, None, LIMIT).await.unwrap();
+    let shown: Vec<_> = results.iter().map(|r| (r.columns.clone(), r.rows.clone(), r.rows_affected)).collect();
+    assert_eq!(
+        shown,
+        [
+            (vec![String::from("id")], vec![vec![json!(1)], vec![json!(2)]], None),
+            (vec![String::from("note ü"), String::from("n")], vec![vec![json!("x;y"), json!(3)]], None),
+            (vec![], vec![], Some(1)),
+            (vec![String::from("4")], vec![vec![json!(4)]], None),
+        ]
+    );
+    drop_database(&config, &database).await;
+}
+
+#[tokio::test]
 async fn text_with_a_binary_collation_reads_as_text_and_binary_strings_as_hex() {
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let database = database(&config, "ozendb it collation").await;
