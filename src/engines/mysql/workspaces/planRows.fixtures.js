@@ -615,3 +615,14 @@ export const treeNeverExecuted = [
 // A WHERE MySQL found could never hold, as MySQL 8.0.46 gives it: one step, timed in
 // microseconds written with an exponent.
 export const treeImpossibleWhere = "-> Zero rows (Impossible WHERE)  (cost=0..0 rows=0) (actual time=76e-6..76e-6 rows=0 loops=1)\n"
+
+// A filter on an alias with a line break in it, which MySQL 8.0.46 writes as it is, so a
+// step runs over more than one line.
+export const treeBrokenLines = [
+  "-> Filter: ((cap.`o",
+  "x`.`name` > <cache>(convert(concat('a','\\n') using utf8mb4))) and (cap.`o",
+  "x`.id > 1))  (cost=0.55 rows=2) (actual time=0.0152..0.0174 rows=2 loops=1)",
+  "    -> Covering index scan on o",
+  "x using by_name  (cost=0.55 rows=3) (actual time=0.0117..0.0147 rows=3 loops=1)",
+  "",
+].join('\n')
