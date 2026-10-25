@@ -13,6 +13,7 @@ import {
   duplicateConnection,
   exportConnections,
   importConnections,
+  connectionUri,
 } from './connections'
 
 beforeEach(() => {
@@ -115,5 +116,19 @@ describe('importConnections', () => {
     invoke.mockResolvedValue(2)
     await importConnections('/tmp/conns.json')
     expect(invoke).toHaveBeenCalledWith('import_connections', { path: '/tmp/conns.json' })
+  })
+})
+
+describe('connectionUri', () => {
+  it('translates the id into the connection_uri payload', async () => {
+    invoke.mockResolvedValue('mongodb://localhost:27017')
+    await connectionUri('connection-1')
+    expect(invoke).toHaveBeenCalledWith('connection_uri', { id: 'connection-1' })
+  })
+
+  it('resolves with the command response unchanged', async () => {
+    const uri = 'postgresql://localhost:5432'
+    invoke.mockResolvedValue(uri)
+    await expect(connectionUri('connection-1')).resolves.toBe(uri)
   })
 })

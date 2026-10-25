@@ -1,5 +1,6 @@
-// Saved connections: testing, persistence, disconnect, and file import/export. Every
-// engine shares one connections.json and one pool, so none of this is engine-specific.
+// Saved connections: testing, persistence, disconnect, file import/export, and the
+// assembled connection string. Every engine shares one connections.json and one pool,
+// so none of this is engine-specific.
 
 import { invoke } from '@tauri-apps/api/core'
 
@@ -37,4 +38,8 @@ export function exportConnections(path) {
 
 export function importConnections(path) {
   return invoke('import_connections', { path })
+}
+
+export function connectionUri(id) {
+  return invoke('connection_uri', { id })
 }
