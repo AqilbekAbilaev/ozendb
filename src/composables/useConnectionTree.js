@@ -1,8 +1,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onConnectionSaved, onConnectionUpdated, onConnectionDeleted } from '../appApi/events'
 import { errCode, errMessage } from '../utils/errors'
-import { appendResource, createResourceRef, resourceAt } from '../utils/resourceRef'
-import { nodeTagKey } from '../utils/tabColor'
+import { createResourceRef } from '../utils/resourceRef'
 import { activeTab, activeTabId } from '../stores/tabs'
 import {
   connectionResourceLoading, connectionResourceErrors,
@@ -20,9 +19,7 @@ import {
 import { isCollectionTab } from '../utils/workspaceTypes'
 import { workspaceBrowsesTable } from '../workspaces/registry'
 
-const databaseResource = (connectionId, dbName) => createResourceRef(connectionId, [{ kind: 'database', name: dbName }])
-
-export function useConnectionTree({ emit }) {
+export function useConnectionTree() {
   // The open-connection registry lives in the store; the tree renders it and owns
   // only its own view state (expansion, selection, search).
   const connections = openConnections
@@ -33,13 +30,6 @@ export function useConnectionTree({ emit }) {
       id, { message: errMessage(error), code: errCode(error) },
     ]),
   ))
-  const expandedDbs = ref({})        // "connId/dbName" → boolean
-  // The collection row highlighted by a single click — derived, since the selection
-  // can also be cleared from outside the tree (opening it from the toolbar).
-  const selectedKey = computed(() => {
-    const collection = resourceAt(treeSelection.value?.resource, 'collection')
-    return collection ? nodeTagKey(collection) : null
-  })
   const searchText = ref('')
 
   const setSelection = setTreeSelection
@@ -67,11 +57,6 @@ export function useConnectionTree({ emit }) {
     if (treeSelection.value && !live.has(treeSelection.value.resource.connectionId)) setSelection(null)
     for (const id of Object.keys(expandedConns.value)) {
       if (!live.has(id)) delete expandedConns.value[id]
-    }
-    for (const key of Object.keys(expandedDbs.value)) {
-      // Keys are `connId/dbName` and connection ids are UUIDs, so the first segment
-      // is the id — a database name can never contain a slash.
-      if (!live.has(key.slice(0, key.indexOf('/')))) delete expandedDbs.value[key]
     }
     // Synchronous on purpose: an async flush leaves a tick where the selection still
     // names a connection that is gone, and the native menu derives its enabled items
@@ -132,49 +117,6 @@ export function useConnectionTree({ emit }) {
     }
   }
 
-  function toggleDatabase(conn, dbName) {
-    // Selecting a database row enables database-scoped menu items.
-    setSelection({ resource: databaseResource(conn.id, dbName), connectionName: conn.name, engine: conn.engine })
-    const key = databaseKey(conn.id, dbName)
-    expandedDbs.value[key] = !expandedDbs.value[key]
-  }
-
-  // Single click only selects (highlights) the row; double click opens it. This
-  // mirrors Studio-3T and lets the same collection be opened in several tabs.
-  function highlightCollection(conn, db, collName) {
-    setSelection({
-      resource: appendResource(databaseResource(conn.id, db.name), 'collection', collName),
-      connectionName: conn.name,
-      engine: conn.engine,
-    })
-  }
-
-  function openCollection(conn, db, collName) {
-    openCollectionFor(conn.id, conn.name, db.name, collName)
-  }
-
-  function openCollectionFor(connectionId, connectionName, dbName, collectionName) {
-    // Opening makes the row the active collection, so its highlight comes from
-    // `activeCollectionKey`. Clear the single-click selection set by the click
-    // that preceded this double-click, otherwise it lingers as a stale highlight
-    // after the active tab moves to another collection.
-    setSelection(null)
-    emit('select-collection', {
-      resource: appendResource(databaseResource(connectionId, dbName), 'collection', collectionName),
-      connectionName: connectionName,
-    })
-  }
-
-  // A database or collection row's key, built from its ref by nodeTagKey: the one
-  // spelling the colour tags, the right-click highlight, the active row and the expanded
-  // databases are all compared in, so no two of them can drift apart.
-  function databaseKey(connId, dbName) {
-    return nodeTagKey(databaseResource(connId, dbName))
-  }
-  function collectionKey(connId, dbName, collName) {
-    return nodeTagKey(appendResource(databaseResource(connId, dbName), 'collection', collName))
-  }
-
   async function openRequestedConnection(request) {
     if (!request) return
     const { connectionId } = request
@@ -198,18 +140,14 @@ export function useConnectionTree({ emit }) {
   // The connection whose row highlights. Was a startsWith() over the collection key,
   // which prefix-matched an id instead of comparing one, and only ever for MongoDB.
   const activeConnectionId = computed(() => activeResource.value?.target?.connectionId ?? null)
-  const activeCollectionKey = computed(() => {
-    const t = activeResource.value
-    return isCollectionTab(t) ? nodeTagKey(t.target) : null
-  })
 
   // Keyboard tab switches never click outside the sidebar, so clear the selection here.
   watch(activeTabId, clearSelection)
 
   // When it becomes the active one (switching tabs, or a restored session) expand the
   // sidebar down to it, so the highlighted row is on screen rather than hidden under a
-  // collapsed parent. Only the connection level is shared: a PostgreSQL connection's own
-  // tree holds the schema state below it and opens itself (PostgresTreeNodes).
+  // collapsed parent. Only the connection level is shared: each engine's own tree holds
+  // the state below it and opens itself (useMongoTree, PostgresTreeNodes).
   watch(activeResource, async (t) => {
     if (!t) return
     const conn = connections.value.find(c => c.id === t.target.connectionId)
@@ -218,7 +156,6 @@ export function useConnectionTree({ emit }) {
     if (!expandedConns.value[conn.id]) {
       await toggleConnection(conn)
     }
-    if (isCollectionTab(t)) expandedDbs.value[nodeTagKey(resourceAt(t.target, 'database'))] = true
   })
 
   const filtered = computed(() => {
@@ -238,8 +175,6 @@ export function useConnectionTree({ emit }) {
     expandedConns,
     loadingConns,
     connErrors,
-    expandedDbs,
-    selectedKey,
     searchText,
     sidebarEl,
     filtered,
@@ -248,13 +183,7 @@ export function useConnectionTree({ emit }) {
     selectConnection,
     toggleConnection,
     retryConnection,
-    toggleDatabase,
-    highlightCollection,
     activeConnectionId,
-    activeCollectionKey,
-    openCollection,
-    collectionKey,
-    databaseKey,
     disconnectConn,
   }
 }

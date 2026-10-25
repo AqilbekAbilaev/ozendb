@@ -56,7 +56,6 @@ useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, knownActions
       <ConnectionTree
         v-show="sidebarOpen"
         :width="sidebarWidth"
-        @select-collection="openCollectionTab"
       />
       <Resizer v-show="sidebarOpen" v-model="sidebarWidth" axis="x" :min="200" :max="560" />
 
