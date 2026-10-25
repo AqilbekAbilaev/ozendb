@@ -1,5 +1,6 @@
 // MySQL workspace definitions: the shared table tab, opened on a `database/table` ref, and
-// a query tab whose typed SQL is its `state` and whose runs are `runtime`.
+// a query tab whose typed SQL is its `state` and whose runs are `runtime`. A session saves
+// the state; runtime starts fresh.
 import { defineAsyncComponent } from 'vue'
 import { createResourceRef, segmentName } from '../../../utils/resourceRef'
 import { rollBackOnClose, tableDefinition } from '../../sql/workspaces/tableDefinition.js'
@@ -33,7 +34,8 @@ export const mysqlDefinitions = [
     component: SqlQueryWorkspace,
     create: (ctx) => queryWorkspace({ target: ctx.target.resource, connectionName: ctx.target.connectionName }),
     duplicate: (workspace) => queryWorkspace(workspace, workspace.state.sql),
-    // TODO #397: saving the tab's SQL so it is restored after a restart.
+    serialize: (workspace) => ({ sql: workspace.state.sql }),
+    restore: (saved) => queryWorkspace(saved, saved.sql ?? ''),
     dispose: (workspace) => rollBackOnClose(workspace.runtime.run),
   },
 ]

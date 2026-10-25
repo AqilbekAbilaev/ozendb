@@ -153,9 +153,11 @@ describe('api', () => {
     expect(invoke).toHaveBeenCalledWith('list_mysql_foreign_keys', { id: 'c1', database: 'shop.eu', table: 'order items' })
   })
 
-  it('says what is not available yet rather than calling a command that does not exist', async () => {
-    await expect(api.pushHistory('c1', 'SELECT 1')).rejects.toEqual({ code: 'not_available', message: "Query history isn't available for MySQL yet." })
-    expect(invoke).not.toHaveBeenCalled()
+  it('keeps its history and saved SQL in the library every SQL engine shares', async () => {
+    await api.pushHistory('c1', 'SELECT `ü`')
+    expect(invoke).toHaveBeenCalledWith('push_sql_history', { connectionId: 'c1', sql: 'SELECT `ü`' })
+    await api.saveQuery('c1', 'Top orders', 'SELECT 1')
+    expect(invoke).toHaveBeenCalledWith('save_sql_query', { connectionId: 'c1', name: 'Top orders', sql: 'SELECT 1' })
   })
 
   it('runs SQL through MySQL\'s own command', async () => {
