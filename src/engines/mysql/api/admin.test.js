@@ -25,4 +25,14 @@ describe('MySQL server administration', () => {
       ['list_mysql_grants', { id: 'm1', user: "o'brien ü", host: '10.%' }],
     ])
   })
+
+  it('sends a grant or revoke as one change', async () => {
+    const change = { ...account, database: 'shop', table: null, privileges: ['SELECT'], grantOption: false }
+    await admin.grantPrivileges('m1', change)
+    await admin.revokePrivileges('m1', change)
+    expect(invoke.mock.calls).toEqual([
+      ['grant_mysql_privileges', { id: 'm1', change }],
+      ['revoke_mysql_privileges', { id: 'm1', change }],
+    ])
+  })
 })

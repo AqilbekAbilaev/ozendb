@@ -53,6 +53,8 @@ export const MODALS = {
   // MySQL's server tools, opened from its connection's right-click menu. Accounts are
   // server-wide, so Users is connection level.
   mysqlUsers:      { component: lazy(() => import('../engines/mysql/admin/MySqlUsersModal.vue')),      level: 'connection' },
+  // Opened from the Users modal's detail panel, not a sidebar node.
+  mysqlGrants:     { component: lazy(() => import('../engines/mysql/admin/MySqlGrantsModal.vue')),     level: 'connection' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },
