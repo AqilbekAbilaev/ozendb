@@ -183,16 +183,18 @@ pub(crate) async fn search_tables_impl(
         Ok(val) => val,
         Err(e) => return Err(AppError::Postgres(e)),
     };
-    let _running = match run_id {
+    let running = match run_id {
         Some(run_id) => Some(cancel::register(&mut conn, run_id).await?),
         None => None,
     };
 
-    let rows: Vec<(String, String, String, String)> =
+    let search = async {
         match sqlx::query_as(sqlx::AssertSqlSafe(sql)).bind(&bound_term).bind(cap + 1).fetch_all(&mut *conn).await {
-            Ok(val) => val,
-            Err(e) => return Err(AppError::Postgres(e)),
-        };
+            Ok(val) => Ok(val),
+            Err(e) => Err(AppError::Postgres(e)),
+        }
+    };
+    let rows: Vec<(String, String, String, String)> = cancel::cancellable(running.as_ref(), search).await?;
 
     let truncated = rows.len() as i64 > cap;
     let matches = rows

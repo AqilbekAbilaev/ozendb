@@ -54,3 +54,22 @@ async fn a_statement_over_the_timeout_is_reported_as_timed_out() {
     assert_eq!(err.code(), "cancelled");
     assert_eq!(shown(&err), "The query ran past its time limit and was stopped.");
 }
+
+#[tokio::test]
+async fn cancel_stops_a_query_however_soon_it_comes() {
+    let Some(config) = test_config() else { return eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests") };
+    let pool = pool(&config).await;
+    // Cancelled as soon as it can be found, often before its statement has started.
+    for attempt in 0..20 {
+        let id = format!("pg-query-soon {attempt}");
+        let running = {
+            let (pool, id) = (pool.clone(), id.clone());
+            tokio::spawn(async move { run_query_as(&pool, "SELECT pg_sleep(3)", false, Some(&id)).await })
+        };
+        while !cancel_query_impl(&pool, &id).await.unwrap() {
+            tokio::task::yield_now().await;
+        }
+        let stopped = tokio::time::timeout(std::time::Duration::from_secs(2), running).await.expect("Cancel stops it however soon it comes").unwrap().unwrap_err();
+        assert_eq!(stopped.code(), "cancelled", "attempt {attempt}");
+    }
+}

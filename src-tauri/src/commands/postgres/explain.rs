@@ -31,20 +31,17 @@ pub(crate) async fn explain_impl(pool: &sqlx::PgPool, sql: &str, read_only: bool
             result = Err(AppError::Postgres(e));
         }
     }
-    if let (Ok(_), Some(running)) = (&result, &running) {
-        result = running.stopped().map(|()| serde_json::Value::Null);
-    }
     if result.is_ok() {
         // `sql` is the caller's own query, run as-is — the same trust as run_pg_query.
         let explain = format!("EXPLAIN (ANALYZE, FORMAT JSON) {trimmed}");
-        result = match sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(explain)).fetch_one(&mut *tx).await {
-            Ok(plan) => Ok(plan),
-            Err(e) => Err(AppError::Postgres(e)),
+        let plan = async {
+            match sqlx::query_scalar::<_, serde_json::Value>(sqlx::AssertSqlSafe(explain)).fetch_one(&mut *tx).await {
+                Ok(plan) => Ok(plan),
+                Err(e) => Err(AppError::Postgres(e)),
+            }
         };
+        result = cancel::cancellable(running.as_ref(), plan).await;
     }
-    // Unregistered while the connection is still this run's: once rolled back, the pool
-    // can hand it to another tab, whose query a late Cancel would stop instead.
-    drop(running);
     let _ = tx.rollback().await;
     result
 }

@@ -111,11 +111,11 @@ pub(super) async fn run_wrapped_on(
     binds: &[String],
     run_id: Option<&str>,
 ) -> Result<SqlQueryResult, AppError> {
-    let _running = match run_id {
+    let running = match run_id {
         Some(id) => Some(cancel::register(&mut *conn, id).await?),
         None => None,
     };
-    run_statement_on(conn, inner_sql, binds).await
+    cancel::cancellable(running.as_ref(), run_statement_on(conn, inner_sql, binds)).await
 }
 
 /// `run_wrapped_on`'s statement itself, run once the run is registered.
