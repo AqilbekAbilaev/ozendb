@@ -6,8 +6,10 @@ import FormField from '../../../components/base/FormField.vue'
 
 const props = defineProps({
   form: { type: Object, required: true },
+  fields: { type: Object, required: true },
 })
-const { useTls, tlsCaFile, tlsCertKeyFile, tlsAllowInvalidCerts, pickTlsFile, pickClientCert } = props.form
+const { useTls, tlsCaFile, tlsAllowInvalidCerts, pickTlsFile } = props.form
+const { tlsCertKeyFile, pickClientCert } = props.fields
 </script>
 
 <template>

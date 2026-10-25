@@ -33,8 +33,8 @@ describe('formFields', () => {
     const f = useConnectionForm(null)
     f.username.value = 'admin'
     f.password.value = 'secret'
-    f.authDb.value = 'admin'
-    f.authMode.value = 'none'
+    f.engineFields.mongodb.authDb.value = 'admin'
+    f.engineFields.mongodb.authMode.value = 'none'
 
     const fields = f.formFields()
     expect(fields.username).toBe(null)
@@ -105,11 +105,12 @@ describe('engine', () => {
     f.database.value = ' app '
     f.username.value = 'me'
     f.password.value = 'pw'
-    f.authMode.value = 'none'
-    f.connType.value = 'replica'
-    f.replicaSetName.value = 'rs0'
+    const mongo = f.engineFields.mongodb
+    mongo.authMode.value = 'none'
+    mongo.connType.value = 'replica'
+    mongo.replicaSetName.value = 'rs0'
     f.useTls.value = true
-    f.tlsCertKeyFile.value = '/client.pem'
+    mongo.tlsCertKeyFile.value = '/client.pem'
 
     const fields = f.formFields()
     expect(fields).toMatchObject({ engine: 'postgresql', database: 'app', username: 'me', password: 'pw' })
@@ -206,7 +207,7 @@ describe('refusing an edit that would strand the sidebar', () => {
     sidebarShows('c1')
     const f = useConnectionForm(stored())
     f.connName.value = 'renamed'
-    f.advancedOptions.value.socketTimeoutMS = '9000'
+    f.engineFields.mongodb.advancedOptions.value.socketTimeoutMS = '9000'
 
     expect(await f.save()).not.toBe(null)
     expect(f.blockedByLiveConnection.value).toBe(false)
@@ -436,5 +437,145 @@ describe('the colour shown on tabs', () => {
     f.selectedTag.value = 'blue'
     await f.save()
     expect(tagOverrides.value['new-id']).toBe('blue')
+  })
+})
+
+const { ENGINES } = await import('../engines/index.js')
+const { parseConnectionUri } = await import('../utils/connectionUri.js')
+const { KNOWN_OPTION_KEYS } = await import('../data/connectionOptions.js')
+const { parseMySqlUri } = await import('../engines/mysql/connection/parseUri.js')
+
+describe('each engine\'s own fields', () => {
+  it('are made for every engine that brings them, and for no other', () => {
+    const f = useConnectionForm(null)
+    const bringing = Object.values(ENGINES).filter(e => e.useFields).map(e => e.id)
+    expect(Object.keys(f.engineFields)).toEqual(bringing)
+    for (const e of Object.values(ENGINES).filter(e => !e.useFields)) {
+      expect(f.engineFields[e.id], e.id).toBe(undefined)
+    }
+  })
+
+  it('keep what was typed in MongoDB\'s fields across a switch to PostgreSQL and back', () => {
+    const f = useConnectionForm(null)
+    const mongo = f.engineFields.mongodb
+    mongo.connType.value = 'replica'
+    mongo.replicaSetName.value = 'rs-ü 0'
+    mongo.advancedOptions.value.appName = 'my app'
+
+    f.setEngine('postgresql')
+    f.setEngine('mongodb')
+
+    expect(f.engineFields.mongodb).toBe(mongo)
+    expect(f.formFields()).toMatchObject({
+      connectionType: 'replica', replicaSetName: 'rs-ü 0', options: { appName: 'my app' },
+    })
+  })
+})
+
+describe('the payload for each engine', () => {
+  // Shared values, irregular on purpose: padding, unicode, string ports.
+  function fillShared(f) {
+    f.connName.value = '  Prod ü  '
+    f.hosts.value = [{ host: 'db-1.example', port: '6001' }, { host: 'db-2', port: '' }]
+    f.username.value = 'ad min'
+    f.password.value = 'p@ss:/w'
+    f.database.value = '  sales 2024 '
+    f.useTls.value = true
+    f.tlsCaFile.value = '/ca dir/ca.pem'
+    f.tlsAllowInvalidCerts.value = true
+    f.useSsh.value = true
+    f.sshHost.value = 'bastion'
+    f.sshPort.value = '2222'
+    f.sshUser.value = 'ubuntu'
+    f.sshAuth.value = 'key'
+    f.sshKeyFile.value = '/id_ed25519'
+    f.sshKeyPassphrase.value = 'phrase'
+    f.selectedTag.value = 'red'
+    f.readOnly.value = true
+  }
+  const shared = (engine, defaultPort) => ({
+    name: 'Prod ü',
+    engine,
+    hosts: [{ host: 'db-1.example', port: 6001 }, { host: 'db-2', port: defaultPort }],
+    tls: true,
+    tlsCaFile: '/ca dir/ca.pem',
+    tlsAllowInvalidCertificates: true,
+    sshEnabled: true,
+    sshHost: 'bastion',
+    sshPort: 2222,
+    sshUser: 'ubuntu',
+    sshAuth: 'key',
+    sshKeyFile: '/id_ed25519',
+    sshPassword: null,
+    sshPassphrase: 'phrase',
+    tag: 'red',
+    readOnly: true,
+  })
+
+  it('carries MongoDB\'s own settings for MongoDB', () => {
+    const f = useConnectionForm(null)
+    fillShared(f)
+    const mongo = f.engineFields.mongodb
+    mongo.connType.value = 'replica'
+    mongo.replicaSetName.value = 'rs-ü 0'
+    mongo.authMode.value = 'SCRAM-SHA-1'
+    mongo.authDb.value = '$external'
+    mongo.tlsCertKeyFile.value = '/client cert.pem'
+    mongo.readPreference.value = 'secondaryPreferred'
+    mongo.advancedOptions.value.socketTimeoutMS = '9000'
+
+    expect(f.formFields()).toEqual({
+      ...shared('mongodb', 27017),
+      connectionType: 'replica',
+      replicaSetName: 'rs-ü 0',
+      options: { socketTimeoutMS: '9000', readPreference: 'secondaryPreferred' },
+      username: 'ad min',
+      password: 'p@ss:/w',
+      authDb: '$external',
+      authMechanism: 'SCRAM-SHA-1',
+      tlsCertKeyFile: '/client cert.pem',
+    })
+  })
+
+  for (const [engine, defaultPort] of [['postgresql', 5432], ['mysql', 3306]]) {
+    it(`carries only the database and credentials for ${engine}`, () => {
+      const f = useConnectionForm(null)
+      f.setEngine(engine)
+      fillShared(f)
+      f.engineFields.mongodb.connType.value = 'replica'
+
+      expect(f.formFields()).toEqual({
+        ...shared(engine, defaultPort),
+        database: 'sales 2024',
+        username: 'ad min',
+        password: 'p@ss:/w',
+      })
+    })
+  }
+})
+
+describe('a pasted connection string', () => {
+  it('fills MongoDB\'s own fields for MongoDB, and leaves the database alone', () => {
+    const f = useConnectionForm(null)
+    f.applyParsed(parseConnectionUri(
+      'mongodb://app:pw@a:27018,b:27019/sales?replicaSet=rs0&authSource=authdb&readPreference=secondary&appName=x',
+      KNOWN_OPTION_KEYS,
+    ))
+
+    const mongo = f.engineFields.mongodb
+    expect([mongo.connType.value, mongo.replicaSetName.value, mongo.authDb.value, mongo.readPreference.value])
+      .toEqual(['replica', 'rs0', 'authdb', 'secondary'])
+    expect(mongo.advancedOptions.value.appName).toBe('x')
+    expect(f.database.value).toBe('')
+  })
+
+  it('sets the database for MySQL, and leaves MongoDB\'s fields alone', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('mysql')
+    f.applyParsed(parseMySqlUri('mysql://app:pw@db:3307/shop'))
+
+    expect(f.database.value).toBe('shop')
+    expect(f.formFields()).toMatchObject({ username: 'app', password: 'pw', hosts: [{ host: 'db', port: 3307 }] })
+    expect(f.engineFields.mongodb.connType.value).toBe('standalone')
   })
 })

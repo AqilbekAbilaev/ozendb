@@ -7,7 +7,6 @@ import { connectionTargetChanged } from '../utils/connectionTarget.js'
 import { hasLoadedData } from '../stores/connectionData.js'
 import { setTagOverride } from '../stores/nodeTags.js'
 import { ENGINES } from '../engines/index.js'
-import { useMongoFields } from '../engines/mongodb/connection/useMongoFields.js'
 
 /**
  * One connection editor's fields and the two things you can do with them: test the
@@ -47,7 +46,11 @@ export function useConnectionForm(editConn) {
   const username = ref(isEditMode ? (editConn.username ?? '') : '')
   const password = ref('')   // never pre-filled — empty means "keep existing"
 
-  const mongo = useMongoFields(editConn, { pickCertificate })
+  // Each engine's own fields, keyed by engine id: made once, up front, so switching
+  // engine keeps what was typed into each one's fields.
+  const engineFields = Object.fromEntries(Object.values(ENGINES)
+    .filter(e => e.useFields)
+    .map(e => [e.id, e.useFields(editConn, { pickCertificate })]))
 
   // ssl
   const useTls               = ref(isEditMode ? !!editConn.tls : false)
@@ -123,18 +126,11 @@ export function useConnectionForm(editConn) {
       tag:             selectedTag.value !== 'none' ? selectedTag.value : null,
       readOnly:        readOnly.value,
       ...ENGINES[engine.value].buildFields({
-        database:       database.value,
-        connType:       mongo.connType.value,
-        replicaSetName: mongo.replicaSetName.value,
-        // A getter, so only an engine that reads options pays for building them.
-        get options() { return mongo.buildOptions() },
-        authMode:       mongo.authMode.value,
-        username:       username.value,
-        password:       password.value,
-        authDb:         mongo.authDb.value,
-        useTls:         useTls.value,
-        tlsCertKeyFile: mongo.tlsCertKeyFile.value,
-      }),
+        database: database.value,
+        username: username.value,
+        password: password.value,
+        useTls:   useTls.value,
+      }, engineFields[engine.value]),
     }
   }
 
@@ -151,7 +147,7 @@ export function useConnectionForm(editConn) {
     set(tlsAllowInvalidCerts, parsed.tlsAllowInvalidCerts)
     set(tlsCaFile, parsed.tlsCaFile)
     if (ENGINES[engine.value].namesDatabase) set(database, parsed.database)
-    else mongo.applyParsed(parsed)
+    engineFields[engine.value]?.applyParsed?.(parsed)
   }
 
   async function testConnection() {
@@ -270,9 +266,7 @@ export function useConnectionForm(editConn) {
     sshKeyPassphrase, pickSshKey,
     selectedTag, readOnly,
     status, isTesting, isSaving, blockedByLiveConnection,
-    formFields, testConnection, save, saveAsNew,
-    ...mongo,
-    // After the spread: the form's own applyParsed calls mongo's.
-    applyParsed,
+    engineFields,
+    formFields, applyParsed, testConnection, save, saveAsNew,
   }
 }

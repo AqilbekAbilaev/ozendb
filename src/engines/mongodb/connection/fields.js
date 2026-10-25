@@ -1,14 +1,15 @@
-// MongoDB's part of the connection editor's payload, from plain form values.
-export function buildMongoFields(v) {
-  const auth = v.authMode !== 'none'
+// MongoDB's part of the connection editor's payload, from the form's shared values and
+// MongoDB's own fields (useMongoFields).
+export function buildMongoFields(v, mongo) {
+  const auth = mongo.authMode.value !== 'none'
   return {
-    connectionType: v.connType,
-    replicaSetName: v.replicaSetName || null,
-    options:        v.options,
+    connectionType: mongo.connType.value,
+    replicaSetName: mongo.replicaSetName.value || null,
+    options:        mongo.buildOptions(),
     username:       auth ? (v.username || null) : null,
     password:       auth ? (v.password || null) : null,
-    authDb:         auth ? (v.authDb || null) : null,
-    authMechanism:  v.authMode,
-    tlsCertKeyFile: v.useTls ? (v.tlsCertKeyFile || null) : null,
+    authDb:         auth ? (mongo.authDb.value || null) : null,
+    authMechanism:  mongo.authMode.value,
+    tlsCertKeyFile: v.useTls ? (mongo.tlsCertKeyFile.value || null) : null,
   }
 }
