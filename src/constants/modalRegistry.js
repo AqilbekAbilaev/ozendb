@@ -22,12 +22,12 @@ export const MODALS = {
   errorReport:       { component: lazy(() => import('../components/app/ErrorReportModal.vue')),          level: null },
 
   // ── connection level ──
-  serverStatus: { component: lazy(() => import('../components/admin/ServerStatusModal.vue')), level: 'connection' },
-  serverCharts: { component: lazy(() => import('../components/admin/ServerChartsModal.vue')), level: 'connection' },
+  serverStatus: { component: lazy(() => import('../engines/mongodb/admin/ServerStatusModal.vue')), level: 'connection' },
+  serverCharts: { component: lazy(() => import('../engines/mongodb/admin/ServerChartsModal.vue')), level: 'connection' },
   // Build / Host / Replica info share one modal; its feature seeds a { kind, title } payload
   // on top of the node fields (see openServerInfo), so it opens directly, not via modalFeature.
-  serverInfo:   { component: lazy(() => import('../components/admin/ServerInfoModal.vue')),   level: 'connection' },
-  addDatabase:  { component: lazy(() => import('../components/admin/AddDatabaseModal.vue')),  level: 'connection' },
+  serverInfo:   { component: lazy(() => import('../engines/mongodb/admin/ServerInfoModal.vue')),   level: 'connection' },
+  addDatabase:  { component: lazy(() => import('../engines/mongodb/admin/AddDatabaseModal.vue')),  level: 'connection' },
   // PostgreSQL's own read-only diagnostics; opened from its tree menu with the node
   // itself as the target, so it takes no seeding of its own.
   pgServerInfo: { component: lazy(() => import('../engines/postgresql/admin/PostgresServerInfoModal.vue')), level: 'connection' },
@@ -59,30 +59,30 @@ export const MODALS = {
   mysqlServerInfo: { component: lazy(() => import('../engines/mysql/admin/MySqlServerInfoModal.vue')), level: 'connection' },
 
   // ── database level ──
-  dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },
-  profiler:  { component: lazy(() => import('../components/admin/ProfilerModal.vue')),      level: 'database' },
-  users:     { component: lazy(() => import('../components/admin/UsersModal.vue')),         level: 'database' },
-  roles:     { component: lazy(() => import('../components/admin/RolesModal.vue')),         level: 'database' },
-  functions: { component: lazy(() => import('../components/admin/FunctionsModal.vue')),     level: 'database' },
+  dbStats:   { component: lazy(() => import('../engines/mongodb/admin/DatabaseStatsModal.vue')), level: 'database' },
+  profiler:  { component: lazy(() => import('../engines/mongodb/admin/ProfilerModal.vue')),      level: 'database' },
+  users:     { component: lazy(() => import('../engines/mongodb/admin/UsersModal.vue')),         level: 'database' },
+  roles:     { component: lazy(() => import('../engines/mongodb/admin/RolesModal.vue')),         level: 'database' },
+  functions: { component: lazy(() => import('../engines/mongodb/admin/FunctionsModal.vue')),     level: 'database' },
   gridfs:    { component: lazy(() => import('../components/tools/GridFsModal.vue')),        level: 'database' },
-  addBucket:     { component: lazy(() => import('../components/admin/AddBucketModal.vue')),     level: 'database' },
-  addCollection: { component: lazy(() => import('../components/admin/AddCollectionModal.vue')), level: 'database' },
-  dropDatabase:  { component: lazy(() => import('../components/admin/DropDatabaseModal.vue')),  level: 'database' },
+  addBucket:     { component: lazy(() => import('../engines/mongodb/admin/AddBucketModal.vue')),     level: 'database' },
+  addCollection: { component: lazy(() => import('../engines/mongodb/admin/AddCollectionModal.vue')), level: 'database' },
+  dropDatabase:  { component: lazy(() => import('../engines/mongodb/admin/DropDatabaseModal.vue')),  level: 'database' },
   // Add View is seeded with an extra `source` on top of the database fields (empty from a
   // database node, the clicked collection from "Add View Here…"), so its features open it
   // directly rather than through modalFeature.
-  addView:       { component: lazy(() => import('../components/admin/AddViewModal.vue')),       level: 'database' },
+  addView:       { component: lazy(() => import('../engines/mongodb/admin/AddViewModal.vue')),       level: 'database' },
 
   // ── collection level ──
   // Registry modals take one `target` prop and emit `close`; their owners may supply
   // additional per-open listeners without adding routing to App.vue.
-  stats:     { component: lazy(() => import('../components/admin/StatsModal.vue')),             level: 'collection' },
+  stats:     { component: lazy(() => import('../engines/mongodb/admin/StatsModal.vue')),             level: 'collection' },
   history:   { component: lazy(() => import('../components/tools/CollectionHistoryModal.vue')), level: 'collection' },
   mapReduce: { component: lazy(() => import('../components/query/MapReduceModal.vue')),         level: 'collection' },
-  validator: { component: lazy(() => import('../components/admin/ValidatorModal.vue')),         level: 'collection' },
+  validator: { component: lazy(() => import('../engines/mongodb/admin/ValidatorModal.vue')),         level: 'collection' },
   import:    { component: lazy(() => import('../components/tools/ImportFormatModal.vue')),      level: 'collection' },
   exportSource: { component: lazy(() => import('../components/tools/ExportSourceModal.vue')),   level: 'collection' },
-  dropCollection:      { component: lazy(() => import('../components/admin/DropCollectionModal.vue')),      level: 'collection' },
-  renameCollection:    { component: lazy(() => import('../components/admin/RenameCollectionModal.vue')),    level: 'collection' },
-  duplicateCollection: { component: lazy(() => import('../components/admin/DuplicateCollectionModal.vue')), level: 'collection' },
+  dropCollection:      { component: lazy(() => import('../engines/mongodb/admin/DropCollectionModal.vue')),      level: 'collection' },
+  renameCollection:    { component: lazy(() => import('../engines/mongodb/admin/RenameCollectionModal.vue')),    level: 'collection' },
+  duplicateCollection: { component: lazy(() => import('../engines/mongodb/admin/DuplicateCollectionModal.vue')), level: 'collection' },
 }

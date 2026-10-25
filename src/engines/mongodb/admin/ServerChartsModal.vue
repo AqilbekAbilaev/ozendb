@@ -1,11 +1,11 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
-import { serverStatus } from '../../engines/mongodb/api/admin'
-import { errText } from '../../utils/errors'
-import StateMessage from '../base/StateMessage.vue'
-import BaseModal from '../base/BaseModal.vue'
-import HintText from '../base/HintText.vue'
-import BaseModalBody from '../base/BaseModalBody.vue'
+import { serverStatus } from '../api/admin'
+import { errText } from '../../../utils/errors'
+import StateMessage from '../../../components/base/StateMessage.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import HintText from '../../../components/base/HintText.vue'
+import BaseModalBody from '../../../components/base/BaseModalBody.vue'
 
 // Live server metrics: polls serverStatus on an interval and draws simple SVG
 // sparklines. Reuses the existing server_status command (no new backend).

@@ -1,15 +1,15 @@
 <script setup>
 import { ref } from 'vue'
-import { createCollection } from '../../engines/mongodb/api/resources'
-import { apiTarget } from '../../engines/mongodb/api/payload'
-import BaseModal from '../base/BaseModal.vue'
-import BaseInput from '../base/BaseInput.vue'
-import BaseButton from '../base/BaseButton.vue'
-import FieldError from '../base/FieldError.vue'
-import { errText } from '../../utils/errors'
-import { showToast } from '../../stores/toast'
-import { invalidateConnectionResources } from '../../stores/connectionData'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import { createCollection } from '../api/resources'
+import { apiTarget } from '../api/payload'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import FieldError from '../../../components/base/FieldError.vue'
+import { errText } from '../../../utils/errors'
+import { showToast } from '../../../stores/toast'
+import { invalidateConnectionResources } from '../../../stores/connectionData'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Database → Add GridFS Bucket…: a bucket is the pair of `<name>.files` and
 // `<name>.chunks` collections; create both so it appears in the GridFS view.

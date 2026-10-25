@@ -1,14 +1,14 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { createDatabase } from '../../engines/mongodb/api/resources'
-import BaseModal from '../base/BaseModal.vue'
-import BaseInput from '../base/BaseInput.vue'
-import BaseButton from '../base/BaseButton.vue'
-import FieldError from '../base/FieldError.vue'
-import { errText } from '../../utils/errors'
-import { showToast } from '../../stores/toast'
-import { invalidateConnectionResources } from '../../stores/connectionData'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import { createDatabase } from '../api/resources'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import FieldError from '../../../components/base/FieldError.vue'
+import { errText } from '../../../utils/errors'
+import { showToast } from '../../../stores/toast'
+import { invalidateConnectionResources } from '../../../stores/connectionData'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Connection → Add Database…: MongoDB only materialises a database once it holds a
 // collection, so the first collection name is required rather than optional.

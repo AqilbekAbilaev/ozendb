@@ -1,15 +1,15 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { databaseStats } from '../../engines/mongodb/api/admin'
-import { apiTarget } from '../../engines/mongodb/api/payload'
-import { errText, errCode } from '../../utils/errors'
-import BaseIcon from '../base/BaseIcon.vue'
-import RawToggle from '../base/RawToggle.vue'
-import StateMessage from '../base/StateMessage.vue'
-import BaseModalBody from '../base/BaseModalBody.vue'
-import BaseModal from '../base/BaseModal.vue'
-import { fmtBytes, fmtNum } from '../../utils/format'
-import { resourceName } from '../../utils/resourceRef'
+import { databaseStats } from '../api/admin'
+import { apiTarget } from '../api/payload'
+import { errText, errCode } from '../../../utils/errors'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import RawToggle from '../../../components/base/RawToggle.vue'
+import StateMessage from '../../../components/base/StateMessage.vue'
+import BaseModalBody from '../../../components/base/BaseModalBody.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import { fmtBytes, fmtNum } from '../../../utils/format'
+import { resourceName } from '../../../utils/resourceRef'
 
 // Opened from App.vue for a database node. Fetches `dbStats` once and surfaces the
 // headline fields; the full document is available raw below.
