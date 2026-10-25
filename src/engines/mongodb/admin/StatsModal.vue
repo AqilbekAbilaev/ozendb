@@ -1,14 +1,14 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { collectionStats } from '../../engines/mongodb/api/admin'
-import { apiTarget } from '../../engines/mongodb/api/payload'
-import { errText, errCode } from '../../utils/errors'
-import BaseIcon from '../base/BaseIcon.vue'
-import RawToggle from '../base/RawToggle.vue'
-import BaseModal from '../base/BaseModal.vue'
-import StateMessage from '../base/StateMessage.vue'
-import BaseModalBody from '../base/BaseModalBody.vue'
-import { fmtBytes, fmtNum } from '../../utils/format'
+import { collectionStats } from '../api/admin'
+import { apiTarget } from '../api/payload'
+import { errText, errCode } from '../../../utils/errors'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import RawToggle from '../../../components/base/RawToggle.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import StateMessage from '../../../components/base/StateMessage.vue'
+import BaseModalBody from '../../../components/base/BaseModalBody.vue'
+import { fmtBytes, fmtNum } from '../../../utils/format'
 
 // Opened from a collection node's "Collection Stats" action. Fetches collStats
 // and surfaces the headline numbers plus a per-index size breakdown, the way

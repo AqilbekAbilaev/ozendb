@@ -1,12 +1,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listRoles } from '../../engines/mongodb/api/admin'
-import { apiTarget } from '../../engines/mongodb/api/payload'
-import { errText } from '../../utils/errors'
-import StateMessage from '../base/StateMessage.vue'
-import BaseModal from '../base/BaseModal.vue'
-import BaseModalBody from '../base/BaseModalBody.vue'
-import { resourceName } from '../../utils/resourceRef'
+import { listRoles } from '../api/admin'
+import { apiTarget } from '../api/payload'
+import { errText } from '../../../utils/errors'
+import StateMessage from '../../../components/base/StateMessage.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseModalBody from '../../../components/base/BaseModalBody.vue'
+import { resourceName } from '../../../utils/resourceRef'
 
 // Manage Roles for a database: read-only listing of the custom (non-built-in) roles.
 const props = defineProps({

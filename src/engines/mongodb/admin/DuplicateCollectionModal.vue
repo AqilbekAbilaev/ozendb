@@ -1,16 +1,16 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { duplicateCollection } from '../../engines/mongodb/api/transfer'
-import { apiTarget } from '../../engines/mongodb/api/payload'
-import BaseModal from '../base/BaseModal.vue'
-import BaseInput from '../base/BaseInput.vue'
-import BaseButton from '../base/BaseButton.vue'
-import FieldError from '../base/FieldError.vue'
-import { errText } from '../../utils/errors'
-import { showToast } from '../../stores/toast'
-import { invalidateConnectionResources } from '../../stores/connectionData'
-import { resourceName } from '../../utils/resourceRef'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import { duplicateCollection } from '../api/transfer'
+import { apiTarget } from '../api/payload'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import FieldError from '../../../components/base/FieldError.vue'
+import { errText } from '../../../utils/errors'
+import { showToast } from '../../../stores/toast'
+import { invalidateConnectionResources } from '../../../stores/connectionData'
+import { resourceName } from '../../../utils/resourceRef'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Collection → Duplicate Collection…: copies every document into a new collection in the
 // same database, prefilled with a "_copy" suffix. The backend returns the copied count.

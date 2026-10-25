@@ -1,15 +1,15 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { getProfilingStatus, setProfilingLevel, listProfile } from '../../engines/mongodb/api/admin'
-import { apiTarget } from '../../engines/mongodb/api/payload'
-import { errText, errCode } from '../../utils/errors'
-import BaseSelect from '../base/BaseSelect.vue'
-import StateMessage from '../base/StateMessage.vue'
-import BaseModal from '../base/BaseModal.vue'
-import BaseButton from '../base/BaseButton.vue'
-import BaseInput from '../base/BaseInput.vue'
-import BaseModalBody from '../base/BaseModalBody.vue'
-import { resourceName } from '../../utils/resourceRef'
+import { getProfilingStatus, setProfilingLevel, listProfile } from '../api/admin'
+import { apiTarget } from '../api/payload'
+import { errText, errCode } from '../../../utils/errors'
+import BaseSelect from '../../../components/base/BaseSelect.vue'
+import StateMessage from '../../../components/base/StateMessage.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseModalBody from '../../../components/base/BaseModalBody.vue'
+import { resourceName } from '../../../utils/resourceRef'
 
 // Opened from App.vue for a database node. Reads the database's profiling status,
 // lists the slow ops captured in `system.profile`, and lets the user change the
