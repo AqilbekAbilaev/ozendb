@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed } from 'vue'
-import BaseModal from '../base/BaseModal.vue'
-import BaseButton from '../base/BaseButton.vue'
-import BaseRadio from '../base/BaseRadio.vue'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseRadio from '../../../components/base/BaseRadio.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Studio-3T-style "Import format" picker: the first thing the user sees after
 // choosing Import. It only selects an input format — on Configure it emits the

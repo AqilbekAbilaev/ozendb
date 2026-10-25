@@ -1,15 +1,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { listCollectionHistory, clearCollectionHistory, restoreHistory } from '../../engines/mongodb/api/documents'
-import { apiTarget } from '../../engines/mongodb/api/payload'
-import { errText, errCode } from '../../utils/errors'
-import BaseIcon from '../base/BaseIcon.vue'
-import BaseButton from '../base/BaseButton.vue'
-import StateMessage from '../base/StateMessage.vue'
-import BaseModal from '../base/BaseModal.vue'
-import HintText from '../base/HintText.vue'
-import BaseModalBody from '../base/BaseModalBody.vue'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import { listCollectionHistory, clearCollectionHistory, restoreHistory } from '../api/documents'
+import { apiTarget } from '../api/payload'
+import { errText, errCode } from '../../../utils/errors'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import StateMessage from '../../../components/base/StateMessage.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import HintText from '../../../components/base/HintText.vue'
+import BaseModalBody from '../../../components/base/BaseModalBody.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Collection History: the app's record of single-document changes (insert / update /
 // delete) made to this collection, newest-first, each restorable — Studio-3T's
