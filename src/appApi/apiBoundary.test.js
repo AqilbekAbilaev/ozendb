@@ -24,7 +24,7 @@ const APP_COMMANDS = [
   // connections.js
   'test_connection', 'list_connections', 'save_connection', 'update_connection',
   'delete_connection', 'disconnect', 'duplicate_connection',
-  'export_connections', 'import_connections',
+  'export_connections', 'import_connections', 'connection_uri',
   // connectionState.js
   'set_connection_open', 'update_last_accessed',
   // sshTrust.js

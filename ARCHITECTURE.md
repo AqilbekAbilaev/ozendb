@@ -74,9 +74,9 @@ typed calls with no wire shape, so they are imported directly wherever they are 
   and `events`. Nothing here knows what a collection is.
 - **`src/engines/mongodb/api/`** — everything MongoDB-shaped: `queries`, `documents`,
   `admin`, `indexes`, `schema`, `resources`, `gridfs`, `shell`, `transfer`,
-  `connections`, `queryLibrary`. Each takes a target `{ connectionId, database,
-  collection }` and turns it into a command payload via `payload.js`. **The only place
-  that knows command names and wire shapes** — the rest of the frontend talks targets.
+  `queryLibrary`. Each takes a target `{ connectionId, database, collection }` and
+  turns it into a command payload via `payload.js`. **The only place that knows command
+  names and wire shapes** — the rest of the frontend talks targets.
 
 Adding a backend command means adding it to whichever root owns it, and to the list in
 `apiBoundary.test.js` if it is engine-neutral.

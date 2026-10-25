@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import * as connApi from '../../appApi/connections'
-import { connectionUri } from '../../engines/mongodb/api/connections'
 import { updateLastAccessed } from '../../appApi/connectionState'
 import { requestConnectionOpen } from '../../stores/connectionNavigation'
 import { onConnectionSaved as whenConnectionSaved, emitConnectionDeleted } from '../../appApi/events'
@@ -142,7 +141,7 @@ async function duplicateSelected() {
 async function copyUri() {
   if (!selectedId.value) return
   try {
-    const uri = await connectionUri(selectedId.value)
+    const uri = await connApi.connectionUri(selectedId.value)
     await navigator.clipboard.writeText(uri)
     showToast('Connection URI copied (password excluded)')
   } catch (e) {

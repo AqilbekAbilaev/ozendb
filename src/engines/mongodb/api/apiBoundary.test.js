@@ -14,8 +14,6 @@ const MONGO_COMMANDS = [
   'get_default_query', 'set_default_query', 'clear_default_query',
   'list_saved_queries', 'save_query', 'delete_saved_query',
   'get_query_history', 'push_query_history', 'clear_query_history',
-  // connections.js
-  'connection_uri',
   // resources.js
   'list_databases', 'create_collection', 'create_database', 'create_view',
   'drop_database', 'drop_collection', 'rename_collection',
