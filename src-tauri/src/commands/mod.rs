@@ -28,6 +28,7 @@ pub use connection::*;
 pub use mongo::*;
 pub use mysql::*;
 pub use postgres::*;
+pub use sql::library::*;
 pub use persistence::*;
 pub use folders::*;
 pub use operations::*;

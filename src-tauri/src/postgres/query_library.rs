@@ -1,7 +1,7 @@
-//! PostgreSQL's saved SQL and run history. Separate from MongoDB's `history.rs` /
+//! The saved SQL and run history of every SQL engine, PostgreSQL's first, hence the
+//! name and the file it keeps (`pg_queries.json`). Separate from MongoDB's `history.rs` /
 //! `saved_queries.rs`, whose entries are shaped for MongoDB queries (filter, sort,
-//! projection…); here a query is just SQL. Keyed by connection, since a PostgreSQL
-//! connection is bound to one database.
+//! projection…); here a query is just SQL. Keyed by connection.
 use crate::error::AppError;
 use crate::json_store_wrapper;
 use crate::record::{Record, RecordList, Stamp};

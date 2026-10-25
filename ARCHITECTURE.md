@@ -129,6 +129,7 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
   windows. A run carries its engine's name, so `runSql` finds the same commands. Each engine
   registers the table tab through `tableDefinition.js`.
   `connection/` holds what their connection editors share: the authentication and SSL sections and the payload builder.
+  `api/library.js` is the query library's half of the Tauri boundary, the same for every SQL engine.
 
 A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
 screens still sit in the shared `components/` folders and its sidebar rows in
@@ -175,7 +176,7 @@ ResourceRefs.
 - **Backend: `src-tauri/src/commands/postgres/`**, one file per area, over `sqlx`.
   - Commands resolve a pool through `ctx.pg_pool*`.
   - Three modules sit in `src-tauri/src/postgres/`: `uri.rs` (connect options), and the
-    `query_library.rs` (saved SQL and run history) and `row_history.rs` (per-row undo)
+    `query_library.rs` (saved SQL and run history, which every SQL engine keeps there) and `row_history.rs` (per-row undo)
     stores.
 - **Tests:** the `live_tests/pg*.rs` files run against a live server when
   `OZENDB_TEST_POSTGRES` is set, and are skipped otherwise.
@@ -227,7 +228,7 @@ MySQL has no schema level, and one connection reaches every database on its serv
 | `error.rs` | `AppError` enum serialized as `{ code, message }` so the frontend gets a stable category plus a human-readable message. |
 | `menu.rs` | Native OS menu (source of truth). Also opens the document editor/viewer as a **second Tauri webview window** at `src/pages/document.html` (registered as a Vite entry in `vite.config.js`). See "Native menu" below. |
 | `commands/mongo/`, `commands/postgres/`, `commands/mysql/` | Each engine's commands. The rest of `commands/` is engine-neutral: connections, persistence, folders, operations, the error log, the updater, and the CSV import/export helpers both engines' transfers use. `commands/access.rs` is the one lookup and read-only gate behind every `AppContext` resolver. |
-| `commands/sql/` | What every SQL engine's commands share without talking to a server: the filter, join and result shapes, the row cap, and reading SQL with `sqlparser` (format, read back into filters, refuse typed transaction control) in the dialect the engine passes in. |
+| `commands/sql/` | What every SQL engine's commands share without talking to a server: the filter, join and result shapes, the row cap, and reading SQL with `sqlparser` (format, read back into filters, refuse typed transaction control) in the dialect the engine passes in. And `library.rs`, the commands over every SQL engine's saved SQL and run history. |
 | `postgres/` | PostgreSQL outside the command layer: `uri.rs` (connect options) and the `query_library` / `row_history` stores. |
 | `mysql/` | MySQL outside the command layer: `uri.rs` (the connect options the pool and Test Connection dial with, and the Copy URI string) and `session.rs` (the time limit, the UTC time zone (cells show a TIMESTAMP in the user's own zone), and for a read-only connection the server-side read-only mode, that every new session sets, since sqlx's MySQL options carry no session variables). |
 | `live_tests/` | Tests against a live server, skipped unless `OZENDB_TEST_MONGODB` / `OZENDB_TEST_POSTGRES` / `OZENDB_TEST_MYSQL` is set. `cargo test live_tests::pg` runs just the PostgreSQL ones. |

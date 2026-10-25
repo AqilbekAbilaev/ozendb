@@ -9,7 +9,7 @@ const commitTransaction = vi.fn()
 const rollbackTransaction = vi.fn()
 vi.mock('../../postgresql/api/queries', () => ({ runQuery, cancelQuery, explainQuery, formatQuery, beginTransaction, commitTransaction, rollbackTransaction }))
 const pushHistory = vi.fn()
-vi.mock('../../postgresql/api/library', () => ({ pushHistory }))
+vi.mock('../api/library', () => ({ pushHistory }))
 
 const { runSql, cancelSql, explainSql, formatSql, endTransaction, abandonTransaction, createSqlRun } = await import('./runSql.js')
 

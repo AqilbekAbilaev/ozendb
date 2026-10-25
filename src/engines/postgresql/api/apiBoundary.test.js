@@ -12,8 +12,6 @@ const POSTGRES_COMMANDS = [
   'run_pg_query', 'cancel_pg_query', 'explain_pg_query', 'format_pg_sql', 'begin_pg_transaction', 'commit_pg_transaction', 'rollback_pg_transaction', 'browse_pg_table', 'count_pg_table', 'update_pg_row', 'delete_pg_rows', 'insert_pg_row', 'read_pg_table_select',
   // ddl.js
   'create_pg_schema', 'drop_pg_schema', 'create_pg_table', 'drop_pg_table', 'rename_pg_table',
-  // library.js
-  'list_pg_history', 'push_pg_history', 'clear_pg_history', 'list_pg_saved', 'save_pg_query', 'delete_pg_saved',
   // transfer.js
   'export_pg_data', 'pg_import_preview', 'import_pg_csv',
 ]

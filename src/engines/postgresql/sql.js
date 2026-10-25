@@ -3,7 +3,7 @@
 // through the engine table as `engineOf(x).sql`.
 import * as queries from './api/queries.js'
 import { listColumns, listForeignKeys } from './api/resources.js'
-import * as library from './api/library.js'
+import * as library from '../sql/api/library.js'
 import * as transfer from './api/transfer.js'
 import { planRows } from './workspaces/planRows.js'
 import { saveRows } from './saveRows.js'
