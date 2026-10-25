@@ -127,3 +127,21 @@ pub(crate) fn from_clause(quote: fn(&str) -> Result<String, AppError>, schema: &
     }
     Ok(sql)
 }
+
+/// ` ORDER BY …` on `chosen`, then on each of `keys` it isn't, all in one direction.
+/// The chosen column can tie, and with a join a table's key repeats once per match, so
+/// only every table's key in turn keeps pages from overlapping or skipping rows. Empty
+/// when there is nothing to order by.
+pub(crate) fn order_clause(chosen: Option<String>, keys: Vec<String>, descending: bool) -> String {
+    let ties = keys.into_iter().filter(|key| chosen.as_ref() != Some(key));
+    let names: Vec<String> = chosen.clone().into_iter().chain(ties).collect();
+    if names.is_empty() {
+        return String::new();
+    }
+    let direction = if descending { "DESC" } else { "ASC" };
+    format!(" ORDER BY {}", names.iter().map(|name| format!("{name} {direction}")).collect::<Vec<_>>().join(", "))
+}
+
+#[cfg(test)]
+#[path = "sql.test.rs"]
+mod tests;

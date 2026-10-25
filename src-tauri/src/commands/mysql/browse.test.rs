@@ -177,8 +177,8 @@ fn refuses_an_unknown_column_a_missing_value_an_empty_list_and_a_table_not_in_th
 }
 
 #[test]
-fn orders_by_the_chosen_column_or_else_the_primary_key() {
-    assert_eq!(order_clause(Some(&ColumnRef { table: 0, column: "name".into() }), true, &[columns()]).unwrap(), " ORDER BY `t0`.`name` DESC");
+fn orders_by_the_chosen_column_then_the_primary_key_or_else_the_key_alone() {
+    assert_eq!(order_clause(Some(&ColumnRef { table: 0, column: "name".into() }), true, &[columns()]).unwrap(), " ORDER BY `t0`.`name` DESC, `t0`.`id ``key``` DESC");
     assert_eq!(order_clause(None, false, &[columns()]).unwrap(), " ORDER BY `t0`.`id ``key``` ASC");
     assert_eq!(order_clause(Some(&ColumnRef { table: 0, column: String::new() }), false, &[columns()]).unwrap(), " ORDER BY `t0`.`id ``key``` ASC");
 }
@@ -237,7 +237,7 @@ fn compares_a_joined_column_by_its_own_table_s_type() {
 #[test]
 fn orders_by_a_joined_column_or_refuses_one_its_table_lacks() {
     let tables = [columns(), joined()];
-    assert_eq!(order_clause(Some(&ColumnRef { table: 1, column: "at".into() }), false, &tables).unwrap(), " ORDER BY `t1`.`at` ASC");
+    assert_eq!(order_clause(Some(&ColumnRef { table: 1, column: "at".into() }), false, &tables).unwrap(), " ORDER BY `t1`.`at` ASC, `t0`.`id ``key``` ASC, `t1`.`id ``key``` ASC");
     assert!(order_clause(Some(&ColumnRef { table: 2, column: "at".into() }), false, &tables).is_err());
     assert!(order_clause(Some(&ColumnRef { table: 1, column: "nope".into() }), false, &tables).is_err());
 }
