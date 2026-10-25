@@ -24,7 +24,7 @@ async fn page(pool: &MySqlPool, database: &str, table: &str) -> Vec<Vec<Value>> 
     mysql_browse(pool, database, table, &[], &[], None, false, 10, 0).await.unwrap().rows
 }
 
-fn refusal(result: Result<(), AppError>) -> String {
+fn refusal<T: std::fmt::Debug>(result: Result<T, AppError>) -> String {
     result.expect_err("the save is refused").user_message()
 }
 
@@ -48,7 +48,7 @@ async fn every_type_saves_back_exactly_what_the_grid_shows() {
         ],
         "deletes": [],
     }));
-    mysql_save_rows(&pool, name, TABLE, &saved).await.unwrap();
+    mysql_save_rows(&pool, "conn", name, TABLE, &saved).await.unwrap();
 
     let after = page(&pool, name, TABLE).await;
     let mut copied = shown.clone();
@@ -68,10 +68,10 @@ async fn a_key_past_2_to_the_53_deletes_its_own_row_and_not_its_neighbour() {
     let name = "ozendb it save ведомость big keys";
     let pool = seeded(&config, name).await;
     let neighbour = row(&[("id key", json!("9007199254740992")), ("name `x`", json!("neighbour"))]);
-    mysql_save_rows(&pool, name, TABLE, &changes(json!({ "inserts": [neighbour], "updates": [], "deletes": [] }))).await.unwrap();
+    mysql_save_rows(&pool, "conn", name, TABLE, &changes(json!({ "inserts": [neighbour], "updates": [], "deletes": [] }))).await.unwrap();
 
     let gone = changes(json!({ "inserts": [], "updates": [], "deletes": [row(&[("id key", json!("9007199254740993"))])] }));
-    mysql_save_rows(&pool, name, TABLE, &gone).await.unwrap();
+    mysql_save_rows(&pool, "conn", name, TABLE, &gone).await.unwrap();
     let keys: Vec<Value> = page(&pool, name, TABLE).await.into_iter().map(|r| r[0].clone()).collect();
     assert_eq!(keys, [json!(2), json!("9007199254740992"), json!("18446744073709551615")]);
     drop_seeded(&config, pool, name).await;
@@ -112,7 +112,7 @@ async fn a_composite_key_finds_each_row_by_every_part() {
         "updates": [{ "set": row(&[("note", json!("edited"))]), "before": [], "where": key("0x0A0B") }],
         "deletes": [key("0x0A0C")],
     }));
-    mysql_save_rows(&pool, name, "visits ü", &saved).await.unwrap();
+    mysql_save_rows(&pool, "conn", name, "visits ü", &saved).await.unwrap();
     let notes: Vec<Value> = page(&pool, name, "visits ü").await.into_iter().map(|r| r[2].clone()).collect();
     assert_eq!(notes, [json!("edited"), json!("third")]);
     drop_seeded(&config, pool, name).await;
@@ -128,7 +128,7 @@ async fn a_table_without_a_primary_key_is_refused_and_left_as_it_was() {
         "updates": [{ "set": row(&[("line", json!("edited"))]), "before": [], "where": row(&[("line", json!("kept"))]) }],
         "deletes": [],
     }));
-    assert!(refusal(mysql_save_rows(&pool, name, "log", &saved).await).contains("no primary key"));
+    assert!(refusal(mysql_save_rows(&pool, "conn", name, "log", &saved).await).contains("no primary key"));
     assert_eq!(page(&pool, name, "log").await, [vec![json!("kept")]]);
     drop_seeded(&config, pool, name).await;
 }
@@ -148,12 +148,12 @@ async fn a_row_changed_by_someone_else_saves_nothing() {
     }));
     let place = format!("table \"{TABLE}\" of database \"{name}\"");
     assert_eq!(
-        refusal(mysql_save_rows(&pool, name, TABLE, &saved).await),
+        refusal(mysql_save_rows(&pool, "conn", name, TABLE, &saved).await),
         format!("A row in {place} was deleted, or its primary key changed, since it was loaded.")
     );
     let gone = changes(json!({ "inserts": [], "updates": [], "deletes": [row(&[("id key", json!(2))])] }));
     assert_eq!(
-        refusal(mysql_save_rows(&pool, name, TABLE, &gone).await),
+        refusal(mysql_save_rows(&pool, "conn", name, TABLE, &gone).await),
         format!("Some rows in {place} were already deleted, or their primary key changed, since they were loaded.")
     );
     let keys: Vec<Value> = page(&pool, name, TABLE).await.into_iter().map(|r| r[0].clone()).collect();
@@ -169,7 +169,7 @@ async fn more_deletes_than_one_statement_binds_are_all_counted() {
     // Row 2 and 65,536 rows that were never there: refused for those, not by the server's limit.
     let deletes: Vec<Value> = (2..65_538).map(|id| row(&[("id key", json!(id))])).collect();
     let saved = changes(json!({ "inserts": [], "updates": [], "deletes": deletes }));
-    assert!(refusal(mysql_save_rows(&pool, name, TABLE, &saved).await).contains("already deleted"));
+    assert!(refusal(mysql_save_rows(&pool, "conn", name, TABLE, &saved).await).contains("already deleted"));
     assert_eq!(page(&pool, name, TABLE).await.len(), 3);
     drop_seeded(&config, pool, name).await;
 }
@@ -185,7 +185,7 @@ async fn a_read_only_session_refuses_the_save() {
         .await
         .unwrap();
     let saved = changes(json!({ "inserts": [row(&[("id key", json!(4))])], "updates": [], "deletes": [] }));
-    assert!(refusal(mysql_save_rows(&read_only, name, TABLE, &saved).await).contains("READ ONLY"));
+    assert!(refusal(mysql_save_rows(&read_only, "conn", name, TABLE, &saved).await).contains("READ ONLY"));
     read_only.close().await;
     assert_eq!(page(&writable, name, TABLE).await.len(), 3);
     drop_seeded(&config, writable, name).await;

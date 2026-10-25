@@ -20,6 +20,8 @@ pub struct PgColumnChange {
 /// One recorded row edit, enough to identify and reverse it later. Scoped to
 /// `update_pg_row` only (#129 v1) — SQL-tab statement effects and inserts/
 /// deletes aren't tracked here, the same scope MongoDB's history draws per-command.
+/// MySQL's table-tab edits share the type and the file, with an empty `schema`
+/// (commands/mysql/row_history.rs).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PgHistoryEntry {
     pub id: String,

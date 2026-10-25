@@ -8,7 +8,7 @@ const saveRows = vi.fn()
 const runQuery = vi.fn()
 const readTableSelect = vi.fn()
 const listForeignKeys = vi.fn()
-vi.mock('../api/queries', () => ({ browseTable, countTable, saveRows, runQuery, readTableSelect, cancelQuery: vi.fn(), explainQuery: vi.fn(), formatQuery: vi.fn(), beginTransaction: vi.fn(), commitTransaction: vi.fn(), rollbackTransaction: vi.fn() }))
+vi.mock('../api/queries', () => ({ browseTable, countTable, saveRows, runQuery, readTableSelect, cancelQuery: vi.fn(), explainQuery: vi.fn(), formatQuery: vi.fn(), beginTransaction: vi.fn(), commitTransaction: vi.fn(), rollbackTransaction: vi.fn(), undoRowEdit: vi.fn() }))
 vi.mock('../api/resources', async (original) => ({ ...(await original()), listColumns, listForeignKeys }))
 
 const { mysqlDefinitions } = await import('./mysqlDefinitions.js')
