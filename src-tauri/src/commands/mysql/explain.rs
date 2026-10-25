@@ -24,7 +24,7 @@ const NOT_ITERATED: &str = "<not executable by iterator executor>";
 /// Whether running `sql` can only read: one query made only of SELECTs that write into
 /// neither a variable nor a file, and VALUES, its WITH included. SQL sqlparser can't
 /// read doesn't count, MySQL's `TABLE t` among it.
-fn only_reads(sql: &str) -> bool {
+pub(super) fn only_reads(sql: &str) -> bool {
     matches!(Parser::parse_sql(&MySqlDialect {}, sql).as_deref(), Ok([Statement::Query(query)]) if reads(query))
 }
 

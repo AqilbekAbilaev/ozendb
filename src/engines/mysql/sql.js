@@ -2,6 +2,7 @@
 // commands they call. Reached through the engine table as `engineOf(x).sql`.
 import * as queries from './api/queries.js'
 import * as resources from './api/resources.js'
+import * as transfer from './api/transfer.js'
 import { exactNumber, filterText, readFilterText } from './filterValues.js'
 import { planRows } from './workspaces/planRows.js'
 
@@ -77,12 +78,16 @@ export const api = Object.freeze({
   commitTransaction: queries.commitTransaction,
   rollbackTransaction: queries.rollbackTransaction,
   saveRows: (target, changes) => queries.saveRows(inDatabase(target), changes),
+  exportData: transfer.exportData,
+  importPreview: (target, path) => transfer.importPreview(inDatabase(target), path),
+  importCsv: (target, path, mapping) => transfer.importCsv(inDatabase(target), path, mapping),
 })
 
 export const mysqlSql = Object.freeze({
   dialect,
   api,
   readPlan: planRows,
-  // TODO #396: an export window. TODO #417: a row-history window, once saves record history.
-  modals: Object.freeze({}),
+  // modalRegistry names: exporting a query's rows. TODO #417: a row-history window, once
+  // saves record history.
+  modals: Object.freeze({ export: 'sqlExport' }),
 })

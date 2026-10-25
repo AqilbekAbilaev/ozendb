@@ -89,6 +89,21 @@ describe('MySQL right-click menus', () => {
     expectAServerTool('mysql:server_info', 'mysqlServerInfo')
   })
 
+  it('offers export and CSV import on a table only', () => {
+    for (const action of ['mysql:export_table', 'mysql:import_csv']) {
+      expect(MYSQL_MENUS.table.map(item => item.value)).toContain(action)
+      expect(MYSQL_MENUS.view.map(item => item.value)).not.toContain(action)
+    }
+  })
+
+  it('exports and imports the table it was opened on, naming its database the schema', () => {
+    const target = { connId: 'm1', engine: 'mysql', schema: 'shop `2024` ü', table: 'order items' }
+    MYSQL_ACTIONS['mysql:export_table'](table)
+    MYSQL_ACTIONS['mysql:import_csv'](table)
+    expect([openModals.sqlExport, openModals.sqlImport]).toEqual([target, target])
+    expect([MODALS.sqlExport.level, MODALS.sqlImport.level]).toEqual(['database', 'database'])
+  })
+
   it('is the action the engine table finds for a MySQL node', () => {
     expect(contextAction(table, 'mysql:open_table')).toBe(MYSQL_ACTIONS['mysql:open_table'])
   })
