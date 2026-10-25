@@ -242,6 +242,7 @@ pub fn run() {
             list_mysql_processes,
             kill_mysql_query,
             kill_mysql_connection,
+            show_mysql_server_info,
             list_pg_databases,
             list_pg_schemas,
             list_pg_tables,

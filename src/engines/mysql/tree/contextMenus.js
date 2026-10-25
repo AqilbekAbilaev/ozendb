@@ -15,6 +15,7 @@ export const MYSQL_MENUS = {
   connection: [
     NEW_SQL,
     { sep: true },
+    { value: 'mysql:server_info', label: 'Server Info', icon: 'info' },
     { value: 'mysql:activity', label: 'Server Activity…', icon: 'clock' },
     { value: 'mysql:users', label: 'Users…', icon: 'connect' },
     { sep: true },
@@ -36,6 +37,7 @@ export const MYSQL_ACTIONS = {
   'mysql:open_table': (n) => openMySqlTable({ resource: n.resource, connectionName: n.connName }),
   'mysql:new_sql': (n) => openMySqlQuery({ resource: n.resource, connectionName: n.connName }),
   'mysql:definition': (n) => openModal('mysqlDefinition', n),
+  'mysql:server_info': (n) => openModal('mysqlServerInfo', n),
   'mysql:activity': (n) => openModal('mysqlActivity', n),
   'mysql:users': (n) => openModal('mysqlUsers', n),
 }

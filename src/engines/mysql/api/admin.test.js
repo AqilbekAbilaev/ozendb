@@ -46,4 +46,9 @@ describe('MySQL server administration', () => {
       ['kill_mysql_connection', { id: 'm1', process: 42 }],
     ])
   })
+
+  it('reads the server\'s variables and status', async () => {
+    await admin.serverInfo('m1')
+    expect(invoke).toHaveBeenCalledWith('show_mysql_server_info', { id: 'm1' })
+  })
 })

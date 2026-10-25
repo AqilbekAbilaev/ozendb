@@ -13,6 +13,7 @@ mod mysql_query;
 mod mysql_routines;
 mod mysql_row_write;
 mod mysql_schema;
+mod mysql_serverinfo;
 mod mysql_users;
 mod pg;
 mod pg_activity;
