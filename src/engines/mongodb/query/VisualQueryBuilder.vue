@@ -1,16 +1,16 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import BaseIcon from '../base/BaseIcon.vue'
-import BaseSelect from '../base/BaseSelect.vue'
-import BaseButton from '../base/BaseButton.vue'
-import BaseInput from '../base/BaseInput.vue'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import BaseSelect from '../../../components/base/BaseSelect.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
 import {
   OPERATORS,
   detectType,
   generateFilter,
   generateSort,
   generateProjection,
-} from '../../utils/vqbGenerator'
+} from '../../../utils/vqbGenerator'
 
 const props = defineProps({
   tabs:            { type: Array,  required: true },
@@ -350,4 +350,4 @@ function removeSortField(id) {
   padding: 5px 8px; min-width: 0;
 }
 </style>
-<style scoped src="./QueryBuilderPanel.css"></style>
+<style scoped src="../../../components/query/QueryBuilderPanel.css"></style>

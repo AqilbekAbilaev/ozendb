@@ -6,7 +6,7 @@
 import { ref, computed, watch } from 'vue'
 import { savedQueryBrowserRequest } from '../../stores/menuRequests'
 import TabBar from './TabBar.vue'
-import QueryBrowserModal from '../query/QueryBrowserModal.vue'
+import QueryBrowserModal from '../../engines/mongodb/query/QueryBrowserModal.vue'
 import { workspaceComponentFor, workspacePaneKind } from '../../workspaces/registry'
 import { useSavedQueryBrowser } from '../../composables/useSavedQueryBrowser'
 

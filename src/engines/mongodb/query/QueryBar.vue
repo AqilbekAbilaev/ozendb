@@ -1,22 +1,22 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
-import { historyRequest, saveQueryRequest } from '../../stores/menuRequests'
-import { getQueryHistory, clearQueryHistory, setDefaultQuery, clearDefaultQuery, saveQuery } from '../../engines/mongodb/api/queryLibrary'
-import { errText } from '../../utils/errors'
-import { showToast } from '../../stores/toast'
-import { setCollectionQueryMode } from '../../utils/queryMode'
-import { clipboardQuery, copyQuery, pasteQuery } from '../../stores/queryClipboard'
-import { vqbOpen } from '../../stores/visualQueryBuilder'
-import BaseIcon from '../base/BaseIcon.vue'
-import BaseButton from '../base/BaseButton.vue'
-import BaseInput from '../base/BaseInput.vue'
-import SegmentedControl from '../base/SegmentedControl.vue'
-import NumberStepper from '../base/NumberStepper.vue'
-import MenuItem from '../base/MenuItem.vue'
-import FieldError from '../base/FieldError.vue'
-import FlexSpacer from '../base/FlexSpacer.vue'
-import { isCollectionTab } from '../../utils/workspaceTypes'
-import { apiTarget } from '../../engines/mongodb/api/payload'
+import { historyRequest, saveQueryRequest } from '../../../stores/menuRequests'
+import { getQueryHistory, clearQueryHistory, setDefaultQuery, clearDefaultQuery, saveQuery } from '../api/queryLibrary'
+import { errText } from '../../../utils/errors'
+import { showToast } from '../../../stores/toast'
+import { setCollectionQueryMode } from '../../../utils/queryMode'
+import { clipboardQuery, copyQuery, pasteQuery } from '../../../stores/queryClipboard'
+import { vqbOpen } from '../../../stores/visualQueryBuilder'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import SegmentedControl from '../../../components/base/SegmentedControl.vue'
+import NumberStepper from '../../../components/base/NumberStepper.vue'
+import MenuItem from '../../../components/base/MenuItem.vue'
+import FieldError from '../../../components/base/FieldError.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
+import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { apiTarget } from '../api/payload'
 
 const props = defineProps({
   activeTab:      { type: Object,  required: true },
@@ -328,5 +328,5 @@ watch(() => props.activeTab && props.activeTab.id, () => {
   </template>
 </template>
 
-<style scoped src="../workspace/WorkspaceToolbar.css"></style>
+<style scoped src="../../../components/workspace/WorkspaceToolbar.css"></style>
 <style scoped src="./QueryBar.css"></style>
