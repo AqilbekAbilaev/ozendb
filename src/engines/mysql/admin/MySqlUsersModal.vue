@@ -53,7 +53,7 @@ async function load() {
 }
 onMounted(load)
 
-watch(selected, async (account) => {
+async function loadGrants(account) {
   grants.value = []
   grantsError.value = null
   if (!account) return
@@ -63,7 +63,15 @@ watch(selected, async (account) => {
   } catch (e) {
     if (selected.value === account) grantsError.value = errText(e)
   }
-})
+}
+watch(selected, loadGrants)
+
+// The Grants window sits over this one; what it changes shows here as soon as it applies.
+function openGrants(account) {
+  const { connId, connName } = props.target
+  openModal('mysqlGrants', { connId, connName, user: account.user, host: account.host },
+    { on: { changed: () => loadGrants(selected.value) } })
+}
 
 const shown = computed(() => matchUsers(all.value, filters.value))
 const dropCheck = computed(() => (selected.value ? canDropUser(selected.value) : { ok: false }))
@@ -152,7 +160,7 @@ async function confirmDrop() {
                   icon="key"
                   :disabled="readOnly"
                   :title="readOnly ? 'This connection is read-only' : 'Grant or revoke this account\'s privileges'"
-                  @click="openModal('mysqlGrants', { connId: target.connId, connName: target.connName, user: selected.user, host: selected.host })"
+                  @click="openGrants(selected)"
                 >Grants…</BaseButton>
                 <BaseButton
                   variant="ghost"
