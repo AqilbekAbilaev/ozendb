@@ -139,7 +139,7 @@ async function saveChanges() {
         <BaseButton variant="ghost" icon="load" class="qbar-hide-sm" title="Open a saved query" @click="library = 'saved'" />
         <BaseButton variant="ghost" icon="save" class="qbar-hide-sm" title="Save these filters' SQL" @click="library = 'saved'" />
         <BaseButton variant="ghost" icon="history" class="qbar-hide-sm" title="Queries run on this connection" @click="library = 'history'" />
-        <BaseButton v-if="engineOf(activeTab).sql.modals.rowHistory" variant="ghost" icon="undo" class="qbar-hide-sm" title="Row edit history for this table" @click="openModal(engineOf(activeTab).sql.modals.rowHistory, t.target)" />
+        <BaseButton v-if="engineOf(activeTab).sql.modals.rowHistory" variant="ghost" icon="undo" class="qbar-hide-sm" title="Row edit history for this table" @click="openModal(engineOf(activeTab).sql.modals.rowHistory, { ...t.target, engine: activeTab.engine })" />
         <BaseButton variant="ghost" icon="copy" class="qbar-hide-md" title="Copy SQL" @click="copySql" />
         <BaseButton v-if="t.activeFilters" variant="ghost" icon="close" title="Show every row again" @click="t.clearFilters">
           Clear ({{ t.activeFilters }})

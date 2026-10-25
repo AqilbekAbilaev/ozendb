@@ -207,7 +207,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       }
       case 'pg:row_history': {
         const target = pgMenuTarget('table')
-        if (target?.table) openModal('pgRowHistory', target)
+        if (target?.table) openModal('sqlRowHistory', target)
         return
       }
       case 'pg:drop_table': {
