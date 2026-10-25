@@ -35,6 +35,16 @@ function setDatabaseOpen(connectionId, key, open) {
   openDatabases.value[connectionId][key] = open
 }
 
+// The shared tree expands the active tab's connection; its database is opened here, so
+// the highlighted collection row is on screen rather than under a closed database. Module
+// scope too, since each connection's rows call useMongoTree and a collapsed one has none.
+watch(activeTab, (tab) => {
+  if (!isCollectionTab(tab)) return
+  const { connectionId } = tab.target
+  if (!openConnections.value.some(c => c.id === connectionId)) return  // not in the sidebar
+  setDatabaseOpen(connectionId, nodeTagKey(resourceAt(tab.target, 'database')), true)
+})
+
 /** The sidebar's MongoDB rows: which databases are open, and what clicking a row does. */
 export function useMongoTree() {
   // The collection row highlighted by a single click — derived, since the selection can
@@ -67,15 +77,6 @@ export function useMongoTree() {
     setTreeSelection(null)
     openCollectionTab({ resource: collectionRef(conn.id, db.name, collection), connectionName: conn.name })
   }
-
-  // The shared tree expands the active tab's connection; its database is opened here, so
-  // the highlighted collection row is on screen rather than under a closed database.
-  watch(activeTab, (tab) => {
-    if (!isCollectionTab(tab)) return
-    const { connectionId } = tab.target
-    if (!openConnections.value.some(c => c.id === connectionId)) return  // not in the sidebar
-    setDatabaseOpen(connectionId, nodeTagKey(resourceAt(tab.target, 'database')), true)
-  })
 
   return {
     selectedKey, activeCollectionKey, isDatabaseOpen, databaseKey, collectionKey,
