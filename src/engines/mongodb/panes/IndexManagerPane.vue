@@ -1,14 +1,14 @@
 <script setup>
 import { onUnmounted } from 'vue'
-import BaseIcon from '../base/BaseIcon.vue'
-import BaseButton from '../base/BaseButton.vue'
-import IndexAddDialog from '../query/IndexAddDialog.vue'
-import { indexKeyLabel } from '../../utils/indexSpec'
-import { fmtBytes } from '../../utils/format'
-import { useIndexManager } from '../../composables/useIndexManager'
-import CollectionCrumbs from '../base/CollectionCrumbs.vue'
-import FlexSpacer from '../base/FlexSpacer.vue'
-import { resourceName, segmentName } from '../../utils/resourceRef'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import IndexAddDialog from '../../../components/query/IndexAddDialog.vue'
+import { indexKeyLabel } from '../../../utils/indexSpec'
+import { fmtBytes } from '../../../utils/format'
+import { useIndexManager } from '../../../composables/useIndexManager'
+import CollectionCrumbs from '../../../components/base/CollectionCrumbs.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
+import { resourceName, segmentName } from '../../../utils/resourceRef'
 
 // One Index Manager tab: everything it does lives in useIndexManager.
 const props = defineProps({

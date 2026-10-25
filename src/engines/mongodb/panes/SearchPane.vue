@@ -1,15 +1,15 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { listDatabases } from '../../engines/mongodb/api/resources'
-import { searchCollections } from '../../engines/mongodb/api/queries'
-import { errText, errCode } from '../../utils/errors'
-import { segmentName } from '../../utils/resourceRef'
-import BaseIcon from '../base/BaseIcon.vue'
-import BaseButton from '../base/BaseButton.vue'
-import BaseInput from '../base/BaseInput.vue'
-import BaseSelect from '../base/BaseSelect.vue'
-import BaseCheckbox from '../base/BaseCheckbox.vue'
-import StateMessage from '../base/StateMessage.vue'
+import { listDatabases } from '../api/resources'
+import { searchCollections } from '../api/queries'
+import { errText, errCode } from '../../../utils/errors'
+import { segmentName } from '../../../utils/resourceRef'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseSelect from '../../../components/base/BaseSelect.vue'
+import BaseCheckbox from '../../../components/base/BaseCheckbox.vue'
+import StateMessage from '../../../components/base/StateMessage.vue'
 
 // The Search tab scans a database for a value or field name, the way Studio-3T's
 // "Search in…" does — one grid row per matching field (its collection, document _id,

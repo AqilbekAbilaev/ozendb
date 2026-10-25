@@ -1,16 +1,16 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
-import { analyzeSchema, exportSchema } from '../../engines/mongodb/api/schema'
-import { errText, errCode } from '../../utils/errors'
-import { resourceName, segmentName } from '../../utils/resourceRef'
-import { apiTarget } from '../../engines/mongodb/api/payload'
-import { refreshRequest } from '../../stores/menuRequests'
-import BaseIcon from '../base/BaseIcon.vue'
-import BaseSelect from '../base/BaseSelect.vue'
-import StateMessage from '../base/StateMessage.vue'
-import BaseButton from '../base/BaseButton.vue'
-import CollectionCrumbs from '../base/CollectionCrumbs.vue'
+import { analyzeSchema, exportSchema } from '../api/schema'
+import { errText, errCode } from '../../../utils/errors'
+import { resourceName, segmentName } from '../../../utils/resourceRef'
+import { apiTarget } from '../api/payload'
+import { refreshRequest } from '../../../stores/menuRequests'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import BaseSelect from '../../../components/base/BaseSelect.vue'
+import StateMessage from '../../../components/base/StateMessage.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import CollectionCrumbs from '../../../components/base/CollectionCrumbs.vue'
 
 // The Schema tab samples documents server-side and infers the field/type shape, the way
 // Studio-3T's Schema Explorer does. Each tab analyzes its own collection independently and
