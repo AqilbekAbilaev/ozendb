@@ -366,9 +366,9 @@ describe('deriveMenuContext (PostgreSQL sidebar selection)', () => {
 })
 
 describe('resolvePgMenuTarget', () => {
-  it('resolves a query tab, carrying both alias spellings', () => {
+  it('resolves a query tab, carrying its engine and both alias spellings', () => {
     expect(resolvePgMenuTarget(pgQueryTab)).toEqual({
-      connId: 'c1', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
+      connId: 'c1', engine: 'postgresql', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
       database: 'app', schema: null, table: null,
     })
   })
@@ -387,7 +387,7 @@ describe('resolvePgMenuTarget', () => {
   it('prefers a deep-enough sidebar selection over the active tab', () => {
     const sel = pgSelection('table', { database: 'other', schema: 'audit', table: 'events' })
     expect(resolvePgMenuTarget(pgTableTab, sel, 'table')).toEqual({
-      connId: 'c1', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
+      connId: 'c1', engine: 'postgresql', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
       database: 'other', schema: 'audit', table: 'events',
     })
   })
@@ -400,7 +400,7 @@ describe('resolvePgMenuTarget', () => {
   it('resolves a selected schema with no PostgreSQL tab open', () => {
     const sel = pgSelection('schema', { database: 'app', schema: 'public' })
     expect(resolvePgMenuTarget(quickstart, sel, 'schema')).toEqual({
-      connId: 'c1', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
+      connId: 'c1', engine: 'postgresql', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
       database: 'app', schema: 'public', table: null,
     })
   })

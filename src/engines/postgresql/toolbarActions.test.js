@@ -74,8 +74,8 @@ describe('runPgTool', () => {
   it('opens export and import on the table in focus', () => {
     runPgTool('pgExport', resolving(table))
     runPgTool('pgImport', resolving(table))
-    expect(openModal).toHaveBeenNthCalledWith(1, 'pgExport', table)
-    expect(openModal).toHaveBeenNthCalledWith(2, 'pgImport', table)
+    expect(openModal).toHaveBeenNthCalledWith(1, 'sqlExport', table)
+    expect(openModal).toHaveBeenNthCalledWith(2, 'sqlImport', table)
   })
 
   it('says what to select when nothing deep enough is in focus', () => {

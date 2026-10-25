@@ -12,48 +12,14 @@
 //! type, and the first bad row rolls the whole import back, named by row and column.
 //! An empty field is NULL; the file must start with a header row.
 use crate::commands::sql::statement::caller_sql;
+use crate::commands::sql::transfer::{check_mapping, preview, write_all, DataRows, ExportResult, ExportSource, ImportColumn, ImportPreview, JsonArray, SourceKind};
 use crate::error::AppError;
 use futures_util::TryStreamExt;
 use super::DIALECT;
-use serde::{Deserialize, Serialize};
 use std::io::Write;
 use tauri::State;
 
 use super::AppContext;
-
-/// What to export: a whole table, or the rows of a query.
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct PgExportSource {
-    pub schema: Option<String>,
-    pub table: Option<String>,
-    pub query: Option<String>,
-}
-
-pub(crate) enum SourceKind<'a> {
-    Table(&'a str, &'a str),
-    Query(&'a str),
-}
-
-impl PgExportSource {
-    pub(crate) fn kind(&self) -> Result<SourceKind<'_>, AppError> {
-        let query = self.query.as_deref().map(|q| q.trim().trim_end_matches(';').trim()).filter(|q| !q.is_empty());
-        match (self.schema.as_deref(), self.table.as_deref(), query) {
-            (Some(schema), Some(table), None) => Ok(SourceKind::Table(schema, table)),
-            (None, None, Some(query)) => Ok(SourceKind::Query(query)),
-            _ => Err(AppError::Validation(String::from("Export a table or a query, not both."))),
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct PgExportResult {
-    /// Counted for JSON. CSV comes back from COPY as bytes, and a value may hold a
-    /// newline, so its row count isn't known without parsing it.
-    pub rows: Option<u64>,
-    pub bytes: u64,
-}
 
 /// The statement that streams `inner` out in `format`.
 pub(crate) fn wrap_export(inner: &str, format: &str) -> Result<String, AppError> {
@@ -64,31 +30,8 @@ pub(crate) fn wrap_export(inner: &str, format: &str) -> Result<String, AppError>
     }
 }
 
-/// Writes a JSON array one element at a time, so a large export never sits in memory.
-#[derive(Default)]
-pub(crate) struct JsonArray {
-    pub rows: u64,
-}
-
-impl JsonArray {
-    pub(crate) fn row<W: Write>(&mut self, out: &mut W, json: &str) -> Result<(), AppError> {
-        let prefix = if self.rows == 0 { "[\n  " } else { ",\n  " };
-        self.rows += 1;
-        write_all(out, prefix.as_bytes())?;
-        write_all(out, json.as_bytes())
-    }
-
-    pub(crate) fn finish<W: Write>(&self, out: &mut W) -> Result<(), AppError> {
-        write_all(out, if self.rows == 0 { b"[]\n" } else { b"\n]\n" })
-    }
-}
-
-fn write_all<W: Write>(out: &mut W, bytes: &[u8]) -> Result<(), AppError> {
-    out.write_all(bytes).map_err(AppError::Io)
-}
-
 /// A table's SELECT, its names quoted by the server: COPY takes no bind parameters.
-async fn inner_sql(conn: &mut sqlx::PgConnection, source: &PgExportSource) -> Result<String, AppError> {
+async fn inner_sql(conn: &mut sqlx::PgConnection, source: &ExportSource) -> Result<String, AppError> {
     match source.kind()? {
         SourceKind::Query(query) => Ok(caller_sql(&DIALECT, query)?.to_string()),
         SourceKind::Table(schema, table) => sqlx::query_scalar("SELECT format('SELECT * FROM %I.%I', $1, $2)")
@@ -105,7 +48,7 @@ async fn stream_to<W: Write>(
     statement: &str,
     format: &str,
     out: &mut W,
-) -> Result<PgExportResult, AppError> {
+) -> Result<ExportResult, AppError> {
     let mut bytes: u64 = 0;
     if format == "csv" {
         let mut stream = conn.copy_out_raw(statement).await.map_err(AppError::Postgres)?;
@@ -113,7 +56,7 @@ async fn stream_to<W: Write>(
             bytes += chunk.len() as u64;
             write_all(out, &chunk)?;
         }
-        return Ok(PgExportResult { rows: None, bytes });
+        return Ok(ExportResult { rows: None, bytes });
     }
     let mut array = JsonArray::default();
     let mut rows = sqlx::query_scalar::<_, String>(sqlx::AssertSqlSafe(statement.to_string())).fetch(&mut *conn);
@@ -122,15 +65,15 @@ async fn stream_to<W: Write>(
         array.row(out, &json)?;
     }
     array.finish(out)?;
-    Ok(PgExportResult { rows: Some(array.rows), bytes })
+    Ok(ExportResult { rows: Some(array.rows), bytes })
 }
 
 pub(crate) async fn export_impl(
     pool: &sqlx::PgPool,
-    source: &PgExportSource,
+    source: &ExportSource,
     format: &str,
     path: &str,
-) -> Result<PgExportResult, AppError> {
+) -> Result<ExportResult, AppError> {
     let mut tx = pool.begin().await.map_err(AppError::Postgres)?;
     sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await.map_err(AppError::Postgres)?;
     let statement = wrap_export(&inner_sql(&mut tx, source).await?, format)?;
@@ -150,36 +93,15 @@ pub async fn export_pg_data(
     ctx: State<'_, AppContext>,
     id: String,
     database: Option<String>,
-    source: PgExportSource,
+    source: ExportSource,
     format: String,
     path: String,
-) -> Result<PgExportResult, AppError> {
+) -> Result<ExportResult, AppError> {
     let pool = ctx.pg_pool_for_database(&id, database.as_deref()).await?;
     export_impl(&pool, &source, &format, &path).await
 }
 
 // ── import ──
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct PgImportColumn {
-    pub name: String,
-    pub data_type: String,
-    pub nullable: bool,
-    pub has_default: bool,
-    /// A generated column computes its own value, so nothing may be imported into it.
-    pub generated: bool,
-}
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct PgImportPreview {
-    pub headers: Vec<String>,
-    pub rows: Vec<Vec<String>>,
-    pub columns: Vec<PgImportColumn>,
-    /// A first guess per header: the same-named column, if there is one.
-    pub mapping: Vec<Option<String>>,
-}
 
 /// One quoted CSV row for COPY. An empty field is left unquoted, which COPY reads as NULL.
 pub(crate) fn encode_csv_row(fields: &[&str]) -> String {
@@ -188,35 +110,6 @@ pub(crate) fn encode_csv_row(fields: &[&str]) -> String {
         .map(|f| if f.is_empty() { String::new() } else { format!("\"{}\"", f.replace('"', "\"\"")) })
         .collect();
     format!("{}\n", cells.join(","))
-}
-
-pub(crate) fn auto_mapping(headers: &[String], columns: &[PgImportColumn]) -> Vec<Option<String>> {
-    headers
-        .iter()
-        .map(|h| columns.iter().find(|c| !c.generated && c.name.eq_ignore_ascii_case(h.trim())).map(|c| c.name.clone()))
-        .collect()
-}
-
-/// `mapping` holds a target column per CSV header (None skips it); returns the mapped
-/// (header index, column) pairs in header order.
-pub(crate) fn check_mapping(mapping: &[Option<String>], columns: &[PgImportColumn]) -> Result<Vec<(usize, String)>, AppError> {
-    let mut pairs: Vec<(usize, String)> = Vec::new();
-    for (index, target) in mapping.iter().enumerate() {
-        let Some(target) = target else { continue };
-        match columns.iter().find(|c| &c.name == target) {
-            None => return Err(AppError::Validation(format!("The table has no column {target}."))),
-            Some(c) if c.generated => return Err(AppError::Validation(format!("{target} is generated and can't be imported into."))),
-            Some(_) => {}
-        }
-        if pairs.iter().any(|(_, c)| c == target) {
-            return Err(AppError::Validation(format!("{target} is mapped from two CSV columns.")));
-        }
-        pairs.push((index, target.clone()));
-    }
-    if pairs.is_empty() {
-        return Err(AppError::Validation(String::from("Map at least one CSV column to a table column.")));
-    }
-    Ok(pairs)
 }
 
 /// COPY's error context reads like `COPY items, line 3, column price: "abc"`; the line
@@ -243,7 +136,7 @@ fn copy_failure(e: sqlx::Error) -> AppError {
     AppError::Postgres(e)
 }
 
-async fn import_columns(pool: &sqlx::PgPool, schema: &str, table: &str) -> Result<Vec<PgImportColumn>, AppError> {
+async fn import_columns(pool: &sqlx::PgPool, schema: &str, table: &str) -> Result<Vec<ImportColumn>, AppError> {
     let rows: Vec<(String, String, bool, bool, bool)> = sqlx::query_as(
         "SELECT a.attname, format_type(a.atttypid, a.atttypmod), NOT a.attnotnull, \
                 a.atthasdef OR a.attidentity <> '', a.attgenerated <> '' \
@@ -263,31 +156,12 @@ async fn import_columns(pool: &sqlx::PgPool, schema: &str, table: &str) -> Resul
     }
     Ok(rows
         .into_iter()
-        .map(|(name, data_type, nullable, has_default, generated)| PgImportColumn { name, data_type, nullable, has_default, generated })
+        .map(|(name, data_type, nullable, has_default, generated)| ImportColumn { name, data_type, nullable, has_default, generated })
         .collect())
 }
 
-fn open_csv(path: &str) -> Result<crate::commands::import::CsvRecords<std::io::BufReader<std::fs::File>>, AppError> {
-    let file = std::fs::File::open(path).map_err(AppError::Io)?;
-    Ok(crate::commands::import::CsvRecords::new(std::io::BufReader::new(file), b',', b'"'))
-}
-
-pub(crate) async fn import_preview_impl(pool: &sqlx::PgPool, schema: &str, table: &str, path: &str, limit: usize) -> Result<PgImportPreview, AppError> {
-    let columns = import_columns(pool, schema, table).await?;
-    let mut records = open_csv(path)?;
-    let headers = match records.next_record()? {
-        Some(val) => val,
-        None => return Err(AppError::Validation(String::from("The file is empty."))),
-    };
-    let mut rows = Vec::new();
-    while rows.len() < limit {
-        match records.next_record()? {
-            Some(row) => rows.push(row),
-            None => break,
-        }
-    }
-    let mapping = auto_mapping(&headers, &columns);
-    Ok(PgImportPreview { headers, rows, columns, mapping })
+pub(crate) async fn import_preview_impl(pool: &sqlx::PgPool, schema: &str, table: &str, path: &str, limit: usize) -> Result<ImportPreview, AppError> {
+    preview(path, import_columns(pool, schema, table).await?, limit)
 }
 
 /// Streams the mapped fields of every data row into COPY, all in one transaction.
@@ -306,35 +180,19 @@ pub(crate) async fn import_csv_impl(pool: &sqlx::PgPool, schema: &str, table: &s
     .await
     .map_err(AppError::Postgres)?;
 
-    let mut records = open_csv(path)?;
-    let width = match records.next_record()? {
-        Some(headers) => headers.len(),
-        None => return Err(AppError::Validation(String::from("The file is empty."))),
-    };
+    let mut rows = DataRows::open(path)?;
     let mut tx = pool.begin().await.map_err(AppError::Postgres)?;
     let mut copy = tx.copy_in_raw(&statement).await.map_err(AppError::Postgres)?;
     let mut buffer: Vec<u8> = Vec::new();
-    let mut row_number = 0usize;
     loop {
-        let row = match records.next_record() {
-            Ok(Some(row)) => row,
+        let row = match rows.next_row() {
+            Ok(Some((_, row))) => row,
             Ok(None) => break,
             Err(e) => {
                 let _ = copy.abort("unreadable file").await;
                 return Err(e);
             }
         };
-        if row.iter().all(|f| f.trim().is_empty()) {
-            continue;
-        }
-        row_number += 1;
-        if row.len() != width {
-            let _ = copy.abort("ragged row").await;
-            return Err(AppError::Validation(format!(
-                "Row {row_number} has {} fields; the header has {width}. Nothing was imported.",
-                row.len()
-            )));
-        }
         let fields: Vec<&str> = pairs.iter().map(|(i, _)| row[*i].as_str()).collect();
         buffer.extend_from_slice(encode_csv_row(&fields).as_bytes());
         if buffer.len() >= 64 * 1024 {
@@ -359,7 +217,7 @@ pub async fn pg_import_preview(
     schema: String,
     table: String,
     path: String,
-) -> Result<PgImportPreview, AppError> {
+) -> Result<ImportPreview, AppError> {
     let pool = ctx.pg_pool_for_database(&id, database.as_deref()).await?;
     import_preview_impl(&pool, &schema, &table, &path, 20).await
 }

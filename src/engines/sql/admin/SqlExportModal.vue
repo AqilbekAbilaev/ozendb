@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
-import { exportData } from '../api/transfer'
+import { engineOf } from '../../index.js'
 import { EXPORT_FORMATS, exportSource, exportLabel, defaultFileName, exportedMessage } from './exportRows'
 import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
@@ -12,9 +12,10 @@ import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 
-// Export a table or a SQL editor's query to a file (#128).
+// Export a table or a SQL editor's query to a file (#128), through its engine's
+// `sql.api`. On MySQL a table's `schema` is its database, as in the table tab.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, database, schema, table } or { connId, database, query }
+  target: { type: Object, required: true },  // { connId, engine, database, schema, table } or { connId, engine, database, query }
 })
 const emit = defineEmits(['close'])
 
@@ -38,7 +39,7 @@ async function confirm() {
   if (!path) return
   exporting.value = true
   try {
-    const result = await exportData(
+    const result = await engineOf(props.target).sql.api.exportData(
       { connectionId: props.target.connId, database: props.target.database },
       exportSource(props.target), format.value, path,
     )

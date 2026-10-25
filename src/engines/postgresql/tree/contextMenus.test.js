@@ -84,12 +84,12 @@ describe('PostgreSQL right-click menus', () => {
   it('exports the table it was opened on', () => {
     expect(PG_MENUS.table.map(i => i.value)).toContain('pg:export_table')
     PG_ACTIONS['pg:export_table'](table)
-    expect(openModal).toHaveBeenCalledWith('pgExport', table)
+    expect(openModal).toHaveBeenCalledWith('sqlExport', table)
   })
 
   it('imports a CSV into the table it was opened on', () => {
     expect(PG_MENUS.table.map(i => i.value)).toContain('pg:import_csv')
     PG_ACTIONS['pg:import_csv'](table)
-    expect(openModal).toHaveBeenCalledWith('pgImport', table)
+    expect(openModal).toHaveBeenCalledWith('sqlImport', table)
   })
 })

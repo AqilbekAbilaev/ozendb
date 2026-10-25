@@ -8,6 +8,7 @@ use crate::error::AppError;
 pub mod format;
 pub mod read_select;
 pub mod statement;
+pub mod transfer;
 
 /// Cap on rows returned by an arbitrary or browse query — the SQL sibling of
 /// `AGG_RESULT_CAP` for Mongo's `run_aggregate`. Requested as `<cap>+1` so

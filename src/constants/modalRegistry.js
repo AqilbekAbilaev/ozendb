@@ -43,11 +43,12 @@ export const MODALS = {
   pgCreateTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresCreateTableModal.vue')),  level: 'database' },
   pgDrop:         { component: lazy(() => import('../engines/postgresql/admin/PostgresDropModal.vue')),         level: 'database' },
   pgRenameTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresRenameTableModal.vue')),  level: 'database' },
-  // A table node, or a SQL editor's { connId, database, query }.
-  pgExport:       { component: lazy(() => import('../engines/postgresql/admin/PostgresExportModal.vue')),       level: 'database' },
-  pgImport:       { component: lazy(() => import('../engines/postgresql/admin/PostgresImportModal.vue')),       level: 'database' },
   // Opened from a table workspace's own toolbar, not a sidebar node.
   pgRowHistory:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRowHistoryModal.vue')),    level: 'table' },
+  // Every SQL engine's bulk export and CSV import, reaching the engine through the
+  // target's `engine`: a table node, or a SQL editor's { connId, engine, database, query }.
+  sqlExport:      { component: lazy(() => import('../engines/sql/admin/SqlExportModal.vue')),                   level: 'database' },
+  sqlImport:      { component: lazy(() => import('../engines/sql/admin/SqlImportModal.vue')),                   level: 'database' },
   // A MySQL view's or stored program's CREATE statement, opened from its sidebar row.
   mysqlDefinition: { component: lazy(() => import('../engines/mysql/admin/MySqlDefinitionModal.vue')), level: 'database' },
   // MySQL's server tools, opened from its connection's right-click menu. Accounts are

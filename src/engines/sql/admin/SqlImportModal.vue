@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { importPreview, importCsv } from '../api/transfer'
+import { engineOf } from '../../index.js'
 import { columnOptions, mappedCount, importedMessage, toSelections, toMapping } from './importRows'
 import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
@@ -14,10 +14,12 @@ import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 
 // Import a CSV into a table (#128): pick a file, check the column mapping against
-// the first rows, then import it in one transaction.
+// the first rows, then import it in one transaction, through its engine's `sql.api`.
+// On MySQL `schema` is the table's database, as in the table tab.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connId, database, schema, table }
+  target: { type: Object, required: true },  // { connId, engine, database, schema, table }
 })
+const api = engineOf(props.target).sql.api
 const emit = defineEmits(['close'])
 
 const table = computed(() => ({
@@ -45,7 +47,7 @@ async function chooseFile() {
   path.value = picked
   loading.value = true
   try {
-    preview.value = await importPreview(table.value, picked)
+    preview.value = await api.importPreview(table.value, picked)
     selections.value = toSelections(preview.value.mapping)
   } catch (e) {
     preview.value = null
@@ -61,7 +63,7 @@ async function confirm() {
   importing.value = true
   error.value = null
   try {
-    const rows = await importCsv(table.value, path.value, toMapping(selections.value))
+    const rows = await api.importCsv(table.value, path.value, toMapping(selections.value))
     showToast(importedMessage(rows))
     emit('close')
   } catch (e) {
