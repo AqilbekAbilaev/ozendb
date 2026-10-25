@@ -10,6 +10,7 @@ import { colorHex, nodeTagName } from '../../utils/tabColor.js'
 import { connDatabases } from '../../stores/connectionData.js'
 import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
+import { useMongoTree } from '../../engines/mongodb/tree/useMongoTree.js'
 import { TREE_NODES } from '../../engines/ui.js'
 import EngineBadge from '../base/EngineBadge.vue'
 import { connectionMenu } from '../../engines/contextActions.js'
@@ -18,14 +19,16 @@ import { appendResource, createResourceRef } from '../../utils/resourceRef'
 const props = defineProps({
   width: { type: Number, default: 320 },
 })
-const emit = defineEmits(['select-collection'])
 
 const {
-  expandedConns, loadingConns, connErrors, expandedDbs, selectedKey,
+  expandedConns, loadingConns, connErrors,
   searchText, sidebarEl, filtered, setSelection, clearSelection, selectConnection,
-  retryConnection, toggleDatabase, highlightCollection, activeConnectionId, activeCollectionKey,
-  openCollection, collectionKey, databaseKey,
-} = useConnectionTree({ emit })
+  retryConnection, activeConnectionId,
+} = useConnectionTree()
+const {
+  selectedKey, activeCollectionKey, isDatabaseOpen, databaseKey, collectionKey,
+  toggleDatabase, highlightCollection, openCollection,
+} = useMongoTree()
 
 const nodeTag = (key, fallbackTag) => nodeTagName(tagOverrides.value, key, fallbackTag)
 
@@ -183,7 +186,7 @@ const { tip, ...statsTip } = useStatsTip()
             >
               <span class="tw">
                 <BaseIcon v-if="!db.accessible" name="lock" :size="12" />
-                <BaseIcon v-else :name="expandedDbs[databaseKey(conn.id, db.name)] ? 'caretDown' : 'caret'" :size="12" />
+                <BaseIcon v-else :name="isDatabaseOpen(conn.id, db.name) ? 'caretDown' : 'caret'" :size="12" />
               </span>
               <span class="ti"><BaseIcon name="dbSmall" :size="15" /></span>
               <span class="tt">{{ db.name }}</span>
@@ -191,7 +194,7 @@ const { tip, ...statsTip } = useStatsTip()
             </div>
 
             <!-- Collections -->
-            <template v-if="expandedDbs[databaseKey(conn.id, db.name)]">
+            <template v-if="isDatabaseOpen(conn.id, db.name)">
               <div
                 v-for="coll in db.collections"
                 :key="coll"

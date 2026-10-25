@@ -38,7 +38,7 @@ beforeEach(() => {
   tabs.value = []
   activeTabId.value = null
   scope = effectScope()
-  tree = scope.run(() => useConnectionTree({ emit: vi.fn() }))
+  tree = scope.run(() => useConnectionTree())
   tree.connections.value = [conn]
 })
 afterEach(() => scope.stop())
@@ -86,9 +86,8 @@ it('expands and names the connection of an active MySQL table tab', async () => 
   expect(listMySqlDatabases).toHaveBeenCalledWith('a')
 })
 
-// The same watcher serves both engines; MongoDB also gets its database opened, which
-// PostgreSQL's own tree does for itself.
-it('expands the connection and database of an active MongoDB collection tab', async () => {
+// The shared tree only expands the connection; MongoDB's own tree opens the database.
+it('expands the connection of an active MongoDB collection tab', async () => {
   listDatabases.mockResolvedValue([])
   tabs.value = [{
     id: 'mongo', type: 'mongodb.find',
@@ -96,23 +95,6 @@ it('expands the connection and database of an active MongoDB collection tab', as
   }]
   activeTabId.value = 'mongo'
   await vi.waitFor(() => expect(tree.expandedConns.value.a).toBe(true))
-  expect(tree.expandedDbs.value['a/shop']).toBe(true)
-})
-
-// The rows look their state up by databaseKey/collectionKey, and the active tab writes it
-// from its target: both go through nodeTagKey, so the row that lights up and opens is the
-// active tab's own, and a click on that database row closes the same entry.
-it('keys the active tab\'s rows the way the rows look themselves up', async () => {
-  listDatabases.mockResolvedValue([])
-  tabs.value = [{
-    id: 'mongo', type: 'mongodb.find',
-    target: createResourceRef('a', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
-  }]
-  activeTabId.value = 'mongo'
-  await vi.waitFor(() => expect(tree.expandedDbs.value[tree.databaseKey('a', 'shop')]).toBe(true))
-  expect(tree.activeCollectionKey.value).toBe(tree.collectionKey('a', 'shop', 'orders'))
-  tree.toggleDatabase({ id: 'a', name: 'Connection' }, 'shop')
-  expect(tree.expandedDbs.value[tree.databaseKey('a', 'shop')]).toBe(false)
 })
 
 // The connection row used to prefix-match the collection key, so it lit up for MongoDB
@@ -179,9 +161,8 @@ it('does not repopulate disconnected data when discovery finishes late', async (
 // A selection is the row's ResourceRef plus the connection's name and engine. The ref is
 // built here, where the clicked level is known for certain (#193).
 it('records a resource ref for a selected connection', () => {
-  const emit = vi.fn()
   const s = effectScope()
-  const t = s.run(() => useConnectionTree({ emit }))
+  const t = s.run(() => useConnectionTree())
   t.selectConnection(conn)
   expect(treeSelection.value).toEqual({
     resource: { connectionId: 'a', segments: [] }, connectionName: conn.name, engine: conn.engine,
@@ -191,71 +172,16 @@ it('records a resource ref for a selected connection', () => {
 
 // The native menu gates MongoDB actions on the selection, so it must know the engine.
 it('records the selected connection\'s engine', () => {
-  const emit = vi.fn()
   const s = effectScope()
-  const t = s.run(() => useConnectionTree({ emit }))
+  const t = s.run(() => useConnectionTree())
   t.selectConnection({ id: 'p', name: 'PG', engine: 'postgresql' })
   expect(treeSelection.value).toEqual(expect.objectContaining({ engine: 'postgresql' }))
   s.stop()
 })
 
-it('records a resource ref for a selected database', () => {
-  const emit = vi.fn()
-  const s = effectScope()
-  const t = s.run(() => useConnectionTree({ emit }))
-  t.toggleDatabase(conn, 'shop')
-  expect(treeSelection.value).toEqual(expect.objectContaining({
-    resource: { connectionId: 'a', segments: [{ kind: 'database', name: 'shop' }] },
-  }))
-  s.stop()
-})
-
-it('records a resource ref for a highlighted collection', () => {
-  const emit = vi.fn()
-  const s = effectScope()
-  const t = s.run(() => useConnectionTree({ emit }))
-  t.highlightCollection(conn, { name: 'shop' }, 'orders')
-  expect(treeSelection.value).toEqual(expect.objectContaining({
-    resource: {
-      connectionId: 'a',
-      segments: [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }],
-    },
-  }))
-  s.stop()
-})
-
-// Double-clicking a collection opens it the way every opener does: with a ref (#193).
-it('opens a collection with its ref and the connection\'s name', () => {
-  const emit = vi.fn()
-  const s = effectScope()
-  const t = s.run(() => useConnectionTree({ emit }))
-  t.openCollection(conn, { name: 'shop' }, 'orders')
-  expect(emit).toHaveBeenCalledWith('select-collection', {
-    resource: {
-      connectionId: 'a',
-      segments: [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }],
-    },
-    connectionName: conn.name,
-  })
-  s.stop()
-})
-
-// Names are opaque: a collection called "a/b" must not be mistaken for two segments.
-it('keeps a name containing a slash in one segment', () => {
-  const emit = vi.fn()
-  const s = effectScope()
-  const t = s.run(() => useConnectionTree({ emit }))
-  t.highlightCollection(conn, { name: 'shop' }, 'a/b')
-  expect(treeSelection.value.resource.segments).toEqual([
-    { kind: 'database', name: 'shop' }, { kind: 'collection', name: 'a/b' },
-  ])
-  s.stop()
-})
-
 it('clears the resource ref along with the selection', () => {
-  const emit = vi.fn()
   const s = effectScope()
-  const t = s.run(() => useConnectionTree({ emit }))
+  const t = s.run(() => useConnectionTree())
   t.selectConnection(conn)
   t.disconnectConn('a', { persist: false })
   expect(treeSelection.value).toBeNull()
@@ -283,7 +209,7 @@ it('clears the selection when the active tab changes', async () => {
   tabs.value = [{ id: 't1', type: 'app.quickstart' }, { id: 't2', type: 'app.quickstart' }]
   activeTabId.value = 't1'
   await nextTick()
-  tree.highlightCollection(conn, { name: 'shop' }, 'orders')
+  setTreeSelection({ resource: createResourceRef('a', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]) })
   activeTabId.value = 't2'
   await nextTick()
   expect(treeSelection.value).toBeNull()
@@ -293,7 +219,7 @@ it('keeps the selection while the active tab stays put', async () => {
   tabs.value = [{ id: 't1', type: 'app.quickstart' }]
   activeTabId.value = 't1'
   await nextTick()
-  tree.highlightCollection(conn, { name: 'shop' }, 'orders')
+  setTreeSelection({ resource: createResourceRef('a', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]) })
   await nextTick()
   expect(resourceName(treeSelection.value.resource)).toBe('orders')
 })
