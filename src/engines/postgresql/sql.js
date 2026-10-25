@@ -4,6 +4,7 @@
 import * as queries from './api/queries.js'
 import { listColumns, listForeignKeys } from './api/resources.js'
 import * as library from './api/library.js'
+import * as transfer from './api/transfer.js'
 import { planRows } from './workspaces/planRows.js'
 import { saveRows } from './saveRows.js'
 
@@ -49,12 +50,12 @@ export const dialect = Object.freeze({
   serverSql: "SELECT current_setting('server_version'), current_setting('server_encoding')",
 })
 
-export const api = Object.freeze({ ...queries, listColumns, listForeignKeys, ...library, saveRows })
+export const api = Object.freeze({ ...queries, listColumns, listForeignKeys, ...library, ...transfer, saveRows })
 
 export const postgresSql = Object.freeze({
   dialect,
   api,
   readPlan: planRows,
   // modalRegistry names: exporting a query's rows, and a table's row-edit history.
-  modals: Object.freeze({ export: 'pgExport', rowHistory: 'pgRowHistory' }),
+  modals: Object.freeze({ export: 'sqlExport', rowHistory: 'pgRowHistory' }),
 })

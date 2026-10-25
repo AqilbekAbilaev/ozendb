@@ -1,7 +1,8 @@
 //! Live-PostgreSQL coverage of bulk export (`export_impl`, #128). Shares
 //! `pg.rs`'s helpers and skip behaviour; see its module doc comment.
 
-use crate::commands::{export_impl, import_csv_impl, import_preview_impl, PgExportSource};
+use crate::commands::sql::transfer::ExportSource;
+use crate::commands::{export_impl, import_csv_impl, import_preview_impl};
 use super::pg::{pool, test_config};
 
 const SCHEMA: &str = "ozendb_it_export";
@@ -21,8 +22,8 @@ async fn setup(pool: &sqlx::PgPool) {
     }
 }
 
-fn table(name: &str) -> PgExportSource {
-    PgExportSource { schema: Some(String::from(SCHEMA)), table: Some(String::from(name)), query: None }
+fn table(name: &str) -> ExportSource {
+    ExportSource { schema: Some(String::from(SCHEMA)), table: Some(String::from(name)), query: None }
 }
 
 fn temp_path(name: &str) -> String {
@@ -65,7 +66,7 @@ async fn exports_tables_and_queries_as_csv_and_json_past_the_grid_cap() {
     assert_eq!(parsed[2]["name"], "two\nlines");
 
     // A query exports its own rows, and nothing stops at the grid's 10,000-row cap.
-    let query = PgExportSource {
+    let query = ExportSource {
         schema: None,
         table: None,
         query: Some(String::from("SELECT n FROM ozendb_it_export.many WHERE n % 2 = 0 OR n > 10000;")),
@@ -76,7 +77,7 @@ async fn exports_tables_and_queries_as_csv_and_json_past_the_grid_cap() {
     assert_eq!(all.rows, Some(10005));
 
     // A write dressed as an export is refused by the read-only transaction, and changes nothing.
-    let write = PgExportSource {
+    let write = ExportSource {
         schema: None,
         table: None,
         query: Some(String::from("DELETE FROM ozendb_it_export.items RETURNING *")),
@@ -180,7 +181,7 @@ async fn imports_csv_through_a_mapping_all_or_nothing() {
     .execute(&pool)
     .await
     .expect("copy table");
-    let source = PgExportSource {
+    let source = ExportSource {
         schema: None,
         table: None,
         query: Some(String::from("SELECT id, name, joined, score, active FROM ozendb_it_import.people")),

@@ -33,7 +33,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:sql'])
 const setSql = (text) => emit('update:sql', text)
-const exportQuery = () => openModal(engineOf(props.run).sql.modals.export, { connId: props.run.connectionId, database: props.run.database, query: props.sql })
+const exportQuery = () => openModal(engineOf(props.run).sql.modals.export, { connId: props.run.connectionId, engine: props.run.engine, database: props.run.database, query: props.sql })
 
 // Manual: runs go into one transaction, begun by the first of them, until Commit or
 // Rollback. The switch holds still while one is open.

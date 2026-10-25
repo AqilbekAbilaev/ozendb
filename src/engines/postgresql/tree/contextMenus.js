@@ -50,8 +50,8 @@ export const PG_ACTIONS = {
   'pg:create_table': (n) => openModal('pgCreateTable', n),
   'pg:rename_table': (n) => openModal('pgRenameTable', n),
   'pg:drop_table': (n) => openModal('pgDrop', n),
-  'pg:export_table': (n) => openModal('pgExport', n),
-  'pg:import_csv': (n) => openModal('pgImport', n),
+  'pg:export_table': (n) => openModal('sqlExport', n),
+  'pg:import_csv': (n) => openModal('sqlImport', n),
   'pg:new_sql': (n) => openPostgresQuery({ connectionId: n.connId, connectionName: n.connName, database: n.database }),
   'pg:open_table': (n) => openPostgresTable({
     connectionId: n.connId, connectionName: n.connName, database: n.database, schema: n.schema, table: n.table,

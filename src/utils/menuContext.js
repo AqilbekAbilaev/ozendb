@@ -167,10 +167,12 @@ export function resolvePgMenuTarget(activeTab, treeSelection = null, requiredLev
 }
 
 // A PostgreSQL selection or tab, read off its ref (a tab keeps no flat identity, #303)
-// into the database/schema/table fields every PostgreSQL consumer reads.
+// into the database/schema/table fields every PostgreSQL consumer reads, and its engine
+// for the shared SQL windows (engines/sql/admin).
 function pgTarget(ref, connectionName) {
   return {
     connId: ref.connectionId,
+    engine: 'postgresql',
     connName: connectionName,
     connectionId: ref.connectionId,
     connectionName: connectionName,
