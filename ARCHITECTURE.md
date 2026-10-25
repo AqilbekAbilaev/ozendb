@@ -118,8 +118,10 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
 
 - **`src/engines/index.js`** — the component-free engine table (`ENGINES`, `engineOf`):
   default port, connection-field builder, the sidebar's top-level loader, the stats card,
-  whether a connection names its database, and for a SQL engine its `sql` entry. Stores and
-  composables read it.
+  whether a connection names its database, and for a SQL engine its `sql` entry. An engine
+  with connection-editor fields of its own declares `useFields`: the connection form makes
+  each one once, hands it to that engine's `buildFields` and editor sections, and passes it
+  a pasted connection string. Stores and composables read it.
 - **`src/engines/ui.js`** — the component half: connection editor sections, sidebar rows.
 - **`src/engines/contextActions.js`** — right-click menus and actions an engine handles itself.
 - **`src/engines/sql/`** — the table and SQL tabs every SQL engine shares. What differs comes

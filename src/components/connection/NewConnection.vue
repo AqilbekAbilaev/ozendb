@@ -35,6 +35,12 @@ const {
   testConnection,
 } = form
 const editor = computed(() => CONNECTION_EDITORS[engine.value])
+// What the active tab's section reads: the shared form, and its engine's own fields
+// when the engine brings any (a prop no section declares would warn).
+const sectionProps = computed(() => {
+  const fields = form.engineFields[engine.value]
+  return fields ? { form, fields } : { form }
+})
 
 // Opens the form for the engine picked on the intro step, pre-filled when it parsed a
 // connection string. `parsed` is null when the user chose to configure it by hand.
@@ -159,7 +165,7 @@ useMomentumScroll(bodyEl)
         </div>
 
         <div v-else class="nc-form">
-          <component :is="editor.sections[activeTab]" :form="form" />
+          <component :is="editor.sections[activeTab]" v-bind="sectionProps" />
         </div>
 
       </div>

@@ -9,8 +9,10 @@ import { READ_PREF_OPTIONS } from '../../../data/connectionOptions.js'
 
 const props = defineProps({
   form: { type: Object, required: true },
+  fields: { type: Object, required: true },
 })
-const { hosts, connType, replicaSetName, readPreference, isMultiHost, addHost, removeHost } = props.form
+const { hosts, addHost, removeHost } = props.form
+const { connType, replicaSetName, readPreference, isMultiHost } = props.fields
 </script>
 
 <template>

@@ -1,5 +1,6 @@
 // MongoDB's entry in the engine table (engines/index.js).
 import { buildMongoFields } from './connection/fields.js'
+import { useMongoFields } from './connection/useMongoFields.js'
 import { listDatabases } from './api/resources.js'
 import { collectionStats, databaseStats } from './api/admin.js'
 
@@ -8,6 +9,8 @@ export const mongodb = Object.freeze({
   defaultPort: 27017,
   // A MongoDB connection is to the server; it picks a database per query.
   namesDatabase: false,
+  // Its own connection-editor fields, beyond the ones every engine shares.
+  useFields: useMongoFields,
   buildFields: buildMongoFields,
   // What the sidebar lists under a connection.
   loadResources: listDatabases,

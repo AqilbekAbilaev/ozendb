@@ -6,8 +6,10 @@ import { AUTH_MODE_OPTIONS, OIDC_ENVIRONMENTS } from '../../../data/connectionOp
 
 const props = defineProps({
   form: { type: Object, required: true },
+  fields: { type: Object, required: true },
 })
-const { isEditMode, authMode, username, password, authDb, oidcEnvironment, oidcTokenResource, oidcNeedsResource } = props.form
+const { isEditMode, username, password } = props.form
+const { authMode, authDb, oidcEnvironment, oidcTokenResource, oidcNeedsResource } = props.fields
 </script>
 
 <template>
