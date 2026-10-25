@@ -29,3 +29,19 @@ export function grantPrivileges(connectionId, change) {
 export function revokePrivileges(connectionId, change) {
   return invoke('revoke_mysql_privileges', { id: connectionId, change })
 }
+
+// Every connection this login may see: all of them only with the PROCESS privilege.
+export function processes(connectionId) {
+  return invoke('list_mysql_processes', { id: connectionId })
+}
+
+// Stop a connection's current statement; the connection stays open. Both kills answer
+// false for a connection that has already gone.
+export function killQuery(connectionId, process) {
+  return invoke('kill_mysql_query', { id: connectionId, process })
+}
+
+// Close a connection, rolling back whatever transaction it holds.
+export function killConnection(connectionId, process) {
+  return invoke('kill_mysql_connection', { id: connectionId, process })
+}

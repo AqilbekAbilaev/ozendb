@@ -81,6 +81,10 @@ describe('MySQL right-click menus', () => {
     expectAServerTool('mysql:users', 'mysqlUsers')
   })
 
+  it('offers Server Activity… on a connection, opening its processes there', () => {
+    expectAServerTool('mysql:activity', 'mysqlActivity')
+  })
+
   it('is the action the engine table finds for a MySQL node', () => {
     expect(contextAction(table, 'mysql:open_table')).toBe(MYSQL_ACTIONS['mysql:open_table'])
   })
