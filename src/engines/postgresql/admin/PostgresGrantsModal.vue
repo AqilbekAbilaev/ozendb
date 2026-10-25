@@ -4,6 +4,7 @@ import { grants as listGrants, grantPrivileges, revokePrivileges } from '../api/
 import { GRANT_KINDS, privilegesFor, groupGrants, revokeChange, grantChange } from './grantRows'
 import { errText, errCode } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
+import { openConnections } from '../../../stores/openConnections'
 import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseModalBody from '../../../components/base/BaseModalBody.vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
@@ -20,6 +21,11 @@ const props = defineProps({
   target: { type: Object, required: true },  // { connId, connName, role }
 })
 defineEmits(['close'])
+
+// Still opens on a read-only connection, since it is the only place to see what a role can
+// touch; only the changes are greyed out.
+const readOnly = computed(() =>
+  !!openConnections.value.find(c => c.id === props.target.connId)?.read_only)
 
 const loading = ref(true)
 const error = ref(null)
@@ -93,7 +99,7 @@ function revoke(schema, obj) {
         <div class="pg-grant-row">
           <BaseCheckbox v-model="draft.grantOption" label="With grant option" />
           <BaseCheckbox v-model="cascade" title="Also revoke what this role granted onward" label="Revoke with CASCADE" />
-          <BaseButton class="pg-grant-btn" bordered :disabled="busy" @click="grant">Grant</BaseButton>
+          <BaseButton class="pg-grant-btn" bordered :disabled="readOnly || busy" :title="readOnly ? 'This connection is read-only' : undefined" @click="grant">Grant</BaseButton>
         </div>
         <FieldError :text="actionError" spaced />
       </div>
@@ -109,7 +115,7 @@ function revoke(schema, obj) {
           <div v-for="obj in entry.objects" :key="obj.object ?? ''" class="pg-item">
             <code class="pg-obj">{{ obj.object ? `${obj.objectKind}: ${obj.object}` : 'schema' }}</code>
             <span class="pg-privs" :title="obj.privileges.join(', ')">{{ obj.privileges.join(', ') }}</span>
-            <BaseButton size="sm" :disabled="busy" title="Revoke these privileges" @click="revoke(entry.schema, obj)">Revoke</BaseButton>
+            <BaseButton size="sm" :disabled="readOnly || busy" :title="readOnly ? 'This connection is read-only' : 'Revoke these privileges'" @click="revoke(entry.schema, obj)">Revoke</BaseButton>
           </div>
         </div>
       </div>
