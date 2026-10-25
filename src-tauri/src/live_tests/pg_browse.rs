@@ -4,8 +4,9 @@
 
 use crate::commands::sql::{ColumnFilter, ColumnRef, FilterOp, JoinKind, JoinOn, TableJoin};
 use crate::commands::{
-    browse_table_impl, count_table_impl, list_columns_impl, list_foreign_keys_impl, list_tables_impl, update_row_impl, ColumnValue,
+    browse_table_impl, count_table_impl, list_columns_impl, list_foreign_keys_impl, list_tables_impl, undo_row_edit_impl, update_row_impl, ColumnValue,
 };
+use crate::postgres::row_history::{PgColumnChange, PgHistoryEntry};
 use super::pg::{pool, test_config};
 
 fn by(column: &str) -> ColumnRef {
@@ -329,4 +330,73 @@ async fn starts_with_and_any_of_work_on_real_column_types() {
     assert_eq!(columns.iter().find(|c| c.name == "mcc").unwrap().enum_values, None);
 
     sqlx::query("DROP SCHEMA ozendb_it_ops CASCADE").execute(&pool).await.unwrap();
+}
+
+/// An edit of one cell in row 1 of `schema`'s table `row t`, as `update_pg_row` records it.
+fn undo_entry(schema: &str, column: &str, before: serde_json::Value, after: serde_json::Value) -> PgHistoryEntry {
+    PgHistoryEntry {
+        id: String::from("e1"),
+        conn_id: String::from("pg-it-test"),
+        database: String::from("postgres"),
+        schema: schema.to_string(),
+        table: String::from("row t"),
+        at: 0,
+        key: vec![ColumnValue { column: String::from("id"), value: serde_json::json!(1) }],
+        changes: vec![PgColumnChange { column: column.to_string(), before, after }],
+    }
+}
+
+#[tokio::test]
+async fn undoes_edits_that_set_a_cell_to_null_or_changed_a_json_cell() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        r#"DROP SCHEMA IF EXISTS "ozendb_it undo.ü" CASCADE"#,
+        r#"CREATE SCHEMA "ozendb_it undo.ü""#,
+        r#"CREATE TABLE "ozendb_it undo.ü"."row t" (id INT PRIMARY KEY, "a note" text, doc json)"#,
+        r#"INSERT INTO "ozendb_it undo.ü"."row t" VALUES (1, NULL, '{"b":[1,"x"]}')"#,
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+    let schema = "ozendb_it undo.ü";
+
+    undo_row_edit_impl(&pool, &undo_entry(schema, "a note", serde_json::json!("hi"), serde_json::Value::Null)).await.unwrap();
+    undo_row_edit_impl(&pool, &undo_entry(schema, "doc", serde_json::json!("plain"), serde_json::json!({"b": [1, "x"]}))).await.unwrap();
+
+    let page = browse_table_impl(&pool, schema, "row t", &[], &[], None, false, 10, 0).await.unwrap();
+    assert_eq!(page.rows[0][1], serde_json::json!("hi"));
+    assert_eq!(page.rows[0][2], serde_json::json!("plain"));
+
+    sqlx::query(r#"DROP SCHEMA "ozendb_it undo.ü" CASCADE"#).execute(&pool).await.unwrap();
+}
+
+#[tokio::test]
+async fn refuses_to_undo_an_edit_to_null_when_the_cell_changed_since() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP SCHEMA IF EXISTS ozendb_it_undo_conflict CASCADE",
+        "CREATE SCHEMA ozendb_it_undo_conflict",
+        r#"CREATE TABLE ozendb_it_undo_conflict."row t" (id INT PRIMARY KEY, "a note" text)"#,
+        r#"INSERT INTO ozendb_it_undo_conflict."row t" VALUES (1, 'newer')"#,
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+    let entry = undo_entry("ozendb_it_undo_conflict", "a note", serde_json::json!("hi"), serde_json::Value::Null);
+
+    assert!(undo_row_edit_impl(&pool, &entry).await.is_err());
+
+    sqlx::query("DROP SCHEMA ozendb_it_undo_conflict CASCADE").execute(&pool).await.unwrap();
 }

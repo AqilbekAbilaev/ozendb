@@ -87,12 +87,15 @@ fn column_cast<'a>(
 /// Builds the `UPDATE ... SET ... WHERE ...` statement and its binds, without
 /// running it — shared by `update_row_impl` (the plain-pool path) and
 /// `update_pg_row`'s transaction branch, so the two can never drift apart.
-async fn build_update(
+/// `unchanged` further requires those columns to still hold those values (undo's
+/// conflict check), NULL included.
+pub(super) async fn build_update(
     pool: &sqlx::PgPool,
     schema: &str,
     table: &str,
     set: &[ColumnValue],
     r#where: &[ColumnValue],
+    unchanged: &[ColumnValue],
 ) -> Result<(String, Vec<Option<String>>), AppError> {
     if set.is_empty() {
         return Err(AppError::Validation("Nothing to update.".to_string()));
@@ -145,6 +148,13 @@ async fn build_update(
         sql.push_str(&format!("{} = ${param}::{pg_type}", quote_ident(&item.column)?));
         binds.push(stringify_param(&item.value, pg_type));
     }
+    for item in unchanged {
+        let pg_type = column_cast(&types, &item.column)?;
+        param += 1;
+        // As text, because `json`, `xml` and `point` have no `=`.
+        sql.push_str(&format!(" AND {}::text IS NOT DISTINCT FROM ${param}::{pg_type}::text", quote_ident(&item.column)?));
+        binds.push(stringify_param(&item.value, pg_type));
+    }
 
     // `sql` interpolates only quoted identifiers (`quote_ident`, checked against
     // `types`/the primary key above) and `$n::type` placeholders — every actual
@@ -177,7 +187,7 @@ pub(crate) async fn update_row_impl(
     set: &[ColumnValue],
     r#where: &[ColumnValue],
 ) -> Result<u64, AppError> {
-    let (sql, binds) = build_update(pool, schema, table, set, r#where).await?;
+    let (sql, binds) = build_update(pool, schema, table, set, r#where, &[]).await?;
     execute_write(sql, binds, pool).await
 }
 
@@ -251,7 +261,7 @@ pub async fn update_pg_row(
     match tx_id {
         Some(tx_id) => {
             let pool = ctx.pg_pool(&id).await?;
-            let (sql, binds) = build_update(&pool, &schema, &table, &set, &r#where).await?;
+            let (sql, binds) = build_update(&pool, &schema, &table, &set, &r#where, &[]).await?;
             txs.execute(&tx_id, sql, binds, Some(entry)).await
         }
         None => {

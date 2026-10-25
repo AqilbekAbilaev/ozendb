@@ -5,7 +5,7 @@ use crate::error::AppError;
 use crate::postgres::row_history::{PgHistoryEntry, PgRowHistoryStore};
 use tauri::State;
 
-use super::row_write::{update_row_impl, ColumnValue};
+use super::row_write::{build_update, execute_write, ColumnValue};
 use super::AppContext;
 
 /// Every recorded edit for one table, newest-first — backs the table workspace's
@@ -43,12 +43,14 @@ pub(crate) async fn undo_row_edit_impl(pool: &sqlx::PgPool, entry: &PgHistoryEnt
         .iter()
         .map(|c| ColumnValue { column: c.column.clone(), value: c.before.clone() })
         .collect();
-    let mut r#where = entry.key.clone();
-    for change in &entry.changes {
-        r#where.push(ColumnValue { column: change.column.clone(), value: change.after.clone() });
-    }
+    let unchanged: Vec<ColumnValue> = entry
+        .changes
+        .iter()
+        .map(|c| ColumnValue { column: c.column.clone(), value: c.after.clone() })
+        .collect();
 
-    let affected = update_row_impl(pool, &entry.schema, &entry.table, &set, &r#where).await?;
+    let (sql, binds) = build_update(pool, &entry.schema, &entry.table, &set, &entry.key, &unchanged).await?;
+    let affected = execute_write(sql, binds, pool).await?;
     if affected == 0 {
         return Err(AppError::Validation(
             "This row has changed since this edit, so undoing it was refused rather than overwriting the newer value.".to_string(),
