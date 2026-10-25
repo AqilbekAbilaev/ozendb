@@ -3,7 +3,7 @@
 import { defineAsyncComponent } from 'vue'
 
 export const MongoCollectionWorkspace = defineAsyncComponent(() => import('./collection/MongoCollectionWorkspace.vue'))
-export const ShellConsole = defineAsyncComponent(() => import('../../../components/app/ShellConsole.vue'))
+export const ShellConsole = defineAsyncComponent(() => import('../panes/ShellConsole.vue'))
 export const IndexManagerPane = defineAsyncComponent(() => import('../panes/IndexManagerPane.vue'))
 export const SchemaPane = defineAsyncComponent(() => import('../panes/SchemaPane.vue'))
 export const SearchPane = defineAsyncComponent(() => import('../panes/SearchPane.vue'))
