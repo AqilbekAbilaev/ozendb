@@ -65,7 +65,7 @@ export const MODALS = {
   users:     { component: lazy(() => import('../engines/mongodb/admin/UsersModal.vue')),         level: 'database' },
   roles:     { component: lazy(() => import('../engines/mongodb/admin/RolesModal.vue')),         level: 'database' },
   functions: { component: lazy(() => import('../engines/mongodb/admin/FunctionsModal.vue')),     level: 'database' },
-  gridfs:    { component: lazy(() => import('../components/tools/GridFsModal.vue')),        level: 'database' },
+  gridfs:    { component: lazy(() => import('../engines/mongodb/tools/GridFsModal.vue')),        level: 'database' },
   addBucket:     { component: lazy(() => import('../engines/mongodb/admin/AddBucketModal.vue')),     level: 'database' },
   addCollection: { component: lazy(() => import('../engines/mongodb/admin/AddCollectionModal.vue')), level: 'database' },
   dropDatabase:  { component: lazy(() => import('../engines/mongodb/admin/DropDatabaseModal.vue')),  level: 'database' },
@@ -78,11 +78,11 @@ export const MODALS = {
   // Registry modals take one `target` prop and emit `close`; their owners may supply
   // additional per-open listeners without adding routing to App.vue.
   stats:     { component: lazy(() => import('../engines/mongodb/admin/StatsModal.vue')),             level: 'collection' },
-  history:   { component: lazy(() => import('../components/tools/CollectionHistoryModal.vue')), level: 'collection' },
+  history:   { component: lazy(() => import('../engines/mongodb/tools/CollectionHistoryModal.vue')), level: 'collection' },
   mapReduce: { component: lazy(() => import('../engines/mongodb/query/MapReduceModal.vue')),         level: 'collection' },
   validator: { component: lazy(() => import('../engines/mongodb/admin/ValidatorModal.vue')),         level: 'collection' },
-  import:    { component: lazy(() => import('../components/tools/ImportFormatModal.vue')),      level: 'collection' },
-  exportSource: { component: lazy(() => import('../components/tools/ExportSourceModal.vue')),   level: 'collection' },
+  import:    { component: lazy(() => import('../engines/mongodb/tools/ImportFormatModal.vue')),      level: 'collection' },
+  exportSource: { component: lazy(() => import('../engines/mongodb/tools/ExportSourceModal.vue')),   level: 'collection' },
   dropCollection:      { component: lazy(() => import('../engines/mongodb/admin/DropCollectionModal.vue')),      level: 'collection' },
   renameCollection:    { component: lazy(() => import('../engines/mongodb/admin/RenameCollectionModal.vue')),    level: 'collection' },
   duplicateCollection: { component: lazy(() => import('../engines/mongodb/admin/DuplicateCollectionModal.vue')), level: 'collection' },

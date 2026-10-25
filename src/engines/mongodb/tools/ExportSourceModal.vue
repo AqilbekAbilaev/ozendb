@@ -1,9 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
-import BaseModal from '../base/BaseModal.vue'
-import BaseButton from '../base/BaseButton.vue'
-import BaseRadio from '../base/BaseRadio.vue'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseRadio from '../../../components/base/BaseRadio.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Studio-3T-style "Export source" picker: the first thing the user sees after
 // choosing Export, and the sibling of ImportFormatModal. It only decides *what* gets
