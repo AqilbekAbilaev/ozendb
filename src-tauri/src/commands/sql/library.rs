@@ -4,27 +4,27 @@ use crate::time::now_ms;
 use tauri::State;
 
 #[tauri::command(async)]
-pub fn list_pg_history(store: State<'_, PgQueryLibraryStore>, connection_id: String) -> Vec<SqlHistoryEntry> {
+pub fn list_sql_history(store: State<'_, PgQueryLibraryStore>, connection_id: String) -> Vec<SqlHistoryEntry> {
     store.history(&connection_id)
 }
 
 #[tauri::command(async)]
-pub fn push_pg_history(store: State<'_, PgQueryLibraryStore>, connection_id: String, sql: String) -> Result<(), AppError> {
+pub fn push_sql_history(store: State<'_, PgQueryLibraryStore>, connection_id: String, sql: String) -> Result<(), AppError> {
     store.push_history(&connection_id, &sql, &now_ms())
 }
 
 #[tauri::command(async)]
-pub fn clear_pg_history(store: State<'_, PgQueryLibraryStore>, connection_id: String) -> Result<(), AppError> {
+pub fn clear_sql_history(store: State<'_, PgQueryLibraryStore>, connection_id: String) -> Result<(), AppError> {
     store.clear_history(&connection_id)
 }
 
 #[tauri::command(async)]
-pub fn list_pg_saved(store: State<'_, PgQueryLibraryStore>, connection_id: String) -> Vec<SavedSql> {
+pub fn list_sql_saved(store: State<'_, PgQueryLibraryStore>, connection_id: String) -> Vec<SavedSql> {
     store.saved(&connection_id)
 }
 
 #[tauri::command(async)]
-pub fn save_pg_query(
+pub fn save_sql_query(
     store: State<'_, PgQueryLibraryStore>,
     connection_id: String,
     name: String,
@@ -38,6 +38,6 @@ pub fn save_pg_query(
 }
 
 #[tauri::command(async)]
-pub fn delete_pg_saved(store: State<'_, PgQueryLibraryStore>, id: String) -> Result<(), AppError> {
+pub fn delete_sql_saved(store: State<'_, PgQueryLibraryStore>, id: String) -> Result<(), AppError> {
     store.delete_saved(&id)
 }

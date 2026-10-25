@@ -1,11 +1,13 @@
 //! What every SQL engine's commands share and that never talks to a server: the shapes
 //! a table tab sends and gets back, and reading SQL with `sqlparser` in the engine's own
-//! dialect. Each engine's commands (`commands/postgres/`) do the talking.
+//! dialect, and the saved SQL and run history each connection keeps (`library.rs`). Each
+//! engine's commands (`commands/postgres/`) do the talking.
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
 
 pub mod format;
+pub mod library;
 pub mod read_select;
 pub mod statement;
 pub mod transfer;

@@ -19,7 +19,7 @@ vi.mock('../../postgresql/api/queries', () => ({
   runQuery, readTableSelect, explainQuery,
 }))
 vi.mock('../../postgresql/api/resources', async (original) => ({ ...(await original()), listColumns, listForeignKeys }))
-vi.mock('../../postgresql/api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
+vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 const { useSqlTable } = await import('./useSqlTable.js')

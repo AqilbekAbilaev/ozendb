@@ -10,7 +10,7 @@ vi.mock('../api/queries', async (original) => ({
   runQuery: vi.fn(() => Promise.resolve({ columns: ['v', 'e'], rows: [['16', 'UTF8']] })),
 }))
 vi.mock('../api/resources', async (original) => ({ ...(await original()), listColumns, listForeignKeys: vi.fn(() => Promise.resolve([])) }))
-vi.mock('../api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
+vi.mock('../../sql/api/library', () => ({ pushHistory: vi.fn(() => Promise.resolve()) }))
 
 const { registerWorkspaceDefinitions } = await import('../../../workspaces/registerDefinitions.js')
 const { restoreWorkspace } = await import('../../../workspaces/lifecycle.js')
