@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { listSavedQueries, deleteSavedQuery } from '../../engines/mongodb/api/queryLibrary'
-import BaseIcon from '../base/BaseIcon.vue'
-import BaseInput from '../base/BaseInput.vue'
-import BaseModal from '../base/BaseModal.vue'
-import BaseButton from '../base/BaseButton.vue'
-import FlexSpacer from '../base/FlexSpacer.vue'
-import { syncedDataVersion } from '../../stores/sync'
+import { listSavedQueries, deleteSavedQuery } from '../api/queryLibrary'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
+import { syncedDataVersion } from '../../../stores/sync'
 
 const emit = defineEmits(['close', 'apply'])
 

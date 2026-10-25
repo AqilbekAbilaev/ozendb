@@ -3,9 +3,9 @@
 // rendering. What it does with the query lives in useCollectionRun; this component
 // renders it. The host (WorkspaceArea.vue) owns the tab bar, other pane kinds, and the
 // result sub-tab compatibility ref this component reads/writes via v-model.
-import QueryBar from '../../../../components/query/QueryBar.vue'
-import SqlQueryBar from '../../../../components/query/SqlQueryBar.vue'
-import PipelineEditor from '../../../../components/query/PipelineEditor.vue'
+import QueryBar from '../../query/QueryBar.vue'
+import SqlQueryBar from '../../query/SqlQueryBar.vue'
+import PipelineEditor from '../../query/PipelineEditor.vue'
 import ResultsPanel from '../../results/ResultsPanel.vue'
 import CollectionCrumbs from '../../../../components/base/CollectionCrumbs.vue'
 import { computed } from 'vue'

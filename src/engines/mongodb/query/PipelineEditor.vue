@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { EditorView, keymap, placeholder } from '@codemirror/view'
-import CodeEditor from '../base/CodeEditor.vue'
-import FieldError from '../base/FieldError.vue'
-import Resizer from '../base/Resizer.vue'
+import CodeEditor from '../../../components/base/CodeEditor.vue'
+import FieldError from '../../../components/base/FieldError.vue'
+import Resizer from '../../../components/base/Resizer.vue'
 
 // The aggregation pipeline box. Uses CodeEditor rather than a plain textarea so Tab
 // indents instead of moving focus — a browser textarea can't do that — which also

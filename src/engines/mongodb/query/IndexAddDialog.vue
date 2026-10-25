@@ -1,16 +1,16 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import BaseModal from '../base/BaseModal.vue'
-import BaseSelect from '../base/BaseSelect.vue'
-import BaseInput from '../base/BaseInput.vue'
-import BaseCheckbox from '../base/BaseCheckbox.vue'
-import BaseTextarea from '../base/BaseTextarea.vue'
-import FormField from '../base/FormField.vue'
-import TabStrip from '../base/TabStrip.vue'
-import BaseButton from '../base/BaseButton.vue'
-import FieldError from '../base/FieldError.vue'
-import HintText from '../base/HintText.vue'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseSelect from '../../../components/base/BaseSelect.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseCheckbox from '../../../components/base/BaseCheckbox.vue'
+import BaseTextarea from '../../../components/base/BaseTextarea.vue'
+import FormField from '../../../components/base/FormField.vue'
+import TabStrip from '../../../components/base/TabStrip.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import FieldError from '../../../components/base/FieldError.vue'
+import HintText from '../../../components/base/HintText.vue'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // The Add / Edit index dialog (Screenshot A). It owns all of its form state and
 // emits an assembled { keys, options } pair — two JSON strings the backend merges

@@ -1,8 +1,8 @@
 <script setup>
-import BaseIcon from '../base/BaseIcon.vue'
-import BaseButton from '../base/BaseButton.vue'
-import BaseTextarea from '../base/BaseTextarea.vue'
-import FieldError from '../base/FieldError.vue'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseTextarea from '../../../components/base/BaseTextarea.vue'
+import FieldError from '../../../components/base/FieldError.vue'
 
 // SQL query bar for a collection tab in `sql` mode. The SQL is translated to a
 // MongoDB find and run against this tab's collection (the FROM clause is only for

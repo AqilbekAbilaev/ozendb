@@ -2,7 +2,7 @@
 import { onUnmounted } from 'vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
-import IndexAddDialog from '../../../components/query/IndexAddDialog.vue'
+import IndexAddDialog from '../query/IndexAddDialog.vue'
 import { indexKeyLabel } from '../../../utils/indexSpec'
 import { fmtBytes } from '../../../utils/format'
 import { useIndexManager } from '../../../composables/useIndexManager'

@@ -79,7 +79,7 @@ export const MODALS = {
   // additional per-open listeners without adding routing to App.vue.
   stats:     { component: lazy(() => import('../engines/mongodb/admin/StatsModal.vue')),             level: 'collection' },
   history:   { component: lazy(() => import('../components/tools/CollectionHistoryModal.vue')), level: 'collection' },
-  mapReduce: { component: lazy(() => import('../components/query/MapReduceModal.vue')),         level: 'collection' },
+  mapReduce: { component: lazy(() => import('../engines/mongodb/query/MapReduceModal.vue')),         level: 'collection' },
   validator: { component: lazy(() => import('../engines/mongodb/admin/ValidatorModal.vue')),         level: 'collection' },
   import:    { component: lazy(() => import('../components/tools/ImportFormatModal.vue')),      level: 'collection' },
   exportSource: { component: lazy(() => import('../components/tools/ExportSourceModal.vue')),   level: 'collection' },
