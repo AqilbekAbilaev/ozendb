@@ -56,6 +56,7 @@ export const MODALS = {
   // Opened from the Users modal's detail panel, not a sidebar node.
   mysqlGrants:     { component: lazy(() => import('../engines/mysql/admin/MySqlGrantsModal.vue')),     level: 'connection' },
   mysqlActivity:   { component: lazy(() => import('../engines/mysql/admin/MySqlActivityModal.vue')),   level: 'connection' },
+  mysqlServerInfo: { component: lazy(() => import('../engines/mysql/admin/MySqlServerInfoModal.vue')), level: 'connection' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },

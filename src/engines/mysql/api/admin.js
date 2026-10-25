@@ -45,3 +45,8 @@ export function killQuery(connectionId, process) {
 export function killConnection(connectionId, process) {
   return invoke('kill_mysql_connection', { id: connectionId, process })
 }
+
+// Every global variable and status counter, as `{ variables, status }` of `{ name, value }`.
+export function serverInfo(connectionId) {
+  return invoke('show_mysql_server_info', { id: connectionId })
+}

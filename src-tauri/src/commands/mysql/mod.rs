@@ -15,6 +15,7 @@ pub mod routines;
 pub mod row_write;
 mod script;
 pub mod schema;
+pub mod serverinfo;
 pub mod transaction;
 pub mod users;
 
@@ -28,6 +29,7 @@ pub use read_select::*;
 pub use routines::*;
 pub use row_write::*;
 pub use schema::*;
+pub use serverinfo::*;
 pub use transaction::*;
 pub use users::*;
 
