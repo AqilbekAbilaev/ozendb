@@ -11,6 +11,7 @@ import { parsePostgresUri } from './postgresql/connection/parseUri.js'
 import { parseMySqlUri } from './mysql/connection/parseUri.js'
 import { parseConnectionUri } from '../utils/connectionUri.js'
 import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
+import MongoTreeNodes from './mongodb/tree/MongoTreeNodes.vue'
 import PostgresTreeNodes from './postgresql/tree/PostgresTreeNodes.vue'
 import MySqlTreeNodes from './mysql/tree/MySqlTreeNodes.vue'
 
@@ -66,9 +67,10 @@ export const CONNECTION_EDITORS = Object.freeze({
   },
 })
 
-// An engine's rows under an expanded connection in the sidebar. MongoDB has none here yet:
-// its rows are still built into ConnectionTree.vue, which falls back to them.
+// An engine's rows under an expanded connection in the sidebar. ConnectionTree.vue draws
+// the connection row itself and hands everything below it to these.
 export const TREE_NODES = Object.freeze({
+  mongodb: MongoTreeNodes,
   postgresql: PostgresTreeNodes,
   mysql: MySqlTreeNodes,
 })

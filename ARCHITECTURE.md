@@ -132,8 +132,8 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
   `api/library.js` is the query library's half of the Tauri boundary, the same for every SQL engine.
 
 A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
-screens still sit in the shared `components/` folders and its sidebar rows in
-`ConnectionTree.vue`, and `utils/menuContext.js` mirrors `menu.rs`'s per-engine menus.
+screens still sit in the shared `components/` folders, and `utils/menuContext.js` mirrors
+`menu.rs`'s per-engine menus.
 
 ## Resource identity
 

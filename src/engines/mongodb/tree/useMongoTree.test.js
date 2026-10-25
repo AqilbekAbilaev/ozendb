@@ -90,6 +90,18 @@ it('opens the database of the active MongoDB collection tab', async () => {
   expect(tree.isDatabaseOpen('c1', 'shop.eu')).toBe(true)
 })
 
+// Each connection's rows call useMongoTree, so the watcher is the module's, not theirs:
+// a collapsed connection has no rows mounted and still gets its database opened.
+it('opens the active collection tab\'s database with no tree mounted', async () => {
+  scope.stop()
+  tabs.value = [{ id: 'm', type: 'mongodb.find', target: collectionRef('shop.eu', 'orders 2024') }]
+  activeTabId.value = 'm'
+  await nextTick()
+  scope = effectScope()
+  tree = scope.run(() => useMongoTree())
+  expect(tree.isDatabaseOpen('c1', 'shop.eu')).toBe(true)
+})
+
 // The rows look their state up by databaseKey/collectionKey, and the active tab writes it
 // from its target: both go through nodeTagKey, so they cannot drift apart.
 it('keys the active tab\'s rows the way the rows look themselves up', async () => {
