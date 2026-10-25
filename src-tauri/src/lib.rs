@@ -237,6 +237,8 @@ pub fn run() {
             create_mysql_user,
             drop_mysql_user,
             list_mysql_grants,
+            grant_mysql_privileges,
+            revoke_mysql_privileges,
             list_pg_databases,
             list_pg_schemas,
             list_pg_tables,

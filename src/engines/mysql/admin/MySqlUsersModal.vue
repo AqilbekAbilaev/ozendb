@@ -5,6 +5,7 @@ import { errText, errCode } from '../../../utils/errors'
 import { accountName, userAttributes, matchUsers, canDropUser } from './userRows'
 import { openConnections } from '../../../stores/openConnections'
 import { showToast } from '../../../stores/toast'
+import { openModal } from '../../../stores/modals'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import BaseInput from '../../../components/base/BaseInput.vue'
@@ -146,6 +147,12 @@ async function confirmDrop() {
               <div class="mu-head">
                 <span class="mu-title">{{ accountName(selected) }}</span>
                 <FlexSpacer />
+                <BaseButton
+                  variant="ghost"
+                  icon="key"
+                  title="Grant or revoke this account's privileges"
+                  @click="openModal('mysqlGrants', { connId: target.connId, connName: target.connName, user: selected.user, host: selected.host })"
+                >Grants…</BaseButton>
                 <BaseButton
                   variant="ghost"
                   icon="trash"

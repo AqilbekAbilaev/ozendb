@@ -19,3 +19,13 @@ export function dropUser(connectionId, { user, host }) {
 export function grants(connectionId, { user, host }) {
   return invoke('list_mysql_grants', { id: connectionId, user, host })
 }
+
+// `change` is what grantRows.js's privilegeChange builds. Both are refused on a
+// read-only connection.
+export function grantPrivileges(connectionId, change) {
+  return invoke('grant_mysql_privileges', { id: connectionId, change })
+}
+
+export function revokePrivileges(connectionId, change) {
+  return invoke('revoke_mysql_privileges', { id: connectionId, change })
+}
