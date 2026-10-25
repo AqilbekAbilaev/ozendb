@@ -16,6 +16,7 @@ pub mod row_write;
 mod script;
 pub mod schema;
 pub mod serverinfo;
+pub mod transfer;
 pub mod transaction;
 pub mod users;
 
@@ -30,6 +31,7 @@ pub use routines::*;
 pub use row_write::*;
 pub use schema::*;
 pub use serverinfo::*;
+pub use transfer::*;
 pub use transaction::*;
 pub use users::*;
 

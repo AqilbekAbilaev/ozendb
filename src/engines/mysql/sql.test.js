@@ -170,4 +170,9 @@ describe('api', () => {
     await api.saveRows(target, changes)
     expect(invoke).toHaveBeenCalledWith('save_mysql_rows', { id: 'c1', database: 'shop.eu', table: 'order items', changes })
   })
+
+  it('imports into the table the shared import window names by its schema', async () => {
+    await api.importPreview({ connectionId: 'c1', schema: 'shop.eu', table: 'order items' }, '/tmp/o.csv')
+    expect(invoke).toHaveBeenCalledWith('mysql_import_preview_csv', { id: 'c1', database: 'shop.eu', table: 'order items', path: '/tmp/o.csv' })
+  })
 })

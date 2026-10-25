@@ -49,10 +49,10 @@ pub(super) enum Param {
     Number(u64),
 }
 
-type Statement = (String, Vec<Param>);
+pub(super) type Statement = (String, Vec<Param>);
 
 /// The most values one prepared statement binds: MySQL counts them in 16 bits.
-const MAX_PARAMS: usize = 65_535;
+pub(super) const MAX_PARAMS: usize = 65_535;
 
 /// The bytes a `0x…` hex literal, as the grid shows a binary value, spells.
 fn bytes(info: &MySqlColumnInfo, value: &Value) -> Result<Vec<u8>, AppError> {
@@ -179,7 +179,7 @@ pub(super) fn delete(table: &str, columns: &[MySqlColumnInfo], rows: &[Vec<Colum
 
 /// The rows a statement matched, edited or not: sqlx asks MySQL for found rows, not
 /// changed ones, so saving a value a row already holds still counts it.
-async fn execute(connection: &mut MySqlConnection, (sql, params): Statement) -> Result<u64, AppError> {
+pub(super) async fn execute(connection: &mut MySqlConnection, (sql, params): Statement) -> Result<u64, AppError> {
     let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
     for param in params {
         query = match param {
