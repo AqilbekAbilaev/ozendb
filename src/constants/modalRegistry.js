@@ -50,6 +50,9 @@ export const MODALS = {
   pgRowHistory:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRowHistoryModal.vue')),    level: 'table' },
   // A MySQL view's or stored program's CREATE statement, opened from its sidebar row.
   mysqlDefinition: { component: lazy(() => import('../engines/mysql/admin/MySqlDefinitionModal.vue')), level: 'database' },
+  // MySQL's server tools, opened from its connection's right-click menu. Accounts are
+  // server-wide, so Users is connection level.
+  mysqlUsers:      { component: lazy(() => import('../engines/mysql/admin/MySqlUsersModal.vue')),      level: 'connection' },
 
   // ── database level ──
   dbStats:   { component: lazy(() => import('../components/admin/DatabaseStatsModal.vue')), level: 'database' },

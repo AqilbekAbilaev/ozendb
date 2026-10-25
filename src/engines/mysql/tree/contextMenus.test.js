@@ -25,6 +25,15 @@ beforeEach(() => {
 
 const openedTab = () => tabs.value.at(-1)
 
+// A server tool is offered on a connection only, and opens its registered modal there.
+function expectAServerTool(action, modal) {
+  const connection = { connId: 'm1', connName: 'Shop MySQL ü', engine: 'mysql', resource: createResourceRef('m1', []) }
+  expect(MYSQL_MENUS.connection.map(item => item.value)).toContain(action)
+  expect(MYSQL_MENUS.database.map(item => item.value)).not.toContain(action)
+  MYSQL_ACTIONS[action](connection)
+  expect([Object.keys(openModals), openModals[modal], MODALS[modal]?.level]).toEqual([[modal], connection, 'connection'])
+}
+
 describe('MySQL right-click menus', () => {
   it('offers to open a table from its row', () => {
     expect(MYSQL_MENUS.table.map(item => item.value)).toContain('mysql:open_table')
@@ -66,6 +75,10 @@ describe('MySQL right-click menus', () => {
     expect(Object.keys(openModals)).toEqual(['mysqlDefinition'])
     expect(MODALS.mysqlDefinition).toBeDefined()
     expect(openModals.mysqlDefinition).toEqual(event)
+  })
+
+  it('offers Users… on a connection, opening its accounts there', () => {
+    expectAServerTool('mysql:users', 'mysqlUsers')
   })
 
   it('is the action the engine table finds for a MySQL node', () => {

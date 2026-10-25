@@ -12,7 +12,18 @@ const NEW_SQL = { value: 'mysql:new_sql', label: 'New SQL Query', icon: 'sql' }
 const DEFINITION = { value: 'mysql:definition', label: 'Show Definition', icon: 'expr' }
 
 export const MYSQL_MENUS = {
-  connection: [NEW_SQL, { sep: true }, COPY_NAME, { sep: true }, REFRESH_NODE, CHOOSE_COLOR, { sep: true }, ...DISCONNECT],
+  connection: [
+    NEW_SQL,
+    { sep: true },
+    { value: 'mysql:users', label: 'Users…', icon: 'connect' },
+    { sep: true },
+    COPY_NAME,
+    { sep: true },
+    REFRESH_NODE,
+    CHOOSE_COLOR,
+    { sep: true },
+    ...DISCONNECT,
+  ],
   database: [NEW_SQL, { sep: true }, COPY_NAME, { sep: true }, REFRESH_NODE],
   table: [{ value: 'mysql:open_table', label: 'Open Table', icon: 'table' }, NEW_SQL, { sep: true }, COPY_NAME],
   view: [{ value: 'mysql:open_table', label: 'Open View', icon: 'table' }, DEFINITION, NEW_SQL, { sep: true }, COPY_NAME],
@@ -24,4 +35,5 @@ export const MYSQL_ACTIONS = {
   'mysql:open_table': (n) => openMySqlTable({ resource: n.resource, connectionName: n.connName }),
   'mysql:new_sql': (n) => openMySqlQuery({ resource: n.resource, connectionName: n.connName }),
   'mysql:definition': (n) => openModal('mysqlDefinition', n),
+  'mysql:users': (n) => openModal('mysqlUsers', n),
 }
