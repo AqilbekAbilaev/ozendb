@@ -556,6 +556,20 @@ describe('SQL mode', () => {
     expect(t.filterRefusal.value).toBe(null)
   })
 
+  it('refuses SQL naming a column the table does not have, wherever it is named', async () => {
+    const t = await loaded({ pageSize: 100 })
+    await t.toSql()
+    t.sql.value = 'edited'
+    const read = { joins: [], columns: [], filters: [], orderBy: [], descending: false, limit: 100, offset: 0 }
+    const nope = { table: 0, column: 'nope' }
+    for (const named of [{ columns: [nope] }, { filters: [{ ...nope, op: 'eq', value: '1' }] }, { orderBy: [nope] }]) {
+      readTableSelect.mockResolvedValue({ ...read, ...named })
+      await t.toFilters()
+      expect(t.filterRefusal.value).toBe('there is no column "nope".')
+      expect(t.mode.value).toBe('sql')
+    }
+  })
+
   it('treats ORDER BY the primary key as no sort, as browsing does', async () => {
     const t = await loaded()
     await t.toSql()

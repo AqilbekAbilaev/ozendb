@@ -43,13 +43,19 @@ export function useTableSqlMode(t) {
     })))
     const columnsOf = (table) => (table ? fetched[table - 1].columns : mainColumns.value)
     // A name as the column's own, where the engine matches it in another case; an unknown
-    // one stays as written, for the backend to refuse.
-    const own = (ref) => ({ ...ref, column: columnsOf(ref.table).find(c => dialect.sameColumn(c.name, ref.column))?.name ?? ref.column })
+    // one is kept to refuse the SQL with.
+    const unknown = []
+    const own = (ref) => {
+      const column = columnsOf(ref.table).find(c => dialect.sameColumn(c.name, ref.column))?.name
+      if (column == null) unknown.push(ref.column)
+      return { ...ref, column: column ?? ref.column }
+    }
     const nextJoins = fetched.map((j, i) => ({ ...j, on: j.on.map(p => ({ column: own({ table: i + 1, column: p.column }).column, equals: own(p.equals) })) }))
-    const [shown, order] = [readShown.map(own), readOrder.map(own)]
+    const [shown, order, named] = [readShown, readOrder, readFilters].map(refs => refs.map(own))
+    if (unknown.length) return `there is no column "${unknown[0]}".`
     const keyOf = ({ table, column }) => (table ? `${nextJoins[table - 1].key}.${column}` : column)
     const infoOf = ({ table, column }) => columnsOf(table).find(c => c.name === column)
-    const read = readFilters.map(own).map(f => (f.value == null ? f : { ...f, value: dialect.readFilterText(f.value, infoOf(f)?.dataType, f.op) }))
+    const read = named.map(f => (f.value == null ? f : { ...f, value: dialect.readFilterText(f.value, infoOf(f)?.dataType, f.op) }))
     const keys = keyColumns.value
     const byKey = order.length === keys.length && order.every((c, i) => !c.table && c.column === keys[i])
     if (order.length > 1 && !byKey) return 'the filter view sorts by one column at a time.'
