@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import "../assets/theme.css";
-import DocumentEditorPage from "../components/results/DocumentEditorPage.vue";
+import DocumentEditorPage from "../engines/mongodb/results/DocumentEditorPage.vue";
 import { installInputUndo } from "../utils/inputUndo";
 import { prePaintTheme, paintTheme } from "../utils/themeMirror";
 import { onThemeChanged } from "../appApi/events";

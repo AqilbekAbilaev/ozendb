@@ -2,11 +2,11 @@
 import { ref, computed } from 'vue'
 import { Decoration, EditorView } from '@codemirror/view'
 import { StateEffect, StateField, RangeSetBuilder } from '@codemirror/state'
-import { mongoStringify } from '../../utils/mongoFormat'
-import { jsonViewerExtensions } from '../../utils/jsonView'
-import { useResultSearch } from '../../composables/useResultSearch'
-import CodeEditor from '../base/CodeEditor.vue'
-import SearchBar from '../base/SearchBar.vue'
+import { mongoStringify } from '../../../utils/mongoFormat'
+import { jsonViewerExtensions } from '../../../utils/jsonView'
+import { useResultSearch } from '../../../composables/useResultSearch'
+import CodeEditor from '../../../components/base/CodeEditor.vue'
+import SearchBar from '../../../components/base/SearchBar.vue'
 
 const props = defineProps({
   results: { type: Array, default: () => [] },

@@ -5,8 +5,8 @@
 // IXSCAN) as the deepest node. All parsing lives in the util — this component only
 // lays out and draws the already-normalized tree.
 import { computed } from 'vue'
-import BaseIcon from '../base/BaseIcon.vue'
-import { fmtBytes } from '../../utils/format'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import { fmtBytes } from '../../../utils/format'
 
 const props = defineProps({
   // The render-ready tree from buildExplainTree(), or null.

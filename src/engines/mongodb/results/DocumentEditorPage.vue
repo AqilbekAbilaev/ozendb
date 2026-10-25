@@ -1,16 +1,16 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { emitDocumentSaved, onDocumentTarget } from '../../appApi/events'
+import { emitDocumentSaved, onDocumentTarget } from '../../../appApi/events'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import CodeEditor from '../base/CodeEditor.vue'
-import BaseButton from '../base/BaseButton.vue'
-import { insertDocument, replaceDocument } from '../../engines/mongodb/api/documents'
-import { runFind } from '../../engines/mongodb/api/queries'
-import { docExtensions } from '../../utils/docEditor'
-import { mongoStringify } from '../../utils/mongoFormat'
-import { parseField } from '../../utils/queryParser'
-import { errText } from '../../utils/errors'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import CodeEditor from '../../../components/base/CodeEditor.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import { insertDocument, replaceDocument } from '../api/documents'
+import { runFind } from '../api/queries'
+import { docExtensions } from '../../../utils/docEditor'
+import { mongoStringify } from '../../../utils/mongoFormat'
+import { parseField } from '../../../utils/queryParser'
+import { errText } from '../../../utils/errors'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // The pop-out document window (Studio-3T-style Cmd/Ctrl+J). Opened by the Rust
 // open_document_window command, seeded from the window URL on first load. Three modes:

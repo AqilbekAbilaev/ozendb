@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { mongoStringify, syntaxHighlight } from '../../utils/mongoFormat'
+import { mongoStringify, syntaxHighlight } from '../../../utils/mongoFormat'
 
 // A single document rendered as a read-only, syntax-highlighted preformatted JSON block.
 // Shared by the Explain "View JSON" mode and the read-only document viewer dialog.

@@ -7,17 +7,17 @@
 // locally; the parent performs the actual document mutation + save and can feed a
 // backend error back in via `saveError` (the dialog stays open on error).
 import { ref, computed, watch } from 'vue'
-import BaseSelect from '../base/BaseSelect.vue'
-import BaseButton from '../base/BaseButton.vue'
-import BaseInput from '../base/BaseInput.vue'
-import BaseTextarea from '../base/BaseTextarea.vue'
-import { BSON_TYPES, buildTypedValue } from '../../utils/docEdit'
-import BaseModal from '../base/BaseModal.vue'
-import BaseModalBody from '../base/BaseModalBody.vue'
-import BaseModalFoot from '../base/BaseModalFoot.vue'
-import FieldError from '../base/FieldError.vue'
-import HintText from '../base/HintText.vue'
-import FormField from '../base/FormField.vue'
+import BaseSelect from '../../../components/base/BaseSelect.vue'
+import BaseButton from '../../../components/base/BaseButton.vue'
+import BaseInput from '../../../components/base/BaseInput.vue'
+import BaseTextarea from '../../../components/base/BaseTextarea.vue'
+import { BSON_TYPES, buildTypedValue } from '../../../utils/docEdit'
+import BaseModal from '../../../components/base/BaseModal.vue'
+import BaseModalBody from '../../../components/base/BaseModalBody.vue'
+import BaseModalFoot from '../../../components/base/BaseModalFoot.vue'
+import FieldError from '../../../components/base/FieldError.vue'
+import HintText from '../../../components/base/HintText.vue'
+import FormField from '../../../components/base/FormField.vue'
 
 const typeOptions = BSON_TYPES.map((t) => ({ value: t, label: t }))
 
