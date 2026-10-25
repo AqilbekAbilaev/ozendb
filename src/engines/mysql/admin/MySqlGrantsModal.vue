@@ -20,7 +20,7 @@ import HintText from '../../../components/base/HintText.vue'
 const props = defineProps({
   target: { type: Object, required: true },  // { connId, connName, user, host }
 })
-defineEmits(['close'])
+const emit = defineEmits(['close', 'changed'])
 
 const loading = ref(true)
 const error = ref(null)
@@ -59,6 +59,7 @@ async function apply(call, done) {
   try {
     await call(props.target.connId, built.change)
     showToast(done)
+    emit('changed')
     await load()
   } catch (e) {
     actionError.value = errText(e)
