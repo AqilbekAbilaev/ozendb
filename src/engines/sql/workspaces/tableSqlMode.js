@@ -1,11 +1,12 @@
 import { errMessage } from '../../../utils/errors'
 import { filterBoxText } from './parseFilter.js'
 import { runSql } from './runSql.js'
+import { pageOrder, tableKeys } from './buildSelectSql.js'
 
 // A table tab's SQL mode: opening it on the SQL the filters amount to, and going back —
 // reading edited SQL into the joins, boxes, sort and page, or saying why they can't show it.
 export function useTableSqlMode(t) {
-  const { dialect, api, kindOf, target, runtime, total, limit, orderBy, descending, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun, mainColumns, joins, joinColumns, nextJoinKey, pauses, refs, keyColumns, currentSql, loadForeignKeys, goTo } = t
+  const { dialect, api, kindOf, target, runtime, total, limit, orderBy, descending, filterText, filters, shownColumns, mode, filterRefusal, sql, sqlRun, mainColumns, joins, joinColumns, nextJoinKey, pauses, refs, currentSql, loadForeignKeys, goTo } = t
   function toSql() {
     openSql(currentSql.value)
     return runSql(sqlRun, sql.value)
@@ -56,9 +57,11 @@ export function useTableSqlMode(t) {
     const keyOf = ({ table, column }) => (table ? `${nextJoins[table - 1].key}.${column}` : column)
     const infoOf = ({ table, column }) => columnsOf(table).find(c => c.name === column)
     const read = named.map(f => (f.value == null ? f : { ...f, value: dialect.readFilterText(f.value, infoOf(f)?.dataType, f.op) }))
-    const keys = keyColumns.value
-    const byKey = order.length === keys.length && order.every((c, i) => !c.table && c.column === keys[i])
-    if (order.length > 1 && !byKey) return 'the filter view sorts by one column at a time.'
+    // The tab's own SQL orders by its sort, then by each table's key (see pageOrder).
+    const ties = tableKeys([mainColumns.value, ...fetched.map(j => j.columns)])
+    const orderedBy = (columns) => order.length === columns.length && order.every((c, i) => c.table === columns[i].table && c.column === columns[i].column)
+    const byKey = orderedBy(ties)
+    if (order.length > 1 && !byKey && !orderedBy(pageOrder(order[0], ties))) return 'the filter view sorts by one column at a time.'
     const texts = {}
     for (const f of read) {
       const key = keyOf(f)

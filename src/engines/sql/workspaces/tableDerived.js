@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { buildSelectSql, aliases } from './buildSelectSql.js'
+import { buildSelectSql, aliases, pageOrder, tableKeys } from './buildSelectSql.js'
 import { columnRefs } from './columnRefs.js'
 import { joinOffers as offersFor } from './joinOffers.js'
 import { mergeColumnOrder } from '../../../composables/useColumnReorder'
@@ -50,7 +50,7 @@ export function useTableDerived(t) {
     joins: wireJoins.value,
     columns: shownColumns.value.map(columnOf),
     filters: filters.value.map(filter => ({ ...wireFilter(filter), dataType: refByKey.value[filter.key].info.dataType })),
-    orderBy: orderBy.value ? [columnOf(orderBy.value)] : keyColumns.value.map(column => ({ table: 0, column })),
+    orderBy: pageOrder(orderBy.value && columnOf(orderBy.value), tableKeys([mainColumns.value ?? [], ...joins.value.map(j => joinColumns.value[j.key] ?? [])])),
     descending: descending.value,
     limit: limit.value,
     offset: offset.value,
