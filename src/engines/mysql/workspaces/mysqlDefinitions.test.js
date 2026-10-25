@@ -144,4 +144,19 @@ describe('mysql.query', () => {
     expect(copy.fields.state.sql).toBe('SELECT `ü`')
     expect(copy.fields.runtime.run).toEqual(createSqlRun('mysql', 'c1', 'shop `2024` ü'))
   })
+
+  it('saves its SQL and comes back in the database it ran in, without its runs', () => {
+    const tab = { ...created(resource).fields, target: created(resource).target, state: { sql: 'SELECT `ü`' } }
+    const restored = query.restore({ target: tab.target, connectionName: 'local', ...query.serialize(tab) })
+    expect(restored.title).toBe('SQL: shop `2024` ü')
+    expect(restored.fields.state.sql).toBe('SELECT `ü`')
+    expect(restored.fields.runtime.run).toEqual(createSqlRun('mysql', 'c1', 'shop `2024` ü'))
+  })
+
+  it('comes back on the connection when it was opened there, in its default database', () => {
+    const restored = query.restore({ target: createResourceRef('c1', []), connectionName: 'local', sql: 'SELECT 1' })
+    expect(restored.title).toBe('SQL: local')
+    expect(restored.target.segments).toEqual([])
+    expect(restored.fields.runtime.run).toEqual(createSqlRun('mysql', 'c1', null))
+  })
 })

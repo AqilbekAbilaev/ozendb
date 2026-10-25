@@ -3,6 +3,7 @@
 import * as queries from './api/queries.js'
 import * as resources from './api/resources.js'
 import * as transfer from './api/transfer.js'
+import * as library from '../sql/api/library.js'
 import { exactNumber, filterText, readFilterText } from './filterValues.js'
 import { planRows } from './workspaces/planRows.js'
 
@@ -50,9 +51,6 @@ export const dialect = Object.freeze({
   serverSql: 'SELECT VERSION(), @@character_set_server',
 })
 
-// Rejects as a failed command would, so the screen shows why.
-const notYet = (what) => () => Promise.reject({ code: 'not_available', message: `${what} isn't available for MySQL yet.` })
-
 // The shared table tab names the namespace a table sits in its `schema`; on MySQL, which
 // has no schema level, that is the table's database.
 const inDatabase = ({ connectionId, schema, table }) => ({ connectionId, database: schema, table })
@@ -67,13 +65,7 @@ export const api = Object.freeze({
   explainQuery: queries.explainQuery,
   formatQuery: queries.formatQuery,
   readTableSelect: (target, sql) => queries.readTableSelect(inDatabase(target), sql),
-  // TODO #397: the query library, history and saved queries.
-  pushHistory: notYet('Query history'),
-  listHistory: notYet('Query history'),
-  clearHistory: notYet('Query history'),
-  listSaved: notYet('Saved queries'),
-  saveQuery: notYet('Saved queries'),
-  deleteSaved: notYet('Saved queries'),
+  ...library,
   beginTransaction: queries.beginTransaction,
   commitTransaction: queries.commitTransaction,
   rollbackTransaction: queries.rollbackTransaction,
