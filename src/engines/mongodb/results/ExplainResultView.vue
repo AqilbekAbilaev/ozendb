@@ -2,11 +2,11 @@
 import { computed, ref } from 'vue'
 import ExplainGraph from './ExplainGraph.vue'
 import JsonDoc from './JsonDoc.vue'
-import BaseSelect from '../base/BaseSelect.vue'
-import SegmentedControl from '../base/SegmentedControl.vue'
-import FieldError from '../base/FieldError.vue'
-import { buildExplainTree } from '../../utils/explainTree'
-import FlexSpacer from '../base/FlexSpacer.vue'
+import BaseSelect from '../../../components/base/BaseSelect.vue'
+import SegmentedControl from '../../../components/base/SegmentedControl.vue'
+import FieldError from '../../../components/base/FieldError.vue'
+import { buildExplainTree } from '../../../utils/explainTree'
+import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 const VERBOSITY_OPTIONS = [
   { value: 'executionStats',    label: 'Execution stats' },

@@ -6,7 +6,7 @@
 import QueryBar from '../../../../components/query/QueryBar.vue'
 import SqlQueryBar from '../../../../components/query/SqlQueryBar.vue'
 import PipelineEditor from '../../../../components/query/PipelineEditor.vue'
-import ResultsPanel from '../../../../components/results/ResultsPanel.vue'
+import ResultsPanel from '../../results/ResultsPanel.vue'
 import CollectionCrumbs from '../../../../components/base/CollectionCrumbs.vue'
 import { computed } from 'vue'
 import { useInitialFindRun } from './useInitialFindRun'
