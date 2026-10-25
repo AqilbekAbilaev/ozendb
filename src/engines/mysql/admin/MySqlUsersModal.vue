@@ -150,7 +150,8 @@ async function confirmDrop() {
                 <BaseButton
                   variant="ghost"
                   icon="key"
-                  title="Grant or revoke this account's privileges"
+                  :disabled="readOnly"
+                  :title="readOnly ? 'This connection is read-only' : 'Grant or revoke this account\'s privileges'"
                   @click="openModal('mysqlGrants', { connId: target.connId, connName: target.connName, user: selected.user, host: selected.host })"
                 >Grants…</BaseButton>
                 <BaseButton
