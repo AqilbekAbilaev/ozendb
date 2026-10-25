@@ -43,8 +43,9 @@ export const MODALS = {
   pgCreateTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresCreateTableModal.vue')),  level: 'database' },
   pgDrop:         { component: lazy(() => import('../engines/postgresql/admin/PostgresDropModal.vue')),         level: 'database' },
   pgRenameTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresRenameTableModal.vue')),  level: 'database' },
-  // Opened from a table workspace's own toolbar, not a sidebar node.
-  pgRowHistory:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRowHistoryModal.vue')),    level: 'table' },
+  // Every SQL engine's row-edit history, reaching the engine through the target's
+  // `engine`. Opened from a table tab's toolbar (and PostgreSQL's menu bar), not a sidebar node.
+  sqlRowHistory:  { component: lazy(() => import('../engines/sql/admin/SqlRowHistoryModal.vue')),              level: 'table' },
   // Every SQL engine's bulk export and CSV import, reaching the engine through the
   // target's `engine`: a table node, or a SQL editor's { connId, engine, database, query }.
   sqlExport:      { component: lazy(() => import('../engines/sql/admin/SqlExportModal.vue')),                   level: 'database' },

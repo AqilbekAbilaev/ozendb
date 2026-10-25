@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listRowHistory, clearRowHistory, undoRowEdit } from '../api/queries'
+import { engineOf } from '../../index.js'
 import { errText, errCode } from '../../../utils/errors'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
@@ -10,13 +10,15 @@ import HintText from '../../../components/base/HintText.vue'
 import BaseModalBody from '../../../components/base/BaseModalBody.vue'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
-// Row History (#129): recorded `update_pg_row` edits for this table,
-// newest-first, each undoable — the Postgres sibling of MongoDB's Collection
-// History, scoped to grid row edits rather than whole documents.
+// Row History (#129): the grid's recorded row edits for this table, newest-first,
+// each undoable, through its engine's `sql.api` — the SQL sibling of MongoDB's
+// Collection History, scoped to grid row edits rather than whole documents.
 const props = defineProps({
-  target: { type: Object, required: true },  // { connectionId, database, schema, table }
+  target: { type: Object, required: true },  // { connectionId, engine, database, schema, table }
 })
 defineEmits(['close'])
+
+const api = engineOf(props.target).sql.api
 
 const loading = ref(true)
 const error = ref(null)
@@ -30,7 +32,7 @@ async function load() {
   error.value = null
   errorCode.value = null
   try {
-    entries.value = await listRowHistory(props.target)
+    entries.value = await api.listRowHistory(props.target)
   } catch (e) {
     error.value = errText(e)
     errorCode.value = errCode(e)
@@ -54,7 +56,7 @@ async function undo(entry) {
   notice.value = null
   error.value = null
   try {
-    await undoRowEdit(entry.id)
+    await api.undoRowEdit(entry.id)
     notice.value = 'Edit undone'
   } catch (e) {
     error.value = errText(e)
@@ -66,7 +68,7 @@ async function undo(entry) {
 
 async function clearAll() {
   try {
-    await clearRowHistory(props.target)
+    await api.clearRowHistory(props.target)
     entries.value = []
     notice.value = 'History cleared'
   } catch (e) {

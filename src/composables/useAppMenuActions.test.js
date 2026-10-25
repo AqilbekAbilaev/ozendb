@@ -89,3 +89,18 @@ describe('GridFS file actions', () => {
     expect(openModal).not.toHaveBeenCalled()
   })
 })
+
+describe('Row History', () => {
+  it('opens the shared SQL row history on the menu bar\'s PostgreSQL table', () => {
+    const table = { connectionId: 'c1', engine: 'postgresql', database: 'app db', schema: 'sales ü', table: 'order.items' }
+    const pgMenuTarget = vi.fn(() => table)
+    const { handleMenuAction } = useAppMenuActions({
+      menuTarget: vi.fn(), pgMenuTarget, handleTool: vi.fn(), menuNode: vi.fn(),
+      knownActions: new Set(), refreshAll: vi.fn(), toolbarHidden: { value: false },
+    })
+    handleMenuAction('pg:row_history')
+    expect(pgMenuTarget).toHaveBeenCalledWith('table')
+    expect(openModal).toHaveBeenCalledWith('sqlRowHistory', table)
+    closeModal('sqlRowHistory')
+  })
+})

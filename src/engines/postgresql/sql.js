@@ -57,5 +57,5 @@ export const postgresSql = Object.freeze({
   api,
   readPlan: planRows,
   // modalRegistry names: exporting a query's rows, and a table's row-edit history.
-  modals: Object.freeze({ export: 'sqlExport', rowHistory: 'pgRowHistory' }),
+  modals: Object.freeze({ export: 'sqlExport', rowHistory: 'sqlRowHistory' }),
 })
