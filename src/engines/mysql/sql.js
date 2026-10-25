@@ -70,6 +70,9 @@ export const api = Object.freeze({
   commitTransaction: queries.commitTransaction,
   rollbackTransaction: queries.rollbackTransaction,
   saveRows: (target, changes) => queries.saveRows(inDatabase(target), changes),
+  listRowHistory: (target) => queries.listRowHistory(inDatabase(target)),
+  clearRowHistory: (target) => queries.clearRowHistory(inDatabase(target)),
+  undoRowEdit: queries.undoRowEdit,
   exportData: transfer.exportData,
   importPreview: (target, path) => transfer.importPreview(inDatabase(target), path),
   importCsv: (target, path, mapping) => transfer.importCsv(inDatabase(target), path, mapping),
@@ -79,7 +82,6 @@ export const mysqlSql = Object.freeze({
   dialect,
   api,
   readPlan: planRows,
-  // modalRegistry names: exporting a query's rows. TODO #417: a row-history window, once
-  // saves record history.
-  modals: Object.freeze({ export: 'sqlExport' }),
+  // modalRegistry names: exporting a query's rows, and a table's row-edit history.
+  modals: Object.freeze({ export: 'sqlExport', rowHistory: 'sqlRowHistory' }),
 })

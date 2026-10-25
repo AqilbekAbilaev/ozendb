@@ -32,6 +32,20 @@ export function saveRows({ connectionId, database, table }, changes) {
   return invoke('save_mysql_rows', { id: connectionId, database, table, changes })
 }
 
+// The row history saveRows records, newest first, and Undo of one edit: refused, as a
+// conflict, if the row has changed again since or is gone.
+export function listRowHistory({ connectionId, database, table }) {
+  return invoke('list_mysql_row_history', { id: connectionId, database, table })
+}
+
+export function clearRowHistory({ connectionId, database, table }) {
+  return invoke('clear_mysql_row_history', { id: connectionId, database, table })
+}
+
+export function undoRowEdit(entryId) {
+  return invoke('undo_mysql_row_edit', { entryId })
+}
+
 // Runs a script, its statements one after another. `runId` names the run so cancelQuery
 // can stop it; `txId` runs it in a transaction held open by beginTransaction;
 // `database`, when given, is the one the session starts in. Resolves to the last

@@ -11,6 +11,7 @@ mod mysql_grants;
 mod mysql_join;
 mod mysql_query;
 mod mysql_routines;
+mod mysql_row_history;
 mod mysql_row_write;
 mod mysql_schema;
 mod mysql_serverinfo;

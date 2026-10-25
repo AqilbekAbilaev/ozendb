@@ -3,18 +3,21 @@
 //! primary key since it was loaded, saves none of them, and no transaction is left open
 //! between calls. Rows are found by their primary key alone, as on PostgreSQL, so a change
 //! someone else made to a row's other columns is overwritten, not detected. Every value is
-//! bound; only quoted names are written into the SQL.
+//! bound; only quoted names are written into the SQL. Each edited row joins the row
+//! history once the save commits (row_history.rs).
 use serde::Deserialize;
 use serde_json::Value;
-use sqlx::mysql::MySqlConnection;
+use sqlx::mysql::{MySql, MySqlConnection};
 use sqlx::MySqlPool;
 use tauri::State;
 
 use super::browse::{base_type, column, flag, typed, unzoned};
+use super::row_history::edit_entry;
 use super::schema::{mysql_columns, MySqlColumnInfo};
 use super::{quote_name, AppContext};
 use crate::commands::postgres::ColumnValue;
 use crate::error::AppError;
+use crate::postgres::row_history::{PgHistoryEntry, PgRowHistoryStore};
 
 /// The types the grid shows as MySQL's hex literal (commands/mysql/cell.rs), and so
 /// reads back from one.
@@ -23,10 +26,12 @@ const BYTES: [&str; 15] = [
     "multipoint", "multilinestring", "multipolygon", "geomcollection", "geometrycollection",
 ];
 
-/// An edited row: the values it takes, and its primary key as the grid loaded it.
+/// An edited row: the values it takes, what those columns held as the grid loaded it,
+/// and its primary key as the grid loaded it.
 #[derive(Deserialize)]
 pub struct MySqlRowUpdate {
     pub(super) set: Vec<ColumnValue>,
+    pub(super) before: Vec<ColumnValue>,
     pub(super) r#where: Vec<ColumnValue>,
 }
 
@@ -110,7 +115,7 @@ fn writable<'a>(columns: &'a [MySqlColumnInfo], name: &str) -> Result<&'a MySqlC
 }
 
 /// `a = ? AND b = ?` over the table's whole primary key, from `row`'s values for it.
-fn found_by_key(columns: &[MySqlColumnInfo], row: &[ColumnValue]) -> Result<(String, Vec<Param>), AppError> {
+pub(super) fn found_by_key(columns: &[MySqlColumnInfo], row: &[ColumnValue]) -> Result<(String, Vec<Param>), AppError> {
     let key: Vec<&MySqlColumnInfo> = columns.iter().filter(|c| c.is_primary_key).collect();
     if key.is_empty() {
         return Err(AppError::Validation(String::from(
@@ -179,7 +184,11 @@ pub(super) fn delete(table: &str, columns: &[MySqlColumnInfo], rows: &[Vec<Colum
 
 /// The rows a statement matched, edited or not: sqlx asks MySQL for found rows, not
 /// changed ones, so saving a value a row already holds still counts it.
-pub(super) async fn execute(connection: &mut MySqlConnection, (sql, params): Statement) -> Result<u64, AppError> {
+pub(super) async fn execute(connection: &mut MySqlConnection, statement: Statement) -> Result<u64, AppError> {
+    Ok(bound(statement).execute(connection).await.map_err(AppError::MySql)?.rows_affected())
+}
+
+pub(super) fn bound((sql, params): Statement) -> sqlx::query::Query<'static, MySql, <MySql as sqlx::Database>::Arguments> {
     let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
     for param in params {
         query = match param {
@@ -189,16 +198,25 @@ pub(super) async fn execute(connection: &mut MySqlConnection, (sql, params): Sta
             Param::Number(number) => query.bind(number),
         };
     }
-    Ok(query.execute(connection).await.map_err(AppError::MySql)?.rows_affected())
+    query
 }
 
 fn expect(rows: u64, expected: usize, refusal: String) -> Result<(), AppError> {
     if rows == expected as u64 { Ok(()) } else { Err(AppError::Validation(refusal)) }
 }
 
-pub(crate) async fn mysql_save_rows(pool: &MySqlPool, database: &str, table: &str, changes: &MySqlRowChanges) -> Result<(), AppError> {
+/// The row history the save makes, one entry per edited row, for the caller to record: it
+/// is only returned once the save has committed. `conn_id` names the connection in it.
+pub(crate) async fn mysql_save_rows(
+    pool: &MySqlPool,
+    conn_id: &str,
+    database: &str,
+    table: &str,
+    changes: &MySqlRowChanges,
+) -> Result<Vec<PgHistoryEntry>, AppError> {
     let columns = mysql_columns(pool, database, table).await?;
     let place = format!("table \"{table}\" of database \"{database}\"");
+    let name = table;
     let table = format!("{}.{}", quote_name(database)?, quote_name(table)?);
     // Every statement is built before the transaction begins, so a refused value opens none.
     let inserts: Vec<Statement> = changes.inserts.iter().map(|row| insert(&table, &columns, row)).collect::<Result<_, _>>()?;
@@ -210,9 +228,11 @@ pub(crate) async fn mysql_save_rows(pool: &MySqlPool, database: &str, table: &st
     for statement in inserts {
         expect(execute(&mut tx, statement).await?, 1, format!("An insert into {place} failed unexpectedly."))?;
     }
-    for statement in updates {
+    let mut history = Vec::with_capacity(updates.len());
+    for (statement, change) in updates.into_iter().zip(&changes.updates) {
         let refusal = format!("A row in {place} was deleted, or its primary key changed, since it was loaded.");
         expect(execute(&mut tx, statement).await?, 1, refusal)?;
+        history.extend(edit_entry(&mut tx, conn_id, database, name, &table, &columns, change).await);
     }
     let mut deleted = 0;
     for statement in deletes {
@@ -220,23 +240,27 @@ pub(crate) async fn mysql_save_rows(pool: &MySqlPool, database: &str, table: &st
     }
     let refusal = format!("Some rows in {place} were already deleted, or their primary key changed, since they were loaded.");
     expect(deleted, changes.deletes.len(), refusal)?;
-    tx.commit().await.map_err(AppError::MySql)
+    tx.commit().await.map_err(AppError::MySql)?;
+    Ok(history)
 }
 
 /// Saves a table tab's staged rows (see the note at the top). A read-only connection is
 /// refused here, and by the server for any SQL (mysql/session.rs).
-// TODO #417: record each edit's row history, as
-// update_pg_row does, from the `before` values the tab sends with every update.
 #[tauri::command]
 pub async fn save_mysql_rows(
     ctx: State<'_, AppContext>,
+    history: State<'_, PgRowHistoryStore>,
     id: String,
     database: String,
     table: String,
     changes: MySqlRowChanges,
 ) -> Result<(), AppError> {
     let pool = ctx.mysql_pool_for_write(&id, None).await?;
-    mysql_save_rows(&pool, &database, &table, &changes).await
+    // In save order, so the last edit ends up newest; a failed write loses only the history.
+    for entry in mysql_save_rows(&pool, &id, &database, &table, &changes).await? {
+        let _ = history.push(entry);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

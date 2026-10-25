@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { dialect, api } from './sql.js'
+import { dialect, api, mysqlSql } from './sql.js'
 import { operatorsFor } from '../sql/workspaces/builderRows.js'
 
 const { quoteName, quoteText, like, filterText, readFilterText, sameColumn, cellKind, jsonShape, takesValue, fillsItself } = dialect
@@ -173,8 +173,24 @@ describe('api', () => {
     expect(invoke).toHaveBeenCalledWith('save_mysql_rows', { id: 'c1', database: 'shop.eu', table: 'order items', changes })
   })
 
+  it('lists, clears and undoes the row history of the table the history window names by its schema', async () => {
+    const table = { connectionId: 'c1', engine: 'mysql', database: 'shop.eu', schema: 'shop.eu', table: 'order items' }
+    await api.listRowHistory(table)
+    expect(invoke).toHaveBeenCalledWith('list_mysql_row_history', { id: 'c1', database: 'shop.eu', table: 'order items' })
+    await api.clearRowHistory(table)
+    expect(invoke).toHaveBeenCalledWith('clear_mysql_row_history', { id: 'c1', database: 'shop.eu', table: 'order items' })
+    await api.undoRowEdit('entry ü')
+    expect(invoke).toHaveBeenCalledWith('undo_mysql_row_edit', { entryId: 'entry ü' })
+  })
+
   it('imports into the table the shared import window names by its schema', async () => {
     await api.importPreview({ connectionId: 'c1', schema: 'shop.eu', table: 'order items' }, '/tmp/o.csv')
     expect(invoke).toHaveBeenCalledWith('mysql_import_preview_csv', { id: 'c1', database: 'shop.eu', table: 'order items', path: '/tmp/o.csv' })
+  })
+})
+
+describe('windows', () => {
+  it('opens the row history every SQL engine shares', () => {
+    expect(mysqlSql.modals.rowHistory).toBe('sqlRowHistory')
   })
 })
