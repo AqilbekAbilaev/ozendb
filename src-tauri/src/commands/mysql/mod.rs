@@ -3,6 +3,7 @@ use crate::error::AppError;
 
 pub(super) use super::AppContext;
 
+pub mod activity;
 pub mod browse;
 pub mod cancel;
 mod cell;
@@ -17,6 +18,7 @@ pub mod schema;
 pub mod transaction;
 pub mod users;
 
+pub use activity::*;
 pub use browse::*;
 pub use cancel::*;
 pub use explain::*;

@@ -35,4 +35,15 @@ describe('MySQL server administration', () => {
       ['revoke_mysql_privileges', { id: 'm1', change }],
     ])
   })
+
+  it('lists the processes, and stops one\'s statement or its whole connection', async () => {
+    await admin.processes('m1')
+    await admin.killQuery('m1', 42)
+    await admin.killConnection('m1', 42)
+    expect(invoke.mock.calls).toEqual([
+      ['list_mysql_processes', { id: 'm1' }],
+      ['kill_mysql_query', { id: 'm1', process: 42 }],
+      ['kill_mysql_connection', { id: 'm1', process: 42 }],
+    ])
+  })
 })
