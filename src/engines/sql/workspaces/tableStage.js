@@ -239,20 +239,21 @@ export function useTableStage(t, connectionReadOnly) {
   // laid out over several lines (see buildStagedSql.js) rather than one that runs
   // off the edge for a table with many columns, with a blank line between them.
   const reviewSql = computed(() => {
-    const qualified = `${target.schema}.${target.table}`
+    const name = dialect.quoteName
+    const qualified = `${name(target.schema)}.${name(target.table)}`
     const statements = []
     for (const draft of staged.inserts) {
       const cols = Object.keys(draft.values)
       if (!cols.length) continue
-      statements.push(buildInsertSql(qualified, cols, cols.map(c => sqlLiteral(dialect, draft.values[c]))))
+      statements.push(buildInsertSql(qualified, cols.map(name), cols.map(c => sqlLiteral(dialect, draft.values[c]))))
     }
     for (const [key, edits] of Object.entries(staged.edits)) {
-      const where = JSON.parse(key).map((value, i) => `${keyColumns.value[i]} = ${sqlLiteral(dialect, value)}`).join(' AND ')
-      const set = Object.entries(edits).map(([column, { value }]) => `${column} = ${sqlLiteral(dialect, value)}`)
+      const where = JSON.parse(key).map((value, i) => `${name(keyColumns.value[i])} = ${sqlLiteral(dialect, value)}`).join(' AND ')
+      const set = Object.entries(edits).map(([column, { value }]) => `${name(column)} = ${sqlLiteral(dialect, value)}`)
       statements.push(buildUpdateSql(qualified, set, where))
     }
     if (staged.deletedKeys.length) {
-      const keyCols = keyColumns.value.join(', ')
+      const keyCols = keyColumns.value.map(name).join(', ')
       const tuples = staged.deletedKeys.map(key => `(${JSON.parse(key).map(value => sqlLiteral(dialect, value)).join(', ')})`)
       statements.push(buildDeleteSql(qualified, keyCols, tuples))
     }
