@@ -13,7 +13,7 @@ describe('the engine table', () => {
   it('gives every engine everything shared code asks of it', () => {
     for (const engine of Object.values(ENGINES)) {
       expect(Number.isInteger(engine.defaultPort), engine.id).toBe(true)
-      expect(typeof engine.namesDatabase, engine.id).toBe('boolean')
+      expect(typeof engine.useFields, engine.id).toBe('function')
       expect(typeof engine.buildFields, engine.id).toBe('function')
       expect(typeof engine.loadResources, engine.id).toBe('function')
     }
@@ -27,13 +27,10 @@ describe('the engine table', () => {
     }
   })
 
-  it('knows the default ports and which engine names a database up front', () => {
+  it('knows the default ports', () => {
     expect(ENGINES.mongodb.defaultPort).toBe(27017)
     expect(ENGINES.postgresql.defaultPort).toBe(5432)
     expect(ENGINES.mysql.defaultPort).toBe(3306)
-    expect(ENGINES.mongodb.namesDatabase).toBe(false)
-    expect(ENGINES.postgresql.namesDatabase).toBe(true)
-    expect(ENGINES.mysql.namesDatabase).toBe(true)
   })
 
   it('names the database field each SQL engine\'s server section shows', () => {

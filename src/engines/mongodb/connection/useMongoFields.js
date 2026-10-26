@@ -177,10 +177,22 @@ export function useMongoFields(editConn, { pickCertificate }) {
     importedExtraOptions.value = parsed.extraOptions
   }
 
+  // What the payload is built from (buildMongoFields), as plain values.
+  function values() {
+    return {
+      connType:       connType.value,
+      replicaSetName: replicaSetName.value,
+      authMode:       authMode.value,
+      authDb:         authDb.value,
+      tlsCertKeyFile: tlsCertKeyFile.value,
+      options:        buildOptions(),
+    }
+  }
+
   return {
     connType, replicaSetName, isMultiHost, authMode, authDb, tlsCertKeyFile, pickClientCert,
     readPreference, oidcEnvironment, oidcTokenResource, oidcNeedsResource,
     advancedOptions, optionVisible, optionDisabled, groupSetCount, openGroups, toggleGroup,
-    buildOptions, applyParsed,
+    buildOptions, applyParsed, values,
   }
 }

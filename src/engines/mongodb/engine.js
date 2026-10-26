@@ -7,8 +7,6 @@ import { collectionStats, databaseStats } from './api/admin.js'
 export const mongodb = Object.freeze({
   id: 'mongodb',
   defaultPort: 27017,
-  // A MongoDB connection is to the server; it picks a database per query.
-  namesDatabase: false,
   // Its own connection-editor fields, beyond the ones every engine shares.
   useFields: useMongoFields,
   buildFields: buildMongoFields,

@@ -6,9 +6,6 @@ import FormField from '../../../components/base/FormField.vue'
 import HintText from '../../../components/base/HintText.vue'
 import { OPTION_GROUPS, BOOL_OPTIONS, enumOptions } from '../../../data/connectionOptions.js'
 
-// NewConnection hands every section the shared form; this one reads only MongoDB's fields.
-defineOptions({ inheritAttrs: false })
-
 const props = defineProps({
   fields: { type: Object, required: true },
 })

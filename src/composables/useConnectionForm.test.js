@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { parseConnectionUri } from '../utils/connectionUri.js'
+import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
+import { parseMySqlUri } from '../engines/mysql/connection/parseUri.js'
 
 // The composable talks to Tauri only inside save/testConnection; these stubs keep the
 // module importable so the field logic — which is what these specs cover — can run.
@@ -7,7 +10,10 @@ vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn() }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
 
 const { useConnectionForm } = await import('./useConnectionForm.js')
+const { invoke } = await import('@tauri-apps/api/core')
 const { emit: tauriEmit } = await import('@tauri-apps/api/event')
+const { connDatabases } = await import('../stores/connectionData.js')
+const { tagOverrides } = await import('../stores/nodeTags.js')
 
 const stored = (over = {}) => ({
   id: 'c1',
@@ -102,7 +108,7 @@ describe('engine', () => {
   it('sends PostgreSQL its database and credentials, and none of MongoDB\'s settings', () => {
     const f = useConnectionForm(null)
     f.setEngine('postgresql')
-    f.database.value = ' app '
+    f.engineFields.postgresql.database.value = ' app '
     f.username.value = 'me'
     f.password.value = 'pw'
     const mongo = f.engineFields.mongodb
@@ -129,7 +135,7 @@ describe('engine', () => {
   it('seeds the engine and database when editing a PostgreSQL connection', () => {
     const f = useConnectionForm(stored({ engine: 'postgresql', database: 'app', hosts: [{ host: 'pg', port: 5432 }] }))
     expect(f.engine.value).toBe('postgresql')
-    expect(f.database.value).toBe('app')
+    expect(f.engineFields.postgresql.database.value).toBe('app')
   })
 })
 
@@ -139,7 +145,7 @@ describe('saving a new connection', () => {
     invoke.mockResolvedValue('new-id')
     const f = useConnectionForm(null)
     f.setEngine('postgresql')
-    f.database.value = 'app'
+    f.engineFields.postgresql.database.value = 'app'
 
     const result = await f.save()
 
@@ -173,9 +179,6 @@ describe('edit-mode seeding', () => {
     expect(fields.tag).toBe('red')
   })
 })
-
-const { invoke } = await import('@tauri-apps/api/core')
-const { connDatabases } = await import('../stores/connectionData.js')
 
 // The sidebar having databases loaded for a connection is what makes an edit risky:
 // what's on screen came from the server it currently points at.
@@ -398,13 +401,11 @@ describe('applyParsed for PostgreSQL', () => {
       username: 'app', password: 'pw', hosts: [{ host: 'db', port: 5433 }], database: 'payments',
       tls: true, tlsAllowInvalidCerts: true, tlsCaFile: null,
     })
-    expect(f.database.value).toBe('payments')
+    expect(f.engineFields.postgresql.database.value).toBe('payments')
     const fields = f.formFields()
     expect(fields).toMatchObject({ username: 'app', password: 'pw', hosts: [{ host: 'db', port: 5433 }], tls: true, tlsAllowInvalidCertificates: true })
   })
 })
-
-const { tagOverrides } = await import('../stores/nodeTags.js')
 
 describe('the colour shown on tabs', () => {
   beforeEach(() => {
@@ -440,19 +441,18 @@ describe('the colour shown on tabs', () => {
   })
 })
 
-const { ENGINES } = await import('../engines/index.js')
-const { parseConnectionUri } = await import('../utils/connectionUri.js')
-const { KNOWN_OPTION_KEYS } = await import('../data/connectionOptions.js')
-const { parseMySqlUri } = await import('../engines/mysql/connection/parseUri.js')
-
 describe('each engine\'s own fields', () => {
-  it('are made for every engine that brings them, and for no other', () => {
+  it('are made for every engine', () => {
     const f = useConnectionForm(null)
-    const bringing = Object.values(ENGINES).filter(e => e.useFields).map(e => e.id)
-    expect(Object.keys(f.engineFields)).toEqual(bringing)
-    for (const e of Object.values(ENGINES).filter(e => !e.useFields)) {
-      expect(f.engineFields[e.id], e.id).toBe(undefined)
-    }
+    expect(Object.keys(f.engineFields).sort()).toEqual(['mongodb', 'mysql', 'postgresql'])
+  })
+
+  it('are made only for the edited connection\'s own engine, which cannot change', () => {
+    const pg = useConnectionForm(stored({ engine: 'postgresql', database: 'app', hosts: [{ host: 'pg', port: 5432 }] }))
+    expect(Object.keys(pg.engineFields)).toEqual(['postgresql'])
+
+    // A record from before engines existed is MongoDB.
+    expect(Object.keys(useConnectionForm(stored()).engineFields)).toEqual(['mongodb'])
   })
 
   it('keep what was typed in MongoDB\'s fields across a switch to PostgreSQL and back', () => {
@@ -470,6 +470,20 @@ describe('each engine\'s own fields', () => {
       connectionType: 'replica', replicaSetName: 'rs-ü 0', options: { appName: 'my app' },
     })
   })
+
+  it('keep a database name with the SQL engine it was typed for', () => {
+    // A PostgreSQL database name rarely means anything on MySQL, so it doesn't follow.
+    const f = useConnectionForm(null)
+    f.setEngine('postgresql')
+    f.engineFields.postgresql.database.value = 'payments'
+
+    f.setEngine('mysql')
+    expect(f.formFields().database).toBe(null)
+    f.engineFields.mysql.database.value = 'shop'
+
+    f.setEngine('postgresql')
+    expect(f.formFields().database).toBe('payments')
+  })
 })
 
 describe('the payload for each engine', () => {
@@ -479,7 +493,7 @@ describe('the payload for each engine', () => {
     f.hosts.value = [{ host: 'db-1.example', port: '6001' }, { host: 'db-2', port: '' }]
     f.username.value = 'ad min'
     f.password.value = 'p@ss:/w'
-    f.database.value = '  sales 2024 '
+    for (const engine of ['postgresql', 'mysql']) f.engineFields[engine].database.value = '  sales 2024 '
     f.useTls.value = true
     f.tlsCaFile.value = '/ca dir/ca.pem'
     f.tlsAllowInvalidCerts.value = true
@@ -566,7 +580,8 @@ describe('a pasted connection string', () => {
     expect([mongo.connType.value, mongo.replicaSetName.value, mongo.authDb.value, mongo.readPreference.value])
       .toEqual(['replica', 'rs0', 'authdb', 'secondary'])
     expect(mongo.advancedOptions.value.appName).toBe('x')
-    expect(f.database.value).toBe('')
+    expect(f.engineFields.postgresql.database.value).toBe('')
+    expect(f.engineFields.mysql.database.value).toBe('')
   })
 
   it('sets the database for MySQL, and leaves MongoDB\'s fields alone', () => {
@@ -574,7 +589,8 @@ describe('a pasted connection string', () => {
     f.setEngine('mysql')
     f.applyParsed(parseMySqlUri('mysql://app:pw@db:3307/shop'))
 
-    expect(f.database.value).toBe('shop')
+    expect(f.engineFields.mysql.database.value).toBe('shop')
+    expect(f.engineFields.postgresql.database.value).toBe('')
     expect(f.formFields()).toMatchObject({ username: 'app', password: 'pw', hosts: [{ host: 'db', port: 3307 }] })
     expect(f.engineFields.mongodb.connType.value).toBe('standalone')
   })
