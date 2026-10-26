@@ -46,8 +46,10 @@ export function useConnectionForm(editConn) {
   const password = ref('')   // never pre-filled — empty means "keep existing"
 
   // Each engine's own fields, keyed by engine id: made once, up front, so switching
-  // engine keeps what was typed into each one's fields.
+  // engine keeps what was typed into each one's fields. An edited connection's engine
+  // is locked, so it gets only its own.
   const engineFields = Object.fromEntries(Object.values(ENGINES)
+    .filter(e => !isEditMode || e.id === engine.value)
     .map(e => [e.id, e.useFields(editConn, { pickCertificate })]))
 
   // ssl

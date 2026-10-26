@@ -450,6 +450,14 @@ describe('each engine\'s own fields', () => {
     expect(Object.keys(f.engineFields).sort()).toEqual(['mongodb', 'mysql', 'postgresql'])
   })
 
+  it('are made only for the edited connection\'s own engine, which cannot change', () => {
+    const pg = useConnectionForm(stored({ engine: 'postgresql', database: 'app', hosts: [{ host: 'pg', port: 5432 }] }))
+    expect(Object.keys(pg.engineFields)).toEqual(['postgresql'])
+
+    // A record from before engines existed is MongoDB.
+    expect(Object.keys(useConnectionForm(stored()).engineFields)).toEqual(['mongodb'])
+  })
+
   it('keep what was typed in MongoDB\'s fields across a switch to PostgreSQL and back', () => {
     const f = useConnectionForm(null)
     const mongo = f.engineFields.mongodb
