@@ -30,6 +30,10 @@ pub(super) struct Run {
     id: String,
     pid: i32,
     cancelled: AtomicBool,
+    // Set once the run is over, even when it never got to note its statement ended, as
+    // when it was dropped or panicked mid-statement: its connection may serve another
+    // run by then.
+    ended: AtomicBool,
     // Held by Cancel while it signals the process, so the statement can't end, and the
     // connection pass to the next run, whose query the signal would stop instead.
     in_statement: tokio::sync::Mutex<bool>,
@@ -37,7 +41,7 @@ pub(super) struct Run {
 
 impl Run {
     fn new(id: &str, pid: i32) -> Run {
-        Run { id: id.to_string(), pid, cancelled: AtomicBool::new(false), in_statement: tokio::sync::Mutex::new(false) }
+        Run { id: id.to_string(), pid, cancelled: AtomicBool::new(false), ended: AtomicBool::new(false), in_statement: tokio::sync::Mutex::new(false) }
     }
 
     /// `statement`'s outcome, unless the run was cancelled before it started.
@@ -62,7 +66,7 @@ impl Run {
         let started = tokio::time::Instant::now();
         loop {
             let in_statement = self.in_statement.lock().await;
-            if !*in_statement {
+            if !*in_statement || self.ended.load(Ordering::SeqCst) {
                 return Ok(());
             }
             signal(self.pid).await?;
@@ -80,6 +84,7 @@ pub(super) struct RunGuard(Arc<Run>);
 
 impl Drop for RunGuard {
     fn drop(&mut self) {
+        self.0.ended.store(true, Ordering::SeqCst);
         if let Ok(mut map) = running().lock() {
             map.remove(&self.0.id);
         }

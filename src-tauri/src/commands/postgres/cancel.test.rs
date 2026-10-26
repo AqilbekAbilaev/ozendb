@@ -1,4 +1,4 @@
-use super::{Run, RESIGNAL_AFTER, RESIGNAL_FOR};
+use super::{Run, RunGuard, RESIGNAL_AFTER, RESIGNAL_FOR};
 use crate::error::AppError;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -112,4 +112,19 @@ async fn a_statement_that_ignores_its_signals_is_signalled_for_a_while_only() {
 
     stop.notify_one();
     running.await.unwrap().unwrap();
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_run_dropped_mid_statement_is_not_signalled() {
+    let (run, stop) = (Arc::new(Run::new("dropped", PID)), Arc::new(Notify::new()));
+    let guard = RunGuard(run.clone());
+    let running = statement(&run, &stop).await;
+    // Dropped before it could note that its statement ended; its connection is free.
+    running.abort();
+    let _ = running.await;
+    drop(guard);
+
+    let signalled = &Mutex::new(Vec::new());
+    run.cancel(|pid| async move { signalled.lock().unwrap().push(pid); Ok(()) }).await.unwrap();
+    assert!(signalled.lock().unwrap().is_empty(), "a run that is over isn't signalled");
 }
