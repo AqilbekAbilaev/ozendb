@@ -13,6 +13,11 @@ use super::AppContext;
 
 /// How long Cancel waits before signalling a statement that is still running again.
 const RESIGNAL_AFTER: Duration = Duration::from_millis(100);
+/// How long Cancel keeps signalling. A signal is lost only when it beats the statement
+/// to the server, so a statement still running past this ignores them: it may be waiting
+/// on something a cancel can't stop, or run on another process than the one signalled,
+/// as behind a connection pooler, where each signal stops some other client's query.
+const RESIGNAL_FOR: Duration = Duration::from_secs(2);
 
 fn running() -> &'static Mutex<HashMap<String, Arc<Run>>> {
     static RUNNING: OnceLock<Mutex<HashMap<String, Arc<Run>>>> = OnceLock::new();
@@ -49,10 +54,12 @@ impl Run {
         outcome
     }
 
-    /// Marks the run cancelled and `signal`s its process until its statement ends: a
-    /// signal that reaches the process before the statement does finds it idle, and is lost.
+    /// Marks the run cancelled and `signal`s its process until its statement ends, for at
+    /// most `RESIGNAL_FOR`: a signal that reaches the process before the statement does
+    /// finds it idle, and is lost.
     async fn cancel<F: Future<Output = Result<(), AppError>>>(&self, signal: impl Fn(i32) -> F) -> Result<(), AppError> {
         self.cancelled.store(true, Ordering::SeqCst);
+        let started = tokio::time::Instant::now();
         loop {
             let in_statement = self.in_statement.lock().await;
             if !*in_statement {
@@ -60,6 +67,9 @@ impl Run {
             }
             signal(self.pid).await?;
             drop(in_statement);
+            if started.elapsed() >= RESIGNAL_FOR {
+                return Ok(());
+            }
             tokio::time::sleep(RESIGNAL_AFTER).await;
         }
     }

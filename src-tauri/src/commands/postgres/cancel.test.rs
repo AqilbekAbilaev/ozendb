@@ -1,4 +1,4 @@
-use super::Run;
+use super::{Run, RESIGNAL_AFTER, RESIGNAL_FOR};
 use crate::error::AppError;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -96,4 +96,20 @@ async fn a_statement_does_not_end_while_a_signal_for_it_is_on_its_way() {
     release.send(()).unwrap();
     running.await.unwrap().unwrap();
     cancelling.await.unwrap().unwrap();
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_statement_that_ignores_its_signals_is_signalled_for_a_while_only() {
+    let (run, stop) = (Arc::new(Run::new("ignoring", PID)), Arc::new(Notify::new()));
+    let running = statement(&run, &stop).await;
+
+    let signals = &Mutex::new(0);
+    let cancel = run.cancel(|_| async move { *signals.lock().unwrap() += 1; Ok(()) });
+    tokio::time::timeout(RESIGNAL_FOR * 2, cancel).await.expect("Cancel gives up signalling").unwrap();
+    // Once at the start, then once per wait until the time is up.
+    let expected = RESIGNAL_FOR.as_millis() / RESIGNAL_AFTER.as_millis() + 1;
+    assert_eq!(*signals.lock().unwrap() as u128, expected);
+
+    stop.notify_one();
+    running.await.unwrap().unwrap();
 }
