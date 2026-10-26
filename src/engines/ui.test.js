@@ -18,6 +18,20 @@ describe('CONNECTION_EDITORS', () => {
     }
   })
 
+  it('gives every section only props the editor hands it', () => {
+    // NewConnection.vue offers each section the shared form and its engine's own fields,
+    // and passes only the ones the section declares.
+    for (const [engine, editor] of Object.entries(CONNECTION_EDITORS)) {
+      for (const [tab, section] of Object.entries(editor.sections)) {
+        const declared = Object.keys(section.props ?? {})
+        expect(declared.length, `${engine}: ${tab}`).toBeGreaterThan(0)
+        for (const name of declared) {
+          expect(['form', 'fields'], `${engine}: ${tab} declares ${name}`).toContain(name)
+        }
+      }
+    }
+  })
+
   it('offers the SSH and General tabs on every engine', () => {
     for (const editor of Object.values(CONNECTION_EDITORS)) {
       const tabs = editor.tabs.map(([tab]) => tab)

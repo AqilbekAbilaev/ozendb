@@ -2,10 +2,6 @@
 import BaseInput from '../../../components/base/BaseInput.vue'
 import FormField from '../../../components/base/FormField.vue'
 
-// NewConnection also hands every section its engine's own fields; this one reads only
-// the shared form.
-defineOptions({ inheritAttrs: false })
-
 const props = defineProps({
   form: { type: Object, required: true },
 })

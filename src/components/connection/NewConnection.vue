@@ -35,11 +35,12 @@ const {
   testConnection,
 } = form
 const editor = computed(() => CONNECTION_EDITORS[engine.value])
-// What the active tab's section reads: the shared form, and its engine's own fields
-// when the engine brings any (a prop no section declares would warn).
+const section = computed(() => editor.value.sections[activeTab.value])
+// What a section may read: the shared form and its engine's own fields. Each is handed
+// only the ones it declares, so a section never declares one it doesn't use.
 const sectionProps = computed(() => {
-  const fields = form.engineFields[engine.value]
-  return fields ? { form, fields } : { form }
+  const offered = { form, fields: form.engineFields[engine.value] }
+  return Object.fromEntries(Object.keys(section.value?.props ?? {}).map(name => [name, offered[name]]))
 })
 
 // Opens the form for the engine picked on the intro step, pre-filled when it parsed a
@@ -165,7 +166,7 @@ useMomentumScroll(bodyEl)
         </div>
 
         <div v-else class="nc-form">
-          <component :is="editor.sections[activeTab]" v-bind="sectionProps" />
+          <component :is="section" v-bind="sectionProps" />
         </div>
 
       </div>
