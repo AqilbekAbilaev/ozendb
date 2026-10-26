@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { parseConnectionUri } from '../utils/connectionUri.js'
+import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
+import { parseMySqlUri } from '../engines/mysql/connection/parseUri.js'
 
 // The composable talks to Tauri only inside save/testConnection; these stubs keep the
 // module importable so the field logic — which is what these specs cover — can run.
@@ -7,7 +10,10 @@ vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn() }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
 
 const { useConnectionForm } = await import('./useConnectionForm.js')
+const { invoke } = await import('@tauri-apps/api/core')
 const { emit: tauriEmit } = await import('@tauri-apps/api/event')
+const { connDatabases } = await import('../stores/connectionData.js')
+const { tagOverrides } = await import('../stores/nodeTags.js')
 
 const stored = (over = {}) => ({
   id: 'c1',
@@ -173,9 +179,6 @@ describe('edit-mode seeding', () => {
     expect(fields.tag).toBe('red')
   })
 })
-
-const { invoke } = await import('@tauri-apps/api/core')
-const { connDatabases } = await import('../stores/connectionData.js')
 
 // The sidebar having databases loaded for a connection is what makes an edit risky:
 // what's on screen came from the server it currently points at.
@@ -404,8 +407,6 @@ describe('applyParsed for PostgreSQL', () => {
   })
 })
 
-const { tagOverrides } = await import('../stores/nodeTags.js')
-
 describe('the colour shown on tabs', () => {
   beforeEach(() => {
     tagOverrides.value = {}
@@ -439,10 +440,6 @@ describe('the colour shown on tabs', () => {
     expect(tagOverrides.value['new-id']).toBe('blue')
   })
 })
-
-const { parseConnectionUri } = await import('../utils/connectionUri.js')
-const { KNOWN_OPTION_KEYS } = await import('../data/connectionOptions.js')
-const { parseMySqlUri } = await import('../engines/mysql/connection/parseUri.js')
 
 describe('each engine\'s own fields', () => {
   it('are made for every engine', () => {
