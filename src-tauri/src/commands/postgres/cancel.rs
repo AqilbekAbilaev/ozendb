@@ -117,8 +117,15 @@ pub(super) async fn cancellable<T>(run: Option<&RunGuard>, statement: impl Futur
 pub(crate) async fn cancel_query_impl(pool: &sqlx::PgPool, run_id: &str) -> Result<bool, AppError> {
     let found = running().lock().ok().and_then(|map| map.get(run_id).cloned());
     let Some(run) = found else { return Ok(false) };
+    // Taken before signalling starts: Cancel holds the run's statement open while it
+    // signals, so waiting for a connection then could wait on the run's own, in a full pool.
+    let conn = match pool.acquire().await {
+        Ok(val) => tokio::sync::Mutex::new(val),
+        Err(e) => return Err(AppError::Postgres(e)),
+    };
+    let conn = &conn;
     let signal = |pid: i32| async move {
-        match sqlx::query("SELECT pg_cancel_backend($1)").bind(pid).execute(pool).await {
+        match sqlx::query("SELECT pg_cancel_backend($1)").bind(pid).execute(&mut **conn.lock().await).await {
             Ok(_) => Ok(()),
             Err(e) => Err(AppError::Postgres(e)),
         }
