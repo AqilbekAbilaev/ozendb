@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import { ref } from 'vue'
 import { buildSqlFields } from './fields.js'
+
+const sql = (database) => ({ database: ref(database) })
 
 describe('buildSqlFields', () => {
   it('sends only the database and credentials', () => {
-    expect(buildSqlFields({ database: ' sales 2024 ', username: 'app user', password: 'pw' })).toEqual({
+    expect(buildSqlFields({ username: 'app user', password: 'pw' }, sql(' sales 2024 '))).toEqual({
       database: 'sales 2024',
       username: 'app user',
       password: 'pw',
@@ -11,7 +14,7 @@ describe('buildSqlFields', () => {
   })
 
   it('turns a blank database and credentials into null', () => {
-    const fields = buildSqlFields({ database: '  ', username: '', password: '' })
+    const fields = buildSqlFields({ username: '', password: '' }, sql('  '))
     expect([fields.database, fields.username, fields.password]).toEqual([null, null, null])
   })
 })

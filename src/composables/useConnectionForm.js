@@ -22,7 +22,6 @@ export function useConnectionForm(editConn) {
 
   const connName = ref(isEditMode ? editConn.name : 'New Connection')
   const engine   = ref(isEditMode ? (editConn.engine ?? 'mongodb') : 'mongodb')
-  const database = ref(isEditMode ? (editConn.database ?? '') : '')
 
   // Seed list — always at least one { host, port } row. In edit mode it comes from the
   // stored config (already a `hosts` array after backend migration).
@@ -49,7 +48,6 @@ export function useConnectionForm(editConn) {
   // Each engine's own fields, keyed by engine id: made once, up front, so switching
   // engine keeps what was typed into each one's fields.
   const engineFields = Object.fromEntries(Object.values(ENGINES)
-    .filter(e => e.useFields)
     .map(e => [e.id, e.useFields(editConn, { pickCertificate })]))
 
   // ssl
@@ -126,7 +124,6 @@ export function useConnectionForm(editConn) {
       tag:             selectedTag.value !== 'none' ? selectedTag.value : null,
       readOnly:        readOnly.value,
       ...ENGINES[engine.value].buildFields({
-        database: database.value,
         username: username.value,
         password: password.value,
         useTls:   useTls.value,
@@ -146,8 +143,7 @@ export function useConnectionForm(editConn) {
     set(useTls, parsed.tls)
     set(tlsAllowInvalidCerts, parsed.tlsAllowInvalidCerts)
     set(tlsCaFile, parsed.tlsCaFile)
-    if (ENGINES[engine.value].namesDatabase) set(database, parsed.database)
-    engineFields[engine.value]?.applyParsed?.(parsed)
+    engineFields[engine.value].applyParsed(parsed)
   }
 
   async function testConnection() {
@@ -258,7 +254,7 @@ export function useConnectionForm(editConn) {
   }
 
   return {
-    isEditMode, connName, engine, database, setEngine, hosts,
+    isEditMode, connName, engine, setEngine, hosts,
     addHost, removeHost,
     username, password,
     useTls, tlsCaFile, tlsAllowInvalidCerts, pickTlsFile,

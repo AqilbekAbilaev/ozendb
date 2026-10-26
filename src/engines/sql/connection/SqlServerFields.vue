@@ -5,8 +5,10 @@ import { ENGINES } from '../../index.js'
 
 const props = defineProps({
   form: { type: Object, required: true },
+  fields: { type: Object, required: true },
 })
-const { engine, hosts, database } = props.form
+const { engine, hosts } = props.form
+const { database } = props.fields
 const { databaseField } = ENGINES[engine.value]
 </script>
 
