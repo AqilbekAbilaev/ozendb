@@ -53,7 +53,7 @@ pub(crate) fn test_config() -> Option<ConnectionConfig> {
     })
 }
 
-fn options(config: &ConnectionConfig) -> sqlx::postgres::PgConnectOptions {
+pub(super) fn options(config: &ConnectionConfig) -> sqlx::postgres::PgConnectOptions {
     let password = std::env::var("OZENDB_TEST_POSTGRES_PASSWORD").ok();
     match pg_uri::build_options(
         config,

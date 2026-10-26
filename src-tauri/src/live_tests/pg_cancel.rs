@@ -4,7 +4,7 @@
 
 use crate::commands::{cancel_query_impl, run_query_as};
 use crate::error::AppError;
-use super::pg::{pool, test_config};
+use super::pg::{options, pool, test_config};
 
 // The message the frontend receives.
 fn shown(err: &AppError) -> String {
@@ -53,4 +53,45 @@ async fn a_statement_over_the_timeout_is_reported_as_timed_out() {
     let err = AppError::Postgres(sqlx::query("SELECT pg_sleep(1)").execute(&mut *tx).await.unwrap_err());
     assert_eq!(err.code(), "cancelled");
     assert_eq!(shown(&err), "The query ran past its time limit and was stopped.");
+}
+
+#[tokio::test]
+async fn cancel_stops_a_query_however_soon_it_comes() {
+    let Some(config) = test_config() else { return eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests") };
+    let pool = pool(&config).await;
+    // Cancelled as soon as it can be found, often before its statement has started.
+    for attempt in 0..20 {
+        let id = format!("pg-query-soon {attempt}");
+        let running = {
+            let (pool, id) = (pool.clone(), id.clone());
+            tokio::spawn(async move { run_query_as(&pool, "SELECT pg_sleep(3)", false, Some(&id)).await })
+        };
+        while !cancel_query_impl(&pool, &id).await.unwrap() {
+            tokio::task::yield_now().await;
+        }
+        let stopped = tokio::time::timeout(std::time::Duration::from_secs(2), running).await.expect("Cancel stops it however soon it comes").unwrap().unwrap_err();
+        assert_eq!(stopped.code(), "cancelled", "attempt {attempt}");
+    }
+}
+
+#[tokio::test]
+async fn cancel_waiting_for_a_connection_does_not_hold_up_the_run() {
+    let Some(config) = test_config() else { return eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests") };
+    // The pool's one connection is the run's, so Cancel has to wait for it to signal.
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(1)
+        .acquire_timeout(std::time::Duration::from_secs(10))
+        .connect_with(options(&config))
+        .await
+        .unwrap();
+    let running = {
+        let pool = pool.clone();
+        tokio::spawn(async move { run_query_as(&pool, "SELECT pg_sleep(1)", false, Some("pg-query-full-pool")).await })
+    };
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    // The run ends on its own and frees the connection; by then there is nothing to stop.
+    let wait = std::time::Duration::from_secs(5);
+    tokio::time::timeout(wait, cancel_query_impl(&pool, "pg-query-full-pool")).await.expect("Cancel gets the connection once the run frees it").unwrap();
+    tokio::time::timeout(wait, running).await.expect("the run isn't held up by the waiting Cancel").unwrap().unwrap();
 }
