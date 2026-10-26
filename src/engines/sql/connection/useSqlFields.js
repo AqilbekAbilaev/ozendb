@@ -15,5 +15,10 @@ export function useSqlFields(editConn) {
     if (parsed.database !== null) database.value = parsed.database
   }
 
-  return { database, applyParsed }
+  // What the payload is built from (buildSqlFields), as plain values.
+  function values() {
+    return { database: database.value }
+  }
+
+  return { database, applyParsed, values }
 }

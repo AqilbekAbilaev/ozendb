@@ -47,6 +47,25 @@ describe('pickClientCert', () => {
   })
 })
 
+describe('values', () => {
+  it('hands over what the payload is built from as plain values', () => {
+    const m = setup(null, { connType: 'replica', authMode: 'SCRAM-SHA-1' })
+    m.replicaSetName.value = 'rs0'
+    m.authDb.value = '$external'
+    m.tlsCertKeyFile.value = '/client.pem'
+    m.advancedOptions.value.retryWrites = 'true'
+
+    expect(m.values()).toEqual({
+      connType: 'replica',
+      replicaSetName: 'rs0',
+      authMode: 'SCRAM-SHA-1',
+      authDb: '$external',
+      tlsCertKeyFile: '/client.pem',
+      options: { retryWrites: 'true' },
+    })
+  })
+})
+
 describe('buildOptions', () => {
   it('omits unset options so the URI carries only real parameters', () => {
     const m = setup()

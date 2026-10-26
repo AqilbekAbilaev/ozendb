@@ -127,7 +127,7 @@ export function useConnectionForm(editConn) {
         username: username.value,
         password: password.value,
         useTls:   useTls.value,
-      }, engineFields[engine.value]),
+      }, engineFields[engine.value].values()),
     }
   }
 

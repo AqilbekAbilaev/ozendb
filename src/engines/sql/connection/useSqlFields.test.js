@@ -11,6 +11,12 @@ describe('useSqlFields', () => {
     expect(useSqlFields({}).database.value).toBe('')
   })
 
+  it('hands over the database as a plain value', () => {
+    const sql = useSqlFields({ database: 'app' })
+    sql.database.value = 'shop'
+    expect(sql.values()).toEqual({ database: 'shop' })
+  })
+
   it('takes the database a pasted connection string names, and keeps its own otherwise', () => {
     const sql = useSqlFields(null)
     sql.applyParsed({ database: 'shop' })

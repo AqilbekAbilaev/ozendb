@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import { ref } from 'vue'
 import { buildMongoFields } from './fields.js'
 
 const shared = (over = {}) => ({
@@ -9,21 +8,16 @@ const shared = (over = {}) => ({
   ...over,
 })
 
-// The parts of useMongoFields that buildMongoFields reads.
-const mongo = (over = {}) => {
-  const v = {
-    connType: 'replica',
-    replicaSetName: 'rs0',
-    authMode: 'SCRAM-SHA-256',
-    authDb: 'admin',
-    tlsCertKeyFile: '/client.pem',
-    ...over,
-  }
-  return {
-    ...Object.fromEntries(Object.entries(v).map(([key, value]) => [key, ref(value)])),
-    buildOptions: () => ({ retryWrites: 'true' }),
-  }
-}
+// MongoDB's own values, as useMongoFields' values() hands them over.
+const mongo = (over = {}) => ({
+  connType: 'replica',
+  replicaSetName: 'rs0',
+  authMode: 'SCRAM-SHA-256',
+  authDb: 'admin',
+  tlsCertKeyFile: '/client.pem',
+  options: { retryWrites: 'true' },
+  ...over,
+})
 
 describe('buildMongoFields', () => {
   it('sends the topology, options, credentials and client certificate', () => {

@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { ref } from 'vue'
 import { buildSqlFields } from './fields.js'
 
-const sql = (database) => ({ database: ref(database) })
+const sql = (database) => ({ database })
 
 describe('buildSqlFields', () => {
   it('sends only the database and credentials', () => {
