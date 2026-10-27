@@ -1,8 +1,8 @@
 import { ref } from 'vue'
-import { insertDocuments } from '../engines/mongodb/api/documents'
-import { errText } from '../utils/errors'
-import { isCollectionTab } from '../utils/workspaceTypes'
-import { apiTarget } from '../engines/mongodb/api/payload'
+import { insertDocuments } from '../api/documents'
+import { errText } from '../../../utils/errors'
+import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { apiTarget } from '../api/payload'
 
 // Holds a clipboard paste until the user confirms it, keeping the original collection
 // target even when they change tabs while the confirmation dialog is open.

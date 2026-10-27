@@ -102,8 +102,8 @@ pub fn gate_enabled(gate: Gate, context: &MenuContext) -> bool {
 }
 
 // The document/collection write actions, disabled while the active tab's read-only
-// lock is on. Mirrored by WRITE_ACTIONS in src/utils/writable.js — keep both in
-// step; the tests pin the exact set on each side.
+// lock is on. Mirrored by WRITE_ACTIONS in src/engines/mongodb/results/writable.js —
+// keep both in step; the tests pin the exact set on each side.
 pub const WRITE_ACTIONS: &[&str] = &[
     "doc:edit_json",
     "doc:delete",

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 
-vi.mock('../engines/mongodb/api/documents', () => ({ replaceDocument: vi.fn() }))
-vi.mock('../engines/mongodb/api/queries', () => ({ runFind: vi.fn() }))
+vi.mock('../api/documents', () => ({ replaceDocument: vi.fn() }))
+vi.mock('../api/queries', () => ({ runFind: vi.fn() }))
 
 import { useMongoCellActions } from './useMongoCellActions'
-import { createResourceRef } from '../utils/resourceRef'
+import { createResourceRef } from '../../../utils/resourceRef'
 
 function setup({ tab, holder }) {
   return useMongoCellActions({

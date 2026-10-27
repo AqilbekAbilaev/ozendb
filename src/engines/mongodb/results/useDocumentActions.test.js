@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive, ref } from 'vue'
 
-vi.mock('../engines/mongodb/api/documents', () => ({
+vi.mock('../api/documents', () => ({
   deleteDocument: vi.fn(),
   deleteMany: vi.fn(),
   insertDocuments: vi.fn(),
@@ -10,9 +10,9 @@ vi.mock('../engines/mongodb/api/documents', () => ({
   openDocumentWindow: vi.fn(),
 }))
 
-import { insertDocuments } from '../engines/mongodb/api/documents'
+import { insertDocuments } from '../api/documents'
 import { useDocumentActions } from './useDocumentActions'
-import { createResourceRef } from '../utils/resourceRef'
+import { createResourceRef } from '../../../utils/resourceRef'
 
 const collectionTab = (connectionId, collectionName) => reactive({
   id: collectionName,

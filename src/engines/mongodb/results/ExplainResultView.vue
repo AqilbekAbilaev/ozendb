@@ -5,7 +5,7 @@ import JsonDoc from './JsonDoc.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
 import SegmentedControl from '../../../components/base/SegmentedControl.vue'
 import FieldError from '../../../components/base/FieldError.vue'
-import { buildExplainTree } from '../../../utils/explainTree'
+import { buildExplainTree } from './explainTree'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 const VERBOSITY_OPTIONS = [

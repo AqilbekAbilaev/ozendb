@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { useResultSearch } from '../../../composables/useResultSearch'
+import { useResultSearch } from './useResultSearch'
 import { useMomentumScroll } from '../../../composables/useMomentumScroll'
 import TreeView from '../../../components/base/TreeView.vue'
 import SearchBar from '../../../components/base/SearchBar.vue'
