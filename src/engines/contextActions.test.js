@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('../stores/modals', () => ({ openModal: vi.fn() }))
 vi.mock('./postgresql/tabs', () => ({ openPostgresQuery: vi.fn(), openPostgresTable: vi.fn() }))
 
-const { contextAction, connectionMenu } = await import('./contextActions.js')
+const { contextAction, connectionMenu, useEngineActions, runEngineTool } = await import('./contextActions.js')
 const { PG_ACTIONS, PG_MENUS } = await import('./postgresql/tree/contextMenus.js')
 const { MYSQL_MENUS } = await import('./mysql/tree/contextMenus.js')
 
@@ -42,5 +42,26 @@ describe('connectionMenu', () => {
   it('has none for MongoDB, which uses the shared connection menu', () => {
     expect(connectionMenu({ id: 'c1', name: 'm', engine: 'mongodb' })).toBe(null)
     expect(connectionMenu({ id: 'c1', name: 'm' })).toBe(null)
+  })
+})
+
+describe('useEngineActions', () => {
+  it('includes MongoDB\'s actions, each with the level it needs', () => {
+    const actions = useEngineActions()
+    expect(actions['coll:stats'].requires).toBe('collection')
+    expect(actions['file:intellishell'].requires).toBe('database')
+  })
+})
+
+describe('runEngineTool', () => {
+  it('reports a tool no engine has', () => {
+    expect(runEngineTool('no such tool', { target: null, pgMenuTarget: vi.fn(), runFeature: vi.fn() })).toBe(false)
+  })
+
+  it('hands an engine\'s aliased tool to the shared dispatcher', () => {
+    const runFeature = vi.fn()
+    const target = { resource: { connectionId: 'c 1', segments: [{ kind: 'database', name: 'магазин' }] }, connectionName: 'Sales' }
+    expect(runEngineTool('search', { target: target, pgMenuTarget: vi.fn(), runFeature: runFeature })).toBe(true)
+    expect(runFeature).toHaveBeenCalledWith('file:search', target.resource, { connectionName: 'Sales' })
   })
 })

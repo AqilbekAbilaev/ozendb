@@ -1,40 +1,28 @@
 import { disconnect } from '../appApi/connections'
 import { showToast } from '../stores/toast'
-import {
-  openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab, openSchemaTab,
-  openSearchTab, openCurrentOpsTab, openExportSource,
-} from '../engines/mongodb/tabs'
-import { useDbActions } from './useDbActions'
 import { useNodeTags } from './useNodeTags'
-import { useDbTransfer } from './useDbTransfer'
-import { dbClipboard } from '../stores/dbClipboard'
-import { treeSelection, setTreeSelection } from '../stores/connectionNavigation'
 import { contextMenu } from '../stores/contextMenu'
 import { TOOLS } from '../constants/tools'
-import { MODALS } from '../constants/modalRegistry'
 import { COLOR_ACTION } from '../constants/contextMenus'
-import { activeTab, closeWhere, handleTabAction } from '../stores/tabs'
+import { closeWhere, handleTabAction } from '../stores/tabs'
 import { affectedByResource } from '../workspaces/lifecycle'
 import { createResourceRef, resourceAt, resourceName } from '../utils/resourceRef'
-import { resolveMenuTarget } from '../utils/menuContext'
 import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
 import { openModal } from '../stores/modals'
-import { contextAction } from '../engines/contextActions.js'
-import { runPgTool } from '../engines/postgresql/toolbarActions'
+import { contextAction, useEngineActions, runEngineTool } from '../engines/contextActions.js'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
 // handleContextAction) and the toolbar (@tool → handleTool). Every action is
-// described once in FEATURES: the node level it needs and what it does. A handler
+// described once in FEATURES: the node level it needs and what it does. The shared
+// actions are here; each engine's own come from engines/contextActions.js. A handler
 // receives the node as a ResourceRef plus a `ctx` carrying its presentation — the
 // connection's display name and the clicked row's label — which a ref never holds.
 // Each entry point converts its own shape into a ref once, on the way in.
 //
-// Dependencies are injected so this stays UI-agnostic and testable: `dbActions` is the
-// sibling composable API; the rest are shared refs and the tab creators, which remain in
-// App.vue. Tab state comes from the store; modals open through stores/modals.js directly.
+// Tab state comes from the store; modals open through stores/modals.js directly.
 // Context-menu entries that are deliberately offered but not implemented yet, by id,
 // with the name the "coming soon" toast uses. Naming them is what lets an unrecognised
 // id be treated as the wiring bug it is rather than as a placeholder.
@@ -46,43 +34,7 @@ export const UNBUILT_ACTIONS = new Map([
 // `menuTarget` comes from useMenu, which App.vue constructs once because it also
 // owns the watcher that pushes the menu context to the native menu.
 export function useFeatures({ menuTarget, pgMenuTarget }) {
-  const { pasteClipboard } = useDbActions()
   const { applyColorTag } = useNodeTags()
-  const { openImportWizard, exportDatabase, importDatabase } = useDbTransfer()
-
-  // Toolbar tool name → registry action. Tools whose behavior is app-level
-  // (connect/sql) or bespoke (collection/shell) are handled in handleTool.
-  const TOOL_ALIASES = {
-    aggregate: 'coll:aggregation',
-    export:    'coll:export',
-    import:    'coll:import',
-    schema:    'coll:schema',
-    search:    'file:search',
-  }
-
-  // The node's resource cut to `level` — a database action run on a collection row acts
-  // on that row's database — with the connection's display name beside it, since a ref
-  // never carries one. This is what every tab, modal and wizard takes; they read the
-  // names they show off the ref.
-  function targetAt(ref, ctx, level) {
-    return { resource: resourceAt(ref, level), connectionName: ctx.connectionName }
-  }
-
-  // Add View is the one structural dialog whose payload isn't just the node's level fields:
-  // it carries the source collection to prefill (empty from a database node, the clicked
-  // collection from "Add View Here…"), so it opens directly instead of via modalFeature.
-  function openAddView(ref, ctx, source) {
-    openModal('addView', { ...targetAt(ref, ctx, 'database'), source: source })
-  }
-
-  // A registry-driven modal feature (see constants/modalRegistry.js): its level and
-  // component are declared once in MODALS, so the feature is named by id alone and opens
-  // the registry modal with the target that level needs. Every registry modal now takes a
-  // ResourceRef, whatever its level (#193).
-  function modalFeature(id) {
-    const level = MODALS[id].level
-    return { requires: level, run: (ref, ctx) => openModal(id, targetAt(ref, ctx, level)) }
-  }
 
   async function disconnectOne(ref, ctx) {
     try { await disconnect(ref.connectionId) } catch (_) {}
@@ -139,74 +91,13 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     showToast(failed ? `Refreshed ${done} connection${done === 1 ? '' : 's'}, ${failed} failed` : 'All connections refreshed')
   }
 
-  function openServerInfo(ref, ctx, kind, title) {
-    openModal('serverInfo', {
-      ...targetAt(ref, ctx, 'connection'), kind: kind, title: title,
-    })
-  }
-  function copyToClipboard(ref, ctx, kind) {
-    const copied = targetAt(ref, ctx, kind)
-    dbClipboard.value = { kind: kind, ...copied }
-    showToast(`Copied ${kind} "${resourceName(copied.resource)}"`)
-  }
-
   // Keyed by action id; the labels menus show are theirs, not ours. Ids match the
   // native menu's where it offers the same action.
   const FEATURES = {
-    // ── open a tab ──
-    'coll:open_tab':           { requires: 'collection', run: (r, c) => openCollectionTab(targetAt(r, c, 'collection')) },
-    'coll:aggregation':        { requires: 'collection', run: (r, c) => openCollectionTab(targetAt(r, c, 'collection'), 'aggregate') },
-    'file:intellishell':       { requires: 'database',   run: (r, c) => openShellTab(targetAt(r, c, 'database')) },
-    'coll:add_index':          { requires: 'collection', run: (r, c) => openIndexManagerTab(targetAt(r, c, 'collection')) },
+    ...useEngineActions(),
 
-    // ── connection-scoped info modals ──
-    'file:server_status':      modalFeature('serverStatus'),
-    'file:server_charts':      modalFeature('serverCharts'),
-    'db:current_ops':          { requires: 'connection', run: (r, c) => openCurrentOpsTab(targetAt(r, c, 'connection')) },
-    'file:server_build':       { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'build',   'Build Info') },
-    'conn:host_info':          { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'host',    'Host Info') },
-    'conn:replica_status':     { requires: 'connection', run: (r, c) => openServerInfo(r, c, 'replica', 'Replica Set Status') },
-
-    // ── database-scoped modals ──
-    'db:database_stats':       modalFeature('dbStats'),
-    'db:profiler':             modalFeature('profiler'),
-    'db:manage_users':         modalFeature('users'),
-    'db:manage_roles':         modalFeature('roles'),
-    'db:functions':            modalFeature('functions'),
-    'gridfs:open':             modalFeature('gridfs'),
-    'file:search':             { requires: 'database', run: (r, c) => openSearchTab(targetAt(r, c, 'database')) },
-
-    // ── collection-scoped modals ──
-    'coll:validator':          modalFeature('validator'),
-    'coll:schema':             { requires: 'collection', run: (r, c) => openSchemaTab(targetAt(r, c, 'collection')) },
-    'coll:history':            modalFeature('history'),
-    'coll:stats':              modalFeature('stats'),
-    'coll:mapreduce':          modalFeature('mapReduce'),
-
-    // ── create/edit dialogs (state + seeders owned by useDbActions) ──
-    'db:add_collection':       modalFeature('addCollection'),
-    'db:add_database':         modalFeature('addDatabase'),
-    'db:add_view':             { requires: 'database',   run: (r, c) => openAddView(r, c, '') },
-    'coll:add_view':           { requires: 'collection', run: (r, c) => openAddView(r, c, resourceName(r)) },
-    'db:add_bucket':           modalFeature('addBucket'),
-    'db:drop_database':        modalFeature('dropDatabase'),
-    'coll:drop':               modalFeature('dropCollection'),
-    'coll:rename':             modalFeature('renameCollection'),
-    'coll:duplicate':          modalFeature('duplicateCollection'),
-
-    // ── import / export (collection-level wizards; db-level exports many) ──
-    'coll:export':             { requires: 'collection', run: (r, c) => openExportSource(targetAt(r, c, 'collection')) },
-    'coll:import':             { requires: 'collection', run: (r, c) => openImportWizard(targetAt(r, c, 'collection')) },
-    // Export / Import Collections… act on a database, so a collection row resolves to
-    // its database rather than carrying a collection the handlers would ignore.
-    'db:export':               { requires: 'database',   run: (r, c) => exportDatabase(targetAt(r, c, 'database')) },
-    'db:import':               { requires: 'database',   run: (r, c) => importDatabase(targetAt(r, c, 'database')) },
-
-    // ── clipboard / copy-paste ──
+    // ── copy ──
     'node:copy_name':          { requires: null,         run: (r, c) => { navigator.clipboard.writeText(c.label); showToast('Copied') } },
-    'coll:copy':               { requires: 'collection', run: (r, c) => copyToClipboard(r, c, 'collection') },
-    'db:copy_database':        { requires: 'database',   run: (r, c) => copyToClipboard(r, c, 'database') },
-    'db:paste':                { requires: 'database',   run: (r, c) => pasteClipboard(targetAt(r, c, 'database')) },
 
     // ── connection lifecycle ──
     'conn:disconnect':         { requires: 'connection', run: disconnectOne },
@@ -270,67 +161,14 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     })
   }
 
-  // Toolbar / native-menu tool dispatch. `connect`/`sql` are app-level (no
-  // node); PostgreSQL's buttons go to runPgTool; `collection`/`shell` keep their bespoke
-  // selection + guidance logic; every other tool resolves the operating node (the passed
-  // sidebar selection, else the active tab) and routes through the shared feature registry.
+  // Toolbar / native-menu tool dispatch. `connect` is app-level (no node); every other
+  // tool is an engine's (engines/contextActions.js), which resolves the node it acts on.
+  // `target` is the native menu's already-resolved node, or null from the toolbar.
   function handleTool(name, target = null) {
     if (name === 'connect') { openModal('connectionManager'); return }
-    if (runPgTool(name, pgMenuTarget)) return
-
-    if (name === 'collection') {
-      const collection = resourceAt(target?.resource, 'collection')
-      if (collection) {
-        openCollectionTab({ resource: collection, connectionName: target.connectionName })
-        return
-      }
-      // Opens the collection highlighted in the sidebar, same as double-clicking it.
-      // Opening makes it the active collection, whose highlight takes over — so the
-      // single-click selection is cleared rather than lingering as a second one.
-      const sel = treeSelection.value
-      const selected = resourceAt(sel?.resource, 'collection')
-      if (!selected) {
-        showToast('Select a collection in the sidebar first')
-        return
-      }
-      setTreeSelection(null)
-      openCollectionTab({ resource: selected, connectionName: sel.connectionName })
-      return
-    }
-
-    // The remaining actions operate on a specific node. From the native menu the caller
-    // passes an already-resolved target; from the toolbar it is the active workspace,
-    // resolved the way the menu resolves it — through its target, and only when that
-    // names a MongoDB resource.
-    const resolved = target || resolveMenuTarget(activeTab.value, null)
-    const ref = resolved?.resource ?? null
-    const ctx = { connectionName: resolved?.connectionName ?? null }
-
-    if (name === 'shell') {
-      if (hasLevel(ref, 'database')) {
-        openShellTab(targetAt(ref, ctx, 'database'))
-      } else {
-        showToast('Select a database or collection first to open IntelliShell')
-      }
-      return
-    }
-
-    if (name === 'sql') {
-      if (hasLevel(ref, 'collection')) {
-        openSqlTab(targetAt(ref, ctx, 'collection'))
-      } else {
-        showToast('Select a collection first to open SQL')
-      }
-      return
-    }
-
-    const action = TOOL_ALIASES[name]
-    if (action) {
-      runFeature(action, ref, ctx)
-      return
-    }
-    // Every entry in TOOLS is handled above or via TOOL_ALIASES, so reaching here
-    // means the toolbar grew a button nobody wired up.
+    if (runEngineTool(name, { target: target, pgMenuTarget: pgMenuTarget, runFeature: runFeature })) return
+    // Every entry in TOOLS is an engine's or `connect`, so reaching here means the
+    // toolbar grew a button nobody wired up.
     const label = TOOLS.find(t => t.name === name)?.label || name
     console.error(`useFeatures: no handler registered for tool "${name}"`)
     showToast(`Could not run "${label}"`)

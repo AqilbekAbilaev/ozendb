@@ -1,13 +1,13 @@
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { showToast } from '../stores/toast'
-import { openImportTab } from '../engines/mongodb/tabs'
-import { listDatabases } from '../engines/mongodb/api/resources'
-import { exportCollection, importCollection } from '../engines/mongodb/api/transfer'
-import { errText } from '../utils/errors'
-import { apiTarget } from '../engines/mongodb/api/payload'
-import { resourceName } from '../utils/resourceRef'
-import { invalidateConnectionResources } from '../stores/connectionData'
-import { openModal, closeModal } from '../stores/modals'
+import { showToast } from '../../../stores/toast'
+import { openImportTab } from '../tabs'
+import { listDatabases } from '../api/resources'
+import { exportCollection, importCollection } from '../api/transfer'
+import { errText } from '../../../utils/errors'
+import { apiTarget } from '../api/payload'
+import { resourceName } from '../../../utils/resourceRef'
+import { invalidateConnectionResources } from '../../../stores/connectionData'
+import { openModal, closeModal } from '../../../stores/modals'
 
 // Import / export flows. Per-collection export is a workspace tab (see openExportTab in
 // App.vue); import opens a format picker first. The database-level Export/Import
