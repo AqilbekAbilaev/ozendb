@@ -2,9 +2,9 @@
 import { ref, computed, nextTick } from 'vue'
 import { useResultSearch } from './useResultSearch'
 import { useMomentumScroll } from '../../../composables/useMomentumScroll'
-import TreeView from '../../../components/base/TreeView.vue'
+import TreeView from './TreeView.vue'
 import SearchBar from '../../../components/base/SearchBar.vue'
-import { isEjsonScalar } from '../../../utils/mongoFormat'
+import { isEjsonScalar } from './mongoFormat'
 
 const props = defineProps({
   results: { type: Array, default: () => [] },
