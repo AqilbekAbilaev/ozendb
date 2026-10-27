@@ -4,7 +4,7 @@
 //   'all'      → every document ({})
 //   'current'  → the query currently in the collection view (the tab's filter)
 //   'selected' → the rows selected in the results grid, matched by _id
-import { mongoStringify } from './mongoFormat'
+import { mongoStringify } from '../../../utils/mongoFormat'
 
 // Indices of the current row selection (multi-select), falling back to the single
 // active row. Empty when nothing is selected. Mirrors the same helper in

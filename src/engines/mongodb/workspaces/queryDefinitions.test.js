@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { queryDefinitions } from './queryDefinitions'
-import { setCollectionQueryMode } from '../../../utils/queryMode'
+import { setCollectionQueryMode } from '../query/queryMode'
 import { createResourceRef, isResourceRef } from '../../../utils/resourceRef'
 import { duplicateWorkspace, restoreWorkspace, disposeWorkspace } from '../../../workspaces/lifecycle'
 import { registerWorkspaceDefinitions } from '../../../workspaces/registerDefinitions'

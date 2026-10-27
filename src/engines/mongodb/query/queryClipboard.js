@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { setCollectionQueryMode } from '../utils/queryMode'
+import { setCollectionQueryMode } from './queryMode'
 
 // The one copied query, shared across tabs so it can be pasted into any of them.
 export const clipboardQuery = ref(null)

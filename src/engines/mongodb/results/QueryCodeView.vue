@@ -6,7 +6,7 @@ import BaseIcon from '../../../components/base/BaseIcon.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'
 import BaseButton from '../../../components/base/BaseButton.vue'
 import CodeEditor from '../../../components/base/CodeEditor.vue'
-import { generateCode, LANGUAGES } from '../../../utils/queryCodegen'
+import { generateCode, LANGUAGES } from '../query/queryCodegen'
 import { showToast } from '../../../stores/toast'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 import { isCollectionTab } from '../../../utils/workspaceTypes'
@@ -15,7 +15,7 @@ import { apiTarget } from '../api/payload'
 const languageOptions = LANGUAGES.map((lang) => ({ value: lang.id, label: lang.label }))
 
 // Query Code sub-tab: the active tab's query rendered as a copy-ready snippet in a chosen
-// target language (Shell, drivers, …). Generation lives in utils/queryCodegen; display is
+// target language (Shell, drivers, …). Generation lives in query/queryCodegen; display is
 // the shared read-only CodeEditor, tokenized by real CodeMirror grammars.
 const props = defineProps({
   activeTab: { type: Object, required: true },
