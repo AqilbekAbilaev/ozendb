@@ -1,17 +1,17 @@
 import { computed, ref, watch } from 'vue'
-import * as idx from '../stores/indexes'
-import { createIndex, dropIndex, indexStats, listIndexes, setIndexHidden } from '../engines/mongodb/api/indexes'
-import { collectionStats } from '../engines/mongodb/api/admin'
+import * as idx from '../../../stores/indexes'
+import { createIndex, dropIndex, indexStats, listIndexes, setIndexHidden } from '../api/indexes'
+import { collectionStats } from '../api/admin'
 import {
   isProtectedIndex, isIndexHidden, indexType, indexProperties, requestedIndexHidden,
   indexSizesFrom, indexUsageFrom, indexSeedFromClipboard,
-} from '../utils/indexSpec'
-import { errText, errMessage } from '../utils/errors'
-import { apiTarget } from '../engines/mongodb/api/payload'
-import { fmtBytes } from '../utils/format'
+} from '../../../utils/indexSpec'
+import { errText, errMessage } from '../../../utils/errors'
+import { apiTarget } from '../api/payload'
+import { fmtBytes } from '../../../utils/format'
 import { useIndexPaneLifecycle } from './useIndexPaneLifecycle'
-import { showToast } from '../stores/toast'
-import { refreshRequest, indexMenuRequest } from '../stores/menuRequests'
+import { showToast } from '../../../stores/toast'
+import { refreshRequest, indexMenuRequest } from '../../../stores/menuRequests'
 
 // One Index Manager tab's list, selection, metrics and create/edit form, behind
 // IndexManagerPane. Two tabs for different collections never share any of it; the shared
