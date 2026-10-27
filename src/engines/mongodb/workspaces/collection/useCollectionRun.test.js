@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../../api/queries', () => ({
   explainFind: vi.fn(), explainAggregate: vi.fn(), loadExplainStorage: vi.fn(), translateSqlToMql: vi.fn(),
@@ -6,13 +6,15 @@ vi.mock('../../api/queries', () => ({
 }))
 vi.mock('../../api/queryLibrary', () => ({ pushQueryHistory: vi.fn(), getDefaultQuery: vi.fn() }))
 
-import { nextTick, reactive } from 'vue'
+import { effectScope, nextTick, reactive } from 'vue'
 import { explainAggregate, runFind, runAggregate, cancelRun } from '../../api/queries'
 import { pushQueryHistory } from '../../api/queryLibrary'
 import { requestRefresh } from '../../../../stores/menuRequests'
-import { tabs } from '../../../../stores/tabs'
+import { tabs, activeTabId } from '../../../../stores/tabs'
 import { createCollectionState, createCollectionRuntime } from '../collectionState'
 import { useCollectionRun } from './useCollectionRun'
+import { collectionResultTab } from './resultTab'
+import { useSavedQueryBrowser } from '../../query/useSavedQueryBrowser'
 import { createResourceRef } from '../../../../utils/resourceRef'
 import { registerWorkspaceDefinitions } from '../../../../workspaces/registerDefinitions'
 
@@ -22,21 +24,31 @@ registerWorkspaceDefinitions()
 // The query runner finds its tab in the tab store and calls the API with this target.
 const ORDERS = { connectionId: 'c1', database: 'shop', collection: 'orders' }
 
+// Each pane's watchers live in a scope of their own, stopped after the test as an
+// unmount would.
+let scope = null
+function mountPane(props) {
+  scope = effectScope()
+  return scope.run(() => useCollectionRun({ activeTab: () => props.activeTab, tabs: () => props.tabs }))
+}
+
 function setup({ mode = 'find', query = {}, resultTab = 'Result' } = {}) {
   const state = createCollectionState()
   Object.assign(state.query, query)
   const tab = reactive({ id: 't1', type: 'mongodb.find', mode, target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]), state, runtime: createCollectionRuntime() })
   tabs.value = [tab]
-  const props = reactive({ activeTab: tab, tabs: [tab], resultTab, savedQueryRequest: null })
-  const emit = vi.fn()
-  const run = useCollectionRun({
-    activeTab: () => props.activeTab, tabs: () => props.tabs,
-    resultTab: () => props.resultTab, savedQueryRequest: () => props.savedQueryRequest,
-  }, emit)
-  return { tab, props, emit, run }
+  activeTabId.value = tab.id
+  collectionResultTab.value = resultTab
+  const props = reactive({ activeTab: tab, tabs: [tab] })
+  return { tab, props, run: mountPane(props) }
 }
 
+afterEach(() => scope?.stop())
+
 beforeEach(() => {
+  const browser = useSavedQueryBrowser()
+  browser.close()
+  browser.request.value = null
   vi.clearAllMocks()
   explainAggregate.mockResolvedValue({})
   runFind.mockResolvedValue({ documents: [], elapsedMs: 4 })
@@ -57,12 +69,12 @@ describe('find', () => {
   })
 
   it('will not run a query that does not parse, and says which field is wrong', () => {
-    const { emit, run } = setup({ query: { sort: '{ a: ' } })
+    const { run } = setup({ query: { sort: '{ a: ' } })
     expect(run.runValid.value).toBe(false)
     expect(run.queryErrorText.value).toMatch(/^Sort: /)
     run.run()
     expect(runFind).not.toHaveBeenCalled()
-    expect(emit).not.toHaveBeenCalled()
+    expect(collectionResultTab.value).toBe('Result')
   })
 })
 
@@ -75,32 +87,42 @@ describe('aggregate', () => {
   })
 
   it('reports a broken pipeline instead of running it', () => {
-    const { emit, run } = setup({ mode: 'aggregate', query: { pipeline: '[ { $match: ' } })
+    const { run } = setup({ mode: 'aggregate', query: { pipeline: '[ { $match: ' } })
     expect(run.pipelineErrorText.value).toMatch(/^Pipeline: /)
     run.run()
     expect(runAggregate).not.toHaveBeenCalled()
-    expect(emit).not.toHaveBeenCalled()
+    expect(collectionResultTab.value).toBe('Result')
   })
 })
 
 describe('wiring', () => {
   it('switches result sub-tab, fetching the plan when Explain opens', () => {
-    const { emit, run } = setup({ mode: 'aggregate', query: { pipeline: '[]' } })
+    const { run } = setup({ mode: 'aggregate', query: { pipeline: '[]' } })
     run.selectRtab('Explain')
-    expect(emit).toHaveBeenCalledWith('update:result-tab', 'Explain')
+    expect(collectionResultTab.value).toBe('Explain')
+    expect(explainAggregate).toHaveBeenCalled()
+  })
+
+  it('keeps the result sub-tab when the pane unmounts and mounts again', () => {
+    const { props, run } = setup({ mode: 'aggregate', query: { pipeline: '[]' } })
+    run.selectRtab('Explain')
+    scope.stop()
+    vi.clearAllMocks()
+
+    mountPane(props).run()
+    expect(collectionResultTab.value).toBe('Explain')
     expect(explainAggregate).toHaveBeenCalled()
   })
 
   it('applies a saved query to the tab, runs it, then acknowledges it', async () => {
-    const { tab, props, emit } = setup()
-    props.savedQueryRequest = {
-      nonce: 7, tabId: 't1',
-      entry: { mode: 'find', filter: '{ b: 2 }', sort: '', projection: '', skip: '10', limit: '5' },
-    }
+    const { tab } = setup()
+    const browser = useSavedQueryBrowser()
+    browser.open(tab)
+    browser.apply({ mode: 'find', filter: '{ b: 2 }', sort: '', projection: '', skip: '10', limit: '5' })
     await nextTick(); await nextTick(); await nextTick()
     expect(tab.state.query).toMatchObject({ filter: '{ b: 2 }', skip: 10, limit: 5 })
     expect(runFind).toHaveBeenCalledWith(ORDERS, expect.objectContaining({ skip: 10, limit: 5 }), expect.any(String))
-    expect(emit).toHaveBeenCalledWith('saved-query-applied', 7)
+    expect(browser.request.value).toBe(null)
   })
 
   it('reruns on View → Refresh', async () => {

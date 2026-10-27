@@ -9,12 +9,14 @@ import { runExplain } from './runExplain'
 import * as queryRunner from './queryRunner'
 import { openCollectionTab } from '../../tabs'
 import { workspaceIsCollection } from '../../../../workspaces/registry'
+import { collectionResultTab } from './resultTab'
+import { useSavedQueryBrowser } from '../../query/useSavedQueryBrowser'
 
 // What MongoCollectionWorkspace does with its query: live validation, the Run button's
 // dispatch on the tab's mode, Explain, cancelling, following a reference, and applying a
 // saved query. Runs go to queryRunner, the one place a query actually executes. Each
 // input is a getter onto the component's props.
-export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, savedQueryRequest }, emit) {
+export function useCollectionRun({ activeTab: getActiveTab, tabs }) {
   const activeTab = computed(getActiveTab)
   const isAggregate = computed(() => activeTab.value && activeTab.value.mode === 'aggregate')
   const isSql = computed(() => activeTab.value && activeTab.value.mode === 'sql')
@@ -33,7 +35,8 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
   const queryErrorText = computed(() => parsedQuery.value && findQueryError(parsedQuery.value))
   const pipelineErrorText = computed(() => pipelineError(parsedPipeline.value))
 
-  const explainVisible = () => resultTab() === 'Explain'
+  const savedQueryBrowser = useSavedQueryBrowser()
+  const explainVisible = () => collectionResultTab.value === 'Explain'
   const explain = (tab = activeTab.value) => { if (workspaceIsCollection(tab)) return runExplain(tab, isOpen) }
 
   // The Run button (and the result toolbar's refresh) dispatch on the tab's mode.
@@ -80,7 +83,7 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
   // Switch result sub-tab; the Explain plan is fetched lazily the first time it's shown
   // (and re-fetched whenever the query re-runs while it's open).
   function selectRtab(t) {
-    emit('update:result-tab', t)
+    collectionResultTab.value = t
     if (t === 'Explain') explain()
   }
 
@@ -122,13 +125,13 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
   // View → Refresh, which only reaches a find (see canRefreshWorkspace).
   watch(refreshRequest, () => run())
 
-  watch(() => savedQueryRequest()?.nonce, async (nonce) => {
-    const request = savedQueryRequest()
+  watch(() => savedQueryBrowser.request.value?.nonce, async (nonce) => {
+    const request = savedQueryBrowser.request.value
     if (nonce == null || request.tabId !== activeTab.value?.id) return
     try {
       await applyFromBrowser(request.entry)
     } finally {
-      emit('saved-query-applied', nonce)
+      savedQueryBrowser.acknowledge(nonce)
     }
   }, { immediate: true })
 

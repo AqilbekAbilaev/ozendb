@@ -16,6 +16,7 @@ import PostgresTreeNodes from './postgresql/tree/PostgresTreeNodes.vue'
 import MySqlTreeNodes from './mysql/tree/MySqlTreeNodes.vue'
 import IndexDetailsModal from './mongodb/admin/IndexDetailsModal.vue'
 import DropIndexModal from './mongodb/admin/DropIndexModal.vue'
+import SavedQueryBrowser from './mongodb/query/SavedQueryBrowser.vue'
 
 // Tabs whose body is the same for every engine, so NewConnection.vue renders them itself.
 export const SHARED_TABS = ['ssh', 'general']
@@ -80,5 +81,6 @@ export const TREE_NODES = Object.freeze({
 // Dialogs an engine keeps mounted app-wide, each showing itself from its own store rather
 // than through openModal; AppModals.vue renders every one. MongoDB's index dialogs overlay
 // the Index Manager and keep their open state, typed text and frozen drop target in
-// mongodb/admin/indexes.js.
-export const MOUNTED_DIALOGS = Object.freeze([IndexDetailsModal, DropIndexModal])
+// mongodb/admin/indexes.js. Its saved-query browser stays open across tab switches and
+// keeps its state in mongodb/query/useSavedQueryBrowser.js.
+export const MOUNTED_DIALOGS = Object.freeze([IndexDetailsModal, DropIndexModal, SavedQueryBrowser])

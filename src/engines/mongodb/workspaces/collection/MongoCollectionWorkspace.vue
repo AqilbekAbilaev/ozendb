@@ -1,9 +1,8 @@
 <script setup>
 // The MongoDB collection workspace: find, aggregate, and SQL-to-MQL query behavior and
 // rendering. What it does with the query lives in useCollectionRun, which runs it
-// itself; this component renders it. The host (WorkspaceArea.vue) owns the tab bar, other
-// pane kinds, the saved-query browser, and the result sub-tab compatibility ref this
-// component reads/writes via v-model.
+// itself; this component renders it. The result sub-tab and the saved-query browser live
+// in module-level stores, since both must outlive this pane unmounting on a tab switch.
 import QueryBar from '../../query/QueryBar.vue'
 import SqlQueryBar from '../../query/SqlQueryBar.vue'
 import PipelineEditor from '../../query/PipelineEditor.vue'
@@ -14,15 +13,14 @@ import { useInitialFindRun } from './useInitialFindRun'
 import { useCollectionRun } from './useCollectionRun'
 import { apiTarget } from '../../api/payload'
 import { runQuery as runFind } from './queryRunner'
+import { collectionResultTab } from './resultTab'
+import { useSavedQueryBrowser } from '../../query/useSavedQueryBrowser'
+import { tabs, activeTabId } from '../../../../stores/tabs'
 
 const props = defineProps({
-  activeTab:        { type: Object, required: true },
-  tabs:             { type: Array,  required: true },
-  activeTabId:      { type: String, required: true },
-  resultTab:        { type: String, required: true },
-  savedQueryRequest: { type: Object, default: null },
+  activeTab: { type: Object, required: true },
 })
-const emit = defineEmits(['update:result-tab', 'open-query-browser', 'saved-query-applied'])
+const savedQueryBrowser = useSavedQueryBrowser()
 
 useInitialFindRun(computed(() => props.activeTab), {
   runQuery: (workspace, query) => runFind(workspace.id, query),
@@ -32,11 +30,9 @@ const {
   isAggregate, isSql, runValid, queryErrorText, pipelineErrorText,
   run, runQuery, selectRtab, onExplainVerbosity, cancel, followReference,
 } = useCollectionRun({
-  activeTab:         () => props.activeTab,
-  tabs:              () => props.tabs,
-  resultTab:         () => props.resultTab,
-  savedQueryRequest: () => props.savedQueryRequest,
-}, emit)
+  activeTab: () => props.activeTab,
+  tabs:      () => tabs.value,
+})
 
 // The breadcrumb's names, read off the tab's ref.
 const names = computed(() => apiTarget(props.activeTab.target))
@@ -63,7 +59,7 @@ const names = computed(() => apiTarget(props.activeTab.target))
       :run-valid="runValid"
       :query-error-text="queryErrorText"
       @run="run"
-      @open-browser="emit('open-query-browser')"
+      @open-browser="savedQueryBrowser.open(activeTab)"
     />
 
     <!-- Aggregation pipeline editor -->
@@ -80,7 +76,7 @@ const names = computed(() => apiTarget(props.activeTab.target))
     :active-tab="activeTab"
     :is-aggregate="isAggregate"
     :run-valid="runValid"
-    :rtab="resultTab"
+    :rtab="collectionResultTab"
     :tabs="tabs"
     :active-tab-id="activeTabId"
     @run="run"
