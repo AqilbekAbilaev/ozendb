@@ -2,7 +2,7 @@
 // current operations. Same contract as the query definitions. duplicate/restore clone
 // the durable configuration (sources, mapping, ops settings) and reset runtime state.
 import { resourceName, segmentName } from '../../../utils/resourceRef'
-import { opsDefaults } from '../../../composables/useCurrentOps'
+import { opsDefaults } from '../admin/useCurrentOps'
 import { IndexManagerPane, SchemaPane, SearchPane, CurrentOpsPane, ImportPane, CsvImportPane, ExportPane } from './panes'
 
 // A tool workspace's identity is its `target` alone (#303): `create` is handed the ref,

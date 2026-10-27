@@ -5,8 +5,8 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 import { ref, reactive, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useCurrentOps, opsDefaults } from './useCurrentOps'
-import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
-import { createResourceRef } from '../utils/resourceRef'
+import { toolDefinitions } from '../workspaces/toolDefinitions'
+import { createResourceRef } from '../../../utils/resourceRef'
 
 // Switching workspace tabs unmounts the pane, so anything held in a plain ref inside it
 // is gone when the user comes back. The toolbar settings live on the tab object for that

@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-vi.mock('../engines/mongodb/api/indexes', () => ({
+vi.mock('../api/indexes', () => ({
   listIndexes: vi.fn(), indexStats: vi.fn(), createIndex: vi.fn(), dropIndex: vi.fn(), setIndexHidden: vi.fn(),
 }))
-vi.mock('../engines/mongodb/api/admin', () => ({ collectionStats: vi.fn() }))
-vi.mock('../stores/toast', () => ({ showToast: vi.fn() }))
+vi.mock('../api/admin', () => ({ collectionStats: vi.fn() }))
+vi.mock('../../../stores/toast', () => ({ showToast: vi.fn() }))
 
 import { nextTick, ref } from 'vue'
-import * as api from '../engines/mongodb/api/indexes'
-import { collectionStats } from '../engines/mongodb/api/admin'
-import { showToast } from '../stores/toast'
-import { requestIndexAction } from '../stores/menuRequests'
+import * as api from '../api/indexes'
+import { collectionStats } from '../api/admin'
+import { showToast } from '../../../stores/toast'
+import { requestIndexAction } from '../../../stores/menuRequests'
 import { useIndexManager } from './useIndexManager'
-import * as idx from '../stores/indexes'
-import { createResourceRef } from '../utils/resourceRef'
+import * as idx from '../../../stores/indexes'
+import { createResourceRef } from '../../../utils/resourceRef'
 
 const ID = { name: '_id_', key: { _id: 1 } }
 const BY_A = { name: 'a_1', key: { a: 1 } }

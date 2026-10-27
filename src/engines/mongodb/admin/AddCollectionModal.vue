@@ -11,11 +11,11 @@ import FieldError from '../../../components/base/FieldError.vue'
 import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
-import { buildCollectionOptions, emptyCollectionOptions } from '../../../utils/collectionOptions'
+import { buildCollectionOptions, emptyCollectionOptions } from './collectionOptions'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Database → Add Collection…: name plus the collection type and that type's options
-// (mirrors 3T's dialog). The per-type field rules live in utils/collectionOptions.js so
+// (mirrors 3T's dialog). The per-type field rules live in collectionOptions.js so
 // they stay unit tested; this component only binds inputs and surfaces the error.
 const props = defineProps({
   target: { type: Object, required: true },   // { resource, connectionName }

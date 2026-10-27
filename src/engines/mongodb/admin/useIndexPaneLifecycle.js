@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { apiTarget } from '../engines/mongodb/api/payload'
+import { apiTarget } from '../api/payload'
 
 function targetOf(tab) {
   return apiTarget(tab.target)

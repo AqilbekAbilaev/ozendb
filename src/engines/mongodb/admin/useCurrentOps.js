@@ -1,8 +1,8 @@
 import { computed, watch } from 'vue'
-import { currentOps, killOp } from '../engines/mongodb/api/admin'
-import { errText, errCode } from '../utils/errors'
-import { normalizeOps, mergeRetained, filterOps } from '../utils/currentOps'
-import { useTicker } from './useTicker'
+import { currentOps, killOp } from '../api/admin'
+import { errText, errCode } from '../../../utils/errors'
+import { normalizeOps, mergeRetained, filterOps } from './currentOps'
+import { useTicker } from '../../../composables/useTicker'
 
 // Poll rates offered in the toolbar. 0 is "Off" — the tab then only refreshes on demand.
 export const FREQUENCIES = [
