@@ -17,7 +17,7 @@ import ResultTable from '../results/ResultTable.vue'
 import TreeView from '../../../components/base/TreeView.vue'
 import { mongoStringify, syntaxHighlight } from '../../../utils/mongoFormat'
 import CodeEditor from '../../../components/base/CodeEditor.vue'
-import { shellExtensions } from '../../../utils/shellEditor'
+import { shellExtensions } from '../query/shellEditor'
 
 // IntelliShell, Studio-3T style: a code editor on top, the command's output in
 // the reused result grid (Table / JSON / Tree) below, plus a Console tab for

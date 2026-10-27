@@ -1,4 +1,4 @@
-import { errText } from './errors'
+import { errText } from '../../../utils/errors'
 import { beginWorkspaceRequest } from './workspaceRequest'
 
 export async function runTranslatedSql(tab, {

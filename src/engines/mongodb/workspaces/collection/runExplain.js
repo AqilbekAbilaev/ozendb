@@ -6,7 +6,7 @@ import { explainFind, explainAggregate, loadExplainStorage } from '../../api/que
 import { errText } from '../../../../utils/errors'
 import { apiTarget } from '../../api/payload'
 import { parsePipeline } from '../../../../utils/queryParser'
-import { beginWorkspaceRequest } from '../../../../utils/workspaceRequest'
+import { beginWorkspaceRequest } from '../../query/workspaceRequest'
 import { parseFindQuery, findQueryValid, findArgs } from './collectionQuery'
 
 export async function runExplain(tab, isCurrent) {

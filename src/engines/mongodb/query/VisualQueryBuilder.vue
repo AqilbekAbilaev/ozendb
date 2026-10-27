@@ -10,7 +10,7 @@ import {
   generateFilter,
   generateSort,
   generateProjection,
-} from '../../../utils/vqbGenerator'
+} from './vqbGenerator'
 
 const props = defineProps({
   tabs:            { type: Array,  required: true },
