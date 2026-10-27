@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { deriveMenuContext, resolveMenuTarget, resolvePgMenuTarget } from './menuContext'
+import { deriveMenuContext } from './menuContext'
 import { ENGINES } from '../engines/index.js'
 import { selectedIndex } from '../engines/mongodb/admin/indexes'
 import { selectedGridfsFile } from '../engines/mongodb/tools/gridfsSelection'
@@ -191,7 +191,8 @@ describe('deriveMenuContext', () => {
 })
 
 // Every item behind the Connection / Database / Collection gates is a MongoDB action,
-// so a PostgreSQL selection or tab must never light one up or be handed to one.
+// so a PostgreSQL selection or tab must never light one up (nor be handed to one: see
+// resolveMenuTarget in engines/mongodb/menu.test.js).
 describe('PostgreSQL never reaches the MongoDB gates', () => {
   const pgConnection = selection('p1', 'Payments PG', null, null, 'postgresql')
   const pgTableTab = {
@@ -215,76 +216,6 @@ describe('PostgreSQL never reaches the MongoDB gates', () => {
   it('a MongoDB tab still counts while a PostgreSQL connection is selected', () => {
     const ctx = derive(collectionTab, pgConnection, 2)
     expect([ctx.hasConnection, ctx.hasDatabase, ctx.hasCollection]).toEqual([true, true, true])
-    expect(resolveMenuTarget(collectionTab, pgConnection, 'connection').resource.connectionId).toBe('c1')
-  })
-
-  it('never hands a PostgreSQL connection to an action — ⌘L finds no database to open a shell on', () => {
-    expect(resolveMenuTarget(quickstart, pgConnection, 'connection')).toBe(null)
-    expect(resolveMenuTarget(pgTableTab, pgConnection, 'database')).toBe(null)
-  })
-})
-
-describe('resolveMenuTarget', () => {
-  it('prefers the sidebar selection over the active tab', () => {
-    const sel = selection('c2', 'Prod', 'analytics', 'events')
-    expect(resolveMenuTarget(collectionTab, sel)).toEqual({
-      resource: ref('c2', 'analytics', 'events'), connectionName: 'Prod',
-    })
-  })
-
-  // The tree builds the selection's ref (see useConnectionTree), and that is
-  // authoritative — the level is never guessed from which fields happen to be set.
-  it('takes the level from the selection\'s ref', () => {
-    const dbSel = selection('c1', 'Local', 'shop', null)
-    expect(resolveMenuTarget(null, dbSel).resource).toEqual(ref('c1', 'shop'))
-    const connSel = selection('c1', 'Local', null, null)
-    expect(resolveMenuTarget(null, connSel).resource).toEqual(ref('c1'))
-  })
-
-  it('names no resource for a selection without a ref rather than guessing one', () => {
-    expect(resolveMenuTarget(null, { connectionId: 'c1', dbName: 'shop' })).toBe(null)
-  })
-
-  it('falls back to the active tab when nothing is selected', () => {
-    expect(resolveMenuTarget(collectionTab, null)).toEqual({
-      resource: ref('c1', 'shop', 'orders'), connectionName: 'Local',
-    })
-  })
-
-  it('returns null when neither a selection nor a tab is available', () => {
-    expect(resolveMenuTarget(null, null)).toBe(null)
-  })
-
-  it('falls back to the active tab when the selection is too shallow for the level', () => {
-    // Collection tab active, but a bare connection is highlighted. A collection-
-    // scoped action must act on the tab (which its gate lit up), not the shallow
-    // selection — otherwise the enabled item would only toast a guide message.
-    const connSel = selection('c2', 'Prod', null, null)
-    expect(resolveMenuTarget(collectionTab, connSel, 'collection')).toEqual({
-      resource: ref('c1', 'shop', 'orders'), connectionName: 'Local',
-    })
-    // A database-scoped action likewise falls through to the collection tab.
-    expect(resolveMenuTarget(collectionTab, connSel, 'database').resource).toEqual(ref('c1', 'shop', 'orders'))
-    // A connection-scoped action is satisfied by the selection, so it wins.
-    expect(resolveMenuTarget(collectionTab, connSel, 'connection').resource).toEqual(ref('c2'))
-  })
-
-  it('prefers the sidebar selection when it satisfies the required level', () => {
-    const collSel = selection('c2', 'Prod', 'analytics', 'events')
-    expect(resolveMenuTarget(collectionTab, collSel, 'collection').resource).toEqual(ref('c2', 'analytics', 'events'))
-  })
-
-  it('returns the shallow selection for the guide message when neither satisfies', () => {
-    const connSel = selection('c2', 'Prod', null, null)
-    expect(resolveMenuTarget(quickstart, connSel, 'collection').resource).toEqual(ref('c2'))
-  })
-
-  // A tool tab resolves through its target, like every other tab.
-  it('resolves a tool tab through its target', () => {
-    const schema = { id: 't3', type: 'mongodb.schema', target: ref('c1', 'shop', 'orders'), connectionId: 'c1', connectionName: 'Local', dbName: 'shop', collectionName: 'orders' }
-    expect(resolveMenuTarget(schema, null, 'collection')).toEqual({
-      resource: ref('c1', 'shop', 'orders'), connectionName: 'Local',
-    })
   })
 })
 
@@ -380,51 +311,6 @@ describe('deriveMenuContext (PostgreSQL sidebar selection)', () => {
     const ctx = derive(quickstart, pgSelection('table', { database: 'app', schema: 'public', table: 'widgets' }), 1)
     expect(ctx.hasDatabase).toBe(false)
     expect(ctx.hasCollection).toBe(false)
-  })
-})
-
-describe('resolvePgMenuTarget', () => {
-  it('resolves a query tab, carrying its engine and both alias spellings', () => {
-    expect(resolvePgMenuTarget(pgQueryTab)).toEqual({
-      connId: 'c1', engine: 'postgresql', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
-      database: 'app', schema: null, table: null,
-    })
-  })
-
-  it('resolves a table tab with its table name', () => {
-    expect(resolvePgMenuTarget(pgTableTab).table).toBe('widgets')
-  })
-
-  it('is null for a non-PostgreSQL tab, or none', () => {
-    expect(resolvePgMenuTarget(collectionTab)).toBeNull()
-    expect(resolvePgMenuTarget(null)).toBeNull()
-  })
-
-  // Same precedence rule as resolveMenuTarget: the sidebar selection wins when it is
-  // deep enough for the action, since that is what the user just clicked.
-  it('prefers a deep-enough sidebar selection over the active tab', () => {
-    const sel = pgSelection('table', { database: 'other', schema: 'audit', table: 'events' })
-    expect(resolvePgMenuTarget(pgTableTab, sel, 'table')).toEqual({
-      connId: 'c1', engine: 'postgresql', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
-      database: 'other', schema: 'audit', table: 'events',
-    })
-  })
-
-  it('falls back to the active tab when the selection is too shallow', () => {
-    const sel = pgSelection('schema', { database: 'other', schema: 'audit' })
-    expect(resolvePgMenuTarget(pgTableTab, sel, 'table').table).toBe('widgets')
-  })
-
-  it('resolves a selected schema with no PostgreSQL tab open', () => {
-    const sel = pgSelection('schema', { database: 'app', schema: 'public' })
-    expect(resolvePgMenuTarget(quickstart, sel, 'schema')).toEqual({
-      connId: 'c1', engine: 'postgresql', connName: 'PG', connectionId: 'c1', connectionName: 'PG',
-      database: 'app', schema: 'public', table: null,
-    })
-  })
-
-  it('is null when neither the tab nor the selection is PostgreSQL', () => {
-    expect(resolvePgMenuTarget(collectionTab, selection('c1', 'Local', 'shop', 'orders'), 'schema')).toBeNull()
   })
 })
 

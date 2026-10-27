@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { nextTick } from 'vue'
 import { createResourceRef } from '../utils/resourceRef'
 
 // The tab store builds its module-scope Quickstart through a definition, so the
@@ -16,91 +15,47 @@ vi.mock('../stores/modals', async (importOriginal) => {
   return { ...actual, openModal: vi.fn(actual.openModal) }
 })
 
-const { openModals, openModal, closeModal } = await import('../stores/modals')
-const { gridfsMenuRequest } = await import('../stores/menuRequests')
+const { openModal, closeModal } = await import('../stores/modals')
+const { setTreeSelection } = await import('../stores/connectionNavigation')
 const { useAppMenuActions } = await import('./useAppMenuActions')
 
 function actions() {
-  const menuTarget = vi.fn(() => ({ resource: db('c1', 'other'), connectionName: 'Local' }))
+  const menuNode = vi.fn()
   const { handleMenuAction } = useAppMenuActions({
-    menuTarget, pgMenuTarget: vi.fn(), handleTool: vi.fn(), menuNode: vi.fn(),
-    knownActions: new Set(), refreshAll: vi.fn(), toolbarHidden: { value: false },
+    runFeature: vi.fn(), menuNode, knownActions: new Set(['coll:stats']), refreshAll: vi.fn(), toolbarHidden: { value: false },
   })
-  return { handleMenuAction, menuTarget }
+  return { handleMenuAction, menuNode }
 }
 
-const db = (connectionId, name) => createResourceRef(connectionId, [{ kind: 'database', name: name }])
-
 beforeEach(() => {
-  closeModal('gridfs')
-  gridfsMenuRequest.value = null
+  setTreeSelection(null)
   vi.clearAllMocks()
 })
 
-// #258: a file action must reach the dialog the file was picked in, not one reopened on
-// whatever database the tab or sidebar names.
-describe('GridFS file actions', () => {
-  it.each(['gridfs:view_file', 'gridfs:rename', 'gridfs:meta', 'gridfs:save', 'gridfs:remove'])(
-    '%s signals the open dialog without resolving a database', (id) => {
-      openModals.gridfs = { resource: db('c1', 'shop') }
-      const { handleMenuAction, menuTarget } = actions()
-      handleMenuAction(id)
-      expect(menuTarget).not.toHaveBeenCalled()
-      expect(openModal).not.toHaveBeenCalled()
-      expect(gridfsMenuRequest.value).toMatchObject({ action: id })
+// An engine's own items (engines/*/menuActions.js) are reached by id, on the node the
+// engine resolves itself.
+describe('Row History', () => {
+  it('opens the shared SQL row history on the menu bar\'s PostgreSQL table', () => {
+    setTreeSelection({
+      engine: 'postgresql', connectionName: 'Local PG',
+      resource: createResourceRef('c1', [
+        { kind: 'database', name: 'app db' }, { kind: 'schema', name: 'sales ü' }, { kind: 'table', name: 'order.items' },
+      ]),
     })
-
-  // #288: AppModals keys each dialog on its payload, so the request must travel through
-  // the menu-request store. A payload that grew a request would remount the dialog and
-  // lose the file the action was aimed at.
-  it.each(['gridfs:view_file', 'gridfs:add'])('%s leaves the dialog payload untouched', async (id) => {
-    openModals.gridfs = { resource: db('c1', 'other') }
-    const { handleMenuAction } = actions()
-    handleMenuAction(id)
-    await nextTick()
-    expect(gridfsMenuRequest.value).toMatchObject({ action: id })
-    expect(openModals.gridfs).toEqual({ resource: db('c1', 'other') })
-  })
-
-  it('bucket actions still resolve their database', () => {
-    openModals.gridfs = { resource: db('c1', 'shop') }
-    const { handleMenuAction, menuTarget } = actions()
-    handleMenuAction('gridfs:add')
-    expect(menuTarget).toHaveBeenCalledWith('database')
-    expect(openModal).toHaveBeenCalledWith('gridfs', { resource: db('c1', 'other'), connectionName: 'Local' })
-  })
-
-  // With a collection selected in the sidebar, the menu resolves to that collection;
-  // GridFS belongs to its database.
-  it('opens on the database of a resolved collection', () => {
-    const { handleMenuAction, menuTarget } = actions()
-    menuTarget.mockReturnValue({
-      resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]),
-      connectionName: 'Local',
+    actions().handleMenuAction('pg:row_history')
+    expect(openModal).toHaveBeenCalledWith('sqlRowHistory', {
+      connId: 'c1', engine: 'postgresql', connName: 'Local PG', connectionId: 'c1', connectionName: 'Local PG',
+      database: 'app db', schema: 'sales ü', table: 'order.items',
     })
-    handleMenuAction('gridfs:add')
-    expect(openModal).toHaveBeenCalledWith('gridfs', { resource: db('c1', 'shop'), connectionName: 'Local' })
-  })
-
-  it('keeps the open dialog when it already shows the resolved database', () => {
-    openModals.gridfs = { resource: db('c1', 'other') }
-    const { handleMenuAction } = actions()
-    handleMenuAction('gridfs:add')
-    expect(openModal).not.toHaveBeenCalled()
+    closeModal('sqlRowHistory')
   })
 })
 
-describe('Row History', () => {
-  it('opens the shared SQL row history on the menu bar\'s PostgreSQL table', () => {
-    const table = { connectionId: 'c1', engine: 'postgresql', database: 'app db', schema: 'sales ü', table: 'order.items' }
-    const pgMenuTarget = vi.fn(() => table)
-    const { handleMenuAction } = useAppMenuActions({
-      menuTarget: vi.fn(), pgMenuTarget, handleTool: vi.fn(), menuNode: vi.fn(),
-      knownActions: new Set(), refreshAll: vi.fn(), toolbarHidden: { value: false },
-    })
-    handleMenuAction('pg:row_history')
-    expect(pgMenuTarget).toHaveBeenCalledWith('table')
-    expect(openModal).toHaveBeenCalledWith('sqlRowHistory', table)
-    closeModal('sqlRowHistory')
+describe('features run by id', () => {
+  it('runs a feature on the menu\'s target, directly or through an alias', () => {
+    const { handleMenuAction, menuNode } = actions()
+    handleMenuAction('coll:stats')
+    handleMenuAction('db:collection_stats')
+    expect(menuNode.mock.calls).toEqual([['coll:stats'], ['coll:stats']])
   })
 })

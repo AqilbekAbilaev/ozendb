@@ -34,6 +34,7 @@ const { MENUS } = await import('../constants/contextMenus')
 const { PG_MENUS, PG_ACTIONS } = await import('../engines/postgresql/tree/contextMenus')
 const { MYSQL_ACTIONS, MYSQL_MENUS } = await import('../engines/mysql/tree/contextMenus')
 const { contextMenu } = await import('../stores/contextMenu')
+const { setTreeSelection } = await import('../stores/connectionNavigation')
 
 vi.mock('../appApi/connections', () => ({
   disconnect: vi.fn(() => Promise.resolve()),
@@ -53,7 +54,7 @@ const {
 // store is real. The tested surface is the disconnect paths — which tabs survive,
 // whether disposal runs, and the active-tab fallback — plus toolbar routing.
 function makeFeatures() {
-  return useFeatures({ menuTarget: vi.fn() })
+  return useFeatures()
 }
 
 // A resource-scoped tab shaped like the real workspaces: long identity keys for
@@ -86,6 +87,7 @@ function seedStore(arr, activeId) {
 beforeEach(() => {
   vi.clearAllMocks()
   refreshConnectionResources.mockReset().mockResolvedValue([])
+  setTreeSelection(null)
 })
 
 describe('resource refresh actions', () => {
@@ -232,16 +234,17 @@ describe('engine actions run through the shared level check', () => {
   })
 
   it('runs a native menu action on the target it resolves', () => {
-    const menuTarget = vi.fn(() => ({ resource: dbRef('c1', 'shop'), connectionName: 'Sales' }))
-    useFeatures({ menuTarget }).menuNode('file:search')
+    setTreeSelection({ resource: dbRef('c1', 'shop'), connectionName: 'Sales', engine: 'mongodb' })
+    makeFeatures().menuNode('file:search')
     expect(openSearchTab).toHaveBeenCalledWith({
       resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]), connectionName: 'Sales',
     })
   })
 
   it('guides the user when the native menu has nothing deep enough', () => {
-    const menuTarget = vi.fn(() => ({ resource: createResourceRef('c1'), connectionName: 'Sales' }))
-    useFeatures({ menuTarget }).menuNode('coll:stats')
+    seedStore([quickstart], 'q')
+    setTreeSelection({ resource: createResourceRef('c1'), connectionName: 'Sales', engine: 'mongodb' })
+    makeFeatures().menuNode('coll:stats')
     expect(openModal).not.toHaveBeenCalled()
     expect(showToast).toHaveBeenCalledWith('Open a collection first')
   })

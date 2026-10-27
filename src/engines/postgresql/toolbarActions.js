@@ -1,7 +1,8 @@
 import { PG_ACTIONS } from './tree/contextMenus'
 import { showToast } from '../../stores/toast'
 import { treeSelection } from '../../stores/connectionNavigation'
-import { resolvePgMenuTarget } from '../../utils/menuContext'
+import { resolvePgMenuTarget } from './menu'
+import { pgMenuTarget } from './menuActions'
 
 // The PostgreSQL toolbar buttons (#163): each runs the right-click action with the same
 // id on whatever pgMenuTarget resolves at the depth it needs, so the toolbar, the
@@ -20,7 +21,7 @@ const HINT = {
 }
 
 // False for a tool that isn't PostgreSQL's, so the caller's own dispatcher runs it.
-export function runPgTool(name, pgMenuTarget) {
+export function runPgTool(name) {
   const tool = PG_TOOLS[name]
   if (!tool) return false
   // Table opens what's selected in the sidebar only, as MongoDB's Collection button

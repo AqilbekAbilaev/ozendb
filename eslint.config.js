@@ -112,10 +112,9 @@ export default [
   },
   // Engine facts come from src/engines (engineOf, ENGINES, ui.js), never from comparing
   // engine names, so a new engine is a new table entry rather than an edit everywhere.
-  // menuContext mirrors menu.rs's per-engine menus and is the one exception.
   {
     files: ['src/**/*.js', 'src/**/*.vue'],
-    ignores: ['src/engines/**', '**/*.test.js', '**/*.fixtures.js', 'src/utils/menuContext.js'],
+    ignores: ['src/engines/**', '**/*.test.js', '**/*.fixtures.js'],
     rules: {
       'no-restricted-syntax': ['error', ...ENGINE_NAME_CHECKS],
       'vue/no-restricted-syntax': ['error', ...ENGINE_NAME_CHECKS],

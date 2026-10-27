@@ -1,9 +1,12 @@
-// Right-click menus, actions and toolbar tools an engine handles itself, keyed by engine.
+// Right-click menus, actions, toolbar tools and native-menu items an engine handles
+// itself, keyed by engine.
 import { PG_ACTIONS, PG_MENUS } from './postgresql/tree/contextMenus.js'
 import { MYSQL_ACTIONS, MYSQL_MENUS } from './mysql/tree/contextMenus.js'
 import { useMongoActions } from './mongodb/tree/actions.js'
 import { runPgTool } from './postgresql/toolbarActions.js'
 import { runMongoTool } from './mongodb/toolbarActions.js'
+import { runPgMenuAction } from './postgresql/menuActions.js'
+import { mongoMenuTarget, runMongoMenuAction } from './mongodb/menuActions.js'
 import { createResourceRef } from '../utils/resourceRef.js'
 
 const CONTEXT_ACTIONS = Object.freeze({ postgresql: PG_ACTIONS, mysql: MYSQL_ACTIONS })
@@ -15,25 +18,43 @@ export function contextAction(nodeData, action) {
 
 // Actions the shared dispatcher (composables/useFeatures) runs by id alone, each
 // `{ requires, run(ref, ctx) }`, so the native menu and the toolbar reach them as well as
-// the right-click menu. Only MongoDB's take this shape.
-const LEVELLED_ACTIONS = Object.freeze({ mongodb: useMongoActions })
+// the right-click menu. Only MongoDB's take this shape. Beside them, the node the native
+// menu runs one on: `{ resource, connectionName }` resolved at the level it needs, or null.
+const LEVELLED_ACTIONS = Object.freeze({ mongodb: { use: useMongoActions, menuTarget: mongoMenuTarget } })
 
 /** Every engine's id-dispatched actions, merged into one table keyed by action id. */
 export function useEngineActions() {
-  return Object.assign({}, ...Object.values(LEVELLED_ACTIONS).map((make) => make()))
+  return Object.assign({}, ...Object.values(LEVELLED_ACTIONS).map((engine) => engine.use()))
 }
 
-// Each engine's toolbar and native-menu tools. A runner returns false for a tool that
-// isn't its own. `target` is the native menu's resolved MongoDB node (null from the
-// toolbar), `pgMenuTarget` PostgreSQL's resolver, `runFeature` the shared dispatcher.
+/** The node a native-menu item runs an id-dispatched action on, at `level`; null when no engine names one. */
+export function levelledMenuTarget(level) {
+  return Object.values(LEVELLED_ACTIONS).map((engine) => engine.menuTarget(level)).find(Boolean) ?? null
+}
+
+// Each engine's toolbar tools. A runner returns false for a tool that isn't its own and
+// resolves the node it acts on itself; `runFeature` is the shared dispatcher.
 const TOOLBARS = Object.freeze({
-  postgresql: (name, { pgMenuTarget }) => runPgTool(name, pgMenuTarget),
-  mongodb: (name, { target, runFeature }) => runMongoTool(name, target, runFeature),
+  postgresql: (name) => runPgTool(name),
+  mongodb: (name, { runFeature }) => runMongoTool(name, null, runFeature),
 })
 
 /** Runs the engine tool called `name`; false when no engine has one. */
 export function runEngineTool(name, context) {
   return Object.values(TOOLBARS).some((run) => run(name, context))
+}
+
+// Each engine's own native-menu items (composables/useAppMenuActions keeps the app-wide
+// ones). A runner returns false for an id that isn't its own; `runFeature` is the shared
+// dispatcher.
+const MENU_ACTIONS = Object.freeze({
+  postgresql: (id) => runPgMenuAction(id),
+  mongodb: (id, { runFeature }) => runMongoMenuAction(id, { runFeature: runFeature }),
+})
+
+/** Runs the engine menu item `id`; false when no engine has it. */
+export function runEngineMenuAction(id, context) {
+  return Object.values(MENU_ACTIONS).some((run) => run(id, context))
 }
 
 // A connection whose engine has a menu of its own: the node its actions get, and the
