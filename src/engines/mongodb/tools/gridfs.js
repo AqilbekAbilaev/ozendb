@@ -1,5 +1,5 @@
-// The rules the GridFS browser applies (composables/useGridfsBrowser), as pure functions.
-import { parseField } from './queryParser'
+// The rules the GridFS browser applies (useGridfsBrowser), as pure functions.
+import { parseField } from '../../../utils/queryParser'
 
 // The default "fs" bucket is always offered, even before it exists (an upload creates
 // it), alongside every bucket the server reported.

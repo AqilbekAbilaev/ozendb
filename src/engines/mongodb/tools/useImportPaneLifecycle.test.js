@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { useImportPaneLifecycle } from './useImportPaneLifecycle'
-import { createResourceRef } from '../utils/resourceRef'
+import { createResourceRef } from '../../../utils/resourceRef'
 
 const tab = (id, connId, sources = []) => ({
   id,

@@ -1,4 +1,4 @@
-import { segmentName } from '../utils/resourceRef'
+import { segmentName } from '../../../utils/resourceRef'
 
 function snapshotSource(source) {
   return {

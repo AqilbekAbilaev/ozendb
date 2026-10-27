@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { computed, reactive } from 'vue'
 
-vi.mock('../engines/mongodb/api/transfer', () => ({
+vi.mock('../api/transfer', () => ({
   importPreview: vi.fn(),
 }))
 
-import { importPreview } from '../engines/mongodb/api/transfer'
-import { PREVIEW_LIMIT } from '../constants/dataTools'
+import { importPreview } from '../api/transfer'
+import { PREVIEW_LIMIT } from './dataTools'
 import { useImportPreview } from './useImportPreview'
 
 describe('useImportPreview', () => {

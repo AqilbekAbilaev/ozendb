@@ -1,4 +1,4 @@
-import { cellText } from './format'
+import { cellText } from '../../../utils/format'
 
 // Preview-grid renderer: CSV/XLSX always use the plain form; JSON uses it only when
 // `style` is 'plain' — CSV/XLSX have no such choice, matching `JsonValueStyle` on the
