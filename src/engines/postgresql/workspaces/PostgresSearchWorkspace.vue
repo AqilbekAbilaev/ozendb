@@ -5,7 +5,7 @@
 // switching away to look at a match and back.
 import { computed } from 'vue'
 import { runSearch, cancelSearch } from './searchRun.js'
-import { openPostgresTable } from '../../../stores/tabCreators'
+import { openPostgresTable } from '../tabs'
 import { crumbSegments } from '../../../utils/crumbSegments'
 import { segmentName } from '../../../utils/resourceRef'
 import WorkspaceCrumbs from '../../../components/base/WorkspaceCrumbs.vue'

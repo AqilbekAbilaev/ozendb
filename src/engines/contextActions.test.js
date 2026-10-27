@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('../stores/modals', () => ({ openModal: vi.fn() }))
-vi.mock('../stores/tabCreators', () => ({ openPostgresQuery: vi.fn(), openPostgresTable: vi.fn() }))
+vi.mock('./postgresql/tabs', () => ({ openPostgresQuery: vi.fn(), openPostgresTable: vi.fn() }))
 
 const { contextAction, connectionMenu } = await import('./contextActions.js')
 const { PG_ACTIONS, PG_MENUS } = await import('./postgresql/tree/contextMenus.js')

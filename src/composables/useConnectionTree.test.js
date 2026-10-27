@@ -228,7 +228,7 @@ it('keeps the selection while the active tab stays put', async () => {
 // all go through openPostgresTable, which always opens a new tab, so none may leave the
 // clicked row selected for the menu to act on.
 it('clears a PostgreSQL selection when a table is opened by any route', async () => {
-  const { openPostgresTable } = await import('../stores/tabCreators')
+  const { openPostgresTable } = await import('../engines/postgresql/tabs')
   setTreeSelection({
     resource: createResourceRef('a', [
       { kind: 'database', name: 'app' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 'widgets' },

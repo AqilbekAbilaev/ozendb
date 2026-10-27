@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const openPostgresQuery = vi.fn()
 const openPostgresTable = vi.fn()
 const openPostgresSearch = vi.fn()
-vi.mock('../../stores/tabCreators', () => ({ openPostgresQuery, openPostgresTable, openPostgresSearch }))
+vi.mock('./tabs', () => ({ openPostgresQuery, openPostgresTable, openPostgresSearch }))
 const openModal = vi.fn()
 vi.mock('../../stores/modals', () => ({ openModal }))
 const showToast = vi.fn()

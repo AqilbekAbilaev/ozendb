@@ -1,6 +1,6 @@
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { showToast } from '../stores/toast'
-import { openImportTab } from '../stores/tabCreators'
+import { openImportTab } from '../engines/mongodb/tabs'
 import { listDatabases } from '../engines/mongodb/api/resources'
 import { exportCollection, importCollection } from '../engines/mongodb/api/transfer'
 import { errText } from '../utils/errors'

@@ -34,7 +34,7 @@ Four rings, outermost first. A ring may import inwards, never outwards — **enf
 |---|---|
 | `src/components/` | Rendering and event wiring only. Grouped by area: `app/`, `base/`, `connection/`, `panes/`, `query/`, `workspace/`. |
 | `src/composables/` | Stateful slices that need a component's lifetime or a caller's wiring (`useFeatures`, `useMenu`, `useConnectionTree`, `useDbActions`, …). Anything that is really app-wide state belongs in `stores/` instead — most of what used to live here has moved. |
-| `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (every "open a tab" entry point) · `queryRunner.js` · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `indexes.js` · `updater.js` · `premium.js` · `toast.js` · `dbClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
+| `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (the shared "open a tab" steps and Quickstart; each engine's openers are its `tabs.js`) · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `indexes.js` · `updater.js` · `premium.js` · `toast.js` · `dbClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
 | `src/utils/` | Pure functions. No Vue, no I/O. |
 
 The rest of `src/` sits around those rings, with its own lint rule where a direction holds:
@@ -94,7 +94,7 @@ A tab is a *workspace*: a plain object with a canonical envelope (`id`, `type`,
 - **`src/engines/mongodb/workspaces/`** holds the MongoDB definitions —
   `queryDefinitions.js` (find, aggregate, SQL, shell) and `toolDefinitions.js`
   (indexes, schema, search, import, export, current ops) — plus the collection
-  workspace component itself.
+  workspace component itself and its query runner.
 
 **Startup order is load-bearing.** `main.js` calls `registerWorkspaceDefinitions()`,
 then `initializeTabs()`, then mounts. Every static import evaluates before that body
@@ -105,7 +105,7 @@ create a workspace during module evaluation.
 plus every mutation (activate/close/cycle/duplicate/reorder/rename), shared by every
 importer. Tabs are plain objects and children mutate their properties directly (e.g.
 `tab.filter`, `tab.skip`), which works because Vue 3 makes array items reactive. The tab
-*creators* live in `src/stores/tabCreators.js` and the rule that the workspace never shows
+*creators* live in each engine's `src/engines/<engine>/tabs.js`, on the shared steps in `src/stores/tabCreators.js`, and the rule that the workspace never shows
 an empty pane — closing the last tab seeds a Quickstart — lives in `tabs.js` with the closes
 it guards. Note: module-scope refs do not survive
 Vite HMR cleanly — restart the dev server before blaming the code for stale tab state.

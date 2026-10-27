@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
-vi.mock('./toast', () => ({ showToast: vi.fn() }))
+vi.mock('../../../../stores/toast', () => ({ showToast: vi.fn() }))
 
 // The store may build a Quickstart tab through its workspace definition (see
 // initializeTabs in stores/tabs.js), so definitions are registered before the store
 // evaluates. Static imports run before this file's body, hence the dynamic import.
-import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
-import { createResourceRef } from '../utils/resourceRef'
+import { registerWorkspaceDefinitions } from '../../../../workspaces/registerDefinitions'
+import { createResourceRef } from '../../../../utils/resourceRef'
 registerWorkspaceDefinitions()
 
 const { invoke } = await import('@tauri-apps/api/core')
 const api = await import('./queryRunner')
-const { showToast } = await import('./toast')
-const { tabs } = await import('./tabs')
-const { createCollectionState, createCollectionRuntime } = await import('../engines/mongodb/workspaces/collectionState')
+const { showToast } = await import('../../../../stores/toast')
+const { tabs } = await import('../../../../stores/tabs')
+const { createCollectionState, createCollectionRuntime } = await import('../collectionState')
 
 // The timing on the toast is the server's, not this process's. Wall clock here also
 // pays for IPC and result marshalling, which grow with the page size and say nothing

@@ -1,0 +1,368 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
+vi.mock('../../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
+vi.mock('./workspaces/collection/queryRunner', () => ({ runQuery: vi.fn() }))
+
+// Definitions must be registered before the tab store can build its Quickstart tab
+// (stores/tabs.js creates it through createWorkspace, see initializeTabs). Static
+// imports evaluate before this module's body, so the store — and everything importing
+// it — is loaded dynamically after the one-time registration.
+import { registerWorkspaceDefinitions } from '../../workspaces/registerDefinitions'
+import { createResourceRef } from '../../utils/resourceRef'
+registerWorkspaceDefinitions()
+
+const creators = await import('./tabs')
+const { runQuery } = await import('./workspaces/collection/queryRunner')
+const { defaultQueryLimit, defaultResultView } = await import('../../stores/settings')
+const { tabs, activeTabId } = await import('../../stores/tabs')
+const { openModal, closeModal } = await import('../../stores/modals')
+const { getDefaultQuery } = await import('./api/queryLibrary')
+
+vi.mock('./api/queryLibrary', () => ({
+  getDefaultQuery: vi.fn(),
+}))
+
+// Each test seeds a clean tab strip; the creators append to it. The query runner is
+// mocked so no Tauri call can leak into the assertions; the modal store likewise.
+function harness() {
+  tabs.value = [{ id: 't0', type: 'app.quickstart', title: 'Quickstart' }]
+  activeTabId.value = 't0'
+  defaultQueryLimit.value = 50
+  defaultResultView.value = 'table'
+  return { ...creators, runQuery, defaultQueryLimit, defaultResultView }
+}
+
+// Every creator takes `{ resource, connectionName }` (#193).
+const collRef = (connectionId, database, collection) => createResourceRef(connectionId, [
+  { kind: 'database', name: database }, { kind: 'collection', name: collection },
+])
+const dbRef = (connectionId, database) => createResourceRef(connectionId, [{ kind: 'database', name: database }])
+const TOOL = { resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' }
+const DB_TOOL = { resource: dbRef('c1', 'shop'), connectionName: 'Sales' }
+const CONN_TOOL = { resource: createResourceRef('c1'), connectionName: 'Sales' }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(getDefaultQuery).mockResolvedValue(null)
+})
+
+const lastTab = () => tabs.value[tabs.value.length - 1]
+const ids = () => tabs.value.map(t => t.id)
+
+describe('open policies — every open makes its own tab', () => {
+  it('opens collections, shells, current-operations, imports, and exports without dedup', () => {
+    const c = harness()
+    c.openCollectionTab(TOOL)
+    c.openCollectionTab(TOOL)
+    c.openShellTab(DB_TOOL)
+    c.openShellTab(DB_TOOL)
+    c.openCurrentOpsTab(CONN_TOOL)
+    c.openCurrentOpsTab(CONN_TOOL)
+    c.openImportTab(TOOL, 'csv')
+    c.openImportTab(TOOL, 'csv')
+    c.openExportTab({ ...TOOL, query: null, selectedIds: [] }, 'collection')
+    c.openExportTab({ ...TOOL, query: null, selectedIds: [] }, 'collection')
+    expect(tabs.value).toHaveLength(11) // the seeded Quickstart plus ten opens
+  })
+
+  it('activates every newly opened tab', () => {
+    const c = harness()
+    c.openCollectionTab(TOOL)
+    c.openShellTab(DB_TOOL)
+    c.openCurrentOpsTab(CONN_TOOL)
+    c.openImportTab(TOOL, 'json')
+    expect(activeTabId.value).toBe(lastTab().id)
+  })
+})
+
+describe('focus policies — one tab per target', () => {
+  it('focuses the existing SQL tab for the same collection instead of opening', () => {
+    const c = harness()
+    c.openSqlTab(TOOL)
+    const sqlTab = lastTab()
+    c.openSqlTab(TOOL)
+    expect(tabs.value).toHaveLength(2)
+    expect(activeTabId.value).toBe(sqlTab.id)
+  })
+
+  it('focuses the existing Index Manager tab for the same collection', () => {
+    const c = harness()
+    c.openIndexManagerTab(TOOL)
+    const idxTab = lastTab()
+    c.openIndexManagerTab(TOOL)
+    expect(tabs.value).toHaveLength(2)
+    expect(activeTabId.value).toBe(idxTab.id)
+  })
+
+  it('focuses the existing Schema tab for the same collection', () => {
+    const c = harness()
+    c.openSchemaTab(TOOL)
+    const schemaTab = lastTab()
+    c.openSchemaTab(TOOL)
+    expect(tabs.value).toHaveLength(2)
+    expect(activeTabId.value).toBe(schemaTab.id)
+  })
+
+  it('focuses the existing Search tab for the same database', () => {
+    const c = harness()
+    c.openSearchTab(DB_TOOL)
+    const searchTab = lastTab()
+    c.openSearchTab(DB_TOOL)
+    expect(tabs.value).toHaveLength(2)
+    expect(activeTabId.value).toBe(searchTab.id)
+  })
+
+  // One tab per *target*, not per connection: a tool matched on the connection alone
+  // would hand the user the tab for whichever collection they opened first.
+  it('tells two collections of one connection apart when focusing', () => {
+    const c = harness()
+    c.openIndexManagerTab(TOOL)
+    const ordersTab = lastTab()
+    const items = { resource: collRef('c1', 'shop', 'items'), connectionName: 'Sales' }
+    c.openIndexManagerTab(items)
+    const itemsTab = lastTab()
+    expect(itemsTab.id).not.toBe(ordersTab.id)
+    expect(tabs.value).toHaveLength(3)
+
+    c.openIndexManagerTab(TOOL)
+    expect(activeTabId.value).toBe(ordersTab.id)
+    c.openIndexManagerTab(items)
+    expect(activeTabId.value).toBe(itemsTab.id)
+    expect(tabs.value).toHaveLength(3)
+  })
+
+  // Search is database-scoped, so two databases on one connection are two tabs.
+  it('tells two databases of one connection apart when focusing Search', () => {
+    const c = harness()
+    c.openSearchTab(DB_TOOL)
+    const shopTab = lastTab()
+    c.openSearchTab({ resource: dbRef('c1', 'warehouse'), connectionName: 'Sales' })
+    expect(tabs.value).toHaveLength(3)
+    c.openSearchTab(DB_TOOL)
+    expect(activeTabId.value).toBe(shopTab.id)
+  })
+})
+
+describe('created tab shapes', () => {
+  it('builds collection tabs through their definition with the app defaults', () => {
+    const c = harness()
+    c.openCollectionTab(TOOL)
+    const tab = lastTab()
+    expect(tab.type).toBe('mongodb.find')
+    expect(tab.engine).toBe('mongodb')
+    expect(tab.mode).toBe('find')
+    expect(tab.state.query.limit).toBe(50)
+    expect(tab.ui.resultView).toBe('table')
+    expect(tab.title).toBe('orders')
+    expect(tab.target).toEqual(TOOL.resource)
+  })
+
+  it('opens aggregate tabs in aggregate mode with an empty pipeline', () => {
+    const c = harness()
+    c.openCollectionTab(TOOL, 'aggregate')
+    expect(lastTab().type).toBe('mongodb.aggregate')
+    expect(lastTab().mode).toBe('aggregate')
+    expect(lastTab().state.query.pipeline).toBe('')
+  })
+
+  it('opens SQL tabs with the seeded editor text', () => {
+    const c = harness()
+    c.openSqlTab(TOOL)
+    expect(lastTab().type).toBe('mongodb.sql_to_mql')
+    expect(lastTab().sql).toBe('SELECT *\nFROM orders')
+    expect(lastTab().mode).toBe('sql')
+  })
+
+  it('gives every shell tab its own engine session', () => {
+    const c = harness()
+    c.openShellTab(DB_TOOL)
+    const s1 = lastTab()
+    c.openShellTab(DB_TOOL)
+    const s2 = lastTab()
+    expect(s1.sessionId).not.toBe(s2.sessionId)
+    expect(s1.title).toBe('mongosh: shop')
+  })
+
+  it('opens current-operations tabs with the toolbar defaults on the tab', () => {
+    const c = harness()
+    c.openCurrentOpsTab(CONN_TOOL)
+    expect(lastTab().type).toBe('mongodb.current_operations')
+    expect(lastTab().frequency).toBe(2000)
+    expect(lastTab().title).toBe('Current Operations: Sales')
+  })
+
+  it('opens imports with the chosen format', () => {
+    const c = harness()
+    c.openImportTab(TOOL, 'csv')
+    expect(lastTab().format).toBe('csv')
+    expect(lastTab().subTab).toBe('source')
+    c.openImportTab(TOOL, 'json')
+    expect(lastTab().format).toBe('json')
+    expect(lastTab().sources).toEqual([])
+  })
+
+  it('opens exports with the source frozen at creation', () => {
+    const c = harness()
+    c.openExportTab({ ...TOOL, query: '{ "a": 1 }', selectedIds: ['x', 'y'] }, 'query')
+    const tab = lastTab()
+    expect(tab.type).toBe('mongodb.export')
+    expect(tab.source).toBe('query')
+    expect(tab.filter).toBe('{ "a": 1 }')
+    expect(tab.sourceCount).toBe(null)
+    expect(tab.title).toBe('Export: orders (query)')
+  })
+})
+
+describe('initial query execution', () => {
+  it('runs a supplied filter immediately, bypassing default-query loading', async () => {
+    const c = harness()
+    await c.openCollectionTab({ ...TOOL, filter: '{ "status": "open" }' })
+    expect(getDefaultQuery).not.toHaveBeenCalled()
+    expect(c.runQuery).toHaveBeenCalledTimes(1)
+    expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
+      filter: '{"status":"open"}', projection: '{}', sort: '{}', skip: 0, limit: 50,
+    })
+  })
+
+  it('keeps the supplied filter text on the tab so the editor, history, and session agree', async () => {
+    const c = harness()
+    const filter = '{ "status": "open" }'
+    await c.openCollectionTab({ ...TOOL, filter })
+    expect(lastTab().state.query.filter).toBe(filter) // exact text, not the parsed EJSON sent to the API
+  })
+
+  it('does not retain filter text that did not parse — an empty query is what ran', async () => {
+    const c = harness()
+    await c.openCollectionTab({ ...TOOL, filter: 'not json' })
+    // Nothing was persisted for display/history/session to misread as the executed query.
+    expect(lastTab().state.query.filter).toBe('')
+    expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
+      filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 50,
+    })
+  })
+
+  it('loads and runs the saved default query on open', async () => {
+    vi.mocked(getDefaultQuery).mockResolvedValue({
+      filter: '{ "x": 1 }', sort: '{ "y": -1 }', projection: '{ "z": 1 }', skip: 2, limit: 5,
+    })
+    const c = harness()
+    await c.openCollectionTab(TOOL)
+    expect(getDefaultQuery).toHaveBeenCalledWith({ connectionId: 'c1', database: 'shop', collection: 'orders' })
+    const tab = lastTab()
+    expect(tab.state.query.filter).toBe('{ "x": 1 }')
+    expect(tab.state.query.limit).toBe(5)
+    expect(c.runQuery).toHaveBeenCalledWith(tab.id, {
+      filter: '{"x":{"$numberInt":"1"}}', sort: '{"y":{"$numberInt":"-1"}}',
+      projection: '{"z":{"$numberInt":"1"}}', skip: 2, limit: 5,
+    })
+  })
+
+  it('falls back to the empty-query run when default-query loading fails', async () => {
+    vi.mocked(getDefaultQuery).mockRejectedValue(new Error('boom'))
+    const c = harness()
+    await c.openCollectionTab(TOOL)
+    expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
+      filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 50,
+    })
+  })
+
+  it('runs the empty-query fallback when there is no saved default query', async () => {
+    const c = harness()
+    await c.openCollectionTab(TOOL)
+    expect(c.runQuery).toHaveBeenCalledWith(lastTab().id, {
+      filter: '{}', projection: '{}', sort: '{}', skip: 0, limit: 50,
+    })
+  })
+
+  it('does not run anything on open for aggregate or SQL tabs', async () => {
+    const c = harness()
+    await c.openCollectionTab(TOOL, 'aggregate')
+    c.openSqlTab(TOOL)
+    expect(c.runQuery).not.toHaveBeenCalled()
+  })
+})
+
+describe('export source resolution', () => {
+  it('starts in the export-source modal with the resolved query and selected ids', () => {
+    const c = harness()
+    tabs.value = [{
+      id: 't1', type: 'mongodb.find', target: collRef('c1', 'shop', 'orders'),
+      state: { query: { filter: '{ "status": "open" }' } },
+      runtime: { results: [{ _id: 'a' }, { _id: 'b' }, { noId: true }], selectedRows: [0, 1, 2] },
+    }]
+    c.openExportSource(TOOL)
+    expect(openModal).toHaveBeenCalledWith('exportSource', {
+      resource: TOOL.resource,
+      connectionName: 'Sales',
+      query: '{"status":"open"}',
+      selectedIds: ['a', 'b'],
+    }, expect.objectContaining({ on: expect.any(Object) }))
+  })
+
+  // #275: two tabs on one collection, the first with an empty query.
+  const SPACED_TOOL = { resource: collRef('c 1', 'shop.eu', 'orders/2026'), connectionName: 'Sales ü' }
+  const collectionTab = (id, filter, results, selectedRows) => ({
+    id, type: 'mongodb.find', target: collRef('c 1', 'shop.eu', 'orders/2026'),
+    state: { query: { filter } }, runtime: { results, selectedRows },
+  })
+
+  it('reads the query and selection from the active tab when it shows the collection', () => {
+    const c = harness()
+    tabs.value = [
+      collectionTab('t1', '', [{ _id: 'x' }], []),
+      collectionTab('t2', '{ "company": "Umbrella Corp." }', [{ _id: 'a' }, { _id: 'b' }], [1]),
+    ]
+    activeTabId.value = 't2'
+    c.openExportSource(SPACED_TOOL)
+    const [, target] = openModal.mock.calls[0]
+    expect(target.query).toBe('{"company":"Umbrella Corp."}')
+    expect(target.selectedIds).toEqual(['b'])
+  })
+
+  it('falls back to the first tab of the collection when the active tab shows another', () => {
+    const c = harness()
+    tabs.value = [
+      collectionTab('t1', '{ "company": "Umbrella Corp." }', [{ _id: 'a' }], [0]),
+      collectionTab('t2', '', [], []),
+      { id: 't3', type: 'app.quickstart', title: 'Quickstart' },
+    ]
+    activeTabId.value = 't3'
+    c.openExportSource(SPACED_TOOL)
+    const [, target] = openModal.mock.calls[0]
+    expect(target.query).toBe('{"company":"Umbrella Corp."}')
+    expect(target.selectedIds).toEqual(['a'])
+  })
+
+  it('opens an export tab from the target captured when the picker opened', () => {
+    const c = harness()
+    c.openExportSource(TOOL)
+    const [, target, options] = openModal.mock.calls[0]
+    options.on.choose('query')
+    expect(lastTab().source).toBe('query')
+    expect(lastTab().target).toEqual(target.resource)
+    expect(closeModal).toHaveBeenCalledWith('exportSource')
+  })
+})
+
+describe('changed settings affect only future workspaces', () => {
+  it('applies a new query limit to tabs opened after the setting changes', () => {
+    const c = harness()
+    c.openCollectionTab(TOOL)
+    expect(lastTab().state.query.limit).toBe(50)
+    c.defaultQueryLimit.value = 100
+    c.openCollectionTab(TOOL)
+    expect(lastTab().state.query.limit).toBe(100)
+    expect(tabs.value[1].state.query.limit).toBe(50)
+  })
+})
+
+describe('ids', () => {
+  it('gives distinct ids to tabs opened in one tick', () => {
+    const c = harness()
+    c.openCollectionTab(TOOL)
+    c.openShellTab(DB_TOOL)
+    c.openCurrentOpsTab(CONN_TOOL)
+    expect(new Set(ids()).size).toBe(4)
+  })
+})

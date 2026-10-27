@@ -3,7 +3,7 @@ import { showToast } from '../stores/toast'
 import {
   openCollectionTab, openShellTab, openIndexManagerTab, openSqlTab, openSchemaTab,
   openSearchTab, openCurrentOpsTab, openExportSource,
-} from '../stores/tabCreators'
+} from '../engines/mongodb/tabs'
 import { useDbActions } from './useDbActions'
 import { useNodeTags } from './useNodeTags'
 import { useDbTransfer } from './useDbTransfer'

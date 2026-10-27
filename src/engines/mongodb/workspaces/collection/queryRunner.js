@@ -1,10 +1,10 @@
 import { markRaw } from 'vue'
-import * as qapi from '../engines/mongodb/api/queries'
-import { pushQueryHistory } from '../engines/mongodb/api/queryLibrary'
-import { apiTarget } from '../engines/mongodb/api/payload'
-import { errText, errCode } from '../utils/errors'
-import { tabs } from './tabs'
-import { showToast } from './toast'
+import * as qapi from '../../api/queries'
+import { pushQueryHistory } from '../../api/queryLibrary'
+import { apiTarget } from '../../api/payload'
+import { errText, errCode } from '../../../../utils/errors'
+import { tabs } from '../../../../stores/tabs'
+import { showToast } from '../../../../stores/toast'
 
 // Query execution: running find/aggregate queries against a tab and cancelling an
 // in-flight query. All state lives on the tab objects themselves.
