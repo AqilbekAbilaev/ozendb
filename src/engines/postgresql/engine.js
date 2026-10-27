@@ -3,6 +3,7 @@ import { buildSqlFields } from '../sql/connection/fields.js'
 import { useSqlFields } from '../sql/connection/useSqlFields.js'
 import { listSchemas, tableStats } from './api/resources.js'
 import { postgresSql } from './sql.js'
+import { postgresqlMenu } from './menu.js'
 
 export const postgresql = Object.freeze({
   id: 'postgresql',
@@ -22,4 +23,6 @@ export const postgresql = Object.freeze({
     label: (target) => `${target.schema}.${target.table}`,
     read: (target) => tableStats({ connectionId: target.connId, schema: target.schema, table: target.table }),
   }),
+  // Its switches for the native menu (utils/menuContext's deriveMenuContext).
+  menu: postgresqlMenu,
 })

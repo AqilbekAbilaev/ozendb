@@ -3,6 +3,7 @@ import { buildMongoFields } from './connection/fields.js'
 import { useMongoFields } from './connection/useMongoFields.js'
 import { listDatabases } from './api/resources.js'
 import { collectionStats, databaseStats } from './api/admin.js'
+import { mongoMenu } from './menu.js'
 
 export const mongodb = Object.freeze({
   id: 'mongodb',
@@ -21,4 +22,6 @@ export const mongodb = Object.freeze({
       ? collectionStats({ connectionId: target.connId, database: target.dbName, collection: target.collName })
       : databaseStats({ connectionId: target.connId, database: target.dbName })),
   }),
+  // Its switches for the native menu (utils/menuContext's deriveMenuContext).
+  menu: mongoMenu,
 })
