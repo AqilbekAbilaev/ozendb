@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from 'vue'
-import { useGridfsBrowser } from '../../../composables/useGridfsBrowser'
-import { fmtUploadDate as fmtDate } from '../../../utils/gridfs'
+import { useGridfsBrowser } from './useGridfsBrowser'
+import { fmtUploadDate as fmtDate } from './gridfs'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import BaseModal from '../../../components/base/BaseModal.vue'
 import BaseSelect from '../../../components/base/BaseSelect.vue'

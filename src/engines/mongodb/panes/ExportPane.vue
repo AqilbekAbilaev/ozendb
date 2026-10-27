@@ -15,8 +15,8 @@ import BaseCheckbox from '../../../components/base/BaseCheckbox.vue'
 import ReorderButtons from '../../../components/base/ReorderButtons.vue'
 import HintText from '../../../components/base/HintText.vue'
 import CollectionCrumbs from '../../../components/base/CollectionCrumbs.vue'
-import { previewCellText } from '../../../utils/exportPreview'
-import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT, JSON_VALUE_STYLES } from '../../../constants/dataTools'
+import { previewCellText } from '../tools/exportPreview'
+import { EXPORT_FORMATS, BSON_KINDS, PREVIEW_LIMIT, JSON_VALUE_STYLES } from '../tools/dataTools'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Stepped Export wizard: sample the collection, choose/reorder/rename fields (optionally

@@ -16,7 +16,7 @@ import NumberStepper from '../../../components/base/NumberStepper.vue'
 import StateMessage from '../../../components/base/StateMessage.vue'
 import HintText from '../../../components/base/HintText.vue'
 import { cellText } from '../../../utils/format'
-import { INSERT_MODES, BSON_KINDS, PREVIEW_LIMIT } from '../../../constants/dataTools'
+import { INSERT_MODES, BSON_KINDS, PREVIEW_LIMIT } from '../tools/dataTools'
 
 // CSV import tab, modelled on Studio 3T's CSV import: a Source options / Target
 // options split, a single source (Clipboard or File), a CSV options panel

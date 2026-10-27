@@ -1,23 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn(), save: vi.fn() }))
-vi.mock('../engines/mongodb/api/gridfs', () => ({
+vi.mock('../api/gridfs', () => ({
   listGridfsBuckets: vi.fn(), listGridfsFiles: vi.fn(), gridfsUpload: vi.fn(), gridfsDownload: vi.fn(),
   gridfsDelete: vi.fn(), gridfsRename: vi.fn(), gridfsSetMetadata: vi.fn(), gridfsDropBucket: vi.fn(),
   gridfsCopyBucket: vi.fn(),
 }))
-vi.mock('../stores/toast', () => ({ showToast: vi.fn() }))
-vi.mock('../stores/connectionData', () => ({ invalidateConnectionResources: vi.fn() }))
+vi.mock('../../../stores/toast', () => ({ showToast: vi.fn() }))
+vi.mock('../../../stores/connectionData', () => ({ invalidateConnectionResources: vi.fn() }))
 
 import { nextTick, reactive, effectScope } from 'vue'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import * as api from '../engines/mongodb/api/gridfs'
-import { showToast } from '../stores/toast'
-import { invalidateConnectionResources } from '../stores/connectionData'
+import * as api from '../api/gridfs'
+import { showToast } from '../../../stores/toast'
+import { invalidateConnectionResources } from '../../../stores/connectionData'
 import { useGridfsBrowser } from './useGridfsBrowser'
-import { selectedGridfsFile, clearGridfsSelection } from '../stores/gridfs'
-import { gridfsMenuRequest, requestGridfsAction } from '../stores/menuRequests'
-import { createResourceRef } from '../utils/resourceRef'
+import { selectedGridfsFile, clearGridfsSelection } from '../../../stores/gridfs'
+import { gridfsMenuRequest, requestGridfsAction } from '../../../stores/menuRequests'
+import { createResourceRef } from '../../../utils/resourceRef'
 
 const DB = { connectionId: 'c1', database: 'shop' }
 const FILE = { id: 'f1', filename: 'report.pdf', length: 10 }

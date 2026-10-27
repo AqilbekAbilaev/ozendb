@@ -10,15 +10,15 @@ import {
   gridfsSetMetadata,
   gridfsDropBucket,
   gridfsCopyBucket,
-} from '../engines/mongodb/api/gridfs'
-import { apiTarget } from '../engines/mongodb/api/payload'
-import { errText, errCode } from '../utils/errors'
-import { bucketChoices, metadataEjson } from '../utils/gridfs'
-import { useConfirmDelete } from './useConfirmDelete'
-import { showToast } from '../stores/toast'
-import { invalidateConnectionResources } from '../stores/connectionData'
-import { selectedGridfsFile, clearGridfsSelection } from '../stores/gridfs'
-import { gridfsMenuRequest } from '../stores/menuRequests'
+} from '../api/gridfs'
+import { apiTarget } from '../api/payload'
+import { errText, errCode } from '../../../utils/errors'
+import { bucketChoices, metadataEjson } from './gridfs'
+import { useConfirmDelete } from '../../../composables/useConfirmDelete'
+import { showToast } from '../../../stores/toast'
+import { invalidateConnectionResources } from '../../../stores/connectionData'
+import { selectedGridfsFile, clearGridfsSelection } from '../../../stores/gridfs'
+import { gridfsMenuRequest } from '../../../stores/menuRequests'
 
 // The GridFS browser behind GridFsModal: a database's buckets and files, and upload /
 // download / delete / rename / edit-metadata, plus bucket copy and drop. `target` is a

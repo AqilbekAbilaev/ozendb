@@ -1,7 +1,7 @@
 import { ref } from 'vue'
-import { importPreview } from '../engines/mongodb/api/transfer'
-import { errText } from '../utils/errors'
-import { PREVIEW_LIMIT } from '../constants/dataTools'
+import { importPreview } from '../api/transfer'
+import { errText } from '../../../utils/errors'
+import { PREVIEW_LIMIT } from './dataTools'
 
 // Owns the asynchronous preview for an import workspace. The lifecycle token keeps a
 // slow response from a previously selected source or tab from replacing current rows.
