@@ -4,10 +4,8 @@ import { deriveMenuContext, resolveMenuTarget, resolvePgMenuTarget } from '../ut
 import { activeTab, tabs } from '../stores/tabs'
 import { treeSelection } from '../stores/connectionNavigation'
 import { openConnections } from '../stores/openConnections'
-import { selectedIndex } from '../stores/indexes'
-import { selectedGridfsFile } from '../stores/gridfs'
 import { canRefreshWorkspace } from '../workspaces/lifecycle'
-import { workspaceIsCollection } from '../workspaces/registry'
+import { ENGINES } from '../engines/index.js'
 
 // Derives what the native menu treats as "selected" and keeps the backend menu in
 // step with it, plus resolves the node a menu action should act on. The actual
@@ -20,16 +18,14 @@ export function useMenu() {
   // tree even while Quickstart is the active tab (the original bug). `anyConnection`
   // is true whenever at least one connection is open — it gates Refresh All
   // Connections; View → Refresh gates on the active tab being able to reload.
-  const menuContext = computed(() => deriveMenuContext(
-    activeTab.value,
-    treeSelection.value,
-    openConnections.value.length,
-    !!selectedIndex.value,
-    canRefreshWorkspace(activeTab.value),
-    tabs.value,
-    !!selectedGridfsFile.value,
-    workspaceIsCollection(activeTab.value),
-  ))
+  const menuContext = computed(() => deriveMenuContext({
+    activeTab: activeTab.value,
+    treeSelection: treeSelection.value,
+    connectionCount: openConnections.value.length,
+    canRefresh: canRefreshWorkspace(activeTab.value),
+    openTabs: tabs.value,
+    engines: Object.values(ENGINES),
+  }))
 
   // Push the context down to the native menu so gated items enable/disable in step
   // with the selection. Runs immediately for the initial (empty) state too.

@@ -15,7 +15,7 @@ import * as api from '../api/gridfs'
 import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
 import { useGridfsBrowser } from './useGridfsBrowser'
-import { selectedGridfsFile, clearGridfsSelection } from '../../../stores/gridfs'
+import { selectedGridfsFile, clearGridfsSelection } from './gridfsSelection'
 import { gridfsMenuRequest, requestGridfsAction } from '../../../stores/menuRequests'
 import { createResourceRef } from '../../../utils/resourceRef'
 

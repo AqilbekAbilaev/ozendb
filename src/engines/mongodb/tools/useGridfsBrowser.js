@@ -17,7 +17,7 @@ import { bucketChoices, metadataEjson } from './gridfs'
 import { useConfirmDelete } from '../../../composables/useConfirmDelete'
 import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
-import { selectedGridfsFile, clearGridfsSelection } from '../../../stores/gridfs'
+import { selectedGridfsFile, clearGridfsSelection } from './gridfsSelection'
 import { gridfsMenuRequest } from '../../../stores/menuRequests'
 
 // The GridFS browser behind GridFsModal: a database's buckets and files, and upload /

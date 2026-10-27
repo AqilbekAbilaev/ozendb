@@ -15,39 +15,37 @@
 // names no resource and gates everything off.
 import { sameResource, segmentName } from './resourceRef'
 
-// How many segments each gated level needs.
-const DEPTH = { connection: 0, database: 1, collection: 2 }
+// How many segments each gated level needs. Exported, with the helpers below, for the
+// engines' own switches (engines/*/menu.js) while the resolvers here still need them (#476).
+export const DEPTH = { connection: 0, database: 1, collection: 2 }
 
 // PostgreSQL's own levels, one deeper than Mongo's: database/schema/table.
-const PG_DEPTH = { schema: 2, table: 3 }
+export const PG_DEPTH = { schema: 2, table: 3 }
 
 // The mirror of mongoResource: only a PostgreSQL selection or tab counts toward the
 // PostgreSQL gates. Depth alone cannot separate them — a Mongo collection is two
 // segments deep, exactly as a Postgres schema is.
-function pgResource(source, ref) {
+export function pgResource(source, ref) {
   return source?.engine === 'postgresql' ? ref : null
 }
 
-const PG_TAB_TYPES = ['postgresql.query', 'postgresql.table_browse', 'postgresql.search']
+export const PG_TAB_TYPES = ['postgresql.query', 'postgresql.table_browse', 'postgresql.search']
 
 // Every item behind the connection/database/collection gates is a MongoDB action, so
 // only a MongoDB selection or tab counts toward them — a PostgreSQL one names no
 // resource here, and an action can never be handed one. No engine means MongoDB (a
 // selection or tab from before engines existed).
-function mongoResource(source, ref) {
+export function mongoResource(source, ref) {
   return (source?.engine ?? 'mongodb') === 'mongodb' ? ref : null
 }
 
-// The engines the native menu has items of its own for (menu.rs's MenuEngine).
-const MENU_ENGINES = ['mongodb', 'postgresql']
-
-// Which engine's items the menu shows (#152); 'none' hides both. A sidebar
+// Which engine's items the menu shows (#152); 'none' hides them all. A sidebar
 // selection wins, as it does in resolveMenuTarget, but only when it enables something:
 // a PostgreSQL row above a schema enables nothing, so the tab decides instead.
-function menuEngine(tab, selDepth, pgSelDepth) {
-  if (selDepth >= 0) return 'mongodb'
-  if (pgSelDepth >= PG_DEPTH.schema) return 'postgresql'
-  return MENU_ENGINES.includes(tab?.engine) ? tab.engine : 'none'
+function menuEngine(engines, tab, treeSelection) {
+  const selected = engines.find(e => e.menu.selectionEnables(treeSelection))
+  if (selected) return selected.id
+  return engines.some(e => e.id === tab?.engine) ? tab.engine : 'none'
 }
 
 // MongoDB tabs carry the lock at the top level, PostgreSQL's table tab under `state`.
@@ -55,66 +53,31 @@ function isLocked(tab) {
   return !!(tab && (tab.readOnly || tab.state?.readOnly))
 }
 
-// -1 for "names no resource", so every comparison below is false for it.
-function depth(ref) {
+// -1 for "names no resource", so every comparison against a depth is false for it.
+export function depth(ref) {
   return ref ? ref.segments.length : -1
 }
 
-// Which item groups should be enabled, given the active tab, the current sidebar
-// selection, and how many connections are open.
-//   activeTab      a workspace (any kind) | null
-//   treeSelection  the tree's selection payload, carrying `resource` | null
+// Which item groups should be enabled: what every engine shares, merged with each
+// engine's own switches (its `menu` entry, engines/*/menu.js).
+//   activeTab        a workspace (any kind) | null
+//   treeSelection    the tree's selection payload, carrying `resource` | null
 //   connectionCount  number of connections open in the tree
-//   indexSelected  whether an index row is selected in the open Indexes dialog
-//   canRefresh     whether the active tab can reload (workspaces/lifecycle's canRefreshWorkspace)
-//   openTabs       every open workspace, for the lock of one showing the selected resource
-//   gridfsFileSelected  whether a file row is selected in the open GridFS dialog
-//   activeIsCollection  whether the active tab is a collection tab (the registry's workspaceIsCollection)
-export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false, openTabs = [], gridfsFileSelected = false, activeIsCollection = false) {
-  const tab = activeTab || null
-  const tabDepth = depth(mongoResource(tab, tab?.target ?? null))
-  const selDepth = depth(mongoResource(treeSelection, treeSelection?.resource))
-  const reaches = (level) => tabDepth >= DEPTH[level] || selDepth >= DEPTH[level]
-
-  // Document/field selection is a property of the ACTIVE collection tab's results
-  // view only — never the sidebar. The Document menu acts on the row/field the user
-  // has selected in the grid, which only exists while a collection tab is active and
-  // has run a query. A field selection implies a row selection.
-  const isCollection = activeIsCollection
-  const rowCount = isCollection ? (tab.runtime.results?.length ?? 0) : 0
-  const selectedRow = isCollection ? (tab.runtime.selectedRow ?? -1) : -1
-  const hasDocument = selectedRow >= 0 && selectedRow < rowCount
-  const hasField = hasDocument && !!(tab && tab.runtime.selectedField)
-
-  // PostgreSQL (#145), the same union as Connection/Database/Collection above:
-  // a query tab names a schema, a table tab names a schema and a table, and the
-  // sidebar contributes whichever level its clicked row named.
-  const pgSelDepth = depth(pgResource(treeSelection, treeSelection?.resource))
-  const pgReaches = (level) => pgSelDepth >= PG_DEPTH[level]
-  const hasPgSchema = PG_TAB_TYPES.includes(tab?.type) || pgReaches('schema')
-  const hasPgTable = tab?.type === 'postgresql.table_browse' || pgReaches('table')
-
+//   canRefresh       whether the active tab can reload (workspaces/lifecycle's canRefreshWorkspace)
+//   openTabs         every open workspace, for the lock of one showing the selected resource
+//   engines          the engine table's entries; one without a `menu` has no items
+export function deriveMenuContext({ activeTab = null, treeSelection = null, connectionCount = 0, canRefresh = false, openTabs = [], engines = [] }) {
+  const withMenu = engines.filter(e => e.menu)
   return {
-    hasConnection: reaches('connection'),
-    hasDatabase: reaches('database'),
-    hasCollection: reaches('collection'),
+    ...Object.assign({}, ...withMenu.map(e => e.menu.switches({ activeTab, treeSelection }))),
     // Refresh acts on every open connection, so it enables whenever one exists.
-    anyConnection: (connectionCount || 0) > 0 || tabDepth >= 0,
-    hasDocument: hasDocument,
-    hasField: hasField,
-    // Index-menu actions operate on the index selected in the Indexes dialog, which
-    // is independent of the tab/tree selection — so it's passed in directly.
-    hasIndex: !!indexSelected,
-    // Same for the GridFS dialog's selected file (see Gate::GridfsFile).
-    hasGridfsFile: !!gridfsFileSelected,
+    anyConnection: connectionCount > 0 || withMenu.some(e => e.menu.tabNamesConnection?.(activeTab)),
     // A read-only lock (see writable.js) disables the write actions: the active tab's,
     // or that of an open tab showing the sidebar selection, which a write may target.
-    readOnly: isLocked(tab) || openTabs.some(t => isLocked(t) && sameResource(t.target, treeSelection?.resource)),
+    readOnly: isLocked(activeTab) || openTabs.some(t => isLocked(t) && sameResource(t.target, treeSelection?.resource)),
     // Refresh reloads the active tab, never the sidebar selection.
     canRefreshTab: !!canRefresh,
-    hasPgSchema: hasPgSchema,
-    hasPgTable: hasPgTable,
-    engine: menuEngine(tab, selDepth, pgSelDepth),
+    engine: menuEngine(withMenu, activeTab, treeSelection),
   }
 }
 

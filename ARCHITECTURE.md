@@ -118,7 +118,8 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
 
 - **`src/engines/index.js`** — the component-free engine table (`ENGINES`, `engineOf`):
   default port, connection-field builder, the sidebar's top-level loader, the stats card,
-  whether a connection names its database, and for a SQL engine its `sql` entry. An engine
+  whether a connection names its database, for a SQL engine its `sql` entry, and for an
+  engine with native-menu items its `menu` entry (its own menu switches). An engine
   with connection-editor fields of its own declares `useFields`: the connection form makes
   each one once, hands it to that engine's `buildFields` and editor sections, and passes it
   a pasted connection string. Stores and composables read it.
@@ -134,8 +135,8 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
   `api/library.js` is the query library's half of the Tauri boundary, the same for every SQL engine.
 
 A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
-screens still sit in the shared `components/` folders, and `utils/menuContext.js` mirrors
-`menu.rs`'s per-engine menus.
+screens still sit in the shared `components/` folders, and `utils/menuContext.js` still holds
+the per-engine depth tables its menu-target resolvers use (#476).
 
 ## Resource identity
 
@@ -255,7 +256,8 @@ removed.
 - **Enable/disable** reflects the current selection, which is the UNION of the active tab **and the
   sidebar/tree selection** (`treeSelection` in `stores/connectionNavigation.js`, which the tree
   writes). `useMenu` derives the `menuContext` (see `src/utils/menuContext.js`, unit-tested) from
-  those and the open connections, and pushes it to Rust via the
+  those and the open connections, merging in each engine's own switches (its `menu` entry),
+  and pushes it to Rust via the
   `set_menu_context` command, which flips each gated item's `enabled`. Menu actions resolve their
   target via `resolveMenuTarget`, which is level-aware: it picks whichever of the sidebar selection
   or active tab actually satisfies the action's required depth (`connection`/`database`/`collection`),
