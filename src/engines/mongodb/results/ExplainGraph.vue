@@ -1,6 +1,6 @@
 <script setup>
 // Visual Explain node-graph. Renders the parsed explain tree (see
-// utils/explainTree.js) as an inline-SVG graph, Studio-3T style: the Result box on
+// explainTree.js) as an inline-SVG graph, Studio-3T style: the Result box on
 // the left, execution stages flowing in from the right, the data source (COLLSCAN /
 // IXSCAN) as the deepest node. All parsing lives in the util — this component only
 // lays out and draws the already-normalized tree.

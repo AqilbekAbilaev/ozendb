@@ -12,7 +12,7 @@ import { ref, onUnmounted } from 'vue'
 // calls `beginDrag` once it has decided a drag may start. `suppressNextClick` is exposed
 // because the click that fires after a real drag has to be swallowed by the caller's
 // click handlers, which own cell selection.
-import { vqbOpen } from '../stores/visualQueryBuilder'
+import { vqbOpen } from '../../../stores/visualQueryBuilder'
 
 const DRAG_THRESHOLD = 5
 

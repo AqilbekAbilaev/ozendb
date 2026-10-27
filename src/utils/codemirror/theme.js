@@ -1,6 +1,7 @@
 // Shared CodeMirror 6 theme + highlight styles for every editor/viewer in the app
 // (IntelliShell, the document editor, the results JSON view). Previously each of
-// engines/mongodb/query/shellEditor.js, utils/docEditor.js and utils/jsonView.js defined its own
+// engines/mongodb/query/shellEditor.js, engines/mongodb/results/docEditor.js and
+// engines/mongodb/results/jsonView.js defined its own
 // byte-for-byte copy of these; they now import from here so the palette is defined once.
 import { EditorView } from '@codemirror/view'
 import { HighlightStyle } from '@codemirror/language'

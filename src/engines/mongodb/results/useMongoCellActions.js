@@ -1,12 +1,12 @@
 import { computed, markRaw, ref } from 'vue'
-import { replaceDocument } from '../engines/mongodb/api/documents'
-import { runFind } from '../engines/mongodb/api/queries'
-import { valueToClipboard } from '../utils/clipboardCopy'
-import { dbRefOf, idFilterString } from '../utils/dbRef'
-import { errText } from '../utils/errors'
-import { createResourceRef, segmentName } from '../utils/resourceRef'
-import { apiTarget } from '../engines/mongodb/api/payload'
-import { formatCell, guessType } from '../utils/resultGrid'
+import { replaceDocument } from '../api/documents'
+import { runFind } from '../api/queries'
+import { valueToClipboard } from './clipboardCopy'
+import { dbRefOf, idFilterString } from './dbRef'
+import { errText } from '../../../utils/errors'
+import { createResourceRef, segmentName } from '../../../utils/resourceRef'
+import { apiTarget } from '../api/payload'
+import { formatCell, guessType } from './resultGrid'
 
 // What a MongoDB grid's cells do beyond being clicked (see useGridCells): drill into a
 // nested value, follow a DBRef, copy a value / document / selection, and edit in place.

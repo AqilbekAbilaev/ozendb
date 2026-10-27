@@ -1,9 +1,9 @@
 import { computed, ref } from 'vue'
-import { countDocuments } from '../engines/mongodb/api/queries'
-import { errText } from '../utils/errors'
-import { parseField } from '../utils/queryParser'
-import { isCollectionTab } from '../utils/workspaceTypes'
-import { apiTarget } from '../engines/mongodb/api/payload'
+import { countDocuments } from '../api/queries'
+import { errText } from '../../../utils/errors'
+import { parseField } from '../../../utils/queryParser'
+import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { apiTarget } from '../api/payload'
 
 // Owns collection pagination and the optional server-side count shown in the results footer.
 export function useResultsPagination({ activeTab, isAggregate, requery, showToast }) {

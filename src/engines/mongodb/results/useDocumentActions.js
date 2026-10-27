@@ -5,15 +5,15 @@ import {
   replaceDocument,
   clearCollection,
   openDocumentWindow as openDocumentWindowApi,
-} from '../engines/mongodb/api/documents'
-import { errText } from '../utils/errors'
-import { canWriteTab, isWriteAction } from '../utils/writable'
-import { inspectField, setFieldValue, addFieldValue, removeField, renameField, getContainer } from '../utils/docEdit'
-import { valueToClipboard, valueToEjson, documentToClipboard, fieldPath } from '../utils/clipboardCopy'
+} from '../api/documents'
+import { errText } from '../../../utils/errors'
+import { canWriteTab, isWriteAction } from './writable'
+import { inspectField, setFieldValue, addFieldValue, removeField, renameField, getContainer } from './docEdit'
+import { valueToClipboard, valueToEjson, documentToClipboard, fieldPath } from './clipboardCopy'
 import { useDocumentPaste } from './useDocumentPaste'
-import { isCollectionTab } from '../utils/workspaceTypes'
-import { resourceName } from '../utils/resourceRef'
-import { apiTarget } from '../engines/mongodb/api/payload'
+import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { resourceName } from '../../../utils/resourceRef'
+import { apiTarget } from '../api/payload'
 
 // Document CRUD + field-edit + native Document/Collection menu dispatch for the results
 // grid. UI-agnostic: `activeTab` is a getter onto ResultsPanel's props, `docMenuRequest`
