@@ -16,7 +16,7 @@ import { vqbOpen } from '../stores/visualQueryBuilder'
 import { keyBindings } from '../stores/settings'
 import { matchBinding } from '../utils/keybindings'
 import { isEditingTarget } from '../utils/editingTarget'
-import { isCollectionTab } from '../utils/workspaceTypes'
+import { workspaceIsCollection } from '../workspaces/registry'
 
 // Native menu items that run a feature registered under another id: two items, one
 // action. Every other id that names a feature runs it directly.
@@ -72,7 +72,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       case 'file:load':
       case 'file:save': {
         const tab = tabs.value.find(t => t.id === activeTabId.value)
-        if (!isCollectionTab(tab)) { showToast('Open a collection tab first'); return }
+        if (!workspaceIsCollection(tab)) { showToast('Open a collection tab first'); return }
         if (id === 'file:load') requestSavedQueryBrowser()
         else requestSaveQuery()
         return
@@ -163,7 +163,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       case 'view:step_cell':
       case 'view:step_out': {
         const tab = tabs.value.find(t => t.id === activeTabId.value)
-        if (!isCollectionTab(tab)) { showToast('Open a collection tab first'); return }
+        if (!workspaceIsCollection(tab)) { showToast('Open a collection tab first'); return }
         requestDocAction(id)
         return
       }
@@ -178,7 +178,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       // History Manager: open the active collection tab's query-history menu.
       case 'view:history': {
         const tab = tabs.value.find(t => t.id === activeTabId.value)
-        if (!isCollectionTab(tab)) { showToast('Open a collection tab first'); return }
+        if (!workspaceIsCollection(tab)) { showToast('Open a collection tab first'); return }
         requestHistory()
         return
       }
@@ -227,7 +227,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
   // collection tab with a selected row/field, so this only needs to signal the panel.
   function requestDocMenuAction(action) {
     const tab = tabs.value.find(t => t.id === activeTabId.value)
-    if (!isCollectionTab(tab) || (tab.runtime.selectedRow ?? -1) < 0) {
+    if (!workspaceIsCollection(tab) || (tab.runtime.selectedRow ?? -1) < 0) {
       showToast('Select a document in the results first')
       return
     }
@@ -246,7 +246,7 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       return
     }
     const active = tabs.value.find(t => t.id === activeTabId.value)
-    const sameCollectionActive = isCollectionTab(active)
+    const sameCollectionActive = workspaceIsCollection(active)
       && sameResource(active.target, collection)
     // Reuse the active tab when it already shows this collection; otherwise open one so
     // the operation has a results view to refresh afterward.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { workspaceComponentFor, workspacePaneKind, registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
+import { workspaceComponentFor, workspacePaneKind, workspaceIsCollection, registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
 import { registerWorkspaceDefinitions } from './registerDefinitions'
 import QuickstartPane from '../components/panes/QuickstartPane.vue'
 
@@ -45,6 +45,22 @@ describe('workspacePaneKind', () => {
     expect(workspacePaneKind({ type: 'mongodb.shell' })).toBe(null)
     expect(workspacePaneKind({ type: 'mongodb.indexes' })).toBe(null)
     expect(workspacePaneKind({ type: 'bogus.type' })).toBe(null)
+  })
+})
+
+describe('workspaceIsCollection', () => {
+  it('is true for every collection mode', () => {
+    for (const type of ['mongodb.find', 'mongodb.aggregate', 'mongodb.sql_to_mql']) {
+      expect(workspaceIsCollection({ type }), type).toBe(true)
+    }
+  })
+
+  it('is false for other panes, unknown types and no tab', () => {
+    for (const type of ['app.quickstart', 'mongodb.shell', 'mongodb.indexes', 'postgresql.table_browse', 'bogus.type']) {
+      expect(workspaceIsCollection({ type }), type).toBe(false)
+    }
+    expect(workspaceIsCollection(null)).toBe(false)
+    expect(workspaceIsCollection({ kind: 'collection' })).toBe(false)
   })
 })
 

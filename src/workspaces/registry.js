@@ -22,6 +22,12 @@ export function workspaceBrowsesTable(tab) {
   return Boolean(definitions.get(tab?.type)?.browsesTable)
 }
 
+// Whether the tab is a collection tab: Find, Aggregate and SQL share one pane and one
+// result stack, so the document menus, paging and query code act on any of them.
+export function workspaceIsCollection(tab) {
+  return definitions.get(tab?.type)?.paneKind === 'collection'
+}
+
 // Definition registry. Populated once at startup by registerDefinitions();
 // a duplicate type throws, so a definition file can never silently shadow another.
 // Definitions are kept separate from components on purpose: registerDefinitions

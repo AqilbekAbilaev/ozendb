@@ -49,8 +49,8 @@ describe('tabColorName', () => {
 
   it('keeps MongoDB\'s nearest-coloured-ancestor rule', () => {
     const tab = { type: 'mongodb.find', target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]) }
-    expect(tabColorName(tab, { c1: 'green', 'c1/shop': 'blue' })).toBe('blue')
-    expect(tabColorName(tab, { c1: 'green' })).toBe('green')
+    expect(tabColorName(tab, { c1: 'green', 'c1/shop': 'blue' }, true)).toBe('blue')
+    expect(tabColorName(tab, { c1: 'green' }, true)).toBe('green')
   })
 })
 

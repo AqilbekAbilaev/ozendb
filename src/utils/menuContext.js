@@ -14,7 +14,6 @@
 // *filters*, from enabling the Database menu. A tab without a target (Quickstart)
 // names no resource and gates everything off.
 import { sameResource, segmentName } from './resourceRef'
-import { isCollectionTab } from './workspaceTypes'
 
 // How many segments each gated level needs.
 const DEPTH = { connection: 0, database: 1, collection: 2 }
@@ -70,7 +69,8 @@ function depth(ref) {
 //   canRefresh     whether the active tab can reload (workspaces/lifecycle's canRefreshWorkspace)
 //   openTabs       every open workspace, for the lock of one showing the selected resource
 //   gridfsFileSelected  whether a file row is selected in the open GridFS dialog
-export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false, openTabs = [], gridfsFileSelected = false) {
+//   activeIsCollection  whether the active tab is a collection tab (the registry's workspaceIsCollection)
+export function deriveMenuContext(activeTab, treeSelection, connectionCount, indexSelected = false, canRefresh = false, openTabs = [], gridfsFileSelected = false, activeIsCollection = false) {
   const tab = activeTab || null
   const tabDepth = depth(mongoResource(tab, tab?.target ?? null))
   const selDepth = depth(mongoResource(treeSelection, treeSelection?.resource))
@@ -80,7 +80,7 @@ export function deriveMenuContext(activeTab, treeSelection, connectionCount, ind
   // view only — never the sidebar. The Document menu acts on the row/field the user
   // has selected in the grid, which only exists while a collection tab is active and
   // has run a query. A field selection implies a row selection.
-  const isCollection = isCollectionTab(tab)
+  const isCollection = activeIsCollection
   const rowCount = isCollection ? (tab.runtime.results?.length ?? 0) : 0
   const selectedRow = isCollection ? (tab.runtime.selectedRow ?? -1) : -1
   const hasDocument = selectedRow >= 0 && selectedRow < rowCount

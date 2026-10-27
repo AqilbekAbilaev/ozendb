@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { appendResource, createResourceRef, resourceAt } from '../../../utils/resourceRef'
 import { nodeTagKey } from '../../../utils/tabColor'
-import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { workspaceIsCollection } from '../../../workspaces/registry'
 import { activeTab } from '../../../stores/tabs'
 import { openConnections } from '../../../stores/openConnections'
 import { treeSelection, setTreeSelection } from '../../../stores/connectionNavigation'
@@ -39,7 +39,7 @@ function setDatabaseOpen(connectionId, key, open) {
 // the highlighted collection row is on screen rather than under a closed database. Module
 // scope too, since each connection's rows call useMongoTree and a collapsed one has none.
 watch(activeTab, (tab) => {
-  if (!isCollectionTab(tab)) return
+  if (!workspaceIsCollection(tab)) return
   const { connectionId } = tab.target
   if (!openConnections.value.some(c => c.id === connectionId)) return  // not in the sidebar
   setDatabaseOpen(connectionId, nodeTagKey(resourceAt(tab.target, 'database')), true)
@@ -53,7 +53,7 @@ export function useMongoTree() {
     const collection = resourceAt(treeSelection.value?.resource, 'collection')
     return collection ? nodeTagKey(collection) : null
   })
-  const activeCollectionKey = computed(() => isCollectionTab(activeTab.value) ? nodeTagKey(activeTab.value.target) : null)
+  const activeCollectionKey = computed(() => workspaceIsCollection(activeTab.value) ? nodeTagKey(activeTab.value.target) : null)
 
   const isDatabaseOpen = (connectionId, database) => !!openDatabases.value[connectionId]?.[databaseKey(connectionId, database)]
 

@@ -13,6 +13,10 @@ vi.mock('../api/documents', () => ({
 import { insertDocuments } from '../api/documents'
 import { useDocumentActions } from './useDocumentActions'
 import { createResourceRef } from '../../../utils/resourceRef'
+import { registerWorkspaceDefinitions } from '../../../workspaces/registerDefinitions'
+
+// Whether a tab is a collection tab is a question for its definition.
+registerWorkspaceDefinitions()
 
 const collectionTab = (connectionId, collectionName) => reactive({
   id: collectionName,

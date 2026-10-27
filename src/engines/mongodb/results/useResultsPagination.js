@@ -2,14 +2,14 @@ import { computed, ref } from 'vue'
 import { countDocuments } from '../api/queries'
 import { errText } from '../../../utils/errors'
 import { parseField } from '../../../utils/queryParser'
-import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { workspaceIsCollection } from '../../../workspaces/registry'
 import { apiTarget } from '../api/payload'
 
 // Owns collection pagination and the optional server-side count shown in the results footer.
 export function useResultsPagination({ activeTab, isAggregate, requery, showToast }) {
   const countMenu = ref(null)
   const isCountDisabled = computed(() =>
-    isAggregate() || !isCollectionTab(activeTab())
+    isAggregate() || !workspaceIsCollection(activeTab())
   )
 
   async function fetchCount(tab) {

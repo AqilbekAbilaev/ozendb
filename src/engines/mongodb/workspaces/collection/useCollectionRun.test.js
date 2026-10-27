@@ -10,6 +10,10 @@ import { requestRefresh } from '../../../../stores/menuRequests'
 import { createCollectionState, createCollectionRuntime } from '../collectionState'
 import { useCollectionRun } from './useCollectionRun'
 import { createResourceRef } from '../../../../utils/resourceRef'
+import { registerWorkspaceDefinitions } from '../../../../workspaces/registerDefinitions'
+
+// Whether a tab is a collection tab is a question for its definition.
+registerWorkspaceDefinitions()
 
 function setup({ mode = 'find', query = {}, resultTab = 'Result' } = {}) {
   const state = createCollectionState()
