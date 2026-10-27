@@ -1,14 +1,9 @@
 <script setup>
 // Generic workspace host: active-tab lookup, tab bar, and dynamic rendering of the
 // component resolved from the registry.
-// Props/listeners are built per resolved key so collection-only attributes never leak
-// onto ordinary panes' root DOM nodes.
-import { ref, computed, watch } from 'vue'
-import { savedQueryBrowserRequest } from '../../stores/menuRequests'
+import { computed } from 'vue'
 import TabBar from './TabBar.vue'
-import QueryBrowserModal from '../../engines/mongodb/query/QueryBrowserModal.vue'
 import { workspaceComponentFor, workspacePaneKind } from '../../workspaces/registry'
-import { useSavedQueryBrowser } from '../../composables/useSavedQueryBrowser'
 
 const props = defineProps({
   tabs:           { type: Array,   required: true },
@@ -18,46 +13,14 @@ const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab'])
 
 const activeTab = computed(() => props.tabs.find(t => t.id === props.activeTabId))
 const component = computed(() => workspaceComponentFor(activeTab.value))
-const paneKind = computed(() => workspacePaneKind(activeTab.value))
-const savedQueryBrowser = useSavedQueryBrowser({
-  activate: (id) => emit('activate-tab', id),
-})
 
-watch(() => savedQueryBrowserRequest.value?.nonce, (nonce) => {
-  if (nonce != null) savedQueryBrowser.open(activeTab.value)
-})
-watch(() => props.tabs.map(tab => tab.id), (ids) => {
-  savedQueryBrowser.retainTargets(new Set(ids))
-})
-
-// Which result sub-tab is active. Kept here (rather than in MongoCollectionWorkspace)
-// because the collection workspace unmounts when another pane kind activates: the
-// sub-tab must survive collection → non-collection → collection switches.
-const rtab = ref('Result')
-
-// Prop bindings per the definition's paneKind: ordinary panes get the active tab,
-// Quickstart gets none, and the collection workspace gets its full compatibility
-// contract. Read from the definition rather than compared against a known component,
-// so this never needs to import an engine's own components.
+// Every pane gets the active tab except Quickstart, which takes none. Read from the
+// definition rather than compared against a known component, so this never needs to
+// import an engine's own components.
 const bindings = computed(() => {
-  if (paneKind.value === 'quickstart') return {}
-  if (paneKind.value === 'collection') {
-    return {
-      activeTab:        activeTab.value,
-      tabs:             props.tabs,
-      activeTabId:      props.activeTabId,
-      resultTab:        rtab.value,
-      savedQueryRequest: savedQueryBrowser.request.value,
-    }
-  }
+  if (workspacePaneKind(activeTab.value) === 'quickstart') return {}
   return component.value ? { activeTab: activeTab.value } : {}
 })
-
-const collectionListeners = {
-  'update:result-tab': (v) => { rtab.value = v },
-  'open-query-browser': () => savedQueryBrowser.open(activeTab.value),
-  'saved-query-applied': (nonce) => savedQueryBrowser.acknowledge(nonce),
-}
 </script>
 
 <template>
@@ -76,12 +39,6 @@ const collectionListeners = {
       :is="component"
       v-if="component"
       v-bind="bindings"
-      v-on="paneKind === 'collection' ? collectionListeners : {}"
-    />
-    <QueryBrowserModal
-      v-if="savedQueryBrowser.isOpen.value"
-      @close="savedQueryBrowser.close"
-      @apply="savedQueryBrowser.apply"
     />
   </div>
 </template>

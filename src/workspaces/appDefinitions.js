@@ -8,7 +8,7 @@ export const appDefinitions = [
     engine: 'app',
     component: QuickstartPane,
     // No active tab resolves to this definition too (registry.js), so WorkspaceArea
-    // needs the same marker either way: no props, no listeners.
+    // needs the same marker either way: no props.
     paneKind: 'quickstart',
     create() {
       return {

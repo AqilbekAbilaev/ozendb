@@ -10,8 +10,8 @@ export function workspaceComponentFor(tab) {
   return def.componentFor ? def.componentFor(tab) : def.component
 }
 
-// The pane's binding contract, so the host needn't import engine components to compare:
-// null for plain `{ activeTab }`, 'quickstart' (no props) or 'collection' (props + listeners).
+// The pane's kind, so the host needn't import engine components to compare: null for a
+// plain pane, 'quickstart' (no props) or 'collection' (see workspaceIsCollection).
 export function workspacePaneKind(tab) {
   if (!tab) return 'quickstart'
   return definitions.get(tab.type)?.paneKind ?? null
