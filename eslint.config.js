@@ -11,7 +11,18 @@ const ENGINE_NAME_CHECKS = [
     selector: "Property > Identifier.key[name=/^(mongodb|postgresql)$/], Property > Literal.key[value=/^(mongodb|postgresql)$/]",
     message: 'Per-engine tables belong in src/engines.',
   },
+  {
+    selector: "ImportExpression > Literal.source[value=/engines\\/(mongodb|postgresql|mysql|sql)\\//]",
+    message: 'Reach an engine through src/engines/index.js, ui.js, modals.js, workspaces.js or contextActions.js, not its folder.',
+  },
 ]
+
+// Shared code reaches an engine only through the files at the top of src/engines, never
+// by path into its folder, so an engine stays one folder plus one table entry (#467).
+const ENGINE_FOLDERS = {
+  group: ['**/engines/mongodb/**', '**/engines/postgresql/**', '**/engines/mysql/**', '**/engines/sql/**'],
+  message: "Reach an engine through src/engines/index.js, ui.js, modals.js, workspaces.js or contextActions.js, not its folder.",
+}
 
 // ESLint's recommended rules catch general JavaScript mistakes; Vue's essentials
 // cover template correctness. Project-specific rules stay focused on dead code, not
@@ -30,6 +41,15 @@ export default [
       globals: { ...globals.browser, ...globals.node },
     },
   },
+  // Every shared file, unless a layering block below names it; those blocks repeat
+  // ENGINE_FOLDERS, since a later block's no-restricted-imports replaces this one.
+  {
+    files: ['src/**/*.js', 'src/**/*.vue'],
+    ignores: ['src/engines/**', '**/*.test.js', '**/*.fixtures.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [ENGINE_FOLDERS] }],
+    },
+  },
   // The layering rule from docs/CODING.md: a ring may import inwards, never outwards.
   {
     files: ['src/utils/**/*.js'],
@@ -38,7 +58,7 @@ export default [
       'no-restricted-imports': ['error', { patterns: [{
         group: ['**/stores/*', '**/composables/*', '**/components/*', '**/engines/*', '**/appApi/*', '**/workspaces/*'],
         message: 'utils/ holds pure functions — no Vue, no I/O, no app state.',
-      }] }],
+      }, ENGINE_FOLDERS] }],
     },
   },
   // The two Tauri roots sit beside utils/, at the centre: everything may call them, and
@@ -50,7 +70,7 @@ export default [
       'no-restricted-imports': ['error', { patterns: [{
         regex: '^\\.\\./',
         message: 'appApi/ wraps Tauri commands — it imports its own files and @tauri-apps, nothing app-side.',
-      }] }],
+      }, ENGINE_FOLDERS] }],
     },
   },
   {
@@ -77,6 +97,7 @@ export default [
           regex: '^\\.\\./(?!\\.\\./)',
           message: 'components/base/ imports other base components only, never a feature area.',
         },
+        ENGINE_FOLDERS,
       ] }],
     },
   },
@@ -87,7 +108,7 @@ export default [
       'no-restricted-imports': ['error', { patterns: [{
         group: ['**/stores/*', '**/composables/*'],
         message: 'workspaces/ is the machinery the tab store builds on, so it reads no app state.',
-      }] }],
+      }, ENGINE_FOLDERS] }],
     },
   },
   {
@@ -97,7 +118,7 @@ export default [
       'no-restricted-imports': ['error', { patterns: [{
         group: ['**/composables/*', '**/components/*'],
         message: 'stores/ is imported by composables and components, not the other way round.',
-      }] }],
+      }, ENGINE_FOLDERS] }],
     },
   },
   {
@@ -107,7 +128,7 @@ export default [
       'no-restricted-imports': ['error', { patterns: [{
         group: ['**/components/*'],
         message: 'composables/ is imported by components, not the other way round.',
-      }] }],
+      }, ENGINE_FOLDERS] }],
     },
   },
   // Engine facts come from src/engines (engineOf, ENGINES, ui.js), never from comparing
