@@ -20,7 +20,7 @@
 //  - Python fromisoformat and PHP/Ruby double-quoted strings assume well-behaved values;
 //    they are not hardened against every edge case.
 
-import { parseField, parsePipeline } from '../../../utils/queryParser'
+import { parseField, parsePipeline } from './queryParser'
 import { collectTypes, SCAFFOLDS } from './queryCodegen/scaffolds'
 
 export const LANGUAGES = [

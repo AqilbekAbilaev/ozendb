@@ -1,5 +1,15 @@
-import { parseField } from './queryParser'
-import { segmentName } from './resourceRef'
+import { parseField } from '../../query/queryParser'
+import { segmentName } from '../../../../utils/resourceRef'
+import { onDocumentSaved } from '../../../../appApi/events'
+import { tabs } from '../../../../stores/tabs'
+import { runQuery } from './queryRunner'
+
+// MongoDB's startup hook (its engine's `start`). The pop-out editor emits this after a
+// save; refresh matching Find tabs explicitly, since that isn't part of the
+// restored-workspace lifecycle.
+export function refreshFindsOnDocumentSave() {
+  onDocumentSaved((saved) => refreshFindWorkspacesAfterDocumentSave(tabs.value, saved, runQuery))
+}
 
 export function refreshFindWorkspacesAfterDocumentSave(workspaces, payload = {}, runQuery) {
   payload = payload || {}

@@ -18,10 +18,7 @@ import { watch } from "vue";
 import { loadSettings, restoreSessionEnabled, editorTabWidth } from "./stores/settings";
 import { EDITOR_TAB_WIDTH } from "./constants/injectionKeys";
 import { useSessionPersistence } from "./composables/useSessionPersistence";
-import { refreshFindWorkspacesAfterDocumentSave } from "./utils/documentSaveRefresh";
-import { runQuery } from "./engines/mongodb/workspaces/collection/queryRunner";
-import { tabs } from "./stores/tabs";
-import { onDocumentSaved } from "./appApi/events";
+import { ENGINES } from "./engines/index.js";
 
 prePaintTheme();
 
@@ -45,9 +42,8 @@ app.config.errorHandler = (err) => {
 };
 app.mount("#app");
 
-// The pop-out editor emits this after a save; refresh matching Find tabs explicitly,
-// since that isn't part of the restored-workspace lifecycle.
-onDocumentSaved((saved) => refreshFindWorkspacesAfterDocumentSave(tabs.value, saved, runQuery));
+// Whatever an engine connects for itself once the app is up (its `start`).
+for (const engine of Object.values(ENGINES)) engine.start?.();
 
 // Settings before the session, so restored workspaces adopt the stored defaults; the
 // update check last, so its dialog can't land on a tab strip that is still restoring.

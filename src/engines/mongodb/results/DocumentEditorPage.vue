@@ -8,7 +8,7 @@ import { insertDocument, replaceDocument } from '../api/documents'
 import { runFind } from '../api/queries'
 import { docExtensions } from './docEditor'
 import { mongoStringify } from './mongoFormat'
-import { parseField } from '../../../utils/queryParser'
+import { parseField } from '../query/queryParser'
 import { errText } from '../../../utils/errors'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 

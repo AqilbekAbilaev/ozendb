@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseFindQuery, findQueryValid, findQueryError, pipelineError, expandIdFilter, findArgs } from './collectionQuery'
-import { parsePipeline } from '../../../../utils/queryParser'
+import { parsePipeline } from '../../query/queryParser'
 
 const query = (over = {}) => ({ filter: '', projection: '', sort: '', skip: 0, limit: 50, ...over })
 

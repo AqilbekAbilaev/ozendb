@@ -5,6 +5,7 @@ import { listDatabases } from './api/resources.js'
 import { collectionStats, databaseStats } from './api/admin.js'
 import { mongoMenu } from './menu.js'
 import { nodeTagKey } from '../../utils/tabColor.js'
+import { refreshFindsOnDocumentSave } from './workspaces/collection/documentSaveRefresh.js'
 
 export const mongodb = Object.freeze({
   id: 'mongodb',
@@ -27,4 +28,6 @@ export const mongodb = Object.freeze({
   menu: mongoMenu,
   // How a node's colour tag is keyed in the tag store, for the tab bar (utils/tabColor).
   tagKey: nodeTagKey,
+  // What it connects once at startup, after the app mounts (main.js).
+  start: refreshFindsOnDocumentSave,
 })

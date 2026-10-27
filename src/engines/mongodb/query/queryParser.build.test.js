@@ -19,7 +19,7 @@ describe('queryParser in the production bundle', () => {
         ...config.build,
         write: false,
         rolldownOptions: {},
-        lib: { entry: 'src/utils/queryParser.js', formats: ['es'], fileName: 'queryParser' },
+        lib: { entry: 'src/engines/mongodb/query/queryParser.js', formats: ['es'], fileName: 'queryParser' },
       },
     })
     const entry = result.output.find((o) => o.type === 'chunk' && o.isEntry)

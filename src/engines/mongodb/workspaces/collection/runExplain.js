@@ -5,7 +5,7 @@
 import { explainFind, explainAggregate, loadExplainStorage } from '../../api/queries'
 import { errText } from '../../../../utils/errors'
 import { apiTarget } from '../../api/payload'
-import { parsePipeline } from '../../../../utils/queryParser'
+import { parsePipeline } from '../../query/queryParser'
 import { beginWorkspaceRequest } from '../../query/workspaceRequest'
 import { parseFindQuery, findQueryValid, findArgs } from './collectionQuery'
 
