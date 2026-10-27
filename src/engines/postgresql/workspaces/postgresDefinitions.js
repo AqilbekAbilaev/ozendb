@@ -14,6 +14,9 @@ const SqlQueryWorkspace = defineAsyncComponent(() => import('../../sql/workspace
 
 const ENGINE = 'postgresql'
 
+// The levels a tab with no colour of its own takes one from, deepest first.
+const COLOR_LEVELS = ['table', 'schema', 'database', 'connection']
+
 // The PostgreSQL openers still pass flat fields (connectionId, database, schema, table);
 // this is the one place they become the tab's ref. A tab's identity is that `target`
 // alone (#303): beside it the tab keeps only the connection's display name.
@@ -57,10 +60,12 @@ function searchWorkspace({ target, connectionName }, state = createSearchState()
 }
 
 export const postgresDefinitions = [
-  tableDefinition(ENGINE, openedRef),
+  // The table tab is shared with MySQL, whose tabs take no colour, so the levels go here.
+  { ...tableDefinition(ENGINE, openedRef), colorLevels: COLOR_LEVELS },
   {
     type: 'postgresql.query',
     engine: ENGINE,
+    colorLevels: COLOR_LEVELS,
     component: SqlQueryWorkspace,
     create: (ctx) => queryWorkspace(fromOpened(ctx.target)),
     duplicate: (workspace) => queryWorkspace(workspace, workspace.state.sql),
@@ -71,6 +76,7 @@ export const postgresDefinitions = [
   {
     type: 'postgresql.search',
     engine: ENGINE,
+    colorLevels: COLOR_LEVELS,
     component: PostgresSearchWorkspace,
     create: (ctx) => searchWorkspace(fromOpened(ctx.target)),
     duplicate: (workspace) => searchWorkspace(workspace, copy(workspace.state)),

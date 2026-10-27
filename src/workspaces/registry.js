@@ -28,6 +28,12 @@ export function workspaceIsCollection(tab) {
   return definitions.get(tab?.type)?.paneKind === 'collection'
 }
 
+// The levels a tab with no colour of its own takes one from, deepest first (read off
+// the tab's ref); none for a tab that inherits no colour.
+export function workspaceColorLevels(tab) {
+  return definitions.get(tab?.type)?.colorLevels ?? []
+}
+
 // Definition registry. Populated once at startup by registerDefinitions();
 // a duplicate type throws, so a definition file can never silently shadow another.
 // Definitions are kept separate from components on purpose: registerDefinitions

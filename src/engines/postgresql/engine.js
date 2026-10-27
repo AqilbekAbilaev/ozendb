@@ -4,6 +4,7 @@ import { useSqlFields } from '../sql/connection/useSqlFields.js'
 import { listSchemas, tableStats } from './api/resources.js'
 import { postgresSql } from './sql.js'
 import { postgresqlMenu } from './menu.js'
+import { pgTagKey } from '../../utils/tabColor.js'
 
 export const postgresql = Object.freeze({
   id: 'postgresql',
@@ -25,4 +26,6 @@ export const postgresql = Object.freeze({
   }),
   // Its switches for the native menu (utils/menuContext's deriveMenuContext).
   menu: postgresqlMenu,
+  // How a node's colour tag is keyed in the tag store, for the tab bar (utils/tabColor).
+  tagKey: pgTagKey,
 })
