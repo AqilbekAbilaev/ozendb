@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { deriveMenuContext, resolveMenuTarget, resolvePgMenuTarget } from './menuContext'
 import { ENGINES } from '../engines/index.js'
-import { selectedIndex } from '../stores/indexes'
+import { selectedIndex } from '../engines/mongodb/admin/indexes'
 import { selectedGridfsFile } from '../engines/mongodb/tools/gridfsSelection'
 import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
 

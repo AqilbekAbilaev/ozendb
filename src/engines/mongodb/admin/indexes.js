@@ -1,8 +1,8 @@
 import { ref } from 'vue'
-import { dropIndex as dropIndexApi, indexStats } from '../engines/mongodb/api/indexes'
-import { errText } from '../utils/errors'
-import { isProtectedIndex, indexSpecJson } from '../utils/indexSpec'
-import { showToast } from './toast'
+import { dropIndex as dropIndexApi, indexStats } from '../api/indexes'
+import { errText } from '../../../utils/errors'
+import { isProtectedIndex, indexSpecJson } from './indexSpec'
+import { showToast } from '../../../stores/toast'
 
 // The app-level index surfaces that overlay or act on the Index Manager tab: View
 // Details, the type-to-confirm Drop, and the Index menu actions. The tab keeps its own

@@ -1,7 +1,7 @@
 // MongoDB's switches for the native menu (menu.rs's MongoDB gates), merged into the
 // shared context by deriveMenuContext (utils/menuContext.js).
 import { DEPTH, depth, mongoResource } from '../../utils/menuContext.js'
-import { selectedIndex } from '../../stores/indexes.js'
+import { selectedIndex } from './admin/indexes.js'
 import { workspaceIsCollection } from '../../workspaces/registry.js'
 import { selectedGridfsFile } from './tools/gridfsSelection.js'
 

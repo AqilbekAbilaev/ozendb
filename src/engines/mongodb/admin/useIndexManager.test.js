@@ -12,7 +12,7 @@ import { collectionStats } from '../api/admin'
 import { showToast } from '../../../stores/toast'
 import { requestIndexAction } from '../../../stores/menuRequests'
 import { useIndexManager } from './useIndexManager'
-import * as idx from '../../../stores/indexes'
+import * as idx from './indexes'
 import { createResourceRef } from '../../../utils/resourceRef'
 
 const ID = { name: '_id_', key: { _id: 1 } }

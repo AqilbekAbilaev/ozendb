@@ -1,20 +1,15 @@
 <script setup>
 import { unref } from 'vue'
-import * as indexesStore from '../../stores/indexes'
 import { useSshHostKey } from '../../composables/useSshHostKey'
 import { MODALS } from '../../constants/modalRegistry'
+import { MOUNTED_DIALOGS } from '../../engines/ui.js'
 import BaseModal from '../base/BaseModal.vue'
 import BaseButton from '../base/BaseButton.vue'
 import BaseInput from '../base/BaseInput.vue'
-import FieldError from '../base/FieldError.vue'
-import { indexSpecJson } from '../../utils/indexSpec'
 import SshHostKeyModal from '../connection/SshHostKeyModal.vue'
 import { openModals, closeModal, modalOptions } from '../../stores/modals'
 import { renameTabTarget, renameTabValue, confirmRenameTab } from '../../stores/tabs'
 import FlexSpacer from '../base/FlexSpacer.vue'
-
-// indexes/ssh still come through App.vue's appModals provide — see the comment there
-// for why useIndexes/useSshHostKey can't be module-scope stores yet.
 
 // Registry-driven modals are bound generically: every modal gets `close`; node-targeted
 // modals get their payload as `target`; the opener owns any session props and events.
@@ -36,21 +31,6 @@ function modalBindings(id, payload) {
 function modalKey(id, payload) {
   return id + '|' + JSON.stringify(payload || {})
 }
-
-// The Index Manager list/form now lives in IndexManagerPane (the 'indexes' tab).
-// AppModals only keeps the two index dialogs that overlay it: View Details and the
-// type-to-confirm Drop.
-const {
-  indexDetailsTarget,
-  indexDetailsStats,
-  indexDetailsLoading,
-  dropIndexTarget,
-  dropIndexConfirmText,
-  dropIndexError,
-  dropIndexBusy,
-  confirmDropIndex,
-  formatIndexSince,
-} = indexesStore
 
 const {
   sshHostKeyPrompt,
@@ -100,52 +80,6 @@ const {
         </div>
   </BaseModal>
 
-    <!-- Index: View Details (read-only) -->
-    <BaseModal v-if="indexDetailsTarget" :title="`Index Details — ${indexDetailsTarget.name}`" width="560px" @close="indexDetailsTarget = null">
-        <div class="del-body">
-          <div class="idx-detail-section">Definition</div>
-          <pre class="idx-detail-json">{{ indexSpecJson(indexDetailsTarget) }}</pre>
-          <div class="idx-detail-section">Usage</div>
-          <div v-if="indexDetailsLoading" class="idx-msg">Loading usage…</div>
-          <table v-else-if="indexDetailsStats" class="idx-detail-stats">
-            <tbody>
-              <tr><td>Operations</td><td>{{ indexDetailsStats.accesses?.ops ?? '—' }}</td></tr>
-              <tr><td>Tracking since</td><td>{{ formatIndexSince(indexDetailsStats.accesses?.since) }}</td></tr>
-            </tbody>
-          </table>
-          <div v-else class="idx-msg">Usage statistics unavailable.</div>
-        </div>
-        <div class="del-footer">
-          <FlexSpacer />
-          <BaseButton @click="indexDetailsTarget = null">Close</BaseButton>
-        </div>
-  </BaseModal>
-
-    <!-- Index: Drop confirmation (type the name to confirm) -->
-    <BaseModal v-if="dropIndexTarget" title="Drop Index" @close="dropIndexTarget = null">
-        <div class="del-body">
-          <p>This permanently drops the index
-            <code>{{ dropIndexTarget.name }}</code> from
-            <code>{{ dropIndexTarget.dbName }}.{{ dropIndexTarget.collectionName }}</code>.
-            Queries that relied on it may slow down.
-            This cannot be undone.</p>
-          <p class="cc-prompt">Type <code>{{ dropIndexTarget.name }}</code> to confirm:</p>
-          <BaseInput
-            class="prompt-input"
-            v-model="dropIndexConfirmText"
-            autocomplete="off"
-            @keydown.enter="confirmDropIndex"
-          />
-          <FieldError :text="dropIndexError" spaced />
-        </div>
-        <div class="del-footer">
-          <FlexSpacer />
-          <BaseButton @click="dropIndexTarget = null">Cancel</BaseButton>
-          <BaseButton
-            variant="danger"
-            :disabled="dropIndexBusy || dropIndexConfirmText !== dropIndexTarget.name"
-            @click="confirmDropIndex"
-          >{{ dropIndexBusy ? 'Dropping…' : 'Drop Index' }}</BaseButton>
-        </div>
-  </BaseModal>
+    <!-- Dialogs an engine keeps mounted app-wide, showing themselves from their own stores -->
+    <component v-for="(dialog, i) in MOUNTED_DIALOGS" :is="dialog" :key="i" />
 </template>

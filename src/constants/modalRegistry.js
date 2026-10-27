@@ -1,4 +1,5 @@
 import { defineAsyncComponent } from 'vue'
+import { ENGINE_MODALS } from '../engines/modals.js'
 
 // Single source of truth for registry-driven modals. One row per modal:
 //   component — the modal, lazy-loaded so each is code-split out of the main bundle
@@ -6,12 +7,12 @@ import { defineAsyncComponent } from 'vue'
 //
 // A conforming modal takes a single `target` prop (its context object) and emits `close`.
 // AppModals.vue renders whatever stores/modals.js reports open via one v-for, so adding a
-// modal is this one row plus the component itself — no edits to useFeatures/AppModals.
+// modal is one row (here, or in its engine's modals.js) plus the component itself — no edits to useFeatures/AppModals.
 // (Modals that emit extra events or carry no context still live as explicit blocks in
 // AppModals until the registry grows an adapter for them.)
 const lazy = (loader) => defineAsyncComponent(loader)
 
-export const MODALS = {
+const APP_MODALS = {
   // ── app-level singletons (no node target; level null) ──
   // Opened by id alone (openModal('about')); any session props/events are supplied by
   // the owner when it opens the modal and bound generically by AppModals.
@@ -20,71 +21,11 @@ export const MODALS = {
   preferences:       { component: lazy(() => import('../components/app/PreferencesModal.vue')),          level: null },
   update:            { component: lazy(() => import('../components/app/UpdateModal.vue')),               level: null },
   errorReport:       { component: lazy(() => import('../components/app/ErrorReportModal.vue')),          level: null },
-
-  // ── connection level ──
-  serverStatus: { component: lazy(() => import('../engines/mongodb/admin/ServerStatusModal.vue')), level: 'connection' },
-  serverCharts: { component: lazy(() => import('../engines/mongodb/admin/ServerChartsModal.vue')), level: 'connection' },
-  // Build / Host / Replica info share one modal; its feature seeds a { kind, title } payload
-  // on top of the node fields (see openServerInfo), so it opens directly, not via modalFeature.
-  serverInfo:   { component: lazy(() => import('../engines/mongodb/admin/ServerInfoModal.vue')),   level: 'connection' },
-  addDatabase:  { component: lazy(() => import('../engines/mongodb/admin/AddDatabaseModal.vue')),  level: 'connection' },
-  // PostgreSQL's own read-only diagnostics; opened from its tree menu with the node
-  // itself as the target, so it takes no seeding of its own.
-  pgServerInfo: { component: lazy(() => import('../engines/postgresql/admin/PostgresServerInfoModal.vue')), level: 'connection' },
-  // Opened from a database node (every user schema) or a schema node (just that one).
-  pgRoutines:   { component: lazy(() => import('../engines/postgresql/admin/PostgresRoutinesModal.vue')),   level: 'database' },
-  pgActivity:   { component: lazy(() => import('../engines/postgresql/admin/PostgresActivityModal.vue')),   level: 'connection' },
-  // Roles are cluster-wide in Postgres, so this is connection level, not database.
-  pgRoles:      { component: lazy(() => import('../engines/postgresql/admin/PostgresRolesModal.vue')),      level: 'connection' },
-  // Opened from the Roles modal's own detail panel, not a sidebar node.
-  pgGrants:     { component: lazy(() => import('../engines/postgresql/admin/PostgresGrantsModal.vue')),      level: 'connection' },
-  // Schema changes, opened from a database, schema or table node with the node as target.
-  pgCreateSchema: { component: lazy(() => import('../engines/postgresql/admin/PostgresCreateSchemaModal.vue')), level: 'database' },
-  pgCreateTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresCreateTableModal.vue')),  level: 'database' },
-  pgDrop:         { component: lazy(() => import('../engines/postgresql/admin/PostgresDropModal.vue')),         level: 'database' },
-  pgRenameTable:  { component: lazy(() => import('../engines/postgresql/admin/PostgresRenameTableModal.vue')),  level: 'database' },
-  // Every SQL engine's row-edit history, reaching the engine through the target's
-  // `engine`. Opened from a table tab's toolbar (and PostgreSQL's menu bar), not a sidebar node.
-  sqlRowHistory:  { component: lazy(() => import('../engines/sql/admin/SqlRowHistoryModal.vue')),              level: 'table' },
-  // Every SQL engine's bulk export and CSV import, reaching the engine through the
-  // target's `engine`: a table node, or a SQL editor's { connId, engine, database, query }.
-  sqlExport:      { component: lazy(() => import('../engines/sql/admin/SqlExportModal.vue')),                   level: 'database' },
-  sqlImport:      { component: lazy(() => import('../engines/sql/admin/SqlImportModal.vue')),                   level: 'database' },
-  // A MySQL view's or stored program's CREATE statement, opened from its sidebar row.
-  mysqlDefinition: { component: lazy(() => import('../engines/mysql/admin/MySqlDefinitionModal.vue')), level: 'database' },
-  // MySQL's server tools, opened from its connection's right-click menu. Accounts are
-  // server-wide, so Users is connection level.
-  mysqlUsers:      { component: lazy(() => import('../engines/mysql/admin/MySqlUsersModal.vue')),      level: 'connection' },
-  // Opened from the Users modal's detail panel, not a sidebar node.
-  mysqlGrants:     { component: lazy(() => import('../engines/mysql/admin/MySqlGrantsModal.vue')),     level: 'connection' },
-  mysqlActivity:   { component: lazy(() => import('../engines/mysql/admin/MySqlActivityModal.vue')),   level: 'connection' },
-  mysqlServerInfo: { component: lazy(() => import('../engines/mysql/admin/MySqlServerInfoModal.vue')), level: 'connection' },
-
-  // ── database level ──
-  dbStats:   { component: lazy(() => import('../engines/mongodb/admin/DatabaseStatsModal.vue')), level: 'database' },
-  profiler:  { component: lazy(() => import('../engines/mongodb/admin/ProfilerModal.vue')),      level: 'database' },
-  users:     { component: lazy(() => import('../engines/mongodb/admin/UsersModal.vue')),         level: 'database' },
-  roles:     { component: lazy(() => import('../engines/mongodb/admin/RolesModal.vue')),         level: 'database' },
-  functions: { component: lazy(() => import('../engines/mongodb/admin/FunctionsModal.vue')),     level: 'database' },
-  gridfs:    { component: lazy(() => import('../engines/mongodb/tools/GridFsModal.vue')),        level: 'database' },
-  addBucket:     { component: lazy(() => import('../engines/mongodb/admin/AddBucketModal.vue')),     level: 'database' },
-  addCollection: { component: lazy(() => import('../engines/mongodb/admin/AddCollectionModal.vue')), level: 'database' },
-  dropDatabase:  { component: lazy(() => import('../engines/mongodb/admin/DropDatabaseModal.vue')),  level: 'database' },
-  // Add View is seeded with an extra `source` on top of the database fields (empty from a
-  // database node, the clicked collection from "Add View Here…"), so its features open it
-  // directly rather than through modalFeature.
-  addView:       { component: lazy(() => import('../engines/mongodb/admin/AddViewModal.vue')),       level: 'database' },
-
-  // ── collection level ──
-  // Registry modals take one `target` prop and emit `close`; their owners may supply
-  // additional per-open listeners without adding routing to App.vue.
-  stats:     { component: lazy(() => import('../engines/mongodb/admin/StatsModal.vue')),             level: 'collection' },
-  history:   { component: lazy(() => import('../engines/mongodb/tools/CollectionHistoryModal.vue')), level: 'collection' },
-  mapReduce: { component: lazy(() => import('../engines/mongodb/query/MapReduceModal.vue')),         level: 'collection' },
-  validator: { component: lazy(() => import('../engines/mongodb/admin/ValidatorModal.vue')),         level: 'collection' },
-  import:    { component: lazy(() => import('../engines/mongodb/tools/ImportFormatModal.vue')),      level: 'collection' },
-  exportSource: { component: lazy(() => import('../engines/mongodb/tools/ExportSourceModal.vue')),   level: 'collection' },
-  dropCollection:      { component: lazy(() => import('../engines/mongodb/admin/DropCollectionModal.vue')),      level: 'collection' },
-  renameCollection:    { component: lazy(() => import('../engines/mongodb/admin/RenameCollectionModal.vue')),    level: 'collection' },
-  duplicateCollection: { component: lazy(() => import('../engines/mongodb/admin/DuplicateCollectionModal.vue')), level: 'collection' },
 }
+
+// The app's own rows and each engine's (engines/<engine>/modals.js, gathered by
+// engines/modals.js). Ids are global, since openModal names a dialog by id alone; the
+// registry's spec checks that no two tables share one.
+export const MODAL_TABLES = [APP_MODALS, ...ENGINE_MODALS]
+
+export const MODALS = Object.assign({}, ...MODAL_TABLES)
