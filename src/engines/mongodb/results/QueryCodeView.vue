@@ -9,7 +9,7 @@ import CodeEditor from '../../../components/base/CodeEditor.vue'
 import { generateCode, LANGUAGES } from '../query/queryCodegen'
 import { showToast } from '../../../stores/toast'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
-import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { workspaceIsCollection } from '../../../workspaces/registry'
 import { apiTarget } from '../api/payload'
 
 const languageOptions = LANGUAGES.map((lang) => ({ value: lang.id, label: lang.label }))
@@ -33,7 +33,7 @@ const viewerExt = [keymap.of([...defaultKeymap])]
 
 const queryCode = computed(() => {
   const tab = props.activeTab
-  if (!isCollectionTab(tab)) return ''
+  if (!workspaceIsCollection(tab)) return ''
   const { database, collection } = apiTarget(tab.target)
   return generateCode({
     collection: collection,

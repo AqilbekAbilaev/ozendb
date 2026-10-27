@@ -15,7 +15,7 @@ import NumberStepper from '../../../components/base/NumberStepper.vue'
 import MenuItem from '../../../components/base/MenuItem.vue'
 import FieldError from '../../../components/base/FieldError.vue'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
-import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { workspaceIsCollection } from '../../../workspaces/registry'
 import { apiTarget } from '../api/payload'
 
 const props = defineProps({
@@ -60,7 +60,7 @@ function sortById(dir) {
 // ── query history ──────────────────────────────────────
 async function openHistoryMenu() {
   const tab = props.activeTab
-  if (!isCollectionTab(tab)) return
+  if (!workspaceIsCollection(tab)) return
   if (historyMenu.value) {
     historyMenu.value = false
     return

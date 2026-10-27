@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { insertDocuments } from '../api/documents'
 import { errText } from '../../../utils/errors'
-import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { workspaceIsCollection } from '../../../workspaces/registry'
 import { apiTarget } from '../api/payload'
 
 // Holds a clipboard paste until the user confirms it, keeping the original collection
@@ -12,7 +12,7 @@ export function useDocumentPaste({ activeTab, showToast, requery }) {
 
   async function pasteDocuments() {
     const tab = activeTab()
-    if (!isCollectionTab(tab)) {
+    if (!workspaceIsCollection(tab)) {
       showToast('Open a collection first')
       return
     }

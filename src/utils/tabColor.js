@@ -3,7 +3,6 @@
 // colour can never drift between where it's chosen and where it's shown. Each preset
 // points at an existing theme token (never a raw hex), so the tags stay theme-aware
 // and in step with the rest of the UI — blue is literally the app accent.
-import { isCollectionTab } from './workspaceTypes'
 import { resourceAt } from './resourceRef'
 
 const TAG_COLORS = {
@@ -42,13 +41,14 @@ export function colorHex(value) {
 // otherwise the tab takes its node's colour using the same own-colour-first
 // cascade as the tree — check the collection, then the database, then the
 // connection, and use the first that has a colour. Returns null when nothing set.
-export function tabColorName(tab, tagOverrides) {
+// `isCollection` is whether the tab is a collection tab, which the registry knows.
+export function tabColorName(tab, tagOverrides, isCollection = false) {
   if (!tab) return null
   if (tab.color) return tab.color
   // The levels whose colour the tab can take, deepest first, read off its ref.
   let levels = []
   let keyOf = nodeTagKey
-  if (isCollectionTab(tab)) levels = ['collection', 'database', 'connection']
+  if (isCollection) levels = ['collection', 'database', 'connection']
   else if (tab.type === 'mongodb.shell') levels = ['database', 'connection']
   else if (tab.type.startsWith('postgresql.')) {
     levels = ['table', 'schema', 'database', 'connection']

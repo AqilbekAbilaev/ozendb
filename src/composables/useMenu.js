@@ -7,6 +7,7 @@ import { openConnections } from '../stores/openConnections'
 import { selectedIndex } from '../stores/indexes'
 import { selectedGridfsFile } from '../stores/gridfs'
 import { canRefreshWorkspace } from '../workspaces/lifecycle'
+import { workspaceIsCollection } from '../workspaces/registry'
 
 // Derives what the native menu treats as "selected" and keeps the backend menu in
 // step with it, plus resolves the node a menu action should act on. The actual
@@ -27,6 +28,7 @@ export function useMenu() {
     canRefreshWorkspace(activeTab.value),
     tabs.value,
     !!selectedGridfsFile.value,
+    workspaceIsCollection(activeTab.value),
   ))
 
   // Push the context down to the native menu so gated items enable/disable in step

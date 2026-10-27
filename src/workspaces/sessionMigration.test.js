@@ -5,14 +5,13 @@ import { describe, it, expect } from 'vitest'
 import { migrateSession, toRestoreRecord, sessionRestoreNotice } from './sessionMigration'
 import { restoreWorkspace } from './lifecycle'
 import { registerWorkspaceDefinitions } from './registerDefinitions'
-import { getWorkspaceDefinition } from './registry'
+import { getWorkspaceDefinition, workspaceIsCollection } from './registry'
 import { appDefinitions } from './appDefinitions'
 import { queryDefinitions } from '../engines/mongodb/workspaces/queryDefinitions'
 import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
 import { postgresDefinitions } from '../engines/postgresql/workspaces/postgresDefinitions'
 import { legacy, expected, sessions } from './sessionMigration.fixtures'
 import { migrateTableState } from '../engines/sql/workspaces/tableState'
-import { isCollectionTab } from '../utils/workspaceTypes'
 import { createResourceRef } from '../utils/resourceRef'
 
 registerWorkspaceDefinitions()
@@ -288,7 +287,7 @@ describe('toRestoreRecord bridge', () => {
 
   // A collection tab keeps its query under state and its view under ui; the pinned
   // fixtures are the flat record those come from, so compare against that layout.
-  const flatView = (tab) => (isCollectionTab(tab)
+  const flatView = (tab) => (workspaceIsCollection(tab)
     ? { ...tab, ...tab.state.query, resultView: tab.ui.resultView }
     : tab)
 

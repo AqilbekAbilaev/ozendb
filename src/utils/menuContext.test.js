@@ -107,17 +107,17 @@ describe('deriveMenuContext', () => {
 
     // A collection tab with results but no row selected: still no document context.
     const noSelection = withRuntime({ results: [{ _id: 1 }], selectedRow: -1 })
-    expect(deriveMenuContext(noSelection, null, 1).hasDocument).toBe(false)
+    expect(deriveMenuContext(noSelection, null, 1, false, false, [], false, true).hasDocument).toBe(false)
 
     // A row selected enables whole-document actions but not field actions.
     const rowSelected = withRuntime({ results: [{ _id: 1 }], selectedRow: 0 })
-    const rowCtx = deriveMenuContext(rowSelected, null, 1)
+    const rowCtx = deriveMenuContext(rowSelected, null, 1, false, false, [], false, true)
     expect(rowCtx.hasDocument).toBe(true)
     expect(rowCtx.hasField).toBe(false)
 
     // A selected field enables both.
     const fieldSelected = withRuntime({ results: [{ _id: 1 }], selectedRow: 0, selectedField: '_id' })
-    const fieldCtx = deriveMenuContext(fieldSelected, null, 1)
+    const fieldCtx = deriveMenuContext(fieldSelected, null, 1, false, false, [], false, true)
     expect(fieldCtx.hasDocument).toBe(true)
     expect(fieldCtx.hasField).toBe(true)
   })

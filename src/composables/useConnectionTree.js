@@ -16,8 +16,7 @@ import {
   consumeConnectionOpenRequest,
   treeSelection, setTreeSelection,
 } from '../stores/connectionNavigation'
-import { isCollectionTab } from '../utils/workspaceTypes'
-import { workspaceBrowsesTable } from '../workspaces/registry'
+import { workspaceBrowsesTable, workspaceIsCollection } from '../workspaces/registry'
 
 export function useConnectionTree() {
   // The open-connection registry lives in the store; the tree renders it and owns
@@ -135,7 +134,7 @@ export function useConnectionTree() {
   // SQL table. Its row is the one the tree highlights.
   const activeResource = computed(() => {
     const t = activeTab.value
-    return isCollectionTab(t) || workspaceBrowsesTable(t) ? t : null
+    return workspaceIsCollection(t) || workspaceBrowsesTable(t) ? t : null
   })
   // The connection whose row highlights. Was a startsWith() over the collection key,
   // which prefix-matched an id instead of comparing one, and only ever for MongoDB.

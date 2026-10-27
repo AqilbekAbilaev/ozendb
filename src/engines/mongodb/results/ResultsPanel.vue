@@ -28,7 +28,7 @@ import { useTicker } from '../../../composables/useTicker'
 import { useResultsPagination } from './useResultsPagination'
 import { PAGE_SIZE_OPTIONS } from '../../../constants/pageSizes'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
-import { isCollectionTab } from '../../../utils/workspaceTypes'
+import { workspaceIsCollection } from '../../../workspaces/registry'
 import { resourceName } from '../../../utils/resourceRef'
 
 const VIEW_MODES = [
@@ -137,7 +137,7 @@ const runningMs = computed(() => Math.max(0, now.value - (props.activeTab?.runti
 // Bulk Update / Delete dialogs target a whole collection by query, so they're only
 // meaningful on a collection tab (not aggregate output, not IntelliShell results).
 const isCollection = computed(() =>
-  !props.isAggregate && isCollectionTab(props.activeTab)
+  !props.isAggregate && workspaceIsCollection(props.activeTab)
 )
 
 // Read-only mode is a per-tab guard against accidental writes: it greys out the

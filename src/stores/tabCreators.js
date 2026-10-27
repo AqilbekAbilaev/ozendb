@@ -7,7 +7,7 @@ import { createWorkspace } from '../workspaces/createWorkspace'
 import { openModal, closeModal } from './modals'
 import { defaultQueryLimit, defaultResultView } from './settings'
 import { runQuery } from './queryRunner'
-import { isCollectionTab } from '../utils/workspaceTypes'
+import { workspaceIsCollection } from '../workspaces/registry'
 
 // Every "open a tab" entry point in the app. The tab *shape* is owned by the
 // workspace definitions; this is the orchestration layer — which opens focus an
@@ -133,7 +133,7 @@ export function openSchemaTab({ resource, connectionName }) {
 // selected _ids are resolved here and handed to the modal. The active tab wins when it
 // shows the collection, since the same collection may be open in several tabs (#275).
 export function openExportSource({ resource, connectionName }) {
-  const showsNode = t => isCollectionTab(t) && sameResource(t.target, resource)
+  const showsNode = t => workspaceIsCollection(t) && sameResource(t.target, resource)
   const tab = activeTab.value && showsNode(activeTab.value) ? activeTab.value : tabs.value.find(showsNode)
   const pf = tab ? parseField(tab.state.query.filter) : null
   const rows = (tab && tab.runtime.selectedRows) || []

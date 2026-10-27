@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { isCollectionTab } from '../utils/workspaceTypes'
+import { workspaceIsCollection } from '../workspaces/registry'
 
 export function useSavedQueryBrowser({ activate }) {
   const isOpen = ref(false)
@@ -8,7 +8,7 @@ export function useSavedQueryBrowser({ activate }) {
   let nonce = 0
 
   function open(tab) {
-    if (!isCollectionTab(tab)) return
+    if (!workspaceIsCollection(tab)) return
     targetTabId.value = tab.id
     isOpen.value = true
   }

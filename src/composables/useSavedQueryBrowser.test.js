@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useSavedQueryBrowser } from './useSavedQueryBrowser'
+import { registerWorkspaceDefinitions } from '../workspaces/registerDefinitions'
+
+// Whether a tab is a collection tab is a question for its definition.
+registerWorkspaceDefinitions()
 
 describe('saved query browser lifetime', () => {
   it('keeps the opening collection as the load target after a workspace switch', () => {
