@@ -19,7 +19,7 @@ import { loadSettings, restoreSessionEnabled, editorTabWidth } from "./stores/se
 import { EDITOR_TAB_WIDTH } from "./constants/injectionKeys";
 import { useSessionPersistence } from "./composables/useSessionPersistence";
 import { refreshFindWorkspacesAfterDocumentSave } from "./utils/documentSaveRefresh";
-import { runQuery } from "./stores/queryRunner";
+import { runQuery } from "./engines/mongodb/workspaces/collection/queryRunner";
 import { tabs } from "./stores/tabs";
 import { onDocumentSaved } from "./appApi/events";
 

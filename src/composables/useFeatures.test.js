@@ -10,12 +10,12 @@ registerWorkspaceDefinitions()
 
 const applyColorTag = vi.hoisted(() => vi.fn())
 vi.mock('../stores/toast', () => ({ showToast: vi.fn() }))
-vi.mock('../stores/tabCreators', () => ({
+vi.mock('../engines/mongodb/tabs', () => ({
   openCollectionTab: vi.fn(), openShellTab: vi.fn(), openIndexManagerTab: vi.fn(),
   openSqlTab: vi.fn(), openSchemaTab: vi.fn(), openSearchTab: vi.fn(),
   openCurrentOpsTab: vi.fn(), openExportSource: vi.fn(),
-  openPostgresQuery: vi.fn(), openPostgresTable: vi.fn(),
 }))
+vi.mock('../engines/postgresql/tabs', () => ({ openPostgresQuery: vi.fn(), openPostgresTable: vi.fn() }))
 vi.mock('../stores/modals', () => ({ openModal: vi.fn() }))
 vi.mock('./useDbActions', () => ({ useDbActions: () => ({ pasteClipboard: vi.fn() }) }))
 vi.mock('./useNodeTags', () => ({ useNodeTags: () => ({ applyColorTag }) }))
@@ -25,7 +25,8 @@ vi.mock('./useDbTransfer', () => ({
 
 const { tabs, activeTabId } = await import('../stores/tabs')
 const { showToast } = await import('../stores/toast')
-const { openCollectionTab, openShellTab, openSqlTab, openPostgresQuery, openSearchTab, openCurrentOpsTab } = await import('../stores/tabCreators')
+const { openCollectionTab, openShellTab, openSqlTab, openSearchTab, openCurrentOpsTab } = await import('../engines/mongodb/tabs')
+const { openPostgresQuery } = await import('../engines/postgresql/tabs')
 const { openModal } = await import('../stores/modals')
 const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
 const { MENU_ALIASES } = await import('./useAppMenuActions')

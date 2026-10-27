@@ -9,7 +9,7 @@ vi.mock('../engines/mongodb/api/transfer', () => ({
 vi.mock('../stores/connectionData', () => ({ invalidateConnectionResources: vi.fn() }))
 vi.mock('../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
 vi.mock('../stores/toast', () => ({ showToast: vi.fn() }))
-vi.mock('../stores/tabCreators', () => ({ openImportTab: vi.fn() }))
+vi.mock('../engines/mongodb/tabs', () => ({ openImportTab: vi.fn() }))
 
 import { open } from '@tauri-apps/plugin-dialog'
 import { listDatabases } from '../engines/mongodb/api/resources'
@@ -18,7 +18,7 @@ import { invalidateConnectionResources } from '../stores/connectionData'
 import { openModal, closeModal } from '../stores/modals'
 import { dbClipboard } from '../stores/dbClipboard'
 import { showToast } from '../stores/toast'
-import { openImportTab } from '../stores/tabCreators'
+import { openImportTab } from '../engines/mongodb/tabs'
 import { useDbTransfer } from './useDbTransfer'
 import { useDbActions } from './useDbActions'
 import { createResourceRef } from '../utils/resourceRef'

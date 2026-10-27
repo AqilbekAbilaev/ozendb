@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
-import { runQuery, runAggregate, cancelQuery } from './stores/queryRunner'
-import { openCollectionTab } from './stores/tabCreators'
+import { runQuery, runAggregate, cancelQuery } from './engines/mongodb/workspaces/collection/queryRunner'
+import { openCollectionTab } from './engines/mongodb/tabs'
 import { useMenu } from './composables/useMenu'
 import { useOperations } from './composables/useOperations'
 import { useFeatures } from './composables/useFeatures'

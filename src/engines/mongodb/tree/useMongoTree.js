@@ -5,7 +5,7 @@ import { workspaceIsCollection } from '../../../workspaces/registry'
 import { activeTab } from '../../../stores/tabs'
 import { openConnections } from '../../../stores/openConnections'
 import { treeSelection, setTreeSelection } from '../../../stores/connectionNavigation'
-import { openCollectionTab } from '../../../stores/tabCreators'
+import { openCollectionTab } from '../tabs'
 
 const databaseRef = (connectionId, database) => createResourceRef(connectionId, [{ kind: 'database', name: database }])
 const collectionRef = (connectionId, database, collection) => appendResource(databaseRef(connectionId, database), 'collection', collection)

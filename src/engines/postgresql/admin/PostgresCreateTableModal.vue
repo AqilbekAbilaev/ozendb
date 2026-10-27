@@ -11,7 +11,7 @@ import HintText from '../../../components/base/HintText.vue'
 import { errText } from '../../../utils/errors'
 import { showToast } from '../../../stores/toast'
 import { invalidateConnectionResources } from '../../../stores/connectionData'
-import { openPostgresTable } from '../../../stores/tabCreators'
+import { openPostgresTable } from '../tabs'
 import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 
 // Schema → Create Table…: a name and a column list, and the new table opens in a tab.

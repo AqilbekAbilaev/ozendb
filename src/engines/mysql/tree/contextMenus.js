@@ -1,4 +1,4 @@
-import { openMySqlQuery, openMySqlTable } from '../../../stores/tabCreators'
+import { openMySqlQuery, openMySqlTable } from '../tabs'
 import { openModal } from '../../../stores/modals'
 import { resourceName, segmentName } from '../../../utils/resourceRef'
 import { CHOOSE_COLOR, COPY_NAME, DISCONNECT, REFRESH_NODE } from '../../../constants/contextMenus'

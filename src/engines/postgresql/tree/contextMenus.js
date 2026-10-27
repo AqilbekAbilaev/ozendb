@@ -1,4 +1,4 @@
-import { openPostgresQuery, openPostgresTable, openPostgresSearch } from '../../../stores/tabCreators'
+import { openPostgresQuery, openPostgresTable, openPostgresSearch } from '../tabs'
 import { openModal } from '../../../stores/modals'
 import { CHOOSE_COLOR, COPY_NAME, DISCONNECT, REFRESH_NODE } from '../../../constants/contextMenus'
 
