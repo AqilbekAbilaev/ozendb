@@ -5,7 +5,7 @@ import {
 } from '../tabs'
 import { useDbActions } from './useDbActions'
 import { useDbTransfer } from './useDbTransfer'
-import { dbClipboard } from '../../../stores/dbClipboard'
+import { dbClipboard } from './dbClipboard'
 import { MODALS } from '../../../constants/modalRegistry'
 import { resourceAt, resourceName } from '../../../utils/resourceRef'
 import { openModal } from '../../../stores/modals'

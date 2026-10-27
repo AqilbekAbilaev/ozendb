@@ -1,6 +1,6 @@
 import { listDatabases } from '../api/resources'
 import { showToast } from '../../../stores/toast'
-import { dbClipboard } from '../../../stores/dbClipboard'
+import { dbClipboard } from './dbClipboard'
 import { copyCollection, copyCollectionToConnection } from '../api/transfer'
 import { errText } from '../../../utils/errors'
 import { resourceName } from '../../../utils/resourceRef'
