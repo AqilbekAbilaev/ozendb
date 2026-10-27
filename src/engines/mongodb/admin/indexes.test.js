@@ -5,8 +5,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // API boundary, including the frozen drop target — a tab switch while the confirm
 // modal is open must never redirect the drop — and the revision signal the pane
 // watches to reload its own list after a confirmed drop.
-vi.mock('./toast', () => ({ showToast: vi.fn() }))
-vi.mock('../engines/mongodb/api/indexes', () => ({
+vi.mock('../../../stores/toast', () => ({ showToast: vi.fn() }))
+vi.mock('../api/indexes', () => ({
   createIndex: vi.fn(),
   dropIndex: vi.fn(),
   indexStats: vi.fn(),
@@ -15,8 +15,8 @@ vi.mock('../engines/mongodb/api/indexes', () => ({
 }))
 
 const ix = await import('./indexes')
-const { showToast } = await import('./toast')
-const api = await import('../engines/mongodb/api/indexes')
+const { showToast } = await import('../../../stores/toast')
+const api = await import('../api/indexes')
 
 beforeEach(() => {
   vi.clearAllMocks()

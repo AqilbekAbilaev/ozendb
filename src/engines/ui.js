@@ -1,5 +1,5 @@
 // The component half of the engine table (engines/index.js), for components only:
-// what each engine's connection editor shows, and its own sidebar rows.
+// what each engine's connection editor shows, its own sidebar rows, and its dialogs.
 import MongoServerFields from './mongodb/connection/MongoServerFields.vue'
 import MongoAuthFields from './mongodb/connection/MongoAuthFields.vue'
 import MongoSslFields from './mongodb/connection/MongoSslFields.vue'
@@ -14,6 +14,8 @@ import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
 import MongoTreeNodes from './mongodb/tree/MongoTreeNodes.vue'
 import PostgresTreeNodes from './postgresql/tree/PostgresTreeNodes.vue'
 import MySqlTreeNodes from './mysql/tree/MySqlTreeNodes.vue'
+import IndexDetailsModal from './mongodb/admin/IndexDetailsModal.vue'
+import DropIndexModal from './mongodb/admin/DropIndexModal.vue'
 
 // Tabs whose body is the same for every engine, so NewConnection.vue renders them itself.
 export const SHARED_TABS = ['ssh', 'general']
@@ -74,3 +76,9 @@ export const TREE_NODES = Object.freeze({
   postgresql: PostgresTreeNodes,
   mysql: MySqlTreeNodes,
 })
+
+// Dialogs an engine keeps mounted app-wide, each showing itself from its own store rather
+// than through openModal; AppModals.vue renders every one. MongoDB's index dialogs overlay
+// the Index Manager and keep their open state, typed text and frozen drop target in
+// mongodb/admin/indexes.js.
+export const MOUNTED_DIALOGS = Object.freeze([IndexDetailsModal, DropIndexModal])
