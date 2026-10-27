@@ -10,6 +10,12 @@ import {
 } from './collectionState'
 import { MongoCollectionWorkspace, ShellConsole } from './panes'
 
+// The levels a tab with no colour of its own takes one from, deepest first: a
+// collection tab from its collection, database or connection; a shell from its
+// database or connection.
+const COLLECTION_COLOR_LEVELS = ['collection', 'database', 'connection']
+const SHELL_COLOR_LEVELS = ['database', 'connection']
+
 // The editor+result spine shared by every collection-scoped query mode. Scalar
 // defaults arrive from the creator; the fallbacks mirror the app's settings defaults
 // so a definition used without a context still produces a sane tab.
@@ -142,6 +148,7 @@ export const queryDefinitions = [
     // over it; this puts them back (see collectionState.js).
     component: MongoCollectionWorkspace,
     paneKind: 'collection',
+    colorLevels: COLLECTION_COLOR_LEVELS,
     // A find only reads, so Refresh may run it again; the other query modes can write.
     canRefresh: () => true,
     create(ctx) {
@@ -169,6 +176,7 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: MongoCollectionWorkspace,
     paneKind: 'collection',
+    colorLevels: COLLECTION_COLOR_LEVELS,
     create(ctx) {
       return createCollection(ctx, 'aggregate')
     },
@@ -186,6 +194,7 @@ export const queryDefinitions = [
     engine: 'mongodb',
     component: MongoCollectionWorkspace,
     paneKind: 'collection',
+    colorLevels: COLLECTION_COLOR_LEVELS,
     create(ctx) {
       const base = createCollection(ctx, 'sql', {
         sql: 'SELECT *\nFROM ' + resourceName(ctx.target.resource),
@@ -227,6 +236,7 @@ export const queryDefinitions = [
     type: 'mongodb.shell',
     engine: 'mongodb',
     component: ShellConsole,
+    colorLevels: SHELL_COLOR_LEVELS,
     create(ctx) {
       const { resource, connectionName } = ctx.target
       return shellWorkspace({ connectionName: connectionName, target: resource }, ctx)

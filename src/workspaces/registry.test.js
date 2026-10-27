@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { workspaceComponentFor, workspacePaneKind, workspaceIsCollection, registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
+import { workspaceComponentFor, workspacePaneKind, workspaceIsCollection, workspaceColorLevels, registerWorkspaceDefinition, getWorkspaceDefinition } from './registry'
 import { registerWorkspaceDefinitions } from './registerDefinitions'
+import { appDefinitions } from './appDefinitions'
+import { queryDefinitions } from '../engines/mongodb/workspaces/queryDefinitions'
+import { toolDefinitions } from '../engines/mongodb/workspaces/toolDefinitions'
+import { postgresDefinitions } from '../engines/postgresql/workspaces/postgresDefinitions'
+import { mysqlDefinitions } from '../engines/mysql/workspaces/mysqlDefinitions'
+import { ENGINES } from '../engines/index.js'
 import QuickstartPane from '../components/panes/QuickstartPane.vue'
 
 describe('workspaceComponentFor', () => {
@@ -61,6 +67,34 @@ describe('workspaceIsCollection', () => {
     }
     expect(workspaceIsCollection(null)).toBe(false)
     expect(workspaceIsCollection({ kind: 'collection' })).toBe(false)
+  })
+})
+
+describe('workspaceColorLevels', () => {
+  it('names the levels each tab takes a colour from, deepest first', () => {
+    for (const type of ['mongodb.find', 'mongodb.aggregate', 'mongodb.sql_to_mql']) {
+      expect(workspaceColorLevels({ type }), type).toEqual(['collection', 'database', 'connection'])
+    }
+    expect(workspaceColorLevels({ type: 'mongodb.shell' })).toEqual(['database', 'connection'])
+    for (const type of ['postgresql.table_browse', 'postgresql.query', 'postgresql.search']) {
+      expect(workspaceColorLevels({ type }), type).toEqual(['table', 'schema', 'database', 'connection'])
+    }
+  })
+
+  it('is empty for tabs that inherit no colour, unknown types and no tab', () => {
+    for (const type of ['app.quickstart', 'mongodb.indexes', 'mysql.table_browse', 'mysql.query', 'bogus.type']) {
+      expect(workspaceColorLevels({ type }), type).toEqual([])
+    }
+    expect(workspaceColorLevels(null)).toEqual([])
+  })
+
+  // The tab bar keys each level with the engine's tag key, so a definition that takes a
+  // colour must belong to an engine that has one.
+  it('belongs, for every definition with levels, to an engine with a tag key', () => {
+    const all = [...appDefinitions, ...queryDefinitions, ...toolDefinitions, ...postgresDefinitions, ...mysqlDefinitions]
+    for (const def of all.filter((d) => d.colorLevels?.length)) {
+      expect(typeof ENGINES[def.engine]?.tagKey, def.type).toBe('function')
+    }
   })
 })
 

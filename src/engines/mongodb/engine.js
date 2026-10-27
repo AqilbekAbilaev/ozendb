@@ -4,6 +4,7 @@ import { useMongoFields } from './connection/useMongoFields.js'
 import { listDatabases } from './api/resources.js'
 import { collectionStats, databaseStats } from './api/admin.js'
 import { mongoMenu } from './menu.js'
+import { nodeTagKey } from '../../utils/tabColor.js'
 
 export const mongodb = Object.freeze({
   id: 'mongodb',
@@ -24,4 +25,6 @@ export const mongodb = Object.freeze({
   }),
   // Its switches for the native menu (utils/menuContext's deriveMenuContext).
   menu: mongoMenu,
+  // How a node's colour tag is keyed in the tag store, for the tab bar (utils/tabColor).
+  tagKey: nodeTagKey,
 })

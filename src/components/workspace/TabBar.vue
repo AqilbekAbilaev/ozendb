@@ -4,7 +4,8 @@ import { contextMenu } from '../../stores/contextMenu'
 import BaseIcon from '../base/BaseIcon.vue'
 import { colorHex, tabColorName } from '../../utils/tabColor.js'
 import { tagOverrides } from '../../stores/nodeTags'
-import { workspaceIsCollection } from '../../workspaces/registry'
+import { workspaceColorLevels } from '../../workspaces/registry'
+import { engineOf } from '../../engines/index.js'
 import { findDropIndex } from '../../composables/useColumnReorder'
 
 const props = defineProps({
@@ -17,7 +18,7 @@ const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab'])
 
 // The colour name shown on a tab, resolved (with inheritance) by the shared util.
 function tabColor(t) {
-  return tabColorName(t, tagOverrides.value, workspaceIsCollection(t))
+  return tabColorName(t, tagOverrides.value, workspaceColorLevels(t), engineOf(t).tagKey)
 }
 
 // Overflow handling: tabs keep their natural (content) width, so we measure each

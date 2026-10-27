@@ -39,21 +39,15 @@ export function colorHex(value) {
 
 // The colour name in effect for a tab: a colour set on the tab itself wins;
 // otherwise the tab takes its node's colour using the same own-colour-first
-// cascade as the tree — check the collection, then the database, then the
-// connection, and use the first that has a colour. Returns null when nothing set.
-// `isCollection` is whether the tab is a collection tab, which the registry knows.
-export function tabColorName(tab, tagOverrides, isCollection = false) {
+// cascade as the tree — check each of `levels` in turn (deepest first, read off
+// the tab's ref: say the collection, then the database, then the connection) and
+// use the first that has a colour. The tab's workspace definition names its levels
+// and its engine gives `keyOf`, which turns a level's ref into its tag-store key;
+// with no levels it is never called. Returns null when nothing set.
+export function tabColorName(tab, tagOverrides, levels = [], keyOf = null) {
   if (!tab) return null
   if (tab.color) return tab.color
-  // The levels whose colour the tab can take, deepest first, read off its ref.
-  let levels = []
-  let keyOf = nodeTagKey
-  if (isCollection) levels = ['collection', 'database', 'connection']
-  else if (tab.type === 'mongodb.shell') levels = ['database', 'connection']
-  else if (tab.type.startsWith('postgresql.')) {
-    levels = ['table', 'schema', 'database', 'connection']
-    keyOf = pgTagKey
-  }
+  if (!levels.length) return null
   const keys = levels.map((level) => resourceAt(tab.target, level)).filter(Boolean).map(keyOf)
   for (const key of keys) {
     const name = tagOverrides ? tagOverrides[key] : null

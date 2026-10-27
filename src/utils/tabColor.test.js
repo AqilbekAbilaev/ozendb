@@ -13,44 +13,54 @@ describe('nodeTagName', () => {
 
 describe('tabColorName', () => {
   const pg = (...names) => createResourceRef('p1', names.map((name, i) => ({ kind: ['database', 'schema', 'table'][i], name })))
+  // What the tab bar passes for a PostgreSQL and a MongoDB collection tab: the levels its
+  // workspace definition declares and its engine's tag key.
+  const pgColor = (tab, overrides) => tabColorName(tab, overrides, ['table', 'schema', 'database', 'connection'], pgTagKey)
+  const collectionColor = (tab, overrides) => tabColorName(tab, overrides, ['collection', 'database', 'connection'], nodeTagKey)
 
   it('gives each PostgreSQL tab its deepest coloured level: table, schema, database, connection', () => {
     const table = { type: 'postgresql.table_browse', target: pg('pay', 'public', 't') }
     const search = { type: 'postgresql.search', target: pg('pay', 'public') }
     const query = { type: 'postgresql.query', target: pg('pay') }
     const overrides = { p1: 'purple', 'p1/pay': 'blue', 'p1/pay/public': 'green', 'p1/pay/public/t': 'red' }
-    expect(tabColorName(table, overrides)).toBe('red')
-    expect(tabColorName(search, overrides)).toBe('green')
-    expect(tabColorName(query, overrides)).toBe('blue')
+    expect(pgColor(table, overrides)).toBe('red')
+    expect(pgColor(search, overrides)).toBe('green')
+    expect(pgColor(query, overrides)).toBe('blue')
     delete overrides['p1/pay/public/t']
-    expect(tabColorName(table, overrides)).toBe('green')
+    expect(pgColor(table, overrides)).toBe('green')
     delete overrides['p1/pay/public']
-    expect(tabColorName(search, overrides)).toBe('blue')
+    expect(pgColor(search, overrides)).toBe('blue')
     delete overrides['p1/pay']
-    expect(tabColorName(table, overrides)).toBe('purple')
+    expect(pgColor(table, overrides)).toBe('purple')
   })
 
   it('reads a PostgreSQL tab\'s colour under the key its row saves it as', () => {
     const tab = { type: 'postgresql.table_browse', target: pg('pay', 'a/b', 'c') }
-    expect(tabColorName(tab, { [pgTagKey(pg('pay', 'a/b', 'c'))]: 'red' })).toBe('red')
-    expect(tabColorName(tab, { [pgTagKey(pg('pay', 'a', 'b/c'))]: 'red' })).toBe(null)
+    expect(pgColor(tab, { [pgTagKey(pg('pay', 'a/b', 'c'))]: 'red' })).toBe('red')
+    expect(pgColor(tab, { [pgTagKey(pg('pay', 'a', 'b/c'))]: 'red' })).toBe(null)
   })
 
   it('gives a PostgreSQL table or SQL tab its connection\'s colour', () => {
     const overrides = { p1: 'purple' }
     const table = createResourceRef('p1', [{ kind: 'database', name: 'payments' }, { kind: 'schema', name: 'public' }, { kind: 'table', name: 't' }])
-    expect(tabColorName({ type: 'postgresql.table_browse', target: table }, overrides)).toBe('purple')
-    expect(tabColorName({ type: 'postgresql.query', target: createResourceRef('p1', [{ kind: 'database', name: 'payments' }]) }, overrides)).toBe('purple')
+    expect(pgColor({ type: 'postgresql.table_browse', target: table }, overrides)).toBe('purple')
+    expect(pgColor({ type: 'postgresql.query', target: createResourceRef('p1', [{ kind: 'database', name: 'payments' }]) }, overrides)).toBe('purple')
   })
 
   it('lets a tab\'s own colour win over its connection\'s', () => {
-    expect(tabColorName({ type: 'postgresql.table_browse', connectionId: 'p1', color: 'red' }, { p1: 'purple' })).toBe('red')
+    expect(pgColor({ type: 'postgresql.table_browse', connectionId: 'p1', color: 'red' }, { p1: 'purple' })).toBe('red')
   })
 
   it('keeps MongoDB\'s nearest-coloured-ancestor rule', () => {
     const tab = { type: 'mongodb.find', target: createResourceRef('c1', [{ kind: 'database', name: 'shop' }, { kind: 'collection', name: 'orders' }]) }
-    expect(tabColorName(tab, { c1: 'green', 'c1/shop': 'blue' }, true)).toBe('blue')
-    expect(tabColorName(tab, { c1: 'green' }, true)).toBe('green')
+    expect(collectionColor(tab, { c1: 'green', 'c1/shop': 'blue' })).toBe('blue')
+    expect(collectionColor(tab, { c1: 'green' })).toBe('green')
+  })
+
+  it('gives a tab with no levels only its own colour, without needing a key format', () => {
+    const tab = { type: 'mysql.query', target: createResourceRef('m1', [{ kind: 'database', name: 'shop' }]) }
+    expect(tabColorName(tab, { m1: 'green', 'm1/shop': 'blue' }, [])).toBe(null)
+    expect(tabColorName({ ...tab, color: 'red' }, { m1: 'green' }, [])).toBe('red')
   })
 })
 
