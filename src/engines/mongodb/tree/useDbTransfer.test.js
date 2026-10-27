@@ -1,27 +1,27 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
-vi.mock('../engines/mongodb/api/resources', () => ({ listDatabases: vi.fn() }))
-vi.mock('../engines/mongodb/api/transfer', () => ({
+vi.mock('../api/resources', () => ({ listDatabases: vi.fn() }))
+vi.mock('../api/transfer', () => ({
   exportCollection: vi.fn(), importCollection: vi.fn(),
   copyCollection: vi.fn(), copyCollectionToConnection: vi.fn(),
 }))
-vi.mock('../stores/connectionData', () => ({ invalidateConnectionResources: vi.fn() }))
-vi.mock('../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
-vi.mock('../stores/toast', () => ({ showToast: vi.fn() }))
-vi.mock('../engines/mongodb/tabs', () => ({ openImportTab: vi.fn() }))
+vi.mock('../../../stores/connectionData', () => ({ invalidateConnectionResources: vi.fn() }))
+vi.mock('../../../stores/modals', () => ({ openModal: vi.fn(), closeModal: vi.fn() }))
+vi.mock('../../../stores/toast', () => ({ showToast: vi.fn() }))
+vi.mock('../tabs', () => ({ openImportTab: vi.fn() }))
 
 import { open } from '@tauri-apps/plugin-dialog'
-import { listDatabases } from '../engines/mongodb/api/resources'
-import { importCollection, copyCollection, copyCollectionToConnection } from '../engines/mongodb/api/transfer'
-import { invalidateConnectionResources } from '../stores/connectionData'
-import { openModal, closeModal } from '../stores/modals'
-import { dbClipboard } from '../stores/dbClipboard'
-import { showToast } from '../stores/toast'
-import { openImportTab } from '../engines/mongodb/tabs'
+import { listDatabases } from '../api/resources'
+import { importCollection, copyCollection, copyCollectionToConnection } from '../api/transfer'
+import { invalidateConnectionResources } from '../../../stores/connectionData'
+import { openModal, closeModal } from '../../../stores/modals'
+import { dbClipboard } from '../../../stores/dbClipboard'
+import { showToast } from '../../../stores/toast'
+import { openImportTab } from '../tabs'
 import { useDbTransfer } from './useDbTransfer'
 import { useDbActions } from './useDbActions'
-import { createResourceRef } from '../utils/resourceRef'
+import { createResourceRef } from '../../../utils/resourceRef'
 
 beforeEach(() => vi.resetAllMocks())
 

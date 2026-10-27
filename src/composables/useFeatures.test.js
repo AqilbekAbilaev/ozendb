@@ -17,15 +17,15 @@ vi.mock('../engines/mongodb/tabs', () => ({
 }))
 vi.mock('../engines/postgresql/tabs', () => ({ openPostgresQuery: vi.fn(), openPostgresTable: vi.fn() }))
 vi.mock('../stores/modals', () => ({ openModal: vi.fn() }))
-vi.mock('./useDbActions', () => ({ useDbActions: () => ({ pasteClipboard: vi.fn() }) }))
+vi.mock('../engines/mongodb/tree/useDbActions', () => ({ useDbActions: () => ({ pasteClipboard: vi.fn() }) }))
 vi.mock('./useNodeTags', () => ({ useNodeTags: () => ({ applyColorTag }) }))
-vi.mock('./useDbTransfer', () => ({
+vi.mock('../engines/mongodb/tree/useDbTransfer', () => ({
   useDbTransfer: () => ({ openImportWizard: vi.fn(), exportDatabase: vi.fn(), importDatabase: vi.fn() }),
 }))
 
 const { tabs, activeTabId } = await import('../stores/tabs')
 const { showToast } = await import('../stores/toast')
-const { openCollectionTab, openShellTab, openSqlTab, openSearchTab, openCurrentOpsTab } = await import('../engines/mongodb/tabs')
+const { openShellTab, openSearchTab } = await import('../engines/mongodb/tabs')
 const { openPostgresQuery } = await import('../engines/postgresql/tabs')
 const { openModal } = await import('../stores/modals')
 const { useFeatures, UNBUILT_ACTIONS } = await import('./useFeatures')
@@ -34,7 +34,6 @@ const { MENUS } = await import('../constants/contextMenus')
 const { PG_MENUS, PG_ACTIONS } = await import('../engines/postgresql/tree/contextMenus')
 const { MYSQL_ACTIONS, MYSQL_MENUS } = await import('../engines/mysql/tree/contextMenus')
 const { contextMenu } = await import('../stores/contextMenu')
-const { treeSelection, setTreeSelection } = await import('../stores/connectionNavigation')
 
 vi.mock('../appApi/connections', () => ({
   disconnect: vi.fn(() => Promise.resolve()),
@@ -214,115 +213,18 @@ describe('global toolbar routing', () => {
     expect(openShellTab).toHaveBeenCalledWith({ resource: dbRef('c1', 'shop'), connectionName: 'Sales' })
   })
 
-  it('opens the collection explicitly resolved by the native menu', () => {
-    const target = { resource: collRef('c2', 'warehouse', 'stock'), connectionName: 'Sales' }
-    const features = makeFeatures()
-
-    features.handleTool('collection', target)
-
-    expect(openCollectionTab).toHaveBeenCalledWith(target)
-  })
-
-  // With no explicit target, the toolbar's Collection button opens whatever is
-  // highlighted in the sidebar — and clears that highlight, since the opened tab's
-  // own active-collection highlight takes over.
-  it('opens the sidebar selection when no target is given', () => {
-    setTreeSelection({ resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales', engine: 'mongodb' })
-    makeFeatures().handleTool('collection')
-
-    expect(openCollectionTab).toHaveBeenCalledWith({ resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' })
-    expect(treeSelection.value).toBeNull()
-  })
-
-  it('guides the user when nothing in the sidebar is a collection', () => {
-    setTreeSelection({ resource: dbRef('c1', 'shop'), connectionName: 'Sales', engine: 'mongodb' })
-    makeFeatures().handleTool('collection')
-
-    expect(openCollectionTab).not.toHaveBeenCalled()
-    expect(showToast).toHaveBeenCalledWith('Select a collection in the sidebar first')
+  it('reports a tool no engine handles as a fault', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    makeFeatures().handleTool('nope')
+    expect(showToast).toHaveBeenCalledWith('Could not run "nope"')
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
   })
 })
 
-// Every entry point hands the handlers a ResourceRef; each handler cuts it to the level
-// its action needs before passing it on, so a deeper row acts on its own ancestor.
-describe('feature nodes arrive as a ResourceRef', () => {
-  const ordersRow = {
-    type: 'collection', x: 0, y: 0, label: 'orders',
-    nodeData: { resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' },
-  }
-
-  it('opens a database tool for the database of a right-clicked collection', () => {
-    contextMenu.value = ordersRow
-    makeFeatures().handleContextAction('file:intellishell')
-    expect(openShellTab).toHaveBeenCalledWith({ resource: dbRef('c1', 'shop'), connectionName: 'Sales' })
-  })
-
-  it('gives a connection-scoped tool no database or collection to filter on', () => {
-    contextMenu.value = ordersRow
-    makeFeatures().handleContextAction('db:current_ops')
-    expect(openCurrentOpsTab).toHaveBeenCalledWith({
-      resource: createResourceRef('c1'), connectionName: 'Sales',
-    })
-  })
-
-  it('opens a collection-level modal with the collection\'s ref', () => {
-    contextMenu.value = ordersRow
-    makeFeatures().handleContextAction('coll:stats')
-    expect(openModal).toHaveBeenCalledWith('stats', {
-      resource: createResourceRef('c1', [
-        { kind: 'database', name: 'shop' },
-        { kind: 'collection', name: 'orders' },
-      ]),
-      connectionName: 'Sales',
-    })
-  })
-
-  // Every level now goes through the same conversion, so a modal's payload is its ref and
-  // the connection's display name — never the flat fields (#193).
-  it('opens a registry modal with exactly its level\'s target, at every level', () => {
-    contextMenu.value = ordersRow
-    const features = makeFeatures()
-    for (const action of ['coll:validator', 'coll:history', 'coll:mapreduce', 'coll:drop', 'coll:rename', 'coll:duplicate']) {
-      features.handleContextAction(action)
-      contextMenu.value = ordersRow
-    }
-    for (const [, payload] of openModal.mock.calls) {
-      expect(Object.keys(payload).sort()).toEqual(['connectionName', 'resource'])
-    }
-  })
-
-  it('opens a connection-level modal with the connection\'s ref and its name', () => {
-    contextMenu.value = ordersRow
-    makeFeatures().handleContextAction('file:server_status')
-    expect(openModal).toHaveBeenCalledWith('serverStatus', {
-      resource: createResourceRef('c1'), connectionName: 'Sales',
-    })
-  })
-
-  it('opens the shared server info modal with its kind and title beside the ref', () => {
-    makeFeatures().runFeature('conn:host_info', createResourceRef('c1'), { connectionName: 'Sales' })
-    expect(openModal).toHaveBeenCalledWith('serverInfo', {
-      resource: createResourceRef('c1'), connectionName: 'Sales', kind: 'host', title: 'Host Info',
-    })
-  })
-
-  it('opens a database-level modal with the database\'s ref', () => {
-    contextMenu.value = ordersRow
-    makeFeatures().handleContextAction('db:database_stats')
-    expect(openModal).toHaveBeenCalledWith('dbStats', {
-      resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]), connectionName: 'Sales',
-    })
-  })
-
-  it('seeds Add View Here with the clicked collection beside its database\'s ref', () => {
-    contextMenu.value = ordersRow
-    makeFeatures().handleContextAction('coll:add_view')
-    expect(openModal).toHaveBeenCalledWith('addView', {
-      resource: createResourceRef('c1', [{ kind: 'database', name: 'shop' }]),
-      connectionName: 'Sales', source: 'orders',
-    })
-  })
-
+// MongoDB's actions (engines/mongodb/tree/actions.js) come through the engine table, and
+// the level check guarding them is the dispatcher's.
+describe('engine actions run through the shared level check', () => {
   it('guides the user when the node is too shallow for the action', () => {
     makeFeatures().runFeature('coll:stats', createResourceRef('c1', [{ kind: 'database', name: 'shop' }]))
     expect(openModal).not.toHaveBeenCalled()
@@ -357,65 +259,6 @@ describe('color tag persistence', () => {
     await features.handleContextAction('node:color:red')
 
     expect(showToast).toHaveBeenCalledWith('Could not save color tag: disk full')
-  })
-})
-
-// A tool workspace as toolDefinitions builds it: the long spelling, and a target at the
-// tool's own scope. Current Operations is connection-scoped; its dbName and collName are
-// filters, and only the target says so.
-const toolTab = (id, connId, db, coll, kind) => {
-  const connectionScoped = kind === 'currentOps'
-  return {
-    id, type: connectionScoped ? 'mongodb.current_operations' : 'mongodb.' + kind,
-    connectionId: connId, connectionName: 'Sales', dbName: db,
-    ...(connectionScoped ? { collName: coll } : { collectionName: coll }),
-    target: createResourceRef(connId, connectionScoped ? [] : [
-      { kind: 'database', name: db }, { kind: 'collection', name: coll },
-    ]),
-  }
-}
-
-describe('handleTool falling back to the active workspace', () => {
-  beforeEach(() => {
-    tabs.value = [toolTab('s1', 'c1', 'shop', 'orders', 'schema')]
-    activeTabId.value = 's1'
-  })
-
-  // The toolbar passes no target, so the active workspace is it, read through its
-  // target rather than whichever identity fields it happens to carry.
-  it('opens IntelliShell for the database a Schema tab is scoped to', () => {
-    makeFeatures().handleTool('shell')
-    expect(openShellTab).toHaveBeenCalledWith({ resource: dbRef('c1', 'shop'), connectionName: 'Sales' })
-    expect(showToast).not.toHaveBeenCalled()
-  })
-
-  it('opens SQL for the collection a Schema tab is scoped to', () => {
-    makeFeatures().handleTool('sql')
-    expect(openSqlTab).toHaveBeenCalledWith({ resource: collRef('c1', 'shop', 'orders'), connectionName: 'Sales' })
-  })
-
-  // Current Operations is connection-scoped: its dbName/collName are filters, so a
-  // database-scoped tool must not act on them.
-  it('does not treat Current Operations filters as a database', () => {
-    tabs.value = [toolTab('o1', 'c1', 'shop', 'orders', 'currentOps')]
-    activeTabId.value = 'o1'
-    makeFeatures().handleTool('shell')
-    expect(openShellTab).not.toHaveBeenCalled()
-    expect(showToast).toHaveBeenCalled()
-  })
-
-  // A PostgreSQL SQL tab's target is database-deep, the same depth as a MongoDB
-  // database: only its engine says it names nothing a MongoDB tool can act on.
-  it('does not treat a PostgreSQL tab as a MongoDB database', () => {
-    tabs.value = [{
-      id: 'p1', type: 'postgresql.query', engine: 'postgresql',
-      connectionId: 'pg1', connectionName: 'Payments', database: 'app',
-      target: createResourceRef('pg1', [{ kind: 'database', name: 'app' }]),
-    }]
-    activeTabId.value = 'p1'
-    makeFeatures().handleTool('shell')
-    expect(openShellTab).not.toHaveBeenCalled()
-    expect(showToast).toHaveBeenCalled()
   })
 })
 

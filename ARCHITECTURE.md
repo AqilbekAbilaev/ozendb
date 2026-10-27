@@ -33,7 +33,7 @@ Four rings, outermost first. A ring may import inwards, never outwards — **enf
 | Layer | What lives there |
 |---|---|
 | `src/components/` | Rendering and event wiring only. Grouped by area: `app/`, `base/`, `connection/`, `panes/`, `query/`, `workspace/`. |
-| `src/composables/` | Stateful slices that need a component's lifetime or a caller's wiring (`useFeatures`, `useMenu`, `useConnectionTree`, `useDbActions`, …). Anything that is really app-wide state belongs in `stores/` instead — most of what used to live here has moved. |
+| `src/composables/` | Stateful slices that need a component's lifetime or a caller's wiring (`useFeatures`, `useMenu`, `useConnectionTree`, …). Anything that is really app-wide state belongs in `stores/` instead — most of what used to live here has moved. |
 | `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (the shared "open a tab" steps and Quickstart; each engine's openers are its `tabs.js`) · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `updater.js` · `premium.js` · `toast.js` · `dbClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
 | `src/utils/` | Pure functions. No Vue, no I/O. |
 
@@ -130,7 +130,9 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
   the dialogs an engine keeps mounted app-wide.
 - **`src/engines/modals.js`** — each engine's rows for the modal registry (its `modals.js`), all
   loaded lazily, so the composables that read the registry load no components.
-- **`src/engines/contextActions.js`** — right-click menus and actions an engine handles itself.
+- **`src/engines/contextActions.js`** — right-click menus and actions an engine handles itself,
+  and each engine's toolbar tools. MongoDB's actions go through useFeatures' level check, so
+  they are `{ requires, run }` entries (`mongodb/tree/actions.js`) the dispatcher merges in.
 - **`src/engines/sql/`** — the table and SQL tabs every SQL engine shares. What differs comes
   from the tab's engine as `engineOf(tab).sql`: its `dialect` (quoting, case-insensitive
   matching, column-type kinds, which columns take a value), its `api` (the commands the tabs

@@ -1,10 +1,10 @@
-import { listDatabases } from '../engines/mongodb/api/resources'
-import { showToast } from '../stores/toast'
-import { dbClipboard } from '../stores/dbClipboard'
-import { copyCollection, copyCollectionToConnection } from '../engines/mongodb/api/transfer'
-import { errText } from '../utils/errors'
-import { resourceName } from '../utils/resourceRef'
-import { invalidateConnectionResources } from '../stores/connectionData'
+import { listDatabases } from '../api/resources'
+import { showToast } from '../../../stores/toast'
+import { dbClipboard } from '../../../stores/dbClipboard'
+import { copyCollection, copyCollectionToConnection } from '../api/transfer'
+import { errText } from '../../../utils/errors'
+import { resourceName } from '../../../utils/resourceRef'
+import { invalidateConnectionResources } from '../../../stores/connectionData'
 
 // Clipboard paste for collections and databases, same-connection or cross-server. The
 // add/drop/rename/duplicate dialogs used to live here too; each is now a component that
