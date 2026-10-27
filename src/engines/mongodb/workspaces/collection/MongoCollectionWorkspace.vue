@@ -1,8 +1,9 @@
 <script setup>
 // The MongoDB collection workspace: find, aggregate, and SQL-to-MQL query behavior and
-// rendering. What it does with the query lives in useCollectionRun; this component
-// renders it. The host (WorkspaceArea.vue) owns the tab bar, other pane kinds, and the
-// result sub-tab compatibility ref this component reads/writes via v-model.
+// rendering. What it does with the query lives in useCollectionRun, which runs it
+// itself; this component renders it. The host (WorkspaceArea.vue) owns the tab bar, other
+// pane kinds, the saved-query browser, and the result sub-tab compatibility ref this
+// component reads/writes via v-model.
 import QueryBar from '../../query/QueryBar.vue'
 import SqlQueryBar from '../../query/SqlQueryBar.vue'
 import PipelineEditor from '../../query/PipelineEditor.vue'
@@ -12,6 +13,7 @@ import { computed } from 'vue'
 import { useInitialFindRun } from './useInitialFindRun'
 import { useCollectionRun } from './useCollectionRun'
 import { apiTarget } from '../../api/payload'
+import { runQuery as runFind } from './queryRunner'
 
 const props = defineProps({
   activeTab:        { type: Object, required: true },
@@ -20,18 +22,15 @@ const props = defineProps({
   resultTab:        { type: String, required: true },
   savedQueryRequest: { type: Object, default: null },
 })
-const emit = defineEmits([
-  'update:result-tab', 'run-query', 'run-aggregate',
-  'cancel-query', 'follow-reference', 'open-query-browser', 'saved-query-applied',
-])
+const emit = defineEmits(['update:result-tab', 'open-query-browser', 'saved-query-applied'])
 
 useInitialFindRun(computed(() => props.activeTab), {
-  runQuery: (workspace, query) => emit('run-query', workspace.id, query),
+  runQuery: (workspace, query) => runFind(workspace.id, query),
 })
 
 const {
   isAggregate, isSql, runValid, queryErrorText, pipelineErrorText,
-  run, runQuery, selectRtab, onExplainVerbosity,
+  run, runQuery, selectRtab, onExplainVerbosity, cancel, followReference,
 } = useCollectionRun({
   activeTab:         () => props.activeTab,
   tabs:              () => props.tabs,
@@ -88,8 +87,8 @@ const names = computed(() => apiTarget(props.activeTab.target))
     @requery="runQuery"
     @select-rtab="selectRtab"
     @explain-verbosity="onExplainVerbosity"
-    @cancel="activeTab && emit('cancel-query', activeTab.id)"
-    @follow-reference="emit('follow-reference', $event)"
+    @cancel="cancel"
+    @follow-reference="followReference"
   />
 
 </template>

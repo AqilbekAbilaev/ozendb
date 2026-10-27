@@ -1,6 +1,6 @@
 import { getDefaultQuery } from './api/queryLibrary'
 import { apiTarget } from './api/payload'
-import { parseField } from '../../utils/queryParser'
+import { parseField } from './query/queryParser'
 import { sameResource } from '../../utils/resourceRef'
 import { tabs, activeTab } from '../../stores/tabs'
 import { openWorkspaceTab, newWorkspaceTab, showWorkspaceTab, focusOrOpenWorkspaceTab } from '../../stores/tabCreators'

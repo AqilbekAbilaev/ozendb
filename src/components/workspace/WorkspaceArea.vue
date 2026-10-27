@@ -14,7 +14,7 @@ const props = defineProps({
   tabs:           { type: Array,   required: true },
   activeTabId:    { type: String,  required: true },
 })
-const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab', 'run-query', 'run-aggregate', 'cancel-query', 'follow-reference'])
+const emit = defineEmits(['activate-tab', 'close-tab', 'reorder-tab'])
 
 const activeTab = computed(() => props.tabs.find(t => t.id === props.activeTabId))
 const component = computed(() => workspaceComponentFor(activeTab.value))
@@ -55,10 +55,6 @@ const bindings = computed(() => {
 
 const collectionListeners = {
   'update:result-tab': (v) => { rtab.value = v },
-  'run-query': (id, q) => emit('run-query', id, q),
-  'run-aggregate': (id, a) => emit('run-aggregate', id, a),
-  'cancel-query': (id) => emit('cancel-query', id),
-  'follow-reference': (e) => emit('follow-reference', e),
   'open-query-browser': () => savedQueryBrowser.open(activeTab.value),
   'saved-query-applied': (nonce) => savedQueryBrowser.acknowledge(nonce),
 }

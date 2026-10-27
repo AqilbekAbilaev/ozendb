@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(), emit: vi.fn() }))
+vi.mock('../../api/queries', () => ({ runFind: vi.fn() }))
+
+import { listen } from '@tauri-apps/api/event'
+import { runFind } from '../../api/queries'
 import { refreshFindWorkspacesAfterDocumentSave } from './documentSaveRefresh'
-import { createResourceRef } from './resourceRef'
+import { createResourceRef } from '../../../../utils/resourceRef'
+import { tabs } from '../../../../stores/tabs'
+import { ENGINES } from '../../../index.js'
 
 // A Find on c1/shop/orders; any level can be swapped to build an unrelated one.
 const matchingFind = ({ hasRun = true, connectionId = 'c1', dbName = 'shop', collectionName = 'orders', ...fields } = {}) => ({
@@ -64,5 +72,23 @@ describe('refreshFindWorkspacesAfterDocumentSave', () => {
       runQuery,
     )).not.toThrow()
     expect(runQuery).not.toHaveBeenCalled()
+  })
+})
+
+describe('MongoDB\'s startup hook', () => {
+  it('reruns a matching Find when the pop-out editor saves a document', () => {
+    runFind.mockResolvedValue({ documents: [], elapsedMs: 3 })
+    tabs.value = [matchingFind({ dbName: 'shop ü', collectionName: 'or.ders' })]
+
+    ENGINES.mongodb.start()
+    const [name, handler] = listen.mock.calls[0]
+    handler({ event: name, payload: { connId: 'c1', db: 'shop ü', coll: 'or.ders' } })
+
+    expect(name).toBe('document-saved')
+    expect(runFind).toHaveBeenCalledWith(
+      { connectionId: 'c1', database: 'shop ü', collection: 'or.ders' },
+      { filter: '{"status":"open"}', projection: '{"total":{"$numberInt":"1"}}', sort: '{"createdAt":{"$numberInt":"-1"}}', skip: 2, limit: 25 },
+      expect.any(String),
+    )
   })
 })

@@ -1,5 +1,5 @@
 import { watch } from 'vue'
-import { parseField } from '../../../../utils/queryParser'
+import { parseField } from '../../query/queryParser'
 
 export function useInitialFindRun(activeWorkspace, { runQuery }) {
   watch(activeWorkspace, (workspace) => {

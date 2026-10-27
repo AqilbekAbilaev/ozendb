@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { countDocuments } from '../api/queries'
 import { errText } from '../../../utils/errors'
-import { parseField } from '../../../utils/queryParser'
+import { parseField } from '../query/queryParser'
 import { workspaceIsCollection } from '../../../workspaces/registry'
 import { apiTarget } from '../api/payload'
 

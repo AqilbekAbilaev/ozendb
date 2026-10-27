@@ -1,6 +1,6 @@
 // A collection tab's find query as the backend wants it: parsed to canonical Extended JSON
-// (utils/queryParser, MongoDB's own parser), validated, and packed into a run.
-import { parseField } from '../../../../utils/queryParser'
+// (query/queryParser, MongoDB's own parser), validated, and packed into a run.
+import { parseField } from '../../query/queryParser'
 
 export function parseFindQuery(query) {
   return {

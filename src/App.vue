@@ -1,7 +1,5 @@
 <script setup>
 import { ref } from 'vue'
-import { runQuery, runAggregate, cancelQuery } from './engines/mongodb/workspaces/collection/queryRunner'
-import { openCollectionTab } from './engines/mongodb/tabs'
 import { useMenu } from './composables/useMenu'
 import { useOperations } from './composables/useOperations'
 import { useFeatures } from './composables/useFeatures'
@@ -65,10 +63,6 @@ useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, knownActions
         @activate-tab="activateTab"
         @close-tab="closeTab"
         @reorder-tab="moveTab"
-        @run-query="runQuery"
-        @run-aggregate="runAggregate"
-        @cancel-query="cancelQuery"
-        @follow-reference="openCollectionTab"
       />
     </div>
 

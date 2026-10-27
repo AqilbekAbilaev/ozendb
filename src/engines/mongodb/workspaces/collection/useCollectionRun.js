@@ -1,17 +1,19 @@
 import { computed, nextTick, watch } from 'vue'
 import { translateSqlToMql } from '../../api/queries'
-import { parsePipeline } from '../../../../utils/queryParser'
+import { parsePipeline } from '../../query/queryParser'
 import { setCollectionQueryMode } from '../../query/queryMode'
 import { runTranslatedSql } from '../../query/sqlWorkspace'
 import { refreshRequest } from '../../../../stores/menuRequests'
 import { parseFindQuery, findQueryValid, findQueryError, pipelineError, expandIdFilter, findArgs } from './collectionQuery'
 import { runExplain } from './runExplain'
+import * as queryRunner from './queryRunner'
+import { openCollectionTab } from '../../tabs'
 import { workspaceIsCollection } from '../../../../workspaces/registry'
 
 // What MongoCollectionWorkspace does with its query: live validation, the Run button's
-// dispatch on the tab's mode, Explain, and applying a saved query. Runs leave as the
-// component's `run-query` / `run-aggregate` events, so the tab store stays the one place
-// a query actually executes. Each input is a getter onto the component's props.
+// dispatch on the tab's mode, Explain, cancelling, following a reference, and applying a
+// saved query. Runs go to queryRunner, the one place a query actually executes. Each
+// input is a getter onto the component's props.
 export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, savedQueryRequest }, emit) {
   const activeTab = computed(getActiveTab)
   const isAggregate = computed(() => activeTab.value && activeTab.value.mode === 'aggregate')
@@ -49,7 +51,7 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
     if (!workspaceIsCollection(tab)) return
     await runTranslatedSql(tab, {
       translate: translateSqlToMql,
-      runQuery: (workspace, query) => emit('run-query', workspace.id, query),
+      runQuery: (workspace, query) => queryRunner.runQuery(workspace.id, query),
       runExplain: explain,
       explainVisible,
       isCurrent: workspace => isOpen(workspace) && workspace.mode === 'sql',
@@ -60,7 +62,7 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
     if (!workspaceIsCollection(tab)) return
     const parsed = parsePipeline(tab.state.query.pipeline)
     if (!parsed || !parsed.ok) return  // inline error is already shown
-    emit('run-aggregate', tab.id, { pipeline: parsed.ejson })
+    queryRunner.runAggregate(tab.id, { pipeline: parsed.ejson })
     if (explainVisible()) explain(tab)
   }
 
@@ -71,7 +73,7 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
     tab.state.query.filter = expandIdFilter(tab.state.query.filter)
     const parsed = parseFindQuery(tab.state.query)
     if (!findQueryValid(parsed)) return
-    emit('run-query', tab.id, { ...findArgs(tab.state.query, parsed), addToHistory: addToHistory })
+    queryRunner.runQuery(tab.id, { ...findArgs(tab.state.query, parsed), addToHistory: addToHistory })
     if (tab.id === activeTab.value?.id && explainVisible()) explain(tab)
   }
 
@@ -88,6 +90,15 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
     if (!tab) return
     tab.runtime.explainVerbosity = v
     explain(tab)
+  }
+
+  function cancel() {
+    if (activeTab.value) queryRunner.cancelQuery(activeTab.value.id)
+  }
+
+  // A cell's reference opens the collection it points at, in a tab of its own.
+  function followReference(reference) {
+    openCollectionTab(reference)
   }
 
   async function applyFromBrowser(entry) {
@@ -123,6 +134,6 @@ export function useCollectionRun({ activeTab: getActiveTab, tabs, resultTab, sav
 
   return {
     isAggregate, isSql, runValid, queryErrorText, pipelineErrorText,
-    run, runQuery, runAggregate, runSql, selectRtab, onExplainVerbosity,
+    run, runQuery, runAggregate, runSql, selectRtab, onExplainVerbosity, cancel, followReference,
   }
 }
