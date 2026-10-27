@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { Decoration, EditorView } from '@codemirror/view'
 import { StateEffect, StateField, RangeSetBuilder } from '@codemirror/state'
-import { mongoStringify } from '../../../utils/mongoFormat'
+import { mongoStringify } from './mongoFormat'
 import { jsonViewerExtensions } from './jsonView'
 import { useResultSearch } from './useResultSearch'
 import CodeEditor from '../../../components/base/CodeEditor.vue'

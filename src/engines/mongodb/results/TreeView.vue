@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
-import BaseIcon from './BaseIcon.vue'
-import { isEjsonScalar } from '../../utils/mongoFormat'
+import BaseIcon from '../../../components/base/BaseIcon.vue'
+import { isEjsonScalar } from './mongoFormat'
 
 // Recursive tree node. Renders one row (key / value / type) and, when expanded,
 // its children — re-using itself via filename self-reference. The top-level
