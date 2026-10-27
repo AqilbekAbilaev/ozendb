@@ -28,6 +28,16 @@ export function aliases(names) {
   })
 }
 
+// Each table's primary key columns in turn, as `{ table, column }`; `tables` holds each
+// table's columns, the browsed table's first.
+export const tableKeys = (tables) =>
+  tables.flatMap((columns, table) => columns.filter(c => c.isPrimaryKey).map(c => ({ table, column: c.name })))
+
+// The order a page is read in, as the backend's browse sorts it: `chosen` (or nothing),
+// then each of `keys` it isn't, so rows that tie on it still come in one order (#425).
+export const pageOrder = (chosen, keys) =>
+  (chosen ? [chosen, ...keys.filter(k => k.table !== chosen.table || k.column !== chosen.column)] : keys)
+
 // Columns, filters and sort name a column as `{ table, column }` (a filter also carries
 // its column's `dataType`), `table` being 0 for
 // the browsed table and 1 and on for `joins` in order; `columns` are the ones to

@@ -343,6 +343,7 @@ describe('joins', () => {
   it('writes the joins into the SQL, and reads edited joined SQL back into the builder', async () => {
     const t = await joined()
     expect(t.currentSql.value).toContain('LEFT JOIN "public"."regions" ON "regions"."id" = "users"."id"')
+    expect(t.currentSql.value).toContain('ORDER BY "users"."id" ASC, "regions"."id" ASC')
     await t.toSql()
     t.sql.value = 'edited'
     readTableSelect.mockResolvedValue({
@@ -363,6 +364,25 @@ describe('joins', () => {
       filters: [{ table: 1, column: 'name', op: 'contains', value: 'no' }],
       orderBy: { table: 1, column: 'name' }, limit: 50,
     }))
+  })
+
+  it('reads its own order back, the sort followed by every table\'s key, as the sort alone', async () => {
+    const t = await joined()
+    await t.sortBy('j1.name')
+    await t.toSql()
+    t.sql.value = 'edited'
+    const [main, regions] = [{ table: 0, column: 'id' }, { table: 1, column: 'id' }]
+    const read = { joins: [{ schema: 'public', table: 'regions', kind: 'left', on: [{ column: 'id', equals: main }] }], columns: [], filters: [], descending: true, limit: 50, offset: 0 }
+    readTableSelect.mockResolvedValue({ ...read, orderBy: [{ table: 1, column: 'name' }, main, regions] })
+    await t.toFilters()
+    expect(t.filterRefusal.value).toBe(null)
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: { table: 1, column: 'name' }, descending: true }))
+
+    await t.toSql()
+    t.sql.value = 'edited again'
+    readTableSelect.mockResolvedValue({ ...read, orderBy: [main, regions] })
+    await t.toFilters()
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: null }))
   })
 
   it('drops the joins when edited SQL no longer has them', async () => {
@@ -484,7 +504,7 @@ describe('SQL mode', () => {
 
     await t.toSql()
     expect(t.mode.value).toBe('sql')
-    expect(t.sql.value).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC\nLIMIT 100 OFFSET 100;')
+    expect(t.sql.value).toBe('SELECT *\nFROM "public"."users"\nWHERE "id" > \'1\'\nORDER BY "name" ASC, "id" ASC\nLIMIT 100 OFFSET 100;')
     expect(runQuery).toHaveBeenCalledWith('c1', t.sql.value, expect.any(String), null, null)
   })
 
@@ -551,6 +571,10 @@ describe('SQL mode', () => {
     await t.toFilters()
     expect(t.filterRefusal.value).toMatch(/one column/)
 
+    readTableSelect.mockResolvedValue({ ...read, orderBy: [{ table: 0, column: 'id' }, { table: 0, column: 'name' }] })
+    await t.toFilters()
+    expect(t.filterRefusal.value).toMatch(/one column/)
+
     expect(t.mode.value).toBe('sql')
     await t.toSql()
     expect(t.filterRefusal.value).toBe(null)
@@ -568,6 +592,18 @@ describe('SQL mode', () => {
       expect(t.filterRefusal.value).toBe('there is no column "nope".')
       expect(t.mode.value).toBe('sql')
     }
+  })
+
+  it('reads its own sort back after an edit elsewhere in the SQL', async () => {
+    const t = await loaded()
+    await t.sortBy('name')
+    await t.toSql()
+    expect(t.sql.value).toContain('ORDER BY "name" ASC, "id" ASC')
+    t.sql.value = t.sql.value.replace('LIMIT 100', 'LIMIT 20')
+    readTableSelect.mockResolvedValue({ joins: [], columns: [], filters: [], orderBy: [{ table: 0, column: 'name' }, { table: 0, column: 'id' }], descending: false, limit: 20, offset: 0 })
+    await t.toFilters()
+    expect(t.filterRefusal.value).toBe(null)
+    expect(browseTable).toHaveBeenLastCalledWith(target, expect.objectContaining({ orderBy: { table: 0, column: 'name' }, limit: 20 }))
   })
 
   it('treats ORDER BY the primary key as no sort, as browsing does', async () => {

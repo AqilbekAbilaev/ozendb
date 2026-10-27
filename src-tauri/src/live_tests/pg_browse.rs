@@ -192,6 +192,46 @@ async fn joins_add_related_columns_and_filter_sort_and_count_across_them() {
 }
 
 #[tokio::test]
+async fn pages_a_tied_sort_over_a_one_to_many_join_without_repeating_or_skipping_rows() {
+    let config = match test_config() {
+        Some(val) => val,
+        None => {
+            eprintln!("skipping: set OZENDB_TEST_POSTGRES=host[:port] to run live tests");
+            return;
+        }
+    };
+    let pool = pool(&config).await;
+    for stmt in [
+        "DROP SCHEMA IF EXISTS \"ozendb_it ties\" CASCADE",
+        "CREATE SCHEMA \"ozendb_it ties\"",
+        "CREATE TABLE \"ozendb_it ties\".\"клиенты\" (id INT PRIMARY KEY, tier TEXT)",
+        "CREATE TABLE \"ozendb_it ties\".\"order lines\" (id INT PRIMARY KEY, client_id INT, sku TEXT)",
+        "INSERT INTO \"ozendb_it ties\".\"клиенты\" SELECT g, 'gold' FROM generate_series(1, 6) g",
+        "INSERT INTO \"ozendb_it ties\".\"order lines\" SELECT g, 1 + g % 6, 'same' FROM generate_series(1, 30) g",
+    ] {
+        sqlx::query(stmt).execute(&pool).await.unwrap_or_else(|e| panic!("setup ({stmt}): {e}"));
+    }
+    let lines = [TableJoin {
+        schema: String::from("ozendb_it ties"),
+        table: String::from("order lines"),
+        kind: JoinKind::Inner,
+        on: vec![JoinOn { column: String::from("client_id"), equals: by("id") }],
+    }];
+    // Every row ties on both the chosen column and the browsed table's key.
+    for order in [Some(by("tier")), Some(ColumnRef { table: 1, column: String::from("sku") }), None] {
+        let mut seen = Vec::new();
+        for offset in 0..30 {
+            let page = browse_table_impl(&pool, "ozendb_it ties", "клиенты", &lines, &[], order.as_ref(), true, 1, offset).await.unwrap();
+            seen.push(page.rows[0][2].as_i64().unwrap());
+        }
+        seen.sort_unstable();
+        assert_eq!(seen, (1..=30).collect::<Vec<_>>(), "ordered by {order:?}");
+    }
+
+    sqlx::query("DROP SCHEMA \"ozendb_it ties\" CASCADE").execute(&pool).await.unwrap();
+}
+
+#[tokio::test]
 async fn numeric_arrays_and_numeric_domains_keep_their_exact_digits() {
     let config = match test_config() {
         Some(val) => val,

@@ -186,22 +186,13 @@ pub(super) fn where_clause(filters: &[ColumnFilter], tables: &[Vec<MySqlColumnIn
     Ok((format!(" WHERE {}", conditions.join(" AND ")), binds))
 }
 
-/// ` ORDER BY …` on `order_by`, a column of any of `tables`, or else on each table's
-/// primary key in turn, so pages don't overlap or skip rows (see PostgreSQL's browse):
-/// with a join the browsed table's key repeats once per match. Empty when no table has one.
+/// ` ORDER BY …` on `order_by`, a column of any of `tables`, then on each table's primary
+/// key in turn (see `sql::order_clause`).
 pub(super) fn order_clause(order_by: Option<&ColumnRef>, descending: bool, tables: &[Vec<MySqlColumnInfo>]) -> Result<String, AppError> {
-    let names: Vec<String> = match order_by.filter(|r| !r.column.is_empty()) {
-        Some(r) => vec![column_in(tables, r)?.0],
-        None => {
-            let keys = tables.iter().enumerate().flat_map(|(i, columns)| columns.iter().filter(|c| c.is_primary_key).map(move |c| (i, c)));
-            keys.map(|(i, c)| Ok(format!("`t{i}`.{}", quote_name(&c.name)?))).collect::<Result<_, AppError>>()?
-        }
-    };
-    if names.is_empty() {
-        return Ok(String::new());
-    }
-    let direction = if descending { "DESC" } else { "ASC" };
-    Ok(format!(" ORDER BY {}", names.iter().map(|name| format!("{name} {direction}")).collect::<Vec<_>>().join(", ")))
+    let chosen = order_by.filter(|r| !r.column.is_empty()).map(|r| column_in(tables, r).map(|(name, _)| name)).transpose()?;
+    let keys = tables.iter().enumerate().flat_map(|(i, columns)| columns.iter().filter(|c| c.is_primary_key).map(move |c| (i, c)));
+    let keys = keys.map(|(i, c)| Ok(format!("`t{i}`.{}", quote_name(&c.name)?))).collect::<Result<_, AppError>>()?;
+    Ok(sql::order_clause(chosen, keys, descending))
 }
 
 /// The tables of a browse that `wanted` names by place (0 the browsed table, then each

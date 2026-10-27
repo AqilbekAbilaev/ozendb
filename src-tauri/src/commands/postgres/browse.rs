@@ -120,38 +120,23 @@ pub(crate) async fn browse_table_impl(
     let effective_limit = if limit <= 0 { BROWSE_LIMIT_FALLBACK } else { limit.min(ROW_RESULT_CAP) };
     let effective_offset = offset.max(0);
 
-    // `LIMIT`/`OFFSET` alone promise nothing about which rows land on which page
-    // — without an `ORDER BY`, Postgres is free to return them in a different
-    // order on every call, so rows can repeat or vanish between pages. An
-    // explicit `order_by` is quoted and used as given; absent one, this falls
-    // back to the primary key (stable and always unique) rather than paging
-    // unordered. A table with no primary key still pages, just without that
-    // guarantee — nothing safe to default to in that case.
-    let order_columns: Vec<String> = match order_by.filter(|r| !r.column.is_empty()) {
-        Some(r) => vec![column_sql(r.table, &r.column, joins.len() + 1)?],
-        None => {
-            let pk = primary_key_columns(pool, schema, table).await?;
-            let mut quoted = Vec::with_capacity(pk.len());
-            for column in &pk {
-                quoted.push(column_sql(0, column, 1)?);
-            }
-            quoted
+    // `LIMIT`/`OFFSET` alone promise nothing about which rows land on which page —
+    // without a total `ORDER BY`, Postgres may return rows that tie in a different order
+    // on every call, so they repeat or vanish between pages (see `sql::order_clause`).
+    // A table with no primary key still pages, just without that guarantee.
+    let chosen = order_by.filter(|r| !r.column.is_empty()).map(|r| column_sql(r.table, &r.column, joins.len() + 1)).transpose()?;
+    let mut keys = Vec::new();
+    for (i, (schema, table)) in std::iter::once((schema, table)).chain(joins.iter().map(|j| (j.schema.as_str(), j.table.as_str()))).enumerate() {
+        for column in primary_key_columns(pool, schema, table).await? {
+            keys.push(column_sql(i, &column, joins.len() + 1)?);
         }
-    };
+    }
 
     // Each table's columns in its own order, so a caller can tell `t0.id` from `t1.id`
     // by position.
     let select: Vec<String> = (0..=joins.len()).map(|i| format!("\"t{i}\".*")).collect();
-    let mut inner = format!("SELECT {} FROM {from_where}", select.join(", "));
-    if !order_columns.is_empty() {
-        // The direction applies to every column individually — `ORDER BY a, b
-        // DESC` (only `b` gets the suffix) is `a ASC, b DESC`, not "both
-        // descending" — confirmed against a live composite-key table.
-        let direction = if descending { "DESC" } else { "ASC" };
-        let ordered: Vec<String> = order_columns.iter().map(|c| format!("{c} {direction}")).collect();
-        inner.push_str(&format!(" ORDER BY {}", ordered.join(", ")));
-    }
-    inner.push_str(&format!(" LIMIT {effective_limit} OFFSET {effective_offset}"));
+    let order = sql::order_clause(chosen, keys, descending);
+    let inner = format!("SELECT {} FROM {from_where}{order} LIMIT {effective_limit} OFFSET {effective_offset}", select.join(", "));
 
     run_wrapped(pool, &inner, &binds, None).await
 }
