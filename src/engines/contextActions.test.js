@@ -3,7 +3,8 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('../stores/modals', () => ({ openModal: vi.fn() }))
 vi.mock('./postgresql/tabs', () => ({ openPostgresQuery: vi.fn(), openPostgresTable: vi.fn() }))
 
-const { contextAction, connectionMenu, useEngineActions, runEngineTool } = await import('./contextActions.js')
+const { contextAction, connectionMenu, useEngineActions, runEngineTool, runEngineMenuAction, levelledMenuTarget } = await import('./contextActions.js')
+const { setTreeSelection } = await import('../stores/connectionNavigation')
 const { PG_ACTIONS, PG_MENUS } = await import('./postgresql/tree/contextMenus.js')
 const { MYSQL_MENUS } = await import('./mysql/tree/contextMenus.js')
 
@@ -53,15 +54,33 @@ describe('useEngineActions', () => {
   })
 })
 
+const shop = { connectionId: 'c 1', segments: [{ kind: 'database', name: 'магазин' }] }
+
 describe('runEngineTool', () => {
   it('reports a tool no engine has', () => {
-    expect(runEngineTool('no such tool', { target: null, pgMenuTarget: vi.fn(), runFeature: vi.fn() })).toBe(false)
+    expect(runEngineTool('no such tool', { runFeature: vi.fn() })).toBe(false)
+  })
+})
+
+// A native-menu item resolves its node through its engine, from the sidebar selection.
+describe('runEngineMenuAction', () => {
+  it('reports an item no engine has', () => {
+    expect(runEngineMenuAction('view:zoom_in', { runFeature: vi.fn() })).toBe(false)
   })
 
-  it('hands an engine\'s aliased tool to the shared dispatcher', () => {
+  it('hands an engine\'s aliased tool to the shared dispatcher, on the node it resolves', () => {
+    setTreeSelection({ resource: shop, connectionName: 'Sales', engine: 'mongodb' })
     const runFeature = vi.fn()
-    const target = { resource: { connectionId: 'c 1', segments: [{ kind: 'database', name: 'магазин' }] }, connectionName: 'Sales' }
-    expect(runEngineTool('search', { target: target, pgMenuTarget: vi.fn(), runFeature: runFeature })).toBe(true)
-    expect(runFeature).toHaveBeenCalledWith('file:search', target.resource, { connectionName: 'Sales' })
+    expect(runEngineMenuAction('file:search', { runFeature: runFeature })).toBe(true)
+    expect(runFeature).toHaveBeenCalledWith('file:search', shop, { connectionName: 'Sales' })
+    setTreeSelection(null)
+  })
+})
+
+describe('levelledMenuTarget', () => {
+  it('resolves the node an id-dispatched action runs on', () => {
+    setTreeSelection({ resource: shop, connectionName: 'Sales', engine: 'mongodb' })
+    expect(levelledMenuTarget('database')).toEqual({ resource: shop, connectionName: 'Sales' })
+    setTreeSelection(null)
   })
 })

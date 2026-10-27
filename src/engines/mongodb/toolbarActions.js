@@ -4,7 +4,7 @@ import { showToast } from '../../stores/toast'
 import { treeSelection, setTreeSelection } from '../../stores/connectionNavigation'
 import { activeTab } from '../../stores/tabs'
 import { resourceAt } from '../../utils/resourceRef'
-import { resolveMenuTarget } from '../../utils/menuContext'
+import { resolveMenuTarget } from './menu'
 
 // Toolbar tool name → MongoDB action, run through the shared dispatcher so it gets the
 // same level check and guidance as the right-click menu.

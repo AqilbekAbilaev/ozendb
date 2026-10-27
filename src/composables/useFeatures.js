@@ -11,7 +11,7 @@ import { errText } from '../utils/errors'
 import { refreshConnectionResources } from '../stores/connectionData'
 import { openConnections, closeConnection } from '../stores/openConnections'
 import { openModal } from '../stores/modals'
-import { contextAction, useEngineActions, runEngineTool } from '../engines/contextActions.js'
+import { contextAction, useEngineActions, runEngineTool, levelledMenuTarget } from '../engines/contextActions.js'
 
 // Node-action dispatch layer, shared by the right-click menu (@pick →
 // handleContextAction), the native menu bar (handleMenuAction → menuNode →
@@ -31,9 +31,7 @@ export const UNBUILT_ACTIONS = new Map([
   ['conn:export_uri', 'Export URI…'],
 ])
 
-// `menuTarget` comes from useMenu, which App.vue constructs once because it also
-// owns the watcher that pushes the menu context to the native menu.
-export function useFeatures({ menuTarget, pgMenuTarget }) {
+export function useFeatures() {
   const { applyColorTag } = useNodeTags()
 
   async function disconnectOne(ref, ctx) {
@@ -161,12 +159,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
     })
   }
 
-  // Toolbar / native-menu tool dispatch. `connect` is app-level (no node); every other
-  // tool is an engine's (engines/contextActions.js), which resolves the node it acts on.
-  // `target` is the native menu's already-resolved node, or null from the toolbar.
-  function handleTool(name, target = null) {
+  // Toolbar tool dispatch. `connect` is app-level (no node); every other tool is an
+  // engine's (engines/contextActions.js), which resolves the node it acts on.
+  function handleTool(name) {
     if (name === 'connect') { openModal('connectionManager'); return }
-    if (runEngineTool(name, { target: target, pgMenuTarget: pgMenuTarget, runFeature: runFeature })) return
+    if (runEngineTool(name, { runFeature: runFeature })) return
     // Every entry in TOOLS is an engine's or `connect`, so reaching here means the
     // toolbar grew a button nobody wired up.
     const label = TOOLS.find(t => t.name === name)?.label || name
@@ -175,11 +172,11 @@ export function useFeatures({ menuTarget, pgMenuTarget }) {
   }
 
   // Bridges a native-menu item into the feature registry by synthesizing the
-  // "selected node" from the current target (sidebar selection, or the active tab).
+  // "selected node" from the engine's menu target (sidebar selection, or the active tab).
   // `requiredType` (the feature's own level unless given) guards the action and guides
   // the user when context is missing.
   function menuNode(action, requiredType = FEATURES[action]?.requires ?? null) {
-    const resolved = menuTarget(requiredType)
+    const resolved = levelledMenuTarget(requiredType)
     const ref = resolved?.resource ?? null
     if (!ref || !hasLevel(ref, requiredType)) {
       showToast(levelHint(requiredType))

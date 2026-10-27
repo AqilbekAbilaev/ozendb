@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { docMenuRequest } from '../../../stores/menuRequests'
-import { vqbOpen } from '../../../stores/visualQueryBuilder'
+import { vqbOpen } from '../query/visualQueryBuilder'
 import { defaultResultView } from '../../../stores/settings'
 import BaseIcon from '../../../components/base/BaseIcon.vue'
 import FieldEditModal from './FieldEditModal.vue'

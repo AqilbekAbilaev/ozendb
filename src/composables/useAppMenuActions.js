@@ -1,24 +1,20 @@
-import { nextTick, onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { showToast } from '../stores/toast'
 import { openQuickstart } from '../stores/tabCreators'
-import { openCollectionTab } from '../engines/mongodb/tabs'
-import { openPostgresQuery, openPostgresSearch } from '../engines/postgresql/tabs'
 import { useZoom } from './useZoom'
-import { requestHistory, requestSaveQuery, requestSavedQueryBrowser, requestDocAction, requestRefresh, requestIndexAction, requestGridfsAction } from '../stores/menuRequests'
+import { requestRefresh } from '../stores/menuRequests'
 import { onMenuAction } from '../appApi/events'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { HELP_URLS, HELP_MODALS, isHelpLink } from '../constants/helpLinks'
-import { tabs, activeTabId, activeTab, closeTab, cycleTab } from '../stores/tabs'
+import { activeTabId, activeTab, closeTab, cycleTab } from '../stores/tabs'
 import { canRefreshWorkspace } from '../workspaces/lifecycle'
-import { openModal, openModals } from '../stores/modals'
-import { resourceAt, sameResource } from '../utils/resourceRef'
+import { openModal } from '../stores/modals'
 import { checkNow as checkForUpdates } from '../stores/updater'
-import { vqbOpen } from '../stores/visualQueryBuilder'
 import { keyBindings } from '../stores/settings'
 import { matchBinding } from '../utils/keybindings'
 import { isEditingTarget } from '../utils/editingTarget'
-import { workspaceIsCollection } from '../workspaces/registry'
+import { runEngineMenuAction } from '../engines/contextActions.js'
 
 // Native menu items that run a feature registered under another id: two items, one
 // action. Every other id that names a feature runs it directly.
@@ -29,10 +25,10 @@ export const MENU_ALIASES = {
   'db:paste_database': 'db:paste',
 }
 
-// `menuTarget`/`pgMenuTarget` come from useMenu and the three dispatchers from
-// useFeatures — App.vue constructs both once and hands over what this needs of
-// them. `toolbarHidden` is App.vue's own layout state; the View menu just toggles it.
-export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNode, knownActions, refreshAll, toolbarHidden }) {
+// The dispatchers come from useFeatures — App.vue constructs it once and hands over
+// what this needs of it. `toolbarHidden` is App.vue's own layout state; the View menu
+// just toggles it.
+export function useAppMenuActions({ runFeature, menuNode, knownActions, refreshAll, toolbarHidden }) {
   const { zoomIn, zoomOut, resetZoom } = useZoom()
   const appWindow = getCurrentWindow()
 
@@ -46,6 +42,8 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       return
     }
     if (HELP_MODALS[id]) { openModal(HELP_MODALS[id]); return }
+    // An engine's own items (engines/contextActions.js) resolve their own target.
+    if (runEngineMenuAction(id, { runFeature: runFeature })) return
     switch (id) {
       // --- direct modals / app ---
       case 'file:connect':     openModal('connectionManager'); return
@@ -54,84 +52,6 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
       case 'help:shortcuts':   openModal('preferences', undefined, { props: { initialTab: 'keyboard' } }); return
       case 'help:quickstart':  openQuickstart(); return
       case 'help:updates':     checkForUpdates(); return
-      case 'coll:vqb': {
-        const target = menuTarget('collection')
-        const collection = resourceAt(target?.resource, 'collection')
-        if (!collection) {
-          showToast('Open a collection first')
-          return
-        }
-        openCollectionTab({ resource: collection, connectionName: target.connectionName })
-        vqbOpen.value = true
-        return
-      }
-
-      // --- toolbar dispatcher (targets the sidebar selection, else the active tab) ---
-      case 'file:intellishell': handleTool('shell', menuTarget('database')); return
-      case 'file:sql':          handleTool('sql', menuTarget('collection')); return
-      // File → Load / Save: the saved-query browser and save-query form live in the
-      // active collection tab's QueryBar; signal it (no-op with a toast otherwise).
-      case 'file:load':
-      case 'file:save': {
-        const tab = tabs.value.find(t => t.id === activeTabId.value)
-        if (!workspaceIsCollection(tab)) { showToast('Open a collection tab first'); return }
-        if (id === 'file:load') requestSavedQueryBrowser()
-        else requestSaveQuery()
-        return
-      }
-      case 'file:search':       handleTool('search', menuTarget('database')); return
-      case 'coll:open_tab':     handleTool('collection', menuTarget('collection')); return
-      case 'coll:export':       handleTool('export', menuTarget('collection')); return
-      case 'coll:import':       handleTool('import', menuTarget('collection')); return
-
-      // --- GridFS (acts on the open GridFS dialog) ---
-      case 'gridfs:add':
-      case 'gridfs:save':
-      case 'gridfs:remove':
-      case 'gridfs:view_file':
-      case 'gridfs:rename':
-      case 'gridfs:meta':
-      case 'gridfs:copy_bucket':
-      case 'gridfs:drop_bucket':
-        requestGridfsMenuAction(id); return
-
-
-      // --- index scoped (act on the active tab's selected index) ---
-      case 'idx:edit':   requestIndexAction('startEditIndex'); return
-      case 'idx:view':   requestIndexAction('openIndexDetails'); return
-      case 'idx:copy':   requestIndexAction('copyIndex'); return
-      case 'idx:drop':   requestIndexAction('openDropIndexConfirm'); return
-      case 'idx:hide':   requestIndexAction('setIndexHidden', true); return
-      case 'idx:unhide': requestIndexAction('setIndexHidden', false); return
-
-      // --- collection: document editing (open/activate a collection tab, then run) ---
-      case 'coll:insert_document':
-      case 'coll:update_dialog':
-      case 'coll:delete_dialog':
-      case 'coll:clear':
-        requestCollectionDocAction(id); return
-
-      // --- edit: clipboard copies act on the selected row/field in the active view ---
-      case 'edit:copy':
-      case 'edit:copy_value':
-      case 'edit:copy_field':
-      case 'edit:copy_field_path':
-      case 'edit:copy_document':
-        requestDocMenuAction(id); return
-
-      // --- edit: paste inserts clipboard document(s) into the active collection ---
-      case 'edit:paste_documents':
-        requestCollectionDocAction(id); return
-
-      // --- document: act on the selected row/field in the active results view ---
-      case 'doc:edit_value':
-      case 'doc:add_field':
-      case 'doc:remove_field':
-      case 'doc:rename_field':
-      case 'doc:view_json':
-      case 'doc:edit_json':
-      case 'doc:delete':
-        requestDocMenuAction(id); return
 
       // --- view ---
       // Refresh reloads the active tab when it only reads; the native menu is disabled
@@ -155,68 +75,12 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
         if (activeTabId.value != null) closeTab(activeTabId.value)
         return
 
-      // Results view mode + Refresh Document act on the active collection tab's
-      // ResultsPanel; signal it directly (no row selection required).
-      case 'view:tree':
-      case 'view:table':
-      case 'view:json':
-      case 'view:refresh_document':
-      case 'view:step_column':
-      case 'view:step_cell':
-      case 'view:step_out': {
-        const tab = tabs.value.find(t => t.id === activeTabId.value)
-        if (!workspaceIsCollection(tab)) { showToast('Open a collection tab first'); return }
-        requestDocAction(id)
-        return
-      }
-
       // Toggle the global toolbar. The native menu label stays "Hide Global Toolbar";
       // a toast reports the resulting state.
       case 'view:hide_toolbar':
         toolbarHidden.value = !toolbarHidden.value
         showToast(toolbarHidden.value ? 'Toolbar hidden' : 'Toolbar shown')
         return
-
-      // History Manager: open the active collection tab's query-history menu.
-      case 'view:history': {
-        const tab = tabs.value.find(t => t.id === activeTabId.value)
-        if (!workspaceIsCollection(tab)) { showToast('Open a collection tab first'); return }
-        requestHistory()
-        return
-      }
-
-      // PostgreSQL (#145) — the same handlers the table workspace's own
-      // toolbar/context menu already call (PG_ACTIONS). Each asks pgMenuTarget for
-      // the depth its gate required, so a sidebar selection deep enough for the
-      // action wins over the active tab and a shallower one falls back to it. The
-      // gates already guarantee one of the two qualifies, so a null target here
-      // means it went away between the menu enabling and the click — rare enough
-      // to no-op rather than toast.
-      case 'pg:new_sql': {
-        const target = pgMenuTarget('schema')
-        if (target) openPostgresQuery({ connectionId: target.connectionId, connectionName: target.connectionName, database: target.database })
-        return
-      }
-      case 'pg:create_table': {
-        const target = pgMenuTarget('schema')
-        if (target) openModal('pgCreateTable', target)
-        return
-      }
-      case 'pg:search_schema': {
-        const target = pgMenuTarget('schema')
-        if (target) openPostgresSearch({ connectionId: target.connectionId, connectionName: target.connectionName, database: target.database, schema: target.schema })
-        return
-      }
-      case 'pg:row_history': {
-        const target = pgMenuTarget('table')
-        if (target?.table) openModal('sqlRowHistory', target)
-        return
-      }
-      case 'pg:drop_table': {
-        const target = pgMenuTarget('table')
-        if (target?.table) openModal('pgDrop', target)
-        return
-      }
     }
     // Everything else that names a feature (directly, or through MENU_ALIASES) runs it
     // on the menu's target, at the level the feature itself declares.
@@ -224,72 +88,6 @@ export function useAppMenuActions({ menuTarget, pgMenuTarget, handleTool, menuNo
     if (knownActions.has(action)) menuNode(action)
   }
 
-  // Route a Document-menu action to the active collection tab's ResultsPanel, which
-  // owns the field/document editors. The Document gates already guarantee an active
-  // collection tab with a selected row/field, so this only needs to signal the panel.
-  function requestDocMenuAction(action) {
-    const tab = tabs.value.find(t => t.id === activeTabId.value)
-    if (!workspaceIsCollection(tab) || (tab.runtime.selectedRow ?? -1) < 0) {
-      showToast('Select a document in the results first')
-      return
-    }
-    requestDocAction(action)
-  }
-
-  // Route a Collection document-editing action (Insert / Update / Delete dialog, Clear)
-  // to a collection's ResultsPanel. Resolve the target collection (sidebar selection or
-  // active tab), open it as a tab so its results view exists and can refresh, then — once
-  // that tab is mounted — signal the panel to open the matching dialog.
-  async function requestCollectionDocAction(action) {
-    const target = menuTarget('collection')
-    const collection = resourceAt(target?.resource, 'collection')
-    if (!collection) {
-      showToast('Open a collection first')
-      return
-    }
-    const active = tabs.value.find(t => t.id === activeTabId.value)
-    const sameCollectionActive = workspaceIsCollection(active)
-      && sameResource(active.target, collection)
-    // Reuse the active tab when it already shows this collection; otherwise open one so
-    // the operation has a results view to refresh afterward.
-    if (!sameCollectionActive) {
-      openCollectionTab({ resource: collection, connectionName: target.connectionName })
-    }
-    await nextTick()
-    requestDocAction(action)
-  }
-
-  const GRIDFS_FILE_ACTIONS = ['gridfs:view_file', 'gridfs:rename', 'gridfs:meta', 'gridfs:save', 'gridfs:remove']
-
-  // GridFS menu actions operate inside the GridFS modal. File actions go straight to the
-  // open dialog, since resolving a database would lose the picked file (Gate::GridfsFile).
-  // Bucket actions open the modal on the resolved database (keeping its selection when
-  // it already shows that db), then signal the requested action.
-  //
-  // #288: the request travels through stores/menuRequests, never through the modal's
-  // payload — AppModals keys each dialog on its payload, so writing the action in there
-  // remounted the dialog and threw away the very file selection the action needed.
-  async function requestGridfsMenuAction(action) {
-    if (GRIDFS_FILE_ACTIONS.includes(action)) {
-      if (!openModals.gridfs) return
-      requestGridfsAction(action)
-      return
-    }
-    const target = menuTarget('database')
-    // A collection resolves too; GridFS acts on its database.
-    const database = resourceAt(target?.resource, 'database')
-    if (!database) {
-      showToast('Open a database first')
-      return
-    }
-    if (!sameResource(openModals.gridfs?.resource, database)) {
-      openModal('gridfs', { resource: database, connectionName: target.connectionName })
-    }
-    // Let the open/remount settle first: opening the dialog on another database replaces
-    // the one on screen, and the request belongs to the new instance, not the old one.
-    await nextTick()
-    requestGridfsAction(action)
-  }
   // Two ways an action arrives: the native menu emits the clicked item's id, and on
   // Linux — where WebKitGTK swallows native accelerators, so menu.rs attaches none —
   // the webview matches the keyboard against the user's bindings itself.

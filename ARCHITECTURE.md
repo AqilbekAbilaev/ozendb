@@ -34,7 +34,7 @@ Four rings, outermost first. A ring may import inwards, never outwards — **enf
 |---|---|
 | `src/components/` | Rendering and event wiring only. Grouped by area: `app/`, `base/`, `connection/`, `panes/`, `query/`, `workspace/`. |
 | `src/composables/` | Stateful slices that need a component's lifetime or a caller's wiring (`useFeatures`, `useMenu`, `useConnectionTree`, …). Anything that is really app-wide state belongs in `stores/` instead — most of what used to live here has moved. |
-| `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (the shared "open a tab" steps and Quickstart; each engine's openers are its `tabs.js`) · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `updater.js` · `premium.js` · `toast.js` · `dbClipboard.js` · `visualQueryBuilder.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
+| `src/stores/` | Module-scope state shared by every importer, and the actions over it. `tabs.js` (the tab spine) · `tabCreators.js` (the shared "open a tab" steps and Quickstart; each engine's openers are its `tabs.js`) · `settings.js` (also owns zoom, and loads `nodeTags.js`) · `connectionData.js` · `openConnections.js` · `connectionNavigation.js` (incl. the sidebar selection) · `modals.js` · `contextMenu.js` · `menuRequests.js` (one-shot native-menu signals) · `updater.js` · `premium.js` · `toast.js` · `dbClipboard.js` · `nodeTags.js`. **Anything one leaf writes and another reads goes here** rather than being threaded through App.vue as props and relayed emits. |
 | `src/utils/` | Pure functions. No Vue, no I/O. |
 
 The rest of `src/` sits around those rings, with its own lint rule where a direction holds:
@@ -131,8 +131,10 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
 - **`src/engines/modals.js`** — each engine's rows for the modal registry (its `modals.js`), all
   loaded lazily, so the composables that read the registry load no components.
 - **`src/engines/contextActions.js`** — right-click menus and actions an engine handles itself,
-  and each engine's toolbar tools. MongoDB's actions go through useFeatures' level check, so
-  they are `{ requires, run }` entries (`mongodb/tree/actions.js`) the dispatcher merges in.
+  each engine's toolbar tools, and its native-menu items (`<engine>/menuActions.js`), which
+  resolve the node they act on themselves. MongoDB's actions go through useFeatures' level
+  check, so they are `{ requires, run }` entries (`mongodb/tree/actions.js`) the dispatcher
+  merges in, with the menu target they run on.
 - **`src/engines/sql/`** — the table and SQL tabs every SQL engine shares. What differs comes
   from the tab's engine as `engineOf(tab).sql`: its `dialect` (quoting, case-insensitive
   matching, column-type kinds, which columns take a value), its `api` (the commands the tabs
@@ -143,8 +145,7 @@ ad-hoc `{ mongodb: …, postgresql: … }` tables outside `src/engines/`.
   `api/library.js` is the query library's half of the Tauri boundary, the same for every SQL engine.
 
 A new engine is a folder plus an entry in each. What's left is debt, not pattern: MongoDB's
-screens still sit in the shared `components/` folders, and `utils/menuContext.js` still holds
-the per-engine depth tables its menu-target resolvers use (#476).
+screens still sit in the shared `components/` folders.
 
 ## Resource identity
 
@@ -266,8 +267,10 @@ removed.
   writes). `useMenu` derives the `menuContext` (see `src/utils/menuContext.js`, unit-tested) from
   those and the open connections, merging in each engine's own switches (its `menu` entry),
   and pushes it to Rust via the
-  `set_menu_context` command, which flips each gated item's `enabled`. Menu actions resolve their
-  target via `resolveMenuTarget`, which is level-aware: it picks whichever of the sidebar selection
+  `set_menu_context` command, which flips each gated item's `enabled`. `useAppMenuActions`
+  routes the app-wide items itself and hands each engine its own (`engines/<engine>/menuActions.js`).
+  MongoDB's items resolve their target via `resolveMenuTarget` (`engines/mongodb/menu.js`;
+  PostgreSQL's sibling is `resolvePgMenuTarget`), which is level-aware: it picks whichever of the sidebar selection
   or active tab actually satisfies the action's required depth (`connection`/`database`/`collection`),
   with the sidebar selection winning when both qualify and the active tab used as fallback when the
   selection is too shallow — so an enabled item always fires on a node deep enough for the gate that
@@ -276,4 +279,4 @@ removed.
   editing keys) and `useAppMenuActions` keeps the JS shortcuts instead, matched against the
   user's bindings.
 - The gate→enabled derivation is unit-tested in `menu.rs` (`cargo test`) and `menuContext.test.js`
-  (`npm test`).
+  (`npm test`); the targets in each engine's `menu.test.js`.

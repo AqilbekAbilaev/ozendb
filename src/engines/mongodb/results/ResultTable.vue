@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { vqbOpen } from '../../../stores/visualQueryBuilder'
+import { vqbOpen } from '../query/visualQueryBuilder'
 import { columns, drillRows, cellRows, findMatches } from './resultGrid'
 import { useResultSearch } from './useResultSearch'
 import { useColumnReorder, useDrillColumnOrder } from '../../../composables/useColumnReorder'
