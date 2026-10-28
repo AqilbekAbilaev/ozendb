@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { parseConnectionUri } from '../utils/connectionUri.js'
+import { parseConnectionUri } from '../engines/mongodb/connection/parseUri.js'
 import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
 import { parseMySqlUri } from '../engines/mysql/connection/parseUri.js'
 
