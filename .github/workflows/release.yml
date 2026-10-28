@@ -46,6 +46,10 @@ jobs:
             args: ''
 
     runs-on: ${{ matrix.platform }}
+    env:
+      # The Ubuntu packages Tauri needs to build on Linux; also the key of their cache below.
+      # Keep it the same as ci.yml's list, so a release can reuse the copy CI saved on main.
+      LINUX_PACKAGES: libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev build-essential file
 
     steps:
       - name: Checkout
@@ -71,19 +75,28 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      # Ubuntu's mirror is sometimes very slow (#483), so the downloaded packages are kept
+      # between runs, as in ci.yml, and apt only fetches what changed.
+      - name: Cache Linux system packages
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: actions/cache@v6
+        with:
+          path: ~/apt-archives
+          key: apt-ubuntu-22.04-${{ env.LINUX_PACKAGES }}
+
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            build-essential \
-            file
+          mkdir -p ~/apt-archives/partial
+          # Retry a dropped download, and give up on a stalled connection rather than wait.
+          apt_opts="-o Acquire::Retries=3 -o Acquire::http::Timeout=30"
+          sudo apt-get update $apt_opts
+          sudo apt-get install -y $apt_opts \
+            -o Dir::Cache::Archives="$HOME/apt-archives" \
+            -o APT::Keep-Downloaded-Packages=true \
+            $LINUX_PACKAGES
+          # apt runs as root; the cache step saves the files as the runner's user.
+          sudo chown -R "$USER" ~/apt-archives
 
       - name: Setup Node
         uses: actions/setup-node@v7
