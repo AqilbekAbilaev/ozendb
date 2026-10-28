@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { partitionUriOptions, parseConnectionUri } from './connectionUri'
+import { partitionUriOptions, parseConnectionUri } from './parseUri'
 
 const KNOWN = ['retryWrites', 'w', 'appName', 'socketTimeoutMS', 'readConcernLevel']
 
