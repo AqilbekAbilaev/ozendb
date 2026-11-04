@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.3.0
+
+- **MySQL** — connect to MySQL servers, with SSL/TLS, an SSH tunnel and
+  read-only connections. The sidebar lists databases, tables, views, columns,
+  procedures, functions, triggers and events, and shows the definition of a
+  view or stored program.
+- **MySQL tables** — browse, filter, sort and count a table, join it to the
+  tables its foreign keys point at, and add, edit and delete rows, saved
+  together in one transaction. The row history records each edit and can
+  undo it. TIMESTAMP values show in your own time zone.
+- **MySQL's SQL tab** — run scripts with Cancel, a time limit and Manual-mode
+  transactions, format SQL in MySQL's dialect, and see a statement's plan with
+  Explain, including EXPLAIN ANALYZE on MySQL 8.0.18 and later. A CALL shows
+  its first result set. SQL tabs, saved queries and history come back after a
+  restart.
+- **MySQL administration** — create and drop accounts, grant and revoke their
+  privileges, see and stop the server's processes, and read its version,
+  variables and status. Export tables and queries, and import CSV into a
+  table.
+- **Premium sync** — sign in to an OzenDB account in Preferences → Account to
+  keep connections and their passwords, folders, saved queries, colours,
+  settings and known SSH hosts the same on every device. Everything is
+  encrypted on your device with your sync password before it is uploaded, and
+  a recovery key unlocks it if the password is lost. Sync runs when the app
+  starts, after edits, before it quits and on Sync now, and the indicator in
+  the left rail shows when this device last synced. You can change the sync
+  password, replace the recovery key, turn sync off on one device, or delete
+  your account. On Linux without a keyring service, everything but passwords
+  syncs.
+- **PostgreSQL colours** — databases, schemas and tables can have their own
+  colour, as MongoDB's databases and collections can.
+- **Fixed** — table tab pages no longer repeat or skip rows when the sort
+  column has ties, on PostgreSQL and MySQL.
+- **Fixed** — PostgreSQL's Cancel stops the run it was pressed for, even
+  before its statement starts, and never reaches the next query on that
+  connection.
+- **Fixed** — undoing a PostgreSQL edit that set a value to NULL works, and
+  the save preview quotes table and column names.
+- **Fixed** — a colour chosen in the connection dialog shows on that
+  connection's tabs.
+- **Fixed** — a pasted connection string the editor can't read is refused
+  with a message saying why.
+- **Fixed** — saving an edit to a connection that was deleted meanwhile fails
+  instead of leaving its passwords behind in the keychain.
+- **Security** — dependencies are updated past published advisories in the
+  certificate checks (RUSTSEC-2026-0381 to 0383).
+
 ## v0.2.2
 
 - **Exports write plain values** — CSV and XLSX now write dates as readable
