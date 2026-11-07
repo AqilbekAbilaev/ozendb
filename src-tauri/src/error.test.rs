@@ -153,3 +153,52 @@ fn a_rolled_back_transaction_keeps_its_cause_s_code_and_says_what_was_lost() {
 fn a_mysql_error_that_never_reached_the_server_has_no_number() {
     assert_eq!(super::mysql_number(&sqlx::Error::PoolTimedOut), None);
 }
+
+#[test]
+fn a_tls_failure_through_a_verifying_tunnel_keeps_its_message_and_adds_the_hint() {
+    use super::AppError;
+    let config = crate::storage::ConnectionConfig { ssh_enabled: true, tls: true, ..Default::default() };
+    let original = AppError::Postgres(sqlx::Error::Tls("certificate not valid for name zq7".into())).user_message();
+    let error = AppError::Postgres(sqlx::Error::Tls("certificate not valid for name zq7".into())).through_tunnel(&config);
+    assert_eq!(error.user_message(), format!("{original} {}", super::TUNNEL_HINT));
+}
+
+#[test]
+fn a_tls_failure_through_a_verifying_tunnel_keeps_the_tls_code() {
+    use super::AppError;
+    let config = crate::storage::ConnectionConfig { ssh_enabled: true, tls: true, ..Default::default() };
+    let error = AppError::Postgres(sqlx::Error::Tls("bad peer 91".into())).through_tunnel(&config);
+    assert_eq!(error.code(), "tls");
+}
+
+#[test]
+fn a_mysql_tls_failure_through_a_verifying_tunnel_gets_the_hint_too() {
+    use super::AppError;
+    let config = crate::storage::ConnectionConfig { ssh_enabled: true, tls: true, ..Default::default() };
+    let error = AppError::MySql(sqlx::Error::Tls("unknown issuer 4f".into())).through_tunnel(&config);
+    assert!(error.user_message().contains("127.0.0.1"), "the MySQL failure got no hint");
+}
+
+#[test]
+fn a_tls_failure_without_a_tunnel_is_left_alone() {
+    use super::AppError;
+    let config = crate::storage::ConnectionConfig { ssh_enabled: false, tls: true, ..Default::default() };
+    let error = AppError::Postgres(sqlx::Error::Tls("expired 305".into())).through_tunnel(&config);
+    assert_eq!(error.user_message(), AppError::Postgres(sqlx::Error::Tls("expired 305".into())).user_message());
+}
+
+#[test]
+fn a_tls_failure_with_invalid_certificates_allowed_is_left_alone() {
+    use super::AppError;
+    let config = crate::storage::ConnectionConfig { ssh_enabled: true, tls: true, tls_allow_invalid_certificates: true, ..Default::default() };
+    let error = AppError::Postgres(sqlx::Error::Tls("handshake eof 77".into())).through_tunnel(&config);
+    assert_eq!(error.user_message(), AppError::Postgres(sqlx::Error::Tls("handshake eof 77".into())).user_message());
+}
+
+#[test]
+fn a_non_tls_failure_through_a_verifying_tunnel_is_left_alone() {
+    use super::AppError;
+    let config = crate::storage::ConnectionConfig { ssh_enabled: true, tls: true, ..Default::default() };
+    let error = AppError::Postgres(sqlx::Error::PoolTimedOut).through_tunnel(&config);
+    assert_eq!((error.code(), error.user_message()), ("network", sqlx::Error::PoolTimedOut.to_string()));
+}

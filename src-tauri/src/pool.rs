@@ -227,7 +227,7 @@ impl<R: Runtime> ConnectionPool<R> {
             let host = String::from("127.0.0.1");
             let port = tunnel.local_addr.port();
             let options = pg_uri::build_options_to_for_database(config, postgres, password.as_deref(), &host, port, database)?;
-            return self.get_or_create_postgres(&config.id, database, options).await;
+            return self.get_or_create_postgres(&config.id, database, options).await.map_err(|e| e.through_tunnel(config));
         }
 
         if let Some(pool) = self.get_postgres(&config.id, database).await {
@@ -253,7 +253,7 @@ impl<R: Runtime> ConnectionPool<R> {
         }
         let password = crate::keychain::get(&config.id);
         let options = mysql_uri::build_options(config, password.as_deref(), database, via)?;
-        self.get_or_create_mysql(&config.id, database, options, config.read_only).await
+        self.get_or_create_mysql(&config.id, database, options, config.read_only).await.map_err(|e| e.through_tunnel(config))
     }
 
     /// Returns the cached SSH tunnel for `config`, establishing one if needed.
