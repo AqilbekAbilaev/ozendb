@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+const TUNNEL_HINT: &str = "Through an SSH tunnel the certificate is checked against 127.0.0.1 instead of the server's own name, which the database driver cannot change yet, so allowing invalid certificates for this connection is the only way through for now.";
+
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error("MongoDB error: {0}")]
@@ -122,9 +124,22 @@ pub enum AppError {
     /// A statement in a held transaction failed in a way that rolled the transaction back.
     #[error("{0} MySQL rolled the whole transaction back, so nothing done in it is kept; the statements after this one start a new one.")]
     RolledBack(Box<AppError>),
+
+    /// A TLS handshake that failed through an SSH tunnel, where sqlx checks the certificate against the tunnel's local end (#412).
+    #[error("{0} {hint}", hint = TUNNEL_HINT)]
+    Tunnelled(Box<AppError>),
 }
 
 impl AppError {
+    /// Explains a TLS failure on a tunnelled connection that verifies certificates; any other error passes through unchanged.
+    pub(crate) fn through_tunnel(self, config: &crate::storage::ConnectionConfig) -> AppError {
+        let verified = config.ssh_enabled && config.tls && !config.tls_allow_invalid_certificates;
+        match self {
+            AppError::Postgres(sqlx::Error::Tls(_)) | AppError::MySql(sqlx::Error::Tls(_)) if verified => AppError::Tunnelled(Box::new(self)),
+            other => other,
+        }
+    }
+
     /// Stable category for logging and the structured-error wire format. The
     /// frontend branches on this (e.g. to show an auth vs network hint), so
     /// Mongo errors are classified into actionable sub-categories.
@@ -165,7 +180,7 @@ impl AppError {
             AppError::Validation(_) => "validation",
             AppError::Forbidden(_) => "forbidden",
             AppError::Cancelled | AppError::TimedOut => "cancelled",
-            AppError::InScript { source, .. } | AppError::RolledBack(source) => source.code(),
+            AppError::InScript { source, .. } | AppError::RolledBack(source) | AppError::Tunnelled(source) => source.code(),
         }
     }
 }
@@ -197,6 +212,7 @@ impl AppError {
                 "{} MySQL rolled the whole transaction back, so nothing done in it is kept; the statements after this one start a new one.",
                 source.user_message(),
             ),
+            AppError::Tunnelled(source) => format!("{} {}", source.user_message(), TUNNEL_HINT),
             _ => self.to_string(),
         }
     }

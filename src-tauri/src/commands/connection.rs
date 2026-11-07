@@ -60,7 +60,7 @@ pub async fn test_connection(
 
     // Matching the variant rather than an engine tag hands each arm exactly the
     // settings its driver needs, so neither can be called without them.
-    match &config.engine {
+    let outcome = match &config.engine {
         EngineConfig::Postgres(postgres) => {
             test_postgres_connection(&config, postgres, password.as_deref(), via).await
         }
@@ -70,7 +70,8 @@ pub async fn test_connection(
         EngineConfig::MySql(mysql) => {
             test_mysql_connection(&config, mysql, password.as_deref(), via).await
         }
-    }
+    };
+    outcome.map_err(|e| e.through_tunnel(&config))
 }
 
 /// `via` is the local port of an SSH tunnel, when the connection has one.
