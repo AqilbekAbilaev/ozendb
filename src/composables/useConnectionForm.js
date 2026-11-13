@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { testConnection as testConnectionApi, saveConnection, updateConnection } from '../appApi/connections'
 import { emitConnectionSaved, emitConnectionUpdated } from '../appApi/events'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
@@ -7,6 +7,7 @@ import { connectionTargetChanged } from '../utils/connectionTarget.js'
 import { hasLoadedData } from '../stores/connectionData.js'
 import { setTagOverride } from '../stores/nodeTags.js'
 import { ENGINES } from '../engines/index.js'
+import { brandOf, runsOn } from '../data/connectionOptions.js'
 
 /**
  * One connection editor's fields and the two things you can do with them: test the
@@ -22,6 +23,9 @@ export function useConnectionForm(editConn) {
 
   const connName = ref(isEditMode ? editConn.name : 'New Connection')
   const engine   = ref(isEditMode ? (editConn.engine ?? 'mongodb') : 'mongodb')
+  // Display only: a MySQL connection shown as MariaDB. The backend reads the server's version, not this.
+  const mariadb  = ref(isEditMode ? !!editConn.mariadb : false)
+  const choice   = computed(() => brandOf({ engine: engine.value, mariadb: mariadb.value }))
 
   // Seed list — always at least one { host, port } row. In edit mode it comes from the
   // stored config (already a `hosts` array after backend migration).
@@ -33,11 +37,14 @@ export function useConnectionForm(editConn) {
   function addHost() { hosts.value.push({ host: '', port: ENGINES[engine.value].defaultPort }) }
 
   // A port still at the old engine's default follows the switch; a typed one stays.
-  function setEngine(next) {
+  // `picked` is a picker choice, so 'mariadb' means the MySQL engine with the flag on.
+  function setEngine(picked) {
+    const next = runsOn(picked)
     for (const h of hosts.value) {
       if (Number(h.port) === ENGINES[engine.value].defaultPort) h.port = ENGINES[next].defaultPort
     }
     engine.value = next
+    mariadb.value = picked === 'mariadb'
   }
   function removeHost(index) { if (hosts.value.length > 1) hosts.value.splice(index, 1) }
 
@@ -125,6 +132,7 @@ export function useConnectionForm(editConn) {
       sshPassphrase: (useSsh.value && sshAuth.value === 'key') ? (sshKeyPassphrase.value || null) : null,
       tag:             selectedTag.value !== 'none' ? selectedTag.value : null,
       readOnly:        readOnly.value,
+      ...(engine.value === 'mysql' ? { mariadb: mariadb.value } : {}),
       ...ENGINES[engine.value].buildFields({
         username: username.value,
         password: password.value,
@@ -256,7 +264,7 @@ export function useConnectionForm(editConn) {
   }
 
   return {
-    isEditMode, connName, engine, setEngine, hosts,
+    isEditMode, connName, engine, choice, setEngine, hosts,
     addHost, removeHost,
     username, password,
     useTls, tlsCaFile, tlsAllowInvalidCerts, pickTlsFile,

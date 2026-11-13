@@ -210,7 +210,7 @@ fn a_saved_record_writes_its_engine_tag_back() {
 #[test]
 fn a_mysql_record_round_trips_with_its_default_database() {
     let config = ConnectionConfig {
-        engine: EngineConfig::MySql(MySqlConfig { database: Some(String::from("ведомость 2024")) }),
+        engine: EngineConfig::MySql(MySqlConfig { database: Some(String::from("ведомость 2024")), ..Default::default() }),
         ..conn("1", "Local")
     };
     let json = serde_json::to_string(&config).unwrap();
@@ -223,7 +223,7 @@ fn a_mysql_record_may_leave_out_its_database() {
     let json = r#"{"id":"1","name":"Local","engine":"mysql"}"#;
     let config: ConnectionConfig = serde_json::from_str(json).unwrap();
     assert_eq!(config.engine_kind(), Engine::MySql);
-    assert_eq!(config.engine, EngineConfig::MySql(MySqlConfig { database: None }));
+    assert_eq!(config.engine, EngineConfig::MySql(MySqlConfig::default()));
 }
 
 #[test]
@@ -381,4 +381,29 @@ fn updating_a_removed_connection_is_an_unknown_connection() {
     let updated = storage.update(conn("c.1 ü", "Edited"));
 
     assert!(matches!(updated, Err(AppError::UnknownConnection(id)) if id == "c.1 ü"));
+}
+
+#[test]
+fn a_mariadb_record_round_trips_with_its_flag() {
+    let config = ConnectionConfig {
+        engine: EngineConfig::MySql(MySqlConfig { mariadb: true, ..Default::default() }),
+        ..conn("1", "Local")
+    };
+    let json = serde_json::to_string(&config).unwrap();
+    assert!(json.contains(r#""mariadb":true"#), "flag must be written flat: {json}");
+    assert_eq!(serde_json::from_str::<ConnectionConfig>(&json).unwrap(), config);
+}
+
+#[test]
+fn a_mysql_record_without_the_flag_reads_as_not_mariadb() {
+    let json = r#"{"id":"1","name":"Local","engine":"mysql"}"#;
+    let config: ConnectionConfig = serde_json::from_str(json).unwrap();
+    assert!(!config.engine.as_mysql().unwrap().mariadb);
+}
+
+#[test]
+fn a_false_mariadb_flag_is_not_written() {
+    let config = ConnectionConfig { engine: EngineConfig::MySql(MySqlConfig::default()), ..conn("1", "Local") };
+    let json = serde_json::to_string(&config).unwrap();
+    assert!(!json.contains("mariadb"), "a false flag must stay out of the file: {json}");
 }

@@ -13,7 +13,7 @@ fn config() -> ConnectionConfig {
 }
 
 fn database(name: &str) -> MySqlConfig {
-    MySqlConfig { database: Some(String::from(name)) }
+    MySqlConfig { database: Some(String::from(name)), ..Default::default() }
 }
 
 #[test]

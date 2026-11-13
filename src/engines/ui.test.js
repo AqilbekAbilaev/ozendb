@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { CONNECTION_EDITORS, SHARED_TABS } from './ui.js'
-import { ENGINE_OPTIONS } from '../data/connectionOptions.js'
+import { ENGINE_OPTIONS, runsOn } from '../data/connectionOptions.js'
 
 describe('CONNECTION_EDITORS', () => {
   it('has an editor for every engine the intro screen offers', () => {
     for (const { value } of ENGINE_OPTIONS) {
-      expect(CONNECTION_EDITORS[value], value).toBeDefined()
+      expect(CONNECTION_EDITORS[runsOn(value)], value).toBeDefined()
     }
   })
 

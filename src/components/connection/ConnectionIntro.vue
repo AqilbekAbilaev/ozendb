@@ -5,12 +5,13 @@ import BaseButton from '../base/BaseButton.vue'
 import BaseTextarea from '../base/BaseTextarea.vue'
 import FieldError from '../base/FieldError.vue'
 import BaseSelect from '../base/BaseSelect.vue'
-import { ENGINE_OPTIONS } from '../../data/connectionOptions.js'
+import { ENGINE_OPTIONS, runsOn } from '../../data/connectionOptions.js'
 import { CONNECTION_EDITORS } from '../../engines/ui.js'
 import FlexSpacer from '../base/FlexSpacer.vue'
 
 const props = defineProps({
-  engine: { type: String, default: 'mongodb' },
+  // The picker choice, which is an engine id or 'mariadb'.
+  choice: { type: String, default: 'mongodb' },
   // A saved connection can't change engine (the backend refuses it).
   engineLocked: { type: Boolean, default: false },
 })
@@ -19,8 +20,8 @@ const emit = defineEmits(['close', 'next'])
 const mode      = ref('uri')
 const pastedUri = ref('')
 const uriError  = ref('')
-const engine    = ref(props.engine)
-const editor = computed(() => CONNECTION_EDITORS[engine.value])
+const engine    = ref(props.choice)
+const editor = computed(() => CONNECTION_EDITORS[runsOn(engine.value)])
 
 function pickEngine(next) {
   engine.value = next

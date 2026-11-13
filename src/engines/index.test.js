@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { ENGINES, DEFAULT_ENGINE, engineOf } from './index.js'
-import { ENGINE_OPTIONS } from '../data/connectionOptions.js'
+import { ENGINE_OPTIONS, runsOn } from '../data/connectionOptions.js'
 import { listDatabases as listMySqlDatabases } from './mysql/api/resources.js'
 
 describe('the engine table', () => {
   it('has an entry, under its own id, for every engine the editor offers', () => {
     for (const { value } of ENGINE_OPTIONS) {
-      expect(ENGINES[value]?.id, value).toBe(value)
+      expect(ENGINES[runsOn(value)]?.id, value).toBe(runsOn(value))
     }
   })
 

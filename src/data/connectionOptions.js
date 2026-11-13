@@ -98,7 +98,14 @@ export const ENGINE_OPTIONS = [
   { value: 'mongodb', label: 'MongoDB', badge: 'MDB' },
   { value: 'postgresql', label: 'PostgreSQL', badge: 'PG' },
   { value: 'mysql', label: 'MySQL', badge: 'MY' },
+  { value: 'mariadb', label: 'MariaDB', badge: 'MA' },
 ]
+
+// The engine a picker choice runs on: MariaDB is the MySQL engine under its own name.
+export const runsOn = (choice) => choice === 'mariadb' ? 'mysql' : choice
+
+// The picker choice a connection shows as; the engine, unless a MySQL connection is flagged MariaDB.
+export const brandOf = (connection) => connection.engine === 'mysql' && connection.mariadb ? 'mariadb' : connection.engine
 
 // An engine's name as people write it; an unknown one keeps its own, so a label never breaks a screen.
 export const engineLabel = (engine) => ENGINE_OPTIONS.find(e => e.value === engine)?.label ?? engine

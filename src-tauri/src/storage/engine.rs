@@ -68,6 +68,10 @@ pub struct MySqlConfig {
     /// reaches every database on the server, so this may be left out.
     #[serde(default)]
     pub database: Option<String>,
+    /// Display only: the connection is shown as MariaDB. Behaviour follows the
+    /// server's own version, never this flag.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub mariadb: bool,
 }
 
 impl Default for MongoConfig {

@@ -27,7 +27,7 @@ const activeTab = ref('server')
 
 const form = useConnectionForm(props.editConn)
 const {
-  connName, engine,
+  connName, engine, choice,
   useSsh, sshHost, sshPort, sshUser, sshAuth, sshPassword, sshKeyFile,
   sshKeyPassphrase, pickSshKey,
   selectedTag, readOnly,
@@ -68,7 +68,7 @@ useMomentumScroll(bodyEl)
 </script>
 
 <template>
-  <ConnectionIntro v-if="step === 'intro'" :engine="engine" :engine-locked="isEditMode" @close="$emit('close')" @next="startForm" />
+  <ConnectionIntro v-if="step === 'intro'" :choice="choice" :engine-locked="isEditMode" @close="$emit('close')" @next="startForm" />
 
   <!-- ── Form step ──────────────────────────────────── -->
   <BaseModal v-else class="nc-editor" :title="isEditMode ? 'Edit Connection' : 'New Connection'" width="720px" max-width="94vw" height="600px" max-height="92vh" @close="$emit('close')">

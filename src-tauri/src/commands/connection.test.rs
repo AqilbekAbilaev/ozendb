@@ -128,7 +128,7 @@ fn a_payload_without_a_known_engine_is_rejected() {
 fn mysql_fields_build_a_mysql_connection_with_its_default_database() {
     let f = parse(r#""engine": "mysql", "database": "ведомость 2024""#).unwrap();
     let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
-    assert_eq!(c.engine, EngineConfig::MySql(MySqlConfig { database: Some(String::from("ведомость 2024")) }));
+    assert_eq!(c.engine, EngineConfig::MySql(MySqlConfig { database: Some(String::from("ведомость 2024")), ..Default::default() }));
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn a_mysql_payload_may_leave_out_its_database() {
 fn an_edit_cannot_switch_a_postgres_connection_to_mysql() {
     let mut existing = config();
     existing.engine = EngineConfig::Postgres(PostgresConfig::default());
-    let mysql = ConnectionFields { engine: EngineFields::MySql(MySqlFields { database: None }), ..fields() };
+    let mysql = ConnectionFields { engine: EngineFields::MySql(MySqlFields { database: None, mariadb: false }), ..fields() };
     let err = mysql.into_config(String::from("c1"), Some(&existing), None, None, true).unwrap_err();
     assert_eq!(err.code(), "validation");
 }
@@ -320,4 +320,18 @@ fn the_frontends_payload_deserializes_with_its_secrets() {
     assert_eq!(password.as_deref(), Some("s3cret"));
     assert_eq!(ssh_password.as_deref(), Some("sshpw"));
     assert_eq!(ssh_passphrase.as_deref(), Some("phrase"));
+}
+
+#[test]
+fn mysql_fields_carry_the_mariadb_flag_into_the_saved_config() {
+    let f = parse(r#""engine": "mysql", "mariadb": true"#).unwrap();
+    let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
+    assert!(c.engine.as_mysql().unwrap().mariadb);
+}
+
+#[test]
+fn a_mysql_payload_without_the_flag_is_not_mariadb() {
+    let f = parse(r#""engine": "mysql""#).unwrap();
+    let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
+    assert!(!c.engine.as_mysql().unwrap().mariadb);
 }

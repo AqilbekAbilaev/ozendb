@@ -563,6 +563,7 @@ describe('the payload for each engine', () => {
         database: 'sales 2024',
         username: 'ad min',
         password: 'p@ss:/w',
+        ...(engine === 'mysql' ? { mariadb: false } : {}),
       })
     })
   }
@@ -593,5 +594,38 @@ describe('a pasted connection string', () => {
     expect(f.engineFields.postgresql.database.value).toBe('')
     expect(f.formFields()).toMatchObject({ username: 'app', password: 'pw', hosts: [{ host: 'db', port: 3307 }] })
     expect(f.engineFields.mongodb.connType.value).toBe('standalone')
+  })
+})
+
+describe('the MariaDB choice', () => {
+  it('means the MySQL engine with the flag on', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('mariadb')
+    expect([f.engine.value, f.choice.value, f.formFields().mariadb]).toEqual(['mysql', 'mariadb', true])
+  })
+
+  it('is turned off again by choosing MySQL', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('mariadb')
+    f.setEngine('mysql')
+    expect([f.choice.value, f.formFields().mariadb]).toEqual(['mysql', false])
+  })
+
+  it('is left off by another engine, which sends no flag', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('mariadb')
+    f.setEngine('postgresql')
+    expect('mariadb' in f.formFields()).toBe(false)
+  })
+
+  it('starts from the saved connection when editing', () => {
+    const f = useConnectionForm(stored({ engine: 'mysql', mariadb: true }))
+    expect(f.choice.value).toBe('mariadb')
+  })
+
+  it('keeps the MySQL port when picked', () => {
+    const f = useConnectionForm(null)
+    f.setEngine('mariadb')
+    expect(f.hosts.value[0].port).toBe(3306)
   })
 })

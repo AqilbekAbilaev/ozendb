@@ -12,6 +12,7 @@ import { tagOverrides } from '../../stores/nodeTags'
 import { useConnectionTree } from '../../composables/useConnectionTree.js'
 import { TREE_NODES } from '../../engines/ui.js'
 import EngineBadge from '../base/EngineBadge.vue'
+import { brandOf } from '../../data/connectionOptions.js'
 import { connectionMenu } from '../../engines/contextActions.js'
 import { createResourceRef } from '../../utils/resourceRef'
 
@@ -114,7 +115,7 @@ const { tip, ...statsTip } = useStatsTip()
           <span class="tw">
             <BaseIcon :name="expandedConns[conn.id] ? 'caretDown' : 'caret'" :size="12" />
           </span>
-          <EngineBadge :engine="conn.engine" />
+          <EngineBadge :engine="brandOf(conn)" />
           <span class="tt">{{ conn.name }}</span>
           <span
             v-if="conn.read_only"

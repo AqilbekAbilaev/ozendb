@@ -67,6 +67,8 @@ pub struct PostgresFields {
 pub struct MySqlFields {
     #[serde(default)]
     pub database: Option<String>,
+    #[serde(default)]
+    pub mariadb: bool,
 }
 
 impl ConnectionFields {
@@ -97,7 +99,7 @@ impl ConnectionFields {
                 EngineConfig::Postgres(PostgresConfig { database: postgres.database })
             }
             (EngineFields::MySql(mysql), None | Some(EngineConfig::MySql(_))) => {
-                EngineConfig::MySql(MySqlConfig { database: mysql.database })
+                EngineConfig::MySql(MySqlConfig { database: mysql.database, mariadb: mysql.mariadb })
             }
             _ => {
                 return Err(AppError::Validation(
