@@ -132,6 +132,22 @@ fn mysql_fields_build_a_mysql_connection_with_its_default_database() {
 }
 
 #[test]
+fn mariadb_fields_build_a_mariadb_connection_with_its_default_database() {
+    let f = parse(r#""engine": "mariadb", "database": "ведомость 2024""#).unwrap();
+    let c = f.into_config(String::from("c1"), None, None, None, true).unwrap();
+    assert_eq!(c.engine, EngineConfig::MariaDb(MySqlConfig { database: Some(String::from("ведомость 2024")) }));
+}
+
+#[test]
+fn an_edit_cannot_switch_a_mysql_connection_to_mariadb() {
+    let mut existing = config();
+    existing.engine = EngineConfig::MySql(MySqlConfig::default());
+    let mariadb = ConnectionFields { engine: EngineFields::MariaDb(MySqlFields { database: None }), ..fields() };
+    let err = mariadb.into_config(String::from("c1"), Some(&existing), None, None, true).unwrap_err();
+    assert_eq!(err.code(), "validation");
+}
+
+#[test]
 fn a_mysql_payload_may_leave_out_its_database() {
     let f = parse(r#""engine": "mysql""#).unwrap();
     assert!(matches!(f.engine, EngineFields::MySql(ref m) if m.database.is_none()));

@@ -227,6 +227,31 @@ fn a_mysql_record_may_leave_out_its_database() {
 }
 
 #[test]
+fn a_mariadb_record_loads_with_its_default_database() {
+    let json = r#"{"id":"1","name":"Local","engine":"mariadb","database":"ведомость 2024"}"#;
+    let config: ConnectionConfig = serde_json::from_str(json).unwrap();
+    assert_eq!(config.engine_kind(), Engine::MariaDb);
+    assert_eq!(config.engine, EngineConfig::MariaDb(MySqlConfig { database: Some(String::from("ведомость 2024")) }));
+}
+
+#[test]
+fn a_mariadb_record_round_trips_with_its_engine_tag() {
+    let config = ConnectionConfig {
+        engine: EngineConfig::MariaDb(MySqlConfig { database: Some(String::from("ведомость 2024")) }),
+        ..conn("1", "Local")
+    };
+    let json = serde_json::to_string(&config).unwrap();
+    assert!(json.contains(r#""engine":"mariadb""#), "tag must round-trip: {json}");
+    assert_eq!(serde_json::from_str::<ConnectionConfig>(&json).unwrap(), config);
+}
+
+#[test]
+fn a_mariadb_config_gives_its_settings_as_mysql_ones() {
+    let settings = MySqlConfig { database: Some(String::from("ведомость 2024")) };
+    assert_eq!(EngineConfig::MariaDb(settings.clone()).as_mysql(), Some(&settings));
+}
+
+#[test]
 fn connection_kind_maps_known_strings() {
     assert_eq!(ConnectionKind::from_str("standalone"), ConnectionKind::Standalone);
     assert_eq!(ConnectionKind::from_str("srv"), ConnectionKind::Srv);
