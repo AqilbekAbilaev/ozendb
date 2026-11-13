@@ -96,6 +96,7 @@ fn a_plan_mysql_cannot_show_as_steps_is_refused_without_guessing_the_statement()
 fn any_other_plan_is_read_as_json() {
     assert_eq!(Explain::Iterators { analyze: false }.read(String::from(r#"{"operation": "Insert into `ä b`"}"#)).unwrap()["operation"], "Insert into `ä b`");
     assert_eq!(Explain::Classic.read(String::from(r#"{"query_block": {"select_id": 1}}"#)).unwrap()["query_block"]["select_id"], 1);
+    assert!(Explain::MariaDb { analyze: false }.read(String::from(r#"{"operation": "<not executable by iterator executor>"}"#)).is_ok());
 }
 
 #[test]
@@ -105,11 +106,29 @@ fn a_tree_is_kept_as_the_text_it_is() {
 }
 
 #[test]
-fn a_mariadb_server_explains_a_read_the_classic_way() {
-    assert_eq!(Explain::of("11.4.13-MariaDB-ubu2404", true), Explain::Classic);
+fn a_mariadb_server_analyzes_a_read() {
+    assert_eq!(Explain::of("11.4.13-MariaDB-ubu2404", true), Explain::MariaDb { analyze: true });
 }
 
 #[test]
-fn a_mariadb_server_explains_a_write_the_classic_way() {
-    assert_eq!(Explain::of("10.11.9-MariaDB-ubu2204", false), Explain::Classic);
+fn a_mariadb_server_explains_a_write_without_running() {
+    assert_eq!(Explain::of("10.11.9-MariaDB-ubu2204", false), Explain::MariaDb { analyze: false });
+}
+
+#[test]
+fn mariadb_runs_an_analyzed_read_in_a_read_only_transaction_and_never_runs_a_write() {
+    assert_eq!(Explain::MariaDb { analyze: true }.setup(), Some("START TRANSACTION READ ONLY"));
+    assert_eq!(Explain::MariaDb { analyze: false }.setup(), None);
+}
+
+#[test]
+fn mariadb_asks_for_its_own_json() {
+    assert_eq!(Explain::MariaDb { analyze: true }.statement("SELECT `ü` FROM `a b`"), "ANALYZE FORMAT=JSON SELECT `ü` FROM `a b`");
+    assert_eq!(Explain::MariaDb { analyze: false }.statement("DELETE FROM `a b`"), "EXPLAIN FORMAT=JSON DELETE FROM `a b`");
+}
+
+#[test]
+fn a_mariadb_plan_is_read_as_json_whatever_it_holds() {
+    assert_eq!(Explain::MariaDb { analyze: true }.read(String::from(r#"{"query_block": {"select_id": 1}}"#)).unwrap()["query_block"]["select_id"], 1);
+    assert!(Explain::MariaDb { analyze: false }.read(String::from(r#"{"operation": "<not executable by iterator executor>"}"#)).is_ok());
 }

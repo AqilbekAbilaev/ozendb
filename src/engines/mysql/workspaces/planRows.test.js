@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { planRows } from './planRows.js'
 import { analyzedPlan, estimatedPlan, classicJoin, classicUnion, classicDerived, classicSubqueries, classicDelete,
+  mariaSelect, mariaUnion, mariaSubquery, mariaUpdate, mariaDelete,
   treeJoin, treeUnion, treeDerived, treeSubquery, treeNeverExecuted, treeImpossibleWhere,
   treeBrokenLines } from './planRows.fixtures.js'
 
@@ -125,6 +126,59 @@ describe('planRows of a plan in the classic format', () => {
       [1, 'Filter: (`explain probe`.`pets`.`owner_id` = 1)'],
       [2, 'Index range scan on pets using by_owner'],
     ])
+  })
+})
+
+describe('planRows of a plan from MariaDB', () => {
+  const steps = (plan) => planRows(plan).rows.map(r => [r.depth, r.node])
+
+  it('lists the sort, the temporary table and the join around the tables of an analyzed select', () => {
+    const nodes = steps(mariaSelect).map(([, node]) => node)
+    expect(nodes.slice(0, 3)).toEqual(['Sort', 'Temporary table', 'Nested loop join'])
+    expect(steps(mariaSelect)[0]).toEqual([0, 'Sort'])
+    expect(nodes).toContain('Index lookup on pets using by_owner')
+  })
+
+  it('takes rows and times from the run, not the estimate', () => {
+    const { rows, estimated, executionMs } = planRows(mariaSelect)
+    expect(estimated).toBe(false)
+    expect(rows.find(r => r.node === 'Index lookup on pets using by_owner')).toMatchObject({ rows: 1, ms: expect.closeTo(0.763, 2) })
+    expect(rows.find(r => r.node === 'Sort').ms).toBeCloseTo(executionMs, 10)
+    expect(rows.filter(r => r.hot).map(r => r.node)).toEqual(['Index lookup on pets using by_owner'])
+  })
+
+  it('shows a union as its two halves, with the rows it returned', () => {
+    const { rows } = planRows(mariaUnion)
+    expect(steps(mariaUnion)).toEqual([
+      [0, 'Union all'], [1, 'Nested loop join'], [2, 'Table scan on owners'], [1, 'Nested loop join'], [2, 'Table scan on pets'],
+    ])
+    expect(rows.map(r => r.rows)).toEqual([6, null, 3, null, 4])
+  })
+
+  it('puts a subquery beside its query, its cache looked through', () => {
+    expect(steps(mariaSubquery)).toEqual([
+      [0, 'Nested loop join'],
+      [1, 'Table scan on o'],
+      [0, 'Select #2 (subquery)'],
+      [1, 'Nested loop join'],
+      [2, 'Covering index lookup on p using by_owner'],
+    ])
+    expect(planRows(mariaSubquery).rows[3]).toMatchObject({ rows: null, ms: expect.closeTo(0.0062, 3) })
+  })
+
+  it('shows a single-table DELETE above the read that finds its rows', () => {
+    expect(steps(mariaDelete)).toEqual([
+      [0, 'Delete from pets'],
+      [1, 'Filter: pets.owner_id = 1'],
+      [2, 'Index range scan on pets using by_owner'],
+    ])
+  })
+
+  it('is estimated when MariaDB ran nothing, reading a table\'s rows and cost', () => {
+    const { rows, estimated, executionMs } = planRows(mariaUpdate)
+    expect([estimated, executionMs]).toEqual([true, null])
+    expect(rows.map(r => r.rows)).toEqual([null, 4, 4, 1, 1])
+    expect(rows[0].share).toBe(1)
   })
 })
 

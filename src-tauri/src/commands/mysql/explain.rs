@@ -1,8 +1,9 @@
 //! Explain: the plan MySQL chose for one statement. For a statement that only reads,
 //! ANALYZE runs it and adds the real rows and times: as `EXPLAIN FORMAT=JSON` in its
-//! second version on MySQL 8.3 and later, and as ANALYZE's tree, in text, from 8.0.18.
-//! Anything else, and any statement on an older server, is explained without running,
-//! in the second JSON version on 8.3 and later and the classic one before.
+//! second version on MySQL 8.3 and later, and as ANALYZE's tree, in text, from 8.0.18;
+//! MariaDB's `ANALYZE FORMAT=JSON` does it in its own JSON. Anything else, and any
+//! statement on an older MySQL, is explained without running, in the second JSON version
+//! on 8.3 and later and the classic one before.
 use std::time::Duration;
 
 use sqlparser::ast::{Query, SetExpr, Statement};
@@ -54,6 +55,10 @@ enum Explain {
     Tree,
     /// The classic EXPLAIN FORMAT=JSON, never run.
     Classic,
+    /// MariaDB's own JSON, which has neither a second version nor a tree: `ANALYZE
+    /// FORMAT=JSON` runs a statement that only reads and adds the real rows and times,
+    /// and `EXPLAIN FORMAT=JSON` shows any other without running it.
+    MariaDb { analyze: bool },
 }
 
 impl Explain {
@@ -61,7 +66,7 @@ impl Explain {
     /// (`SELECT VERSION()`).
     fn of(version: &str, reads: bool) -> Explain {
         if Flavor::of(version) == Flavor::MariaDb {
-            return Explain::Classic;
+            return Explain::MariaDb { analyze: reads };
         }
         let mut parts = version.split(['.', '-']).map(|part| part.parse::<u32>().unwrap_or(0));
         let version = (parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0));
@@ -80,7 +85,8 @@ impl Explain {
             Explain::Iterators { analyze: true } => Some("SET SESSION explain_json_format_version = 2; START TRANSACTION READ ONLY"),
             Explain::Iterators { analyze: false } => Some("SET SESSION explain_json_format_version = 2"),
             Explain::Tree => Some("START TRANSACTION READ ONLY"),
-            Explain::Classic => None,
+            Explain::MariaDb { analyze: true } => Some("START TRANSACTION READ ONLY"),
+            Explain::MariaDb { analyze: false } | Explain::Classic => None,
         }
     }
 
@@ -89,17 +95,19 @@ impl Explain {
         match self {
             Explain::Iterators { analyze: true } => format!("EXPLAIN ANALYZE FORMAT=JSON {statement}"),
             Explain::Tree => format!("EXPLAIN ANALYZE {statement}"),
+            Explain::MariaDb { analyze: true } => format!("ANALYZE FORMAT=JSON {statement}"),
+            Explain::MariaDb { analyze: false } => format!("EXPLAIN FORMAT=JSON {statement}"),
             Explain::Iterators { analyze: false } | Explain::Classic => format!("EXPLAIN FORMAT=JSON {statement}"),
         }
     }
 
-    /// The plan in MySQL's `answer`: JSON, or the tree as the text it is.
+    /// The plan in the server's `answer`: JSON, or the tree as the text it is.
     fn read(&self, answer: String) -> Result<serde_json::Value, AppError> {
         if *self == Explain::Tree {
             return Ok(serde_json::Value::String(answer));
         }
         let plan: serde_json::Value = serde_json::from_str(&answer)?;
-        if plan["operation"] == NOT_ITERATED {
+        if matches!(self, Explain::Iterators { .. }) && plan["operation"] == NOT_ITERATED {
             return Err(AppError::Validation(String::from("MySQL can't show this statement's plan as steps; explain a SELECT with the same WHERE instead.")));
         }
         Ok(plan)
