@@ -39,10 +39,10 @@ const rowTag = computed(() => {
 })
 
 // A row's ref: its database, and the table, view or stored program it names, if any. A
-// view is a table to the table tab that browses it.
+// view or sequence is a table to the table tab that browses it.
 function rowResource(database, name = null, kind = 'table') {
   const segments = [{ kind: 'database', name: database }]
-  if (name) segments.push({ kind: kind === 'view' ? 'table' : kind, name })
+  if (name) segments.push({ kind: kind === 'view' || kind === 'sequence' ? 'table' : kind, name })
   return createResourceRef(props.conn.id, segments)
 }
 
@@ -69,7 +69,7 @@ function rowNode(database, name, kind) {
 
 // Double-clicking a view browses it, as a table's row does; a stored program's shows its definition.
 function openRow(database, folder, name) {
-  if (folder.menu === 'view') openTable(database, name)
+  if (folder.menu === 'view' || folder.menu === 'sequence') openTable(database, name)
   else openModal('mysqlDefinition', rowNode(database, name, folder.kind))
 }
 

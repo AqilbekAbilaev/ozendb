@@ -92,6 +92,7 @@ pub enum MySqlDefinitionKind {
     Function,
     Trigger,
     Event,
+    Sequence,
 }
 
 impl MySqlDefinitionKind {
@@ -102,6 +103,7 @@ impl MySqlDefinitionKind {
             Self::Function => "function",
             Self::Trigger => "trigger",
             Self::Event => "event",
+            Self::Sequence => "sequence",
         }
     }
 
@@ -116,6 +118,7 @@ impl MySqlDefinitionKind {
             Self::Function => "Create Function",
             Self::Trigger => "SQL Original Statement",
             Self::Event => "Create Event",
+            Self::Sequence => "Create Table",
         }
     }
 

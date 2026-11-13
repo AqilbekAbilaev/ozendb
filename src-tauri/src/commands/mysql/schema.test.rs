@@ -22,6 +22,16 @@ fn reads_views_and_system_views_as_views() {
 }
 
 #[test]
+fn reads_a_mariadb_sequence_as_a_sequence() {
+    assert_eq!(table_kind("SEQUENCE"), "sequence");
+}
+
+#[test]
+fn keeps_a_system_versioned_table_a_table() {
+    assert_eq!(table_kind("SYSTEM VERSIONED"), "table");
+}
+
+#[test]
 fn reads_an_enum_s_labels_from_its_column_type_in_declared_order() {
     assert_eq!(enum_values("enum('new','paid')"), Some(vec![String::from("new"), String::from("paid")]));
     assert_eq!(enum_values("enum('ü (z)','x,y','')"), Some(vec![String::from("ü (z)"), String::from("x,y"), String::new()]));

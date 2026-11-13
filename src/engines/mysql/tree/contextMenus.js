@@ -34,6 +34,7 @@ export const MYSQL_MENUS = {
     { sep: true }, COPY_NAME,
   ],
   view: [{ value: 'mysql:open_table', label: 'Open View', icon: 'table' }, DEFINITION, NEW_SQL, { sep: true }, COPY_NAME],
+  sequence: [{ value: 'mysql:open_table', label: 'Open Sequence', icon: 'table' }, DEFINITION, NEW_SQL, { sep: true }, COPY_NAME],
   // A procedure, function, trigger or event.
   program: [DEFINITION, NEW_SQL, { sep: true }, COPY_NAME],
 }

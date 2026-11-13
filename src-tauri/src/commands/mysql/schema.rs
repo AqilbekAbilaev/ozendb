@@ -43,7 +43,7 @@ pub async fn list_mysql_databases(ctx: State<'_, AppContext>, id: String) -> Res
 #[serde(rename_all = "camelCase")]
 pub struct MySqlTableInfo {
     pub name: String,
-    /// "table" or "view".
+    /// "table", "view" or "sequence" (MariaDB only).
     pub kind: String,
     /// `TABLE_ROWS`, free to read, unlike a count. For InnoDB it is the optimizer's
     /// estimate and can be far off; None for a view.
@@ -53,6 +53,7 @@ pub struct MySqlTableInfo {
 fn table_kind(table_type: &str) -> &'static str {
     match table_type {
         "VIEW" | "SYSTEM VIEW" => "view",
+        "SEQUENCE" => "sequence",
         _ => "table",
     }
 }

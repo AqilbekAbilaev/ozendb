@@ -22,6 +22,12 @@ fn reads_each_kind_s_create_statement_from_its_own_column() {
 }
 
 #[test]
+fn asks_for_a_sequence_s_definition_and_reads_it_from_the_create_table_column() {
+    let kind = kind("sequence");
+    assert_eq!((kind.show_create("db", "s1").unwrap(), kind.column()), (String::from("SHOW CREATE SEQUENCE `db`.`s1`"), "Create Table"));
+}
+
+#[test]
 fn refuses_a_kind_it_has_no_definition_for() {
     assert!(serde_json::from_value::<MySqlDefinitionKind>(serde_json::json!("table")).is_err());
 }
