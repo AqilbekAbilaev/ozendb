@@ -57,6 +57,10 @@ describe('MySQL right-click menus', () => {
     expect(MYSQL_MENUS.view.map(item => item.value)).toEqual(expect.arrayContaining(['mysql:open_table', 'mysql:new_sql', 'node:copy_name']))
   })
 
+  it('offers to open a sequence and show its definition', () => {
+    expect(MYSQL_MENUS.sequence.map(item => [item.value, item.label])).toEqual(expect.arrayContaining([['mysql:open_table', 'Open Sequence'], ['mysql:definition', 'Show Definition']]))
+  })
+
   it('offers a SQL query and its name on a stored program\'s row, but nothing that would open it as a table', () => {
     const offered = MYSQL_MENUS.program.map(item => item.value)
     expect(offered).toEqual(expect.arrayContaining(['mysql:new_sql', 'node:copy_name']))
