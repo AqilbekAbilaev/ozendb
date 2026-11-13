@@ -6,6 +6,11 @@ describe('engineLabel', () => {
     expect(engineLabel('postgresql')).toBe('PostgreSQL')
   })
 
+  it('names MariaDB as people write it, apart from MySQL', () => {
+    expect(engineLabel('mariadb')).toBe('MariaDB')
+    expect(engineLabel('mysql')).toBe('MySQL')
+  })
+
   it('falls back to the engine name it was given, rather than failing the screen', () => {
     expect(engineLabel('cockroach db')).toBe('cockroach db')
   })

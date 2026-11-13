@@ -34,6 +34,8 @@
   --eng-postgresql-text:  #d3e2f5;
   --eng-mysql-bg:         #6b4320;
   --eng-mysql-text:       #f5dcc4;
+  --eng-mariadb-bg:       #1d4b57;
+  --eng-mariadb-text:     #cdeef5;
   --bg-menu:       #2b2d31;   /* context / dropdown / cell menus */
   --bg-field:      #2a2c30;   /* raised input-like fields (query bar) */
   --success-bg:     #1a3a1a;  /* success callout (connection test) */
@@ -91,6 +93,8 @@
   --eng-postgresql-text:  #23497a;
   --eng-mysql-bg:         #fbe3cf;
   --eng-mysql-text:       #7a4515;
+  --eng-mariadb-bg:       #d3edf2;
+  --eng-mariadb-text:     #145463;
   --bg-menu:       #ffffff;
   --bg-field:      #ffffff;
   --success-bg:     #e6f4ea;
