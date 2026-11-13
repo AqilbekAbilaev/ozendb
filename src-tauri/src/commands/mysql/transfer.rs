@@ -94,7 +94,7 @@ pub(super) fn json_object(keys: &[String], cells: &[Value]) -> String {
 async fn write_rows<W: Write>(conn: &mut MySqlConnection, sql: &str, declared: &[String], format: Format, out: &mut W) -> Result<ExportResult, AppError> {
     let statement = (&mut *conn).prepare(sqlx::AssertSqlSafe(sql.to_string()).into_sql_str()).await.map_err(AppError::MySql)?;
     let names: Vec<&str> = statement.columns().iter().map(|c| c.name()).collect();
-    let json_columns: Vec<bool> = statement.columns().iter().map(|c| c.type_info().name() == "JSON").collect();
+    let json_columns: Vec<bool> = statement.columns().iter().enumerate().map(|(i, c)| c.type_info().name() == "JSON" || declared.get(i).is_some_and(|kind| kind == "json")).collect();
     let keys = if format == Format::Json { json_keys(&names)? } else { Vec::new() };
     let mut bytes = 0u64;
     if format == Format::Csv {
