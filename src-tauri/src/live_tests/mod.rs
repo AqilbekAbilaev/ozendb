@@ -2,6 +2,7 @@
 //! set (`OZENDB_TEST_MONGODB` for `mongodb.rs`, `OZENDB_TEST_POSTGRES` for the `pg*` files,
 //! which share `pg.rs`'s helpers, `OZENDB_TEST_MYSQL` for the `mysql*` files), so a plain
 //! `cargo test` stays green without one.
+mod mariadb;
 mod mongodb;
 mod mysql;
 mod mysql_activity;
