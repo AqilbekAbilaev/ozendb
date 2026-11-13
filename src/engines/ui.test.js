@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CONNECTION_EDITORS, SHARED_TABS } from './ui.js'
+import { CONNECTION_EDITORS, SHARED_TABS, TREE_NODES } from './ui.js'
 import { ENGINE_OPTIONS } from '../data/connectionOptions.js'
 
 describe('CONNECTION_EDITORS', () => {
@@ -50,5 +50,21 @@ describe('CONNECTION_EDITORS', () => {
     expect(CONNECTION_EDITORS.mongodb.parseUri('postgresql://u@h/db')).toBe(null)
     expect(CONNECTION_EDITORS.mysql.parseUri('mysql://u@h/db').database).toBe('db')
     expect(CONNECTION_EDITORS.mysql.parseUri('postgresql://u@h/db')).toBe(null)
+    expect(CONNECTION_EDITORS.mysql.parseUri('mariadb://u@h/db')).toBe(null)
+    expect(CONNECTION_EDITORS.mariadb.parseUri('mariadb://u@h/db').database).toBe('db')
+    expect(CONNECTION_EDITORS.mariadb.parseUri('mysql://u@h/db').database).toBe('db')
+    expect(CONNECTION_EDITORS.mariadb.parseUri('postgresql://u@h/db')).toBe(null)
+  })
+
+  it('shows MariaDB the sections MySQL does, with its own example and refusal', () => {
+    expect(CONNECTION_EDITORS.mariadb.sections).toEqual(CONNECTION_EDITORS.mysql.sections)
+    expect(CONNECTION_EDITORS.mariadb.uriExample).toMatch(/^mariadb:\/\//)
+    expect(CONNECTION_EDITORS.mariadb.uriRefusal).toContain('MariaDB')
+  })
+})
+
+describe('TREE_NODES', () => {
+  it('draws a MariaDB connection\'s rows with MySQL\'s', () => {
+    expect(TREE_NODES.mariadb).toBe(TREE_NODES.mysql)
   })
 })

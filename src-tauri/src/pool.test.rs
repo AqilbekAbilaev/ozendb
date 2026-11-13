@@ -10,6 +10,7 @@ fn config(engine: Engine) -> ConnectionConfig {
             Engine::Mongo => EngineConfig::Mongo(MongoConfig::default()),
             Engine::Postgres => EngineConfig::Postgres(PostgresConfig::default()),
             Engine::MySql => EngineConfig::MySql(MySqlConfig::default()),
+            Engine::MariaDb => EngineConfig::MariaDb(MySqlConfig::default()),
         },
         ..Default::default()
     }
@@ -32,6 +33,7 @@ fn postgres_config_passes_postgres_and_rejects_mongo() {
 #[test]
 fn mysql_config_passes_mysql_and_rejects_the_others() {
     assert!(mysql_config(&config(Engine::MySql)).is_ok());
+    assert!(mysql_config(&config(Engine::MariaDb)).is_ok());
     assert_eq!(mysql_config(&config(Engine::Mongo)).unwrap_err().code(), "validation");
     assert_eq!(mysql_config(&config(Engine::Postgres)).unwrap_err().code(), "validation");
 }
@@ -41,6 +43,7 @@ fn default_port_for_matches_the_configs_own_engine() {
     assert_eq!(default_port_for(&config(Engine::Mongo)), 27017);
     assert_eq!(default_port_for(&config(Engine::Postgres)), 5432);
     assert_eq!(default_port_for(&config(Engine::MySql)), 3306);
+    assert_eq!(default_port_for(&config(Engine::MariaDb)), 3306);
 }
 
 #[test]

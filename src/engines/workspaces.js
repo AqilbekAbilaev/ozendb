@@ -6,4 +6,4 @@ import { toolDefinitions } from './mongodb/workspaces/toolDefinitions'
 import { postgresDefinitions } from './postgresql/workspaces/postgresDefinitions'
 import { mysqlDefinitions } from './mysql/workspaces/mysqlDefinitions'
 
-export const ENGINE_DEFINITIONS = Object.freeze([...queryDefinitions, ...toolDefinitions, ...postgresDefinitions, ...mysqlDefinitions])
+export const ENGINE_DEFINITIONS = Object.freeze([...queryDefinitions, ...toolDefinitions, ...postgresDefinitions, ...mysqlDefinitions('mysql'), ...mysqlDefinitions('mariadb')])

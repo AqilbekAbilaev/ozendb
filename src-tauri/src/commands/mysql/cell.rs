@@ -47,14 +47,27 @@ fn read(protocol: &str, unsigned: bool, text: bool, declared: Option<&str>, valu
         "FLOAT" => float(decode::<f32>(value)?.to_string().parse().ok()?),
         "DOUBLE" => float(decode(value)?),
         // DECIMAL arrives as the server's own text, exact to the last digit.
-        "DECIMAL" | "CHAR" | "VARCHAR" | "TINYTEXT" | "TEXT" | "MEDIUMTEXT" | "LONGTEXT" | "ENUM" | "SET" => decode(value).map(Value::String),
+        "DECIMAL" | "CHAR" | "VARCHAR" | "TINYTEXT" | "TEXT" | "MEDIUMTEXT" | "LONGTEXT" | "ENUM" | "SET" => {
+            decode::<String>(value).map(|text| json_text(&text, declared))
+        }
         "DATE" => date(decode(value)?),
         "DATETIME" => date_time(decode(value)?, digits(declared)),
         "TIMESTAMP" => timestamp(decode(value)?, digits(declared), &chrono::Local),
         "TIME" => decode(value).map(|span| time(span, digits(declared))),
         "JSON" => decode::<Json<Value>>(value).map(|json| json.0),
-        "BINARY" | "VARBINARY" | "TINYBLOB" | "BLOB" | "MEDIUMBLOB" | "LONGBLOB" if text => decode(value).map(Value::String),
+        "BINARY" | "VARBINARY" | "TINYBLOB" | "BLOB" | "MEDIUMBLOB" | "LONGBLOB" if text => {
+            decode::<String>(value).map(|text| json_text(&text, declared))
+        }
         _ => None,
+    }
+}
+
+/// Text as MariaDB sends a JSON column, which it declares LONGTEXT: parsed when the column's
+/// declared type says JSON, and left as the text when it doesn't parse or the column isn't JSON.
+fn json_text(text: &str, declared: Option<&str>) -> Value {
+    match declared {
+        Some("json") => serde_json::from_str(text).unwrap_or_else(|_| Value::String(String::from(text))),
+        _ => Value::String(String::from(text)),
     }
 }
 

@@ -1,4 +1,5 @@
-use super::{columns_sql, enum_values, foreign_keys, is_system_database, table_kind, MySqlForeignKey};
+use super::{columns_sql, enum_values, foreign_keys, is_system_database, mariadb_default, table_kind, unwidth, MySqlForeignKey};
+use crate::mysql::session::Flavor;
 
 #[test]
 fn flags_mysql_s_own_databases_as_system() {
@@ -19,6 +20,16 @@ fn reads_views_and_system_views_as_views() {
     assert_eq!(table_kind("VIEW"), "view");
     assert_eq!(table_kind("SYSTEM VIEW"), "view");
     assert_eq!(table_kind("BASE TABLE"), "table");
+}
+
+#[test]
+fn reads_a_mariadb_sequence_as_a_sequence() {
+    assert_eq!(table_kind("SEQUENCE"), "sequence");
+}
+
+#[test]
+fn keeps_a_system_versioned_table_a_table() {
+    assert_eq!(table_kind("SYSTEM VERSIONED"), "table");
 }
 
 #[test]
@@ -68,7 +79,7 @@ fn gathers_a_key_s_columns_in_order_and_keeps_keys_apart() {
 
 #[test]
 fn reads_every_table_s_columns_in_one_query_each_table_looked_up_by_equality() {
-    let sql = columns_sql(2);
+    let sql = columns_sql(2, Flavor::MySql);
     assert_eq!(sql.matches("WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ?").count(), 2);
     assert_eq!(sql.matches("UNION ALL").count(), 1);
     assert!(sql.contains("SELECT 0 AS place,") && sql.contains("SELECT 1 AS place,"));
@@ -89,4 +100,75 @@ fn sends_a_foreign_key_s_databases_as_the_schemas_the_table_tab_names_them_by() 
         serde_json::to_value(&key).unwrap(),
         serde_json::json!({ "fromSchema": "shop ü", "fromTable": "orders", "fromColumns": ["buyer"], "toSchema": "склад", "toTable": "buyers", "toColumns": ["id"] })
     );
+}
+
+#[test]
+fn drops_the_display_width_of_an_int() {
+    assert_eq!(unwidth("int(11)"), "int");
+}
+
+#[test]
+fn drops_the_display_width_but_keeps_the_sign() {
+    assert_eq!(unwidth("bigint(20) unsigned"), "bigint unsigned");
+}
+
+#[test]
+fn drops_the_width_of_a_year() {
+    assert_eq!(unwidth("year(4)"), "year");
+}
+
+#[test]
+fn keeps_the_width_of_a_boolean() {
+    assert_eq!(unwidth("tinyint(1)"), "tinyint(1)");
+}
+
+#[test]
+fn keeps_the_width_of_a_zerofill_int() {
+    assert_eq!(unwidth("int(5) unsigned zerofill"), "int(5) unsigned zerofill");
+}
+
+#[test]
+fn keeps_the_length_of_a_varchar() {
+    assert_eq!(unwidth("varchar(10)"), "varchar(10)");
+}
+
+#[test]
+fn keeps_the_precision_of_a_decimal() {
+    assert_eq!(unwidth("decimal(10,2)"), "decimal(10,2)");
+}
+
+#[test]
+fn reads_a_mariadb_null_default_as_none() {
+    assert_eq!(mariadb_default(Some(String::from("NULL"))), None);
+}
+
+#[test]
+fn reads_a_mariadb_quoted_default_with_its_quotes_undoubled() {
+    assert_eq!(mariadb_default(Some(String::from("'it''s'"))), Some(String::from("it's")));
+}
+
+#[test]
+fn reads_a_mariadb_empty_string_default_as_empty() {
+    assert_eq!(mariadb_default(Some(String::from("''"))), Some(String::new()));
+}
+
+#[test]
+fn reads_a_mariadb_quoted_null_default_as_the_text() {
+    assert_eq!(mariadb_default(Some(String::from("'NULL'"))), Some(String::from("NULL")));
+}
+
+#[test]
+fn leaves_a_mariadb_expression_default_as_it_is() {
+    assert_eq!(mariadb_default(Some(String::from("current_timestamp()"))), Some(String::from("current_timestamp()")));
+}
+
+#[test]
+fn leaves_a_missing_mariadb_default_missing() {
+    assert_eq!(mariadb_default(None), None);
+}
+
+#[test]
+fn reads_json_off_a_check_constraint_only_on_mariadb() {
+    assert!(columns_sql(1, Flavor::MariaDb).contains("CHECK_CONSTRAINTS"));
+    assert!(!columns_sql(1, Flavor::MySql).contains("CHECK_CONSTRAINTS"));
 }

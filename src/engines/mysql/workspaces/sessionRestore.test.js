@@ -72,6 +72,14 @@ describe('MySQL tabs across a restart', () => {
     expect(restoredOnConnection.runtime.run.database).toBe(null)
   })
 
+  it('brings back a MariaDB tab under MariaDB\'s own engine', async () => {
+    const query = open('mariadb.query', 'c1', [database])
+    query.state.sql = 'SELECT `ü`'
+    const [restored] = await relaunch(await savedSession([query]))
+    expect(restored).toMatchObject({ id: query.id, type: 'mariadb.query', engine: 'mariadb', state: { sql: 'SELECT `ü`' } })
+    expect(restored.runtime.run.engine).toBe('mariadb')
+  })
+
   it('leaves out a tab whose connection was deleted', async () => {
     const session = await savedSession([open('mysql.query', 'c1', [database]), open('mysql.query', 'gone', [database])])
     expect(session.tabs).toHaveLength(2)

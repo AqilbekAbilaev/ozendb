@@ -9,7 +9,7 @@ import { runPgMenuAction } from './postgresql/menuActions.js'
 import { mongoMenuTarget, runMongoMenuAction } from './mongodb/menuActions.js'
 import { createResourceRef } from '../utils/resourceRef.js'
 
-const CONTEXT_ACTIONS = Object.freeze({ postgresql: PG_ACTIONS, mysql: MYSQL_ACTIONS })
+const CONTEXT_ACTIONS = Object.freeze({ postgresql: PG_ACTIONS, mysql: MYSQL_ACTIONS, mariadb: MYSQL_ACTIONS })
 
 /** The engine's own handler for `action` on this node, or null. */
 export function contextAction(nodeData, action) {
@@ -57,6 +57,15 @@ export function runEngineMenuAction(id, context) {
   return Object.values(MENU_ACTIONS).some((run) => run(id, context))
 }
 
+// MySQL's and MariaDB's connection menu, which differ only in the engine the node names.
+const mysqlConnectionMenu = (conn) => ({
+  node: {
+    connId: conn.id, connName: conn.name, engine: conn.engine, database: conn.database || null,
+    resource: createResourceRef(conn.id),
+  },
+  items: MYSQL_MENUS.connection,
+})
+
 // A connection whose engine has a menu of its own: the node its actions get, and the
 // items. MongoDB has none here; it uses the shared `connection` menu. The node carries a
 // `resource` beside the engine's own fields, for the shared actions (Refresh, Disconnect…).
@@ -68,13 +77,8 @@ const CONNECTION_MENUS = Object.freeze({
     },
     items: PG_MENUS.connection,
   }),
-  mysql: (conn) => ({
-    node: {
-      connId: conn.id, connName: conn.name, engine: 'mysql', database: conn.database || null,
-      resource: createResourceRef(conn.id),
-    },
-    items: MYSQL_MENUS.connection,
-  }),
+  mysql: mysqlConnectionMenu,
+  mariadb: mysqlConnectionMenu,
 })
 
 /** The engine's own right-click menu for a connection, or null for the shared one. */

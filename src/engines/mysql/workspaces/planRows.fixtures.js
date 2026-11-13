@@ -626,3 +626,273 @@ export const treeBrokenLines = [
   "x using by_name  (cost=0.55 rows=3) (actual time=0.0117..0.0147 rows=3 loops=1)",
   "",
 ].join('\n')
+
+// Real plans from MariaDB 11.4, trimmed of what planRows doesn't read: ANALYZE FORMAT=JSON
+// for the first three, which ran the statement, and EXPLAIN FORMAT=JSON for the others.
+
+// ANALYZE of the join with an IN subquery, a GROUP BY and an ORDER BY.
+export const mariaSelect = {
+  "query_optimization": {
+    "r_total_time_ms": 0.071642324
+  },
+  "query_block": {
+    "select_id": 1,
+    "cost": 0.02054866,
+    "r_loops": 1,
+    "r_total_time_ms": 0.794506267,
+    "filesort": {
+      "sort_key": "count(0) desc",
+      "r_loops": 1,
+      "r_total_time_ms": 0.004391386,
+      "r_output_rows": 2,
+      "temporary_table": {
+        "nested_loop": [
+          {
+            "table": {
+              "table_name": "p",
+              "access_type": "index",
+              "key": "by_owner",
+              "loops": 1,
+              "r_loops": 1,
+              "rows": 4,
+              "r_rows": 4,
+              "cost": 0.00723266,
+              "r_table_time_ms": 0.009200999,
+              "r_other_time_ms": 0.00522784,
+              "filtered": 100,
+              "r_filtered": 100,
+              "attached_condition": "p.owner_id is not null",
+              "using_index": true
+            }
+          },
+          {
+            "table": {
+              "table_name": "o",
+              "access_type": "eq_ref",
+              "key": "PRIMARY",
+              "ref": [
+                "ex.p.owner_id"
+              ],
+              "loops": 4,
+              "r_loops": 4,
+              "r_table_loops": 3,
+              "rows": 1,
+              "r_rows": 1,
+              "cost": 0.00439696,
+              "r_table_time_ms": 0.003889513,
+              "r_other_time_ms": 0.00046005,
+              "filtered": 100,
+              "r_filtered": 100
+            }
+          },
+          {
+            "table": {
+              "table_name": "pets",
+              "access_type": "ref",
+              "key": "by_owner",
+              "ref": [
+                "ex.p.owner_id"
+              ],
+              "loops": 4,
+              "r_loops": 4,
+              "rows": 1,
+              "r_rows": 1,
+              "cost": 0.00891904,
+              "r_table_time_ms": 0.004224095,
+              "r_other_time_ms": 0.758789662,
+              "filtered": 100,
+              "r_filtered": 75,
+              "attached_condition": "pets.kind = 'cat'",
+              "first_match": "o"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
+// ANALYZE of a UNION of owners and pets.
+export const mariaUnion = {
+  "query_optimization": {
+    "r_total_time_ms": 0.036469414
+  },
+  "query_block": {
+    "union_result": {
+      "table_name": "<union1,2>",
+      "access_type": "ALL",
+      "r_loops": 1,
+      "r_rows": 6,
+      "query_specifications": [
+        {
+          "query_block": {
+            "select_id": 1,
+            "cost": 0.0113438,
+            "r_loops": 1,
+            "r_total_time_ms": 0.012714108,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "owners",
+                  "access_type": "ALL",
+                  "loops": 1,
+                  "r_loops": 1,
+                  "rows": 3,
+                  "r_rows": 3,
+                  "cost": 0.0113438,
+                  "r_table_time_ms": 0.006064295,
+                  "r_other_time_ms": 0.004265918,
+                  "filtered": 100,
+                  "r_filtered": 100
+                }
+              }
+            ]
+          }
+        },
+        {
+          "query_block": {
+            "select_id": 2,
+            "operation": "UNION",
+            "cost": 0.0115068,
+            "r_loops": 1,
+            "r_total_time_ms": 0.003931336,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "pets",
+                  "access_type": "ALL",
+                  "loops": 1,
+                  "r_loops": 1,
+                  "rows": 4,
+                  "r_rows": 4,
+                  "cost": 0.0115068,
+                  "r_table_time_ms": 0.0009619226,
+                  "r_other_time_ms": 0.002383895,
+                  "filtered": 100,
+                  "r_filtered": 100
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
+
+// ANALYZE of a select-list subquery.
+export const mariaSubquery = {
+  "query_optimization": {
+    "r_total_time_ms": 0.040107991
+  },
+  "query_block": {
+    "select_id": 1,
+    "cost": 0.0113438,
+    "r_loops": 1,
+    "r_total_time_ms": 0.034169165,
+    "nested_loop": [
+      {
+        "table": {
+          "table_name": "o",
+          "access_type": "ALL",
+          "loops": 1,
+          "r_loops": 1,
+          "rows": 3,
+          "r_rows": 3,
+          "cost": 0.0113438,
+          "r_table_time_ms": 0.006022472,
+          "r_other_time_ms": 0.016101748,
+          "filtered": 100,
+          "r_filtered": 100
+        }
+      }
+    ],
+    "subqueries": [
+      {
+        "subquery_cache": {
+          "r_loops": 3,
+          "r_hit_ratio": 0,
+          "query_block": {
+            "select_id": 2,
+            "cost": 0.001792605,
+            "r_loops": 3,
+            "r_total_time_ms": 0.007695381,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "p",
+                  "access_type": "ref",
+                  "key": "by_owner",
+                  "ref": [
+                    "ex.o.id"
+                  ],
+                  "loops": 1,
+                  "r_loops": 3,
+                  "rows": 1,
+                  "r_rows": 1.333333333,
+                  "cost": 0.001792605,
+                  "r_table_time_ms": 0.004098627,
+                  "r_other_time_ms": 0.002091136,
+                  "filtered": 100,
+                  "r_filtered": 100,
+                  "using_index": true
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
+
+// EXPLAIN of a joined UPDATE, which carries no sign of the UPDATE.
+export const mariaUpdate = {
+  "query_block": {
+    "select_id": 1,
+    "cost": 0.01590376,
+    "nested_loop": [
+      {
+        "table": {
+          "table_name": "p",
+          "access_type": "ALL",
+          "loops": 1,
+          "rows": 4,
+          "cost": 0.0115068,
+          "filtered": 100,
+          "attached_condition": "p.owner_id is not null"
+        }
+      },
+      {
+        "table": {
+          "table_name": "o",
+          "access_type": "eq_ref",
+          "key": "PRIMARY",
+          "ref": [
+            "ex.p.owner_id"
+          ],
+          "loops": 4,
+          "rows": 1,
+          "cost": 0.00439696,
+          "filtered": 100,
+          "attached_condition": "o.`name` = 'Åsa'"
+        }
+      }
+    ]
+  }
+}
+
+// EXPLAIN of a single-table DELETE.
+export const mariaDelete = {
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "pets",
+      "access_type": "range",
+      "key": "by_owner",
+      "rows": 2,
+      "attached_condition": "pets.owner_id = 1"
+    }
+  }
+}

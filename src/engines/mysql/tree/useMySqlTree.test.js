@@ -48,7 +48,7 @@ describe('columnRow', () => {
 })
 
 describe('programFolders', () => {
-  const tables = [{ name: 'order items', kind: 'table' }, { name: 'big `view` ü', kind: 'view' }]
+  const tables = [{ name: 'order items', kind: 'table' }, { name: 'big `view` ü', kind: 'view' }, { name: 'ticket ids ü', kind: 'sequence' }]
   const programs = {
     routines: [
       { name: 'same name ü', kind: 'function', returns: 'varchar(10)' },
@@ -61,6 +61,7 @@ describe('programFolders', () => {
   it('gives views and each kind of stored program a folder of its own, in a fixed order', () => {
     expect(programFolders(tables, programs).map(folder => [folder.kind, folder.rows.map(row => row.name)])).toEqual([
       ['view', ['big `view` ü']],
+      ['sequence', ['ticket ids ü']],
       ['procedure', ['same name ü']],
       ['function', ['same name ü']],
       ['trigger', ['stamp; ü']],
@@ -70,7 +71,7 @@ describe('programFolders', () => {
 
   it('says what a function returns, when a trigger fires, and when an event runs', () => {
     const meta = Object.fromEntries(programFolders(tables, programs).map(folder => [folder.kind, folder.rows[0].meta]))
-    expect(meta).toEqual({ view: null, procedure: null, function: '→ varchar(10)', trigger: 'BEFORE INSERT on order items', event: 'EVERY 1 DAY · disabled' })
+    expect(meta).toEqual({ view: null, sequence: null, procedure: null, function: '→ varchar(10)', trigger: 'BEFORE INSERT on order items', event: 'EVERY 1 DAY · disabled' })
   })
 
   it('leaves out what a function returns when MySQL hides it from the login', () => {
@@ -79,11 +80,15 @@ describe('programFolders', () => {
   })
 
   it('gives a view\'s row the view menu and every stored program\'s the program menu', () => {
-    expect(programFolders(tables, programs).map(folder => folder.menu)).toEqual(['view', 'program', 'program', 'program', 'program'])
+    expect(programFolders(tables, programs).map(folder => folder.menu)).toEqual(['view', 'sequence', 'program', 'program', 'program', 'program'])
   })
 
   it('lets only a view\'s row open onto its columns', () => {
-    expect(programFolders(tables, programs).map(folder => !!folder.hasColumns)).toEqual([true, false, false, false, false])
+    expect(programFolders(tables, programs).map(folder => !!folder.hasColumns)).toEqual([true, false, false, false, false, false])
+  })
+
+  it('keeps a sequence out of the tables', () => {
+    expect(programFolders(tables, programs)[1].rows.map(row => row.name)).toEqual(['ticket ids ü'])
   })
 
   it('leaves out a folder with nothing in it', () => {
@@ -112,6 +117,14 @@ describe('useMySqlTree', () => {
     expect(listStoredPrograms).toHaveBeenCalledWith({ connectionId: 'c1', database: shop })
     expect(tree.tablesOf(shop).map(table => table.name)).toEqual(['order items'])
     expect(tree.foldersOf(shop).map(folder => folder.kind)).toEqual(['view', 'event'])
+  })
+
+  it('lists a MariaDB sequence in its own folder, never among the tables', async () => {
+    listTables.mockResolvedValue([{ name: 'order items', kind: 'table', estimatedRows: 12 }, { name: 'ticket ids', kind: 'sequence', estimatedRows: null }])
+    listStoredPrograms.mockResolvedValue(noPrograms)
+    const tree = useMySqlTree('c1')
+    await tree.toggleDatabase(shop)
+    expect([tree.tablesOf(shop).map(table => table.name), tree.foldersOf(shop).map(folder => folder.kind)]).toEqual([['order items'], ['sequence']])
   })
 
   it('opens and closes a database\'s folders one by one', async () => {

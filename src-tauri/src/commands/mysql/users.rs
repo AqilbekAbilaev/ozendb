@@ -2,6 +2,7 @@
 //! may do as SHOW GRANTS states it, and creating or dropping one. MySQL takes no bound value in an account statement, so names and the
 //! password are quoted as strings (`quote_account`) rather than bound.
 use crate::error::{mysql_number, AppError};
+use crate::mysql::session::{flavor, Flavor};
 use serde::{Deserialize, Serialize};
 use sqlx::{MySqlPool, Row};
 use tauri::State;
@@ -37,23 +38,49 @@ pub struct NewMySqlUser {
     pub password: Option<String>,
 }
 
+/// The account listing in the dialect of the server's family: MariaDB keeps the lock in
+/// `mysql.global_priv` and lists roles beside accounts.
+fn listing(flavor: Flavor) -> &'static str {
+    match flavor {
+        Flavor::MySql => {
+            "SELECT User, Host, plugin, account_locked = 'Y', password_expired = 'Y', CONCAT(User, '@', Host) = CURRENT_USER() \
+             FROM mysql.user ORDER BY User, Host"
+        }
+        Flavor::MariaDb => {
+            "SELECT u.User, u.Host, u.plugin, IFNULL(JSON_VALUE(g.Priv, '$.account_locked'), 0) = 1, u.password_expired = 'Y', \
+             CONCAT(u.User, '@', u.Host) = CURRENT_USER() \
+             FROM mysql.user u JOIN mysql.global_priv g ON g.User = u.User AND g.Host = u.Host \
+             WHERE u.is_role = 'N' ORDER BY u.User, u.Host"
+        }
+    }
+}
+
+fn denied(flavor: Flavor) -> String {
+    match flavor {
+        Flavor::MySql => String::from("MySQL doesn't show this login the server's accounts: listing them needs SELECT on mysql.user."),
+        Flavor::MariaDb => String::from(
+            "MariaDB doesn't show this login the server's accounts: listing them needs SELECT on mysql.user and mysql.global_priv.",
+        ),
+    }
+}
+
+fn is_system(user: &str) -> bool {
+    user.starts_with("mysql.") || user == "mariadb.sys"
+}
+
 pub(crate) async fn mysql_users(pool: &MySqlPool) -> Result<Vec<MySqlUser>, AppError> {
-    let rows: Vec<(String, String, String, bool, bool, bool)> = sqlx::query_as(
-        "SELECT User, Host, plugin, account_locked = 'Y', password_expired = 'Y', CONCAT(User, '@', Host) = CURRENT_USER() \
-         FROM mysql.user ORDER BY User, Host",
-    )
-    .fetch_all(pool)
-    .await
-    .map_err(|e| match mysql_number(&e) {
-        Some(TABLE_ACCESS_DENIED) => AppError::Forbidden(String::from(
-            "MySQL doesn't show this login the server's accounts: listing them needs SELECT on mysql.user.",
-        )),
-        _ => AppError::MySql(e),
-    })?;
+    let family = flavor(&mut *pool.acquire().await.map_err(AppError::MySql)?).await.map_err(AppError::MySql)?;
+    let rows: Vec<(String, String, String, bool, bool, bool)> = sqlx::query_as(listing(family))
+        .fetch_all(pool)
+        .await
+        .map_err(|e| match mysql_number(&e) {
+            Some(TABLE_ACCESS_DENIED) => AppError::Forbidden(denied(family)),
+            _ => AppError::MySql(e),
+        })?;
     Ok(rows
         .into_iter()
         .map(|(user, host, plugin, locked, password_expired, current)| MySqlUser {
-            system: user.starts_with("mysql."),
+            system: is_system(&user),
             user,
             host,
             plugin,
@@ -70,7 +97,16 @@ pub(crate) async fn mysql_grants(pool: &MySqlPool, user: &str, host: &str) -> Re
         .fetch_all(pool)
         .await
         .map_err(AppError::MySql)?;
-    rows.iter().map(|row| row.try_get(0).map_err(AppError::MySql)).collect()
+    rows.iter().map(|row| row.try_get::<String, _>(0).map(|grant| credential_free(&grant)).map_err(AppError::MySql)).collect()
+}
+
+/// A grant without the authentication MariaDB writes after the account (`IDENTIFIED BY
+/// PASSWORD '*…'` or `IDENTIFIED VIA … USING …`), which would show the password's hash;
+/// a `WITH` clause after it stays. MySQL writes none, so its grants pass unchanged.
+fn credential_free(grant: &str) -> String {
+    let Some(at) = grant.rfind("` IDENTIFIED ") else { return String::from(grant) };
+    let (head, clause) = grant.split_at(at + 1);
+    format!("{head}{}", clause.find(" WITH ").map_or("", |with| &clause[with..]))
 }
 
 fn create_statement(new: &NewMySqlUser) -> Result<String, AppError> {

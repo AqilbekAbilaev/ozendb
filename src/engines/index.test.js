@@ -31,6 +31,7 @@ describe('the engine table', () => {
     expect(ENGINES.mongodb.defaultPort).toBe(27017)
     expect(ENGINES.postgresql.defaultPort).toBe(5432)
     expect(ENGINES.mysql.defaultPort).toBe(3306)
+    expect(ENGINES.mariadb.defaultPort).toBe(3306)
   })
 
   it('names the database field each SQL engine\'s server section shows', () => {
@@ -47,6 +48,13 @@ describe('engineOf', () => {
   it('reads the engine a connection, tab or node carries', () => {
     expect(engineOf({ engine: 'postgresql' })).toBe(ENGINES.postgresql)
     expect(engineOf({ engine: 'mongodb' })).toBe(ENGINES.mongodb)
+  })
+
+  it('reads a MariaDB connection as its own entry, sharing the SQL MySQL writes', () => {
+    expect(engineOf({ engine: 'mariadb' })).toBe(ENGINES.mariadb)
+    expect(ENGINES.mariadb).not.toBe(ENGINES.mysql)
+    expect(ENGINES.mariadb.id).toBe('mariadb')
+    expect(ENGINES.mariadb.sql).toBe(ENGINES.mysql.sql)
   })
 
   it('treats a record from before engines existed as MongoDB', () => {

@@ -1,6 +1,6 @@
 //! Live tests of MySQL export and CSV import (#396), against the server `mysql.rs` describes.
 
-use super::mysql::{connect, password, run, shown_at, test_config, SKIP};
+use super::mysql::{connect, mariadb, password, run, shown_at, test_config, SKIP};
 use super::mysql_browse::{pool, quoted};
 use crate::commands::sql::transfer::ExportSource;
 use crate::commands::{mysql_browse, mysql_export, mysql_import_csv, mysql_import_preview};
@@ -147,10 +147,12 @@ async fn an_export_leaves_no_session_without_the_time_limit() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("out.csv").to_string_lossy().into_owned();
 
-    mysql_export(&pool, &query("SELECT @@SESSION.max_execution_time AS limit_ms"), "csv", &path).await.unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "limit_ms\n0\n");
-    let limit: u64 = sqlx::query_scalar("SELECT @@SESSION.max_execution_time").fetch_one(&pool).await.unwrap();
-    assert_eq!(limit, 300_000);
+    let (variable, zero, cap) = if mariadb(&mut connect(&config, "").await).await { ("max_statement_time", "0.0", 300.0) } else { ("max_execution_time", "0", 300_000.0) };
+    let read = format!("SELECT CAST(@@SESSION.{variable} AS DOUBLE)");
+    mysql_export(&pool, &query(&format!("SELECT @@SESSION.{variable} AS limit_ms")), "csv", &path).await.unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), format!("limit_ms\n{zero}\n"));
+    let limit: f64 = sqlx::query_scalar(sqlx::AssertSqlSafe(read)).fetch_one(&pool).await.unwrap();
+    assert_eq!(limit, cap);
     pool.close().await;
 }
 

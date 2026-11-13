@@ -15,7 +15,7 @@ import FlexSpacer from '../../../components/base/FlexSpacer.vue'
 // Opened from a view's or stored program's sidebar row. Read-only, as PostgreSQL's
 // routine browser is: the server's own CREATE statement, which a SQL tab can change.
 const props = defineProps({
-  target: { type: Object, required: true },   // { connId, connName, resource, kind }
+  target: { type: Object, required: true },   // { connId, connName, engine, resource, kind }
 })
 defineEmits(['close'])
 
@@ -42,7 +42,7 @@ function copyDefinition() {
 }
 
 function openInSqlTab() {
-  openMySqlQuery({ resource: props.target.resource, connectionName: props.target.connName, sql: definition.value })
+  openMySqlQuery({ engine: props.target.engine, resource: props.target.resource, connectionName: props.target.connName, sql: definition.value })
 }
 </script>
 

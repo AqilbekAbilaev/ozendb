@@ -391,7 +391,7 @@ fn default_port_for(config: &ConnectionConfig) -> u16 {
     match config.engine_kind() {
         Engine::Postgres => pg_uri::DEFAULT_PORT,
         Engine::Mongo => 27017,
-        Engine::MySql => crate::mysql::uri::DEFAULT_PORT,
+        Engine::MySql | Engine::MariaDb => crate::mysql::uri::DEFAULT_PORT,
     }
 }
 

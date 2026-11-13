@@ -1,17 +1,17 @@
-import { classicSteps } from './classicPlan.js'
+import { analyzedClassic, classicSteps } from './classicPlan.js'
 import { treeSteps } from './treePlan.js'
 
 // A MySQL plan as rows to draw (the shape SqlPlan.vue reads, as PostgreSQL's planRows
-// makes it): EXPLAIN FORMAT=JSON in its second version or the classic one, or EXPLAIN
-// ANALYZE's tree as text. Each step comes depth-first with the table behind its alias,
-// and `hot` marks the step whose own share, excluding its inputs', is largest. An
-// analyzed plan sizes each step by its time over all its loops; one MySQL didn't run, by
-// its estimated cost, against the costliest step, as a plan's root can carry no cost of
-// its own. A plan can have more than one root: the classic format and the tree put a
-// select-list subquery beside its query.
+// makes it): EXPLAIN FORMAT=JSON in its second version or the classic one, MariaDB's
+// JSON, or EXPLAIN ANALYZE's tree as text. Each step comes depth-first with the table
+// behind its alias, and `hot` marks the step whose own share, excluding its inputs', is
+// largest. An analyzed plan, MariaDB's included, sizes each step by its time over all
+// its loops; one the server didn't run, by its estimated cost, against the costliest
+// step, as a plan's root can carry no cost of its own. A plan can have more than one
+// root: the classic format and the tree put a select-list subquery beside its query.
 export function planRows(plan) {
   const [roots, estimated] = typeof plan === 'string' ? [treeSteps(plan), false]
-    : plan.query_block ? [classicSteps(plan), true]
+    : plan.query_block ? [classicSteps(plan), !analyzedClassic(plan)]
     : [[plan], plan.actual_last_row_ms == null]
   const weight = (node) => (estimated ? node.estimated_total_cost ?? 0 : (node.actual_last_row_ms ?? 0) * (node.actual_loops ?? 1))
   const twoPlaces = (value) => (value == null ? null : Math.round(value * 100) / 100)

@@ -34,7 +34,11 @@ async fn an_awkwardly_named_account_is_created_listed_and_dropped_under_its_own_
     let users = mysql_users(&pool).await.unwrap();
     let created = users.iter().find(|u| u.user == user).expect("the new account is listed under its own name");
     assert_eq!((created.host.as_str(), created.locked, created.system, created.current), ("%", false, false, false));
-    assert!(users.iter().any(|u| u.user == "mysql.sys" && u.system), "MySQL's reserved accounts are flagged");
+    let reserved = match crate::mysql::session::flavor(&mut connect(&config, "").await).await.unwrap() {
+        crate::mysql::session::Flavor::MySql => "mysql.sys",
+        crate::mysql::session::Flavor::MariaDb => "mariadb.sys",
+    };
+    assert!(users.iter().any(|u| u.user == reserved && u.system), "the server's reserved accounts are not flagged");
     assert_eq!(users.iter().filter(|u| u.current).count(), 1, "exactly one account is the one signed in");
     pool_as(&config, user, PASSWORD).await.close().await;
     assert_eq!(mysql_grants(&pool, user, "%").await.unwrap(), [r"GRANT USAGE ON *.* TO `ozendb it o'brien \ ü`@`%`"]);

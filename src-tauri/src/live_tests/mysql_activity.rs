@@ -1,10 +1,11 @@
 //! Live tests of MySQL's process list and its kills, against the server `mysql.rs`
 //! describes.
 
-use super::mysql::{connect, run, test_config, SKIP};
+use super::mysql::{connect, mariadb, run, test_config, SKIP};
 use super::mysql_browse::pool;
 use super::mysql_users::pool_as;
 use crate::commands::{mysql_kill_connection, mysql_kill_query, mysql_processes};
+use crate::error::mysql_number;
 use std::time::{Duration, Instant};
 
 #[tokio::test]
@@ -13,9 +14,11 @@ async fn a_running_statement_is_listed_stopped_and_then_its_connection_closed() 
     let pool = pool(&config).await;
     let mut sleeper = connect(&config, "").await;
     let sleeper_id: i64 = sqlx::query_scalar("SELECT CAST(CONNECTION_ID() AS SIGNED)").fetch_one(&mut sleeper).await.unwrap();
+    // A stopped SLEEP returns 1 on MySQL; MariaDB reports it as interrupted, error 1317.
+    let stopped = if mariadb(&mut sleeper).await { Err(Some(1317)) } else { Ok(1) };
     let started = Instant::now();
     let sleeping = tokio::spawn(async move {
-        let slept: i64 = sqlx::query_scalar("SELECT SLEEP(30)").fetch_one(&mut sleeper).await.unwrap();
+        let slept: Result<i64, Option<u16>> = sqlx::query_scalar("SELECT SLEEP(30)").fetch_one(&mut sleeper).await.map_err(|e| mysql_number(&e));
         (slept, sleeper)
     });
 
@@ -33,7 +36,7 @@ async fn a_running_statement_is_listed_stopped_and_then_its_connection_closed() 
 
     assert!(mysql_kill_query(&pool, sleeper_id).await.unwrap());
     let (slept, _sleeper) = tokio::time::timeout(Duration::from_secs(10), sleeping).await.unwrap().unwrap();
-    assert_eq!(slept, 1, "a stopped SLEEP returns 1");
+    assert_eq!(slept, stopped, "the SLEEP was not stopped the way this server stops one");
     assert!(started.elapsed() < Duration::from_secs(20));
 
     assert!(mysql_kill_connection(&pool, sleeper_id).await.unwrap());

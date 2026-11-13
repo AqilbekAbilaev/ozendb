@@ -91,7 +91,7 @@ describe('workspaceColorLevels', () => {
   // The tab bar keys each level with the engine's tag key, so a definition that takes a
   // colour must belong to an engine that has one.
   it('belongs, for every definition with levels, to an engine with a tag key', () => {
-    const all = [...appDefinitions, ...queryDefinitions, ...toolDefinitions, ...postgresDefinitions, ...mysqlDefinitions]
+    const all = [...appDefinitions, ...queryDefinitions, ...toolDefinitions, ...postgresDefinitions, ...mysqlDefinitions('mysql'), ...mysqlDefinitions('mariadb')]
     for (const def of all.filter((d) => d.colorLevels?.length)) {
       expect(typeof ENGINES[def.engine]?.tagKey, def.type).toBe('function')
     }

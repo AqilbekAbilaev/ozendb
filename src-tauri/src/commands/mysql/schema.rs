@@ -8,6 +8,7 @@ use sqlx::{MySqlPool, Row};
 use tauri::State;
 
 use super::AppContext;
+use crate::mysql::session::Flavor;
 
 // The catalog is read through the connection's own pool: information_schema answers
 // for every database from any session, so browsing opens no pool per database.
@@ -43,7 +44,7 @@ pub async fn list_mysql_databases(ctx: State<'_, AppContext>, id: String) -> Res
 #[serde(rename_all = "camelCase")]
 pub struct MySqlTableInfo {
     pub name: String,
-    /// "table" or "view".
+    /// "table", "view" or "sequence" (MariaDB only).
     pub kind: String,
     /// `TABLE_ROWS`, free to read, unlike a count. For InnoDB it is the optimizer's
     /// estimate and can be far off; None for a view.
@@ -53,6 +54,7 @@ pub struct MySqlTableInfo {
 fn table_kind(table_type: &str) -> &'static str {
     match table_type {
         "VIEW" | "SYSTEM VIEW" => "view",
+        "SEQUENCE" => "sequence",
         _ => "table",
     }
 }
@@ -117,10 +119,44 @@ pub struct MySqlColumnInfo {
     pub references: Option<MySqlReference>,
 }
 
+/// A column type without the integer display width MariaDB still writes (`int(11)`, `year(4)`),
+/// as MySQL 8 reads it; `tinyint(1)`, which the grid reads as a boolean, and zerofill keep theirs.
+pub(crate) fn unwidth(column_type: &str) -> String {
+    let base = column_type.split('(').next().unwrap_or(column_type);
+    let Some((width, rest)) = column_type[base.len()..].strip_prefix('(').and_then(|after| after.split_once(')')) else {
+        return String::from(column_type);
+    };
+    let integer = matches!(base, "tinyint" | "smallint" | "mediumint" | "int" | "bigint" | "year");
+    let kept = (base == "tinyint" && width == "1") || rest.contains("zerofill") || !width.bytes().all(|b| b.is_ascii_digit());
+    if integer && !kept { format!("{base}{rest}") } else { String::from(column_type) }
+}
+
+/// A default as MariaDB's `COLUMN_DEFAULT` writes it, SQL text, read as MySQL's plain value:
+/// the bare word NULL is no default, and a quoted string is its text.
+fn mariadb_default(default: Option<String>) -> Option<String> {
+    let text = default?;
+    if text == "NULL" {
+        return None;
+    }
+    match text.strip_prefix('\'').and_then(|rest| rest.strip_suffix('\'')) {
+        Some(inner) => Some(inner.replace("''", "'")),
+        None => Some(text),
+    }
+}
+
 /// One query for every table's columns: a UNION ALL branch per table, named by its place
 /// in the list, since MySQL finds a table in its catalog only by equality on its name. A
 /// row-constructor IN or an OR of pairs reads every table of each database instead.
-fn columns_sql(tables: usize) -> String {
+fn columns_sql(tables: usize, flavor: Flavor) -> String {
+    // MariaDB has no JSON type: a JSON column is LONGTEXT with a CHECK named after it. MySQL's
+    // CHECK_CONSTRAINTS has no TABLE_NAME, so only MariaDB can be asked.
+    let json = match flavor {
+        Flavor::MySql => "FALSE",
+        Flavor::MariaDb => {
+            "EXISTS (SELECT 1 FROM information_schema.CHECK_CONSTRAINTS cc WHERE cc.CONSTRAINT_SCHEMA = c.TABLE_SCHEMA \
+             AND cc.TABLE_NAME = c.TABLE_NAME AND cc.CHECK_CLAUSE = CONCAT('json_valid(`', REPLACE(c.COLUMN_NAME, '`', '``'), '`)'))"
+        }
+    };
     // The primary key is read from its constraint rather than `COLUMN_KEY = 'PRI'`, which
     // MySQL also reports for a unique, not-null column on a table that has no primary key.
     let branch = |place: usize| {
@@ -131,7 +167,7 @@ fn columns_sql(tables: usize) -> String {
             EXISTS (SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k
                 WHERE k.TABLE_SCHEMA = c.TABLE_SCHEMA AND k.TABLE_NAME = c.TABLE_NAME
                     AND k.COLUMN_NAME = c.COLUMN_NAME AND k.CONSTRAINT_NAME = 'PRIMARY') AS is_primary_key,
-            c.COLUMN_DEFAULT AS default_value,
+            c.COLUMN_DEFAULT AS default_value, {json} AS is_json,
             -- Not DEFAULT_GENERATED, which marks a default expression such as CURRENT_TIMESTAMP.
             c.EXTRA REGEXP '(VIRTUAL|STORED) GENERATED' AS is_generated,
             c.EXTRA LIKE '%auto_increment%' AS is_auto_increment,
@@ -148,8 +184,9 @@ fn columns_sql(tables: usize) -> String {
     format!("{}\n        ORDER BY place, position, constraint_name\n", branches.join("\n        UNION ALL"))
 }
 
-fn column_info(row: &MySqlRow) -> Result<MySqlColumnInfo, sqlx::Error> {
-    let data_type: String = row.try_get("data_type")?;
+fn column_info(row: &MySqlRow, flavor: Flavor) -> Result<MySqlColumnInfo, sqlx::Error> {
+    let data_type = if row.try_get("is_json")? { String::from("json") } else { unwidth(&row.try_get::<String, _>("data_type")?) };
+    let default: Option<String> = row.try_get("default_value")?;
     let references = match (row.try_get("to_database")?, row.try_get("to_table")?, row.try_get("to_column")?) {
         (Some(database), Some(table), Some(column)) => Some(MySqlReference { database, table, column }),
         _ => None,
@@ -160,7 +197,7 @@ fn column_info(row: &MySqlRow) -> Result<MySqlColumnInfo, sqlx::Error> {
         data_type,
         nullable: row.try_get("nullable")?,
         is_primary_key: row.try_get("is_primary_key")?,
-        default: row.try_get("default_value")?,
+        default: if flavor == Flavor::MariaDb { mariadb_default(default) } else { default },
         generated: row.try_get("is_generated")?,
         auto_increment: row.try_get("is_auto_increment")?,
         references,
@@ -173,7 +210,8 @@ pub(crate) async fn mysql_tables_columns(pool: &MySqlPool, tables: &[(&str, &str
     if tables.is_empty() {
         return Ok(columns);
     }
-    let sql = columns_sql(tables.len());
+    let flavor = Flavor::of(&sqlx::query_scalar::<_, String>("SELECT VERSION()").fetch_one(pool).await.map_err(AppError::MySql)?);
+    let sql = columns_sql(tables.len(), flavor);
     let mut query = sqlx::query(sqlx::AssertSqlSafe(sql));
     for (database, table) in tables {
         query = query.bind(*database).bind(*table);
@@ -181,7 +219,7 @@ pub(crate) async fn mysql_tables_columns(pool: &MySqlPool, tables: &[(&str, &str
     for row in query.fetch_all(pool).await.map_err(AppError::MySql)? {
         let place: i64 = row.try_get("place").map_err(AppError::MySql)?;
         let table = &mut columns[usize::try_from(place).expect("a place this query numbered")];
-        let info = column_info(&row).map_err(AppError::MySql)?;
+        let info = column_info(&row, flavor).map_err(AppError::MySql)?;
         // A column in two foreign keys comes back twice, side by side; the first one stays.
         if table.last().is_none_or(|kept| kept.name != info.name) {
             table.push(info);
