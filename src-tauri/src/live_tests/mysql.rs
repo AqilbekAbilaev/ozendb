@@ -3,6 +3,21 @@
 //! `host:port`; `OZENDB_TEST_MYSQL_USER` (default "root") and `OZENDB_TEST_MYSQL_PASSWORD`
 //! name the account. Run them with, e.g.:
 //!   OZENDB_TEST_MYSQL=127.0.0.1:3307 OZENDB_TEST_MYSQL_PASSWORD=ozen cargo test live_tests::mysql
+//! They are not part of CI. To run them against all three supported servers, start each in
+//! Docker (root password `ozen`, TLS on with a self-signed certificate):
+//!   docker run -d --name ozen-mysql -e MYSQL_ROOT_PASSWORD=ozen -p 3307:3306 mysql:8.4
+//!   docker run -d --name ozen-mariadb -e MARIADB_ROOT_PASSWORD=ozen -p 3308:3306 mariadb:11.4
+//! MariaDB before 11.4 has no TLS until given a certificate, so make one and mount it
+//! with a config file `99-tls.cnf` holding `[mariadbd]`, `ssl_cert=/etc/mysql/tls/c.pem`
+//! and `ssl_key=/etc/mysql/tls/k.pem`:
+//!   openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=localhost -keyout k.pem -out c.pem
+//!   chmod 644 k.pem
+//!   docker run -d --name ozen-mariadb10 -e MARIADB_ROOT_PASSWORD=ozen -p 3309:3306 \
+//!     -v "$PWD/c.pem:/etc/mysql/tls/c.pem" -v "$PWD/k.pem:/etc/mysql/tls/k.pem" \
+//!     -v "$PWD/99-tls.cnf:/etc/mysql/mariadb.conf.d/99-tls.cnf" mariadb:10.11
+//! Then run the command above once per port (3307, 3308, 3309). A test that fails on one
+//! server only is a real difference between the servers, unless it is marked MariaDB-aware
+//! with `mariadb`.
 //! The tunnel test also needs the bastion `pg_ssh.rs` describes, with
 //! `OZENDB_TEST_SSH_MYSQL_TARGET` naming MySQL as the bastion sees it.
 
@@ -45,6 +60,11 @@ pub(super) fn test_config() -> Option<ConnectionConfig> {
 
 pub(super) fn password() -> Option<String> {
     std::env::var("OZENDB_TEST_MYSQL_PASSWORD").ok()
+}
+
+/// Whether the server behind `connection` is MariaDB, whose variable names and logins differ from MySQL's.
+pub(super) async fn mariadb(connection: &mut MySqlConnection) -> bool {
+    sqlx::query_scalar::<_, String>("SELECT VERSION()").fetch_one(connection).await.unwrap().contains("MariaDB")
 }
 
 pub(super) async fn connect(config: &ConnectionConfig, database: &str) -> MySqlConnection {
@@ -211,16 +231,20 @@ async fn the_pool_caps_every_session_and_a_read_only_one_refuses_writes() {
         tauri::test::mock_app().handle().clone(),
     );
     let insert = "INSERT INTO notes (body) VALUES ('ünïcode')";
-    let settings = "SELECT @@session.max_execution_time, @@session.transaction_read_only";
+    let (settings, cap) = if mariadb(&mut admin).await {
+        ("SELECT CAST(@@session.max_statement_time AS DOUBLE), @@session.tx_read_only", 300.0)
+    } else {
+        ("SELECT CAST(@@session.max_execution_time AS DOUBLE), @@session.transaction_read_only", 300_000.0)
+    };
 
     let writable = pool.connect_mysql(&config, Some(database)).await.unwrap();
-    let (limit, locked): (u64, i64) = sqlx::query_as(settings).fetch_one(&writable).await.unwrap();
-    assert_eq!((limit, locked), (300_000, 0));
+    let (limit, locked): (f64, i64) = sqlx::query_as(settings).fetch_one(&writable).await.unwrap();
+    assert_eq!((limit, locked), (cap, 0));
     sqlx::query(insert).execute(&writable).await.unwrap();
 
     let locked_pool = pool.connect_mysql(&read_only, Some(database)).await.unwrap();
-    let (limit, locked): (u64, i64) = sqlx::query_as(settings).fetch_one(&locked_pool).await.unwrap();
-    assert_eq!((limit, locked), (300_000, 1));
+    let (limit, locked): (f64, i64) = sqlx::query_as(settings).fetch_one(&locked_pool).await.unwrap();
+    assert_eq!((limit, locked), (cap, 1));
     let refusal = crate::error::AppError::MySql(sqlx::query(insert).execute(&locked_pool).await.unwrap_err());
     assert!(refusal.user_message().contains("READ ONLY"), "{}", refusal.user_message());
 
@@ -255,6 +279,9 @@ async fn session_setup_turns_backslash_escapes_back_on_and_keeps_the_rest_of_the
 #[tokio::test]
 async fn a_new_user_without_tls_is_told_to_use_tls() {
     let Some(mut config) = test_config() else { return eprintln!("{SKIP}") };
+    if mariadb(&mut connect(&config, "").await).await {
+        return eprintln!("skipping: MariaDB has no caching_sha2_password, so a plain login has no such refusal");
+    }
     let (user, secret) = ("ozendb_it_plain", "pa ss");
     config.username = Some(String::from(user));
     config.tls = false;
