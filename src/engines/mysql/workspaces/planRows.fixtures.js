@@ -628,7 +628,7 @@ export const treeBrokenLines = [
 ].join('\n')
 
 // Real plans from MariaDB 11.4, trimmed of what planRows doesn't read: ANALYZE FORMAT=JSON
-// for the first two, which ran the statement, and EXPLAIN FORMAT=JSON for the others.
+// for the first three, which ran the statement, and EXPLAIN FORMAT=JSON for the others.
 
 // ANALYZE of the join with an IN subquery, a GROUP BY and an ORDER BY.
 export const mariaSelect = {
