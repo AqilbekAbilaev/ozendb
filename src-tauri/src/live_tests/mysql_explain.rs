@@ -1,4 +1,4 @@
-//! Live tests of MySQL's Explain, against the server `mysql.rs` describes.
+//! Live tests of MySQL's and MariaDB's Explain, against the server `mysql.rs` describes.
 
 use std::time::Duration;
 
@@ -6,6 +6,7 @@ use super::mysql::{connect, password, run, test_config, SKIP};
 use super::mysql_browse::{pool, quoted};
 use crate::commands::{cancel_mysql_run, explain_mysql_sql};
 use crate::error::AppError;
+use crate::mysql::session::{flavor, Flavor};
 use crate::mysql::uri::build_options;
 use crate::storage::ConnectionConfig;
 use serde_json::Value;
@@ -38,9 +39,13 @@ async fn pets(config: &ConnectionConfig, database: &str) -> i64 {
     sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) FROM {database}.pets"))).fetch_one(&mut connect(config, "").await).await.unwrap()
 }
 
-/// Whether the plan carries what running the statement found, in any of MySQL's formats.
+async fn mariadb(config: &ConnectionConfig) -> bool {
+    flavor(&mut connect(config, "").await).await.unwrap() == Flavor::MariaDb
+}
+
+/// Whether the plan carries what running the statement found, in any of the formats.
 fn ran(plan: &Value) -> bool {
-    plan.to_string().contains("actual")
+    plan.to_string().contains("actual") || plan.to_string().contains("r_loops")
 }
 
 /// The rows the plan's first step really returned: in the JSON, or the tree's first line.
@@ -70,6 +75,12 @@ async fn a_select_is_explained_with_the_rows_and_times_it_really_took() {
          WHERE o.id IN (SELECT owner_id FROM {database}.pets WHERE kind = 'cat') GROUP BY o.name ORDER BY 2 DESC;"
     );
     let plan = explain_mysql_sql(&pool, &sql, false, None, LIMIT).await.unwrap();
+    if mariadb(&config).await {
+        assert!(plan.to_string().contains("r_loops"), "{plan}");
+        assert!(plan.to_string().contains("\"key\":\"by_owner\""), "{plan}");
+        assert!(plan["query_block"]["filesort"].is_object(), "{plan}");
+        return drop_database(&config, &database).await;
+    }
     assert!(ran(&plan), "{plan}");
     assert_eq!(rows_found(&plan), 2.0, "{plan}");
     let steps = operations(&plan);
@@ -85,6 +96,10 @@ async fn a_union_is_explained_as_its_two_halves() {
     let pool = pool(&config).await;
     let sql = format!("SELECT name FROM {database}.owners UNION SELECT kind FROM {database}.pets");
     let plan = explain_mysql_sql(&pool, &sql, false, None, LIMIT).await.unwrap();
+    if mariadb(&config).await {
+        assert_eq!(plan["query_block"]["union_result"]["query_specifications"].as_array().map(Vec::len), Some(2), "{plan}");
+        return drop_database(&config, &database).await;
+    }
     let steps = operations(&plan);
     assert!(steps.iter().any(|s| s.contains("union")), "{steps:?}");
     assert_eq!(steps.iter().filter(|s| s.starts_with("Table scan")).count(), 3, "{steps:?}");
@@ -98,11 +113,18 @@ async fn a_write_is_explained_without_running() {
     let pool = pool(&config).await;
     let joined = format!("UPDATE {database}.pets p JOIN {database}.owners o ON o.id = p.owner_id SET p.kind = 'owl' WHERE o.name = 'Åsa'");
     let plan = explain_mysql_sql(&pool, &joined, false, None, LIMIT).await.unwrap();
-    assert!(plan.to_string().to_lowercase().contains("update") && !ran(&plan), "{plan}");
-    // MySQL 8.3 and later can't show a single-table DELETE as steps; the classic format can.
+    let marked = mariadb(&config).await || plan.to_string().to_lowercase().contains("update");
+    assert!(marked && !ran(&plan), "{plan}");
+    // MySQL 8.3 and later can't show a single-table DELETE as steps; the classic format and MariaDB's can.
     let single = explain_mysql_sql(&pool, &format!("DELETE FROM {database}.pets WHERE owner_id = 1"), false, None, LIMIT).await;
-    assert!(single.as_ref().map_or_else(|e| e.to_string().contains("as steps"), |plan| plan["query_block"]["table"]["delete"] == true), "{single:?}");
-    let with = format!("WITH x AS (SELECT 1 AS n) DELETE FROM {database}.pets WHERE id IN (SELECT n FROM x)");
+    let marker = if mariadb(&config).await { Value::from(1) } else { Value::from(true) };
+    assert!(single.as_ref().map_or_else(|e| e.to_string().contains("as steps"), |plan| plan["query_block"]["table"]["delete"] == marker), "{single:?}");
+    // MariaDB has no WITH before DELETE, only inside it.
+    let with = if mariadb(&config).await {
+        format!("DELETE FROM {database}.pets WHERE id IN (WITH x AS (SELECT 1 AS n) SELECT n FROM x)")
+    } else {
+        format!("WITH x AS (SELECT 1 AS n) DELETE FROM {database}.pets WHERE id IN (SELECT n FROM x)")
+    };
     let plan = explain_mysql_sql(&pool, &with, false, None, LIMIT).await.unwrap();
     assert!(!ran(&plan), "{plan}");
     assert_eq!(pets(&config, &database).await, 4);
