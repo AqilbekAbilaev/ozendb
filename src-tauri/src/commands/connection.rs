@@ -67,7 +67,7 @@ pub async fn test_connection(
         EngineConfig::Mongo(mongo) => {
             test_mongo_connection(&config, mongo, password.as_deref(), via).await
         }
-        EngineConfig::MySql(mysql) => {
+        EngineConfig::MySql(mysql) | EngineConfig::MariaDb(mysql) => {
             test_mysql_connection(&config, mysql, password.as_deref(), via).await
         }
     };
@@ -178,7 +178,7 @@ pub async fn save_connection(
     let warm = match &config.engine {
         EngineConfig::Postgres(_) => ctx.pool.connect_postgres(&config, None).await.map(|_| ()),
         EngineConfig::Mongo(_) => ctx.pool.connect(&config).await.map(|_| ()),
-        EngineConfig::MySql(_) => ctx.pool.connect_mysql(&config, None).await.map(|_| ()),
+        EngineConfig::MySql(_) | EngineConfig::MariaDb(_) => ctx.pool.connect_mysql(&config, None).await.map(|_| ()),
     };
     warm?;
 
@@ -202,7 +202,7 @@ pub fn connection_uri(ctx: State<'_, AppContext>, id: String) -> Result<String, 
     Ok(match &config.engine {
         EngineConfig::Mongo(mongo) => crate::uri::build_uri(&config, mongo, None),
         EngineConfig::Postgres(postgres) => crate::postgres::uri::connection_string(&config, postgres),
-        EngineConfig::MySql(mysql) => crate::mysql::uri::connection_string(&config, mysql),
+        EngineConfig::MySql(mysql) | EngineConfig::MariaDb(mysql) => crate::mysql::uri::connection_string(&config, mysql),
     })
 }
 

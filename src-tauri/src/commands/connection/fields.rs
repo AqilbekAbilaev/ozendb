@@ -42,6 +42,8 @@ pub enum EngineFields {
     Postgres(PostgresFields),
     #[serde(rename = "mysql")]
     MySql(MySqlFields),
+    #[serde(rename = "mariadb")]
+    MariaDb(MySqlFields),
 }
 
 #[derive(serde::Deserialize)]
@@ -98,6 +100,9 @@ impl ConnectionFields {
             }
             (EngineFields::MySql(mysql), None | Some(EngineConfig::MySql(_))) => {
                 EngineConfig::MySql(MySqlConfig { database: mysql.database })
+            }
+            (EngineFields::MariaDb(mariadb), None | Some(EngineConfig::MariaDb(_))) => {
+                EngineConfig::MariaDb(MySqlConfig { database: mariadb.database })
             }
             _ => {
                 return Err(AppError::Validation(

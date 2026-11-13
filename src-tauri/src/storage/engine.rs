@@ -8,6 +8,7 @@ fn default_connection_type() -> String { String::from("standalone") }
 const MONGODB: &str = "mongodb";
 const POSTGRESQL: &str = "postgresql";
 const MYSQL: &str = "mysql";
+const MARIADB: &str = "mariadb";
 
 /// The driver-specific half of a connection: one variant per driver, each owning
 /// only the settings that driver actually reads.
@@ -27,6 +28,7 @@ pub enum EngineConfig {
     Mongo(MongoConfig),
     Postgres(PostgresConfig),
     MySql(MySqlConfig),
+    MariaDb(MySqlConfig),
 }
 
 /// MongoDB's own settings. `options` and `tls_cert_key_file` live here rather than
@@ -61,7 +63,7 @@ pub struct PostgresConfig {
     pub database: Option<String>,
 }
 
-/// MySQL's own settings.
+/// MySQL's own settings. A MariaDB connection carries the same ones.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct MySqlConfig {
     /// Only the database a session starts in: unlike PostgreSQL, one MySQL connection
@@ -113,6 +115,8 @@ impl<'de> Deserialize<'de> for EngineConfig {
             }
             MYSQL => serde_json::from_value(serde_json::Value::Object(map.clone()))
                 .map(EngineConfig::MySql),
+            MARIADB => serde_json::from_value(serde_json::Value::Object(map.clone()))
+                .map(EngineConfig::MariaDb),
             other => return Err(D::Error::custom(format!("unknown connection engine \"{other}\""))),
         };
         variant.map_err(D::Error::custom)
@@ -128,6 +132,7 @@ impl Serialize for EngineConfig {
             EngineConfig::Mongo(config) => (MONGODB, serde_json::to_value(config)),
             EngineConfig::Postgres(config) => (POSTGRESQL, serde_json::to_value(config)),
             EngineConfig::MySql(config) => (MYSQL, serde_json::to_value(config)),
+            EngineConfig::MariaDb(config) => (MARIADB, serde_json::to_value(config)),
         };
         let mut map = match value.map_err(S::Error::custom)? {
             serde_json::Value::Object(map) => map,
@@ -147,6 +152,7 @@ pub enum Engine {
     Mongo,
     Postgres,
     MySql,
+    MariaDb,
 }
 
 impl EngineConfig {
@@ -156,6 +162,7 @@ impl EngineConfig {
             EngineConfig::Mongo(_) => Engine::Mongo,
             EngineConfig::Postgres(_) => Engine::Postgres,
             EngineConfig::MySql(_) => Engine::MySql,
+            EngineConfig::MariaDb(_) => Engine::MariaDb,
         }
     }
 
@@ -178,10 +185,11 @@ impl EngineConfig {
         }
     }
 
-    /// The MySQL settings, or `None` on any other connection.
+    /// The MySQL settings, or `None` on any other connection. MariaDB connections
+    /// share MySQL's settings, so they answer here too.
     pub fn as_mysql(&self) -> Option<&MySqlConfig> {
         match self {
-            EngineConfig::MySql(config) => Some(config),
+            EngineConfig::MySql(config) | EngineConfig::MariaDb(config) => Some(config),
             _ => None,
         }
     }
