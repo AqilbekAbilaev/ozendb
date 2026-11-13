@@ -6,11 +6,15 @@ vi.mock('./postgresql/tabs', () => ({ openPostgresQuery: vi.fn(), openPostgresTa
 const { contextAction, connectionMenu, useEngineActions, runEngineTool, runEngineMenuAction, levelledMenuTarget } = await import('./contextActions.js')
 const { setTreeSelection } = await import('../stores/connectionNavigation')
 const { PG_ACTIONS, PG_MENUS } = await import('./postgresql/tree/contextMenus.js')
-const { MYSQL_MENUS } = await import('./mysql/tree/contextMenus.js')
+const { MYSQL_ACTIONS, MYSQL_MENUS } = await import('./mysql/tree/contextMenus.js')
 
 describe('contextAction', () => {
   it('finds an engine\'s own handler for a node of that engine', () => {
     expect(contextAction({ engine: 'postgresql' }, 'pg:server_info')).toBe(PG_ACTIONS['pg:server_info'])
+  })
+
+  it('gives a MariaDB node MySQL\'s handlers', () => {
+    expect(contextAction({ engine: 'mariadb' }, 'mysql:open_table')).toBe(MYSQL_ACTIONS['mysql:open_table'])
   })
 
   it('leaves everything else to the shared dispatcher', () => {
@@ -38,6 +42,14 @@ describe('connectionMenu', () => {
     })
     expect(menu.items).toBe(MYSQL_MENUS.connection)
     expect(connectionMenu({ id: 'c 1', name: 'Sales · MySQL', engine: 'mysql', database: 'продажи' }).node.database).toBe('продажи')
+  })
+
+  it('gives a MariaDB connection MySQL\'s menu, as a MariaDB node', () => {
+    const menu = connectionMenu({ id: 'c 1', name: 'Sales · MariaDB', engine: 'mariadb', database: 'продажи' })
+    expect(menu.node).toEqual({
+      connId: 'c 1', connName: 'Sales · MariaDB', engine: 'mariadb', database: 'продажи', resource: { connectionId: 'c 1', segments: [] },
+    })
+    expect(menu.items).toBe(MYSQL_MENUS.connection)
   })
 
   it('has none for MongoDB, which uses the shared connection menu', () => {

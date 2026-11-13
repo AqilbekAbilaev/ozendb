@@ -17,7 +17,7 @@ const { createSqlRun } = await import('../../sql/workspaces/runSql.js')
 const { useSqlTable } = await import('../../sql/workspaces/useSqlTable.js')
 const { createResourceRef } = await import('../../../utils/resourceRef')
 
-const def = mysqlDefinitions[0]
+const def = mysqlDefinitions('mysql')[0]
 const resource = createResourceRef('c1', [{ kind: 'database', name: 'shop `2024` ü' }, { kind: 'table', name: 'order items' }])
 const opened = () => def.create({ target: { resource, connectionName: 'local' } })
 const COLUMNS = [
@@ -122,7 +122,7 @@ describe('mysql.table_browse', () => {
 })
 
 describe('mysql.query', () => {
-  const query = mysqlDefinitions.find(d => d.type === 'mysql.query')
+  const query = mysqlDefinitions('mysql').find(d => d.type === 'mysql.query')
   const created = (target) => query.create({ target: { resource: target, connectionName: 'local' } })
 
   it('opens in the database of the row it was opened on, its session starting there', () => {
@@ -158,5 +158,18 @@ describe('mysql.query', () => {
     expect(restored.title).toBe('SQL: local')
     expect(restored.target.segments).toEqual([])
     expect(restored.fields.runtime.run).toEqual(createSqlRun('mysql', 'c1', null))
+  })
+})
+
+describe('MariaDB definitions', () => {
+  const [table, query] = mysqlDefinitions('mariadb')
+  it('registers a table tab and a query tab under MariaDB\'s own engine', () => {
+    expect([table.type, table.engine, query.type, query.engine]).toEqual(['mariadb.table_browse', 'mariadb', 'mariadb.query', 'mariadb'])
+  })
+  it('runs a query tab\'s SQL as MariaDB', () => {
+    expect(query.create({ target: { resource, connectionName: 'local' } }).fields.runtime.run.engine).toBe('mariadb')
+  })
+  it('keeps MySQL\'s query tab on MySQL', () => {
+    expect(mysqlDefinitions('mysql')[1].create({ target: { resource, connectionName: 'local' } }).fields.runtime.run.engine).toBe('mysql')
   })
 })

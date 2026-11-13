@@ -9,14 +9,16 @@ const SSL_MODES = {
   required: [true, true], verify_ca: [true, false], verify_identity: [true, false],
 }
 
+// Everything but the schemes, which MariaDB's editor widens.
+export const mysqlUriOptions = {
+  modeParams: ['ssl-mode', 'sslMode', 'sslmode'],
+  caParams: ['ssl-ca', 'sslca', 'ssl_ca'],
+  modes: SSL_MODES,
+  // MySQL's own clients spell the modes in capitals but read them in any case.
+  modeKey: (mode) => mode.toLowerCase(),
+  defaultPort: mysql.defaultPort,
+}
+
 export function parseMySqlUri(raw) {
-  return parseSqlUri(raw, {
-    schemes: ['mysql'],
-    modeParams: ['ssl-mode', 'sslMode', 'sslmode'],
-    caParams: ['ssl-ca', 'sslca', 'ssl_ca'],
-    modes: SSL_MODES,
-    // MySQL's own clients spell the modes in capitals but read them in any case.
-    modeKey: (mode) => mode.toLowerCase(),
-    defaultPort: mysql.defaultPort,
-  })
+  return parseSqlUri(raw, { ...mysqlUriOptions, schemes: ['mysql'] })
 }

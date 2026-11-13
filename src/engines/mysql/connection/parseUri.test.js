@@ -45,6 +45,10 @@ describe('parseMySqlUri', () => {
     expect(parseMySqlUri('postgresql://localhost')).toBe(null)
   })
 
+  it('refuses a mariadb:// string, which only MariaDB\'s editor reads', () => {
+    expect(parseMySqlUri('mariadb://localhost')).toBe(null)
+  })
+
   it('refuses PostgreSQL\'s spelling of an ssl-mode', () => {
     expect(parseMySqlUri('mysql://h/db?ssl-mode=require')).toBe(null)
   })

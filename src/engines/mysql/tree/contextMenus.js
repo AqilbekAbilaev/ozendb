@@ -43,8 +43,8 @@ export const MYSQL_MENUS = {
 const tableTarget = (n) => ({ connId: n.connId, engine: n.engine, schema: segmentName(n.resource, 'database'), table: resourceName(n.resource) })
 
 export const MYSQL_ACTIONS = {
-  'mysql:open_table': (n) => openMySqlTable({ resource: n.resource, connectionName: n.connName }),
-  'mysql:new_sql': (n) => openMySqlQuery({ resource: n.resource, connectionName: n.connName }),
+  'mysql:open_table': (n) => openMySqlTable({ engine: n.engine, resource: n.resource, connectionName: n.connName }),
+  'mysql:new_sql': (n) => openMySqlQuery({ engine: n.engine, resource: n.resource, connectionName: n.connName }),
   'mysql:definition': (n) => openModal('mysqlDefinition', n),
   'mysql:export_table': (n) => openModal('sqlExport', tableTarget(n)),
   'mysql:import_csv': (n) => openModal('sqlImport', tableTarget(n)),

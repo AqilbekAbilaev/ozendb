@@ -444,7 +444,7 @@ describe('the colour shown on tabs', () => {
 describe('each engine\'s own fields', () => {
   it('are made for every engine', () => {
     const f = useConnectionForm(null)
-    expect(Object.keys(f.engineFields).sort()).toEqual(['mongodb', 'mysql', 'postgresql'])
+    expect(Object.keys(f.engineFields).sort()).toEqual(['mariadb', 'mongodb', 'mysql', 'postgresql'])
   })
 
   it('are made only for the edited connection\'s own engine, which cannot change', () => {

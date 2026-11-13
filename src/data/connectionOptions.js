@@ -98,6 +98,7 @@ export const ENGINE_OPTIONS = [
   { value: 'mongodb', label: 'MongoDB', badge: 'MDB' },
   { value: 'postgresql', label: 'PostgreSQL', badge: 'PG' },
   { value: 'mysql', label: 'MySQL', badge: 'MY' },
+  { value: 'mariadb', label: 'MariaDB', badge: 'MA' },
 ]
 
 // An engine's name as people write it; an unknown one keeps its own, so a label never breaks a screen.

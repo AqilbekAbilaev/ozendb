@@ -9,6 +9,7 @@ import SqlAuthFields from './sql/connection/SqlAuthFields.vue'
 import SqlSslFields from './sql/connection/SqlSslFields.vue'
 import { parsePostgresUri } from './postgresql/connection/parseUri.js'
 import { parseMySqlUri } from './mysql/connection/parseUri.js'
+import { parseMariaDbUri } from './mariadb/connection/parseUri.js'
 import { parseConnectionUri } from './mongodb/connection/parseUri.js'
 import { KNOWN_OPTION_KEYS } from '../data/connectionOptions.js'
 import MongoTreeNodes from './mongodb/tree/MongoTreeNodes.vue'
@@ -68,6 +69,18 @@ export const CONNECTION_EDITORS = Object.freeze({
     uriRefusal: 'That doesn’t look like a MySQL connection string this editor can hold (expected mysql:// with one host).',
     sshHint: '',
   },
+  mariadb: {
+    tabs: [SERVER, AUTH, SSH, SSL, GENERAL],
+    sections: {
+      server: SqlServerFields,
+      auth: SqlAuthFields,
+      ssl: SqlSslFields,
+    },
+    parseUri: parseMariaDbUri,
+    uriExample: 'mariadb://user:password@host:3306/database?ssl-mode=REQUIRED',
+    uriRefusal: 'That doesn’t look like a MariaDB connection string this editor can hold (expected mariadb:// or mysql:// with one host).',
+    sshHint: '',
+  },
 })
 
 // An engine's rows under an expanded connection in the sidebar. ConnectionTree.vue draws
@@ -76,6 +89,7 @@ export const TREE_NODES = Object.freeze({
   mongodb: MongoTreeNodes,
   postgresql: PostgresTreeNodes,
   mysql: MySqlTreeNodes,
+  mariadb: MySqlTreeNodes,
 })
 
 // Dialogs an engine keeps mounted app-wide, each showing itself from its own store rather
