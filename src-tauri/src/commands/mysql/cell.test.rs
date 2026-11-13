@@ -1,7 +1,7 @@
 //! The bytes MySQL's binary protocol sends for a date or a BIT, read by hand, and the
 //! rules each type's text follows. Every other type is decoded by sqlx, whose values
 //! can't be built outside it, so those cases are in the live tests (live_tests/mysql_browse.rs).
-use super::{bits, boolean, date, date_time, digits, fraction, hex, timestamp};
+use super::{bits, boolean, date, date_time, digits, fraction, hex, json_text, timestamp};
 use chrono::FixedOffset;
 use serde_json::json;
 
@@ -77,4 +77,19 @@ fn shows_a_tinyint_1_as_a_boolean_only_when_it_holds_0_or_1() {
 fn shows_bytes_as_upper_case_hex() {
     assert_eq!(hex(&[0x00, 0xFF]), json!("0x00FF"));
     assert_eq!(hex(&[]), json!("0x"));
+}
+
+#[test]
+fn reads_text_in_a_json_declared_column_as_json() {
+    assert_eq!(json_text("{\"a\": [1, \"b\"]}", Some("json")), json!({"a": [1, "b"]}));
+}
+
+#[test]
+fn reads_text_that_is_not_json_in_a_json_declared_column_as_the_text() {
+    assert_eq!(json_text("not {json", Some("json")), json!("not {json"));
+}
+
+#[test]
+fn reads_text_in_a_longtext_column_as_the_text() {
+    assert_eq!(json_text("[1]", Some("longtext")), json!("[1]"));
 }

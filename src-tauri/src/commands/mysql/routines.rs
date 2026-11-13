@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{MySqlPool, Row};
 use tauri::State;
 
+use super::schema::unwidth;
 use super::{quote_name, AppContext};
 
 #[derive(Serialize)]
@@ -71,7 +72,7 @@ pub(crate) async fn mysql_stored_programs(pool: &MySqlPool, database: &str) -> R
     .fetch_all(pool);
     let (routines, triggers, events) = tokio::try_join!(routines, triggers, events).map_err(AppError::MySql)?;
     Ok(MySqlStoredPrograms {
-        routines: routines.into_iter().map(|(name, kind, returns)| MySqlRoutine { name, kind, returns }).collect(),
+        routines: routines.into_iter().map(|(name, kind, returns)| MySqlRoutine { name, kind, returns: returns.map(|declared| unwidth(&declared)) }).collect(),
         triggers: triggers.into_iter().map(|(name, table, timing, event)| MySqlTrigger { name, table, timing, event }).collect(),
         events: events.into_iter().map(|(name, schedule, status)| MySqlEvent { name, schedule, status }).collect(),
     })
