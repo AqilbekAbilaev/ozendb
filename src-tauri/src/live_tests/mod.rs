@@ -1,8 +1,9 @@
 //! Tests against a live server. Each file returns early unless its server's variable is
 //! set (`OZENDB_TEST_MONGODB` for `mongodb.rs`, `OZENDB_TEST_POSTGRES` for the `pg*` files,
 //! which share `pg.rs`'s helpers, `OZENDB_TEST_MYSQL` for the `mysql*` files, which also run
-//! against MariaDB: see `mysql.rs`), so a plain `cargo test` stays green without one. None of
-//! them runs in CI.
+//! against MariaDB: see `mysql.rs`, and for `mariadb.rs`, which runs only there), so a plain
+//! `cargo test` stays green without one. None of them runs in CI.
+mod mariadb;
 mod mongodb;
 mod mysql;
 mod mysql_activity;
