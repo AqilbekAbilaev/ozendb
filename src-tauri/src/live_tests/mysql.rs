@@ -238,7 +238,8 @@ async fn session_setup_turns_backslash_escapes_back_on_and_keeps_the_rest_of_the
     let Some(config) = test_config() else { return eprintln!("{SKIP}") };
     let mut connection = connect(&config, "").await;
     run(&mut connection, "SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES,ANSI_QUOTES')").await;
-    run(&mut connection, &crate::mysql::session::setup_statement(false)).await;
+    let flavor = crate::mysql::session::flavor(&mut connection).await.unwrap();
+    run(&mut connection, &crate::mysql::session::setup_statement(flavor, false)).await;
     let mode: String = sqlx::query_scalar("SELECT @@SESSION.sql_mode").fetch_one(&mut connection).await.unwrap();
     assert!(!mode.contains("NO_BACKSLASH_ESCAPES"), "{mode}");
     assert!(mode.contains("ANSI_QUOTES"), "{mode}");

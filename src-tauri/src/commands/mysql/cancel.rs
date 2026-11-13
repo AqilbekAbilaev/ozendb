@@ -17,7 +17,10 @@ use super::AppContext;
 use crate::error::{mysql_number, AppError};
 
 /// MySQL's `max_execution_time` stopping a SELECT.
-const TIME_LIMIT_EXCEEDED: u16 = 3024;
+const MYSQL_TIME_LIMIT_EXCEEDED: u16 = 3024;
+
+/// MariaDB's `max_statement_time` stopping a statement.
+const MARIADB_TIME_LIMIT_EXCEEDED: u16 = 1969;
 
 #[derive(Clone, Copy)]
 enum Stop {
@@ -121,7 +124,7 @@ impl Run {
         };
         self.running.stopped()?;
         match outcome {
-            Err(AppError::MySql(e)) if mysql_number(&e) == Some(TIME_LIMIT_EXCEEDED) => Err(AppError::TimedOut),
+            Err(AppError::MySql(e)) if matches!(mysql_number(&e), Some(MYSQL_TIME_LIMIT_EXCEEDED | MARIADB_TIME_LIMIT_EXCEEDED)) => Err(AppError::TimedOut),
             outcome => outcome,
         }
     }

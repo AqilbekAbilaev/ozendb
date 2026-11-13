@@ -15,7 +15,7 @@ use super::cancel::Run;
 use super::script::statements;
 use super::AppContext;
 use crate::error::AppError;
-use crate::mysql::session::QUERY_TIME_LIMIT;
+use crate::mysql::session::{Flavor, QUERY_TIME_LIMIT};
 
 /// The whole plan MySQL gives a statement its iterators don't run, a single-table UPDATE
 /// or DELETE among them.
@@ -60,6 +60,9 @@ impl Explain {
     /// For a statement that `reads` only, or not, on a server reporting `version`
     /// (`SELECT VERSION()`).
     fn of(version: &str, reads: bool) -> Explain {
+        if Flavor::of(version) == Flavor::MariaDb {
+            return Explain::Classic;
+        }
         let mut parts = version.split(['.', '-']).map(|part| part.parse::<u32>().unwrap_or(0));
         let version = (parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0));
         if version >= (8, 3, 0) {
