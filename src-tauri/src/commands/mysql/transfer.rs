@@ -28,6 +28,7 @@ use crate::commands::sql::transfer::{
     check_mapping, preview, write_all, DataRows, ExportResult, ExportSource, ImportColumn, ImportPreview, JsonArray, SourceKind,
 };
 use crate::error::AppError;
+use crate::mysql::session::{flavor, unlimited};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Format {
@@ -137,7 +138,8 @@ pub(crate) async fn mysql_export(pool: &MySqlPool, source: &ExportSource, format
     };
     let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
     conn.close_on_drop();
-    sqlx::raw_sql("SET SESSION max_execution_time = 0; START TRANSACTION READ ONLY").execute(&mut *conn).await.map_err(AppError::MySql)?;
+    let lift = unlimited(flavor(&mut conn).await.map_err(AppError::MySql)?);
+    sqlx::raw_sql(sqlx::AssertSqlSafe(format!("{lift}; START TRANSACTION READ ONLY"))).execute(&mut *conn).await.map_err(AppError::MySql)?;
     let file = std::fs::File::create(path).map_err(AppError::Io)?;
     let mut out = std::io::BufWriter::new(file);
     let result = write_rows(&mut conn, &sql, &declared, format, &mut out).await;

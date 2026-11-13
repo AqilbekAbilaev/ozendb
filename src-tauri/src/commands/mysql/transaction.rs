@@ -43,7 +43,7 @@ impl MySqlTransactions {
     pub async fn begin(&self, pool: &MySqlPool, tx_id: &str, read_only: bool) -> Result<(), AppError> {
         let mut conn = pool.acquire().await.map_err(AppError::MySql)?;
         conn.close_on_drop();
-        execute(&mut conn, if read_only { "SET autocommit = 0, SESSION transaction_read_only = ON" } else { "SET autocommit = 0" }).await?;
+        execute(&mut conn, if read_only { "SET autocommit = 0; SET SESSION TRANSACTION READ ONLY" } else { "SET autocommit = 0" }).await?;
         self.open.lock().unwrap().insert(tx_id.to_string(), Arc::new(tokio::sync::Mutex::new(conn)));
         Ok(())
     }

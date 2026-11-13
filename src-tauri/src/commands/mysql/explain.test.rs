@@ -103,3 +103,13 @@ fn a_tree_is_kept_as_the_text_it_is() {
     let tree = "-> Table scan on `ä b`  (cost=0.65 rows=4) (actual time=0.01..0.02 rows=4 loops=1)";
     assert_eq!(Explain::Tree.read(String::from(tree)).unwrap(), serde_json::Value::from(tree));
 }
+
+#[test]
+fn a_mariadb_server_explains_a_read_the_classic_way() {
+    assert_eq!(Explain::of("11.4.13-MariaDB-ubu2404", true), Explain::Classic);
+}
+
+#[test]
+fn a_mariadb_server_explains_a_write_the_classic_way() {
+    assert_eq!(Explain::of("10.11.9-MariaDB-ubu2204", false), Explain::Classic);
+}
