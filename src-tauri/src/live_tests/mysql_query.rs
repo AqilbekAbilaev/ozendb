@@ -3,7 +3,7 @@
 
 use std::time::{Duration, Instant};
 
-use super::mysql::{connect, password, run, shown_at, test_config, SKIP};
+use super::mysql::{connect, mariadb, password, run, shown_at, test_config, SKIP};
 use super::mysql_browse::{pool, quoted};
 use crate::commands::{cancel_mysql_run, run_mysql_sql, MySqlTransactions};
 use crate::error::AppError;
@@ -293,7 +293,8 @@ async fn a_read_only_connection_stays_locked_after_a_function_lifts_its_lock() {
     let database = database(&config, "ozendb it relock").await;
     let mut admin = connect(&config, "").await;
     run(&mut admin, &format!("INSERT INTO {database}.t VALUES (1, 'a')")).await;
-    run(&mut admin, &format!("CREATE FUNCTION {database}.`lift ü`() RETURNS INT DETERMINISTIC NO SQL BEGIN SET SESSION transaction_read_only = OFF; RETURN 1; END")).await;
+    let lock = if mariadb(&mut admin).await { "tx_read_only" } else { "transaction_read_only" };
+    run(&mut admin, &format!("CREATE FUNCTION {database}.`lift ü`() RETURNS INT DETERMINISTIC NO SQL BEGIN SET SESSION {lock} = OFF; RETURN 1; END")).await;
     let pool = read_only_pool(&config).await;
     let err = run_mysql_sql(&pool, &format!("SELECT {database}.`lift ü`(); DELETE FROM {database}.t"), true, None, LIMIT).await.unwrap_err();
     assert!(err.user_message().contains("read-only") || err.user_message().contains("READ ONLY"), "{}", err.user_message());
@@ -309,8 +310,9 @@ async fn a_read_only_connection_refuses_to_call_a_procedure_even_one_that_says_i
     let database = database(&config, "ozendb it read only call ü").await;
     let mut admin = connect(&config, "").await;
     run(&mut admin, &format!("INSERT INTO {database}.t VALUES (1, 'a')")).await;
+    let lock = if mariadb(&mut admin).await { "tx_read_only" } else { "transaction_read_only" };
     run(&mut admin, &format!(
-        "CREATE PROCEDURE {database}.`only reads ü`() READS SQL DATA BEGIN SET SESSION transaction_read_only = OFF; DELETE FROM {database}.t; END"
+        "CREATE PROCEDURE {database}.`only reads ü`() READS SQL DATA BEGIN SET SESSION {lock} = OFF; DELETE FROM {database}.t; END"
     )).await;
     let err = run_mysql_sql(&read_only_pool(&config).await, &format!("CALL {database}.`only reads ü`()"), true, None, LIMIT).await.unwrap_err();
     assert_eq!((err.code(), err.user_message().contains("can't call a stored procedure")), ("validation", true), "{}", err.user_message());
