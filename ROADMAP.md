@@ -1,7 +1,7 @@
 # OzenDB Roadmap
 
-A high-level view of what's done and what's next. OzenDB targets MongoDB, with PostgreSQL in
-preview and more databases as a longer-term goal.
+A high-level view of what's done and what's next. OzenDB supports MongoDB, PostgreSQL, MySQL
+and MariaDB, with more databases as a longer-term goal.
 
 ## Done ✅
 
@@ -34,11 +34,18 @@ preview and more databases as a longer-term goal.
    save / open of `.js` scripts.
 - **Personalization** — light / dark theme toggle; customizable keyboard shortcuts (rebind the
    menu-action combos, applied live in-app and on the native menu bar).
-- **PostgreSQL (preview)** — connections with SSL and SSH tunnels; a database → schema → table
+- **PostgreSQL** — connections with SSL and SSH tunnels; a database → schema → table
    tree; table tabs with filtering, sorting and staged row edits reviewed as SQL before they run;
    a SQL editor with Explain, formatting, cancel, transactions and a saved-query library; Search
    in Schema; server info, activity, roles and grants, routines; create / drop schemas; create /
    rename / drop tables; CSV import and CSV / JSON export; per-row edit history.
+- **MySQL** — connections with SSL/TLS, SSH tunnels and read-only mode; a tree of databases,
+   tables, views, columns, routines, triggers and events; table tabs with filtering, sorting,
+   foreign-key joins and row edits saved in one transaction; a SQL editor with Explain (including
+   EXPLAIN ANALYZE), formatting, cancel, time limits and transactions; accounts and grants,
+   processes, server variables and status; CSV import and export; per-row edit history.
+- **MariaDB** — its own engine on MySQL's screens, tested against MariaDB 10.11 and 11.4, with
+   sequences, MariaDB's column types and JSON columns, its ANALYZE plans and its accounts.
 
 ## Planned 📋
 
@@ -50,4 +57,4 @@ preview and more databases as a longer-term goal.
    with token caching and trusted-endpoint config, for Atlas / enterprise single sign-on.
    Workload-identity OIDC (`MONGODB-OIDC` with `ENVIRONMENT` / `TOKEN_RESOURCE`) already ships;
    this adds the human login path 3T markets. Premium/corporate tier.
-- Support for databases beyond MongoDB and PostgreSQL (longer term), and PostgreSQL out of preview
+- Support for databases beyond MongoDB, PostgreSQL, MySQL and MariaDB (longer term)
