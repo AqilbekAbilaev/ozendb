@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.4.0
+
+- **MariaDB** — MariaDB has its own place in the connection picker, with its
+  own badge and connection editor, and uses the same screens as MySQL:
+  tables, row editing, the SQL tab, export, import and administration. It
+  works with MariaDB 10.11 and 11.4. A MySQL connection that points at a
+  MariaDB server keeps working as it is.
+- **MariaDB sequences** — sequences appear in their own folder in the
+  sidebar. Open one to see its current state, or show its definition.
+- **MariaDB values** — column types, defaults and JSON columns read the same
+  way as MySQL's, in the sidebar, the grid and exports.
+- **MariaDB Explain** — a query's plan shows the rows and time MariaDB really
+  measured, using its ANALYZE. A write statement only shows its plan and is
+  never run.
+- **MariaDB accounts** — the Users screen lists MariaDB's accounts without
+  its roles, shows which ones are locked, and never shows password hashes in
+  an account's grants.
+- **Clearer error** — when a connection checks the server's certificate and
+  goes through an SSH tunnel, the error now explains why the check fails and
+  how to connect for now.
+- **Security** — dependencies updated past two security advisories.
+
 ## v0.3.0
 
 - **MySQL** — connect to MySQL servers, with SSL/TLS, an SSH tunnel and
